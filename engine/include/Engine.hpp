@@ -1,36 +1,34 @@
 #pragma once
 
-#include <string>
+#include "juggler.pb.h"
+#include "../src/modules/ModuleBase.hpp"
 #include <memory>
+#include <string>
 #include <atomic>
 #include <zmq.hpp>
-#include "BallTracker.hpp"
-#include "juggler.pb.h"
-
-namespace juggler {
+#include <librealsense2/rs.hpp>
 
 class Engine {
-private:
-    std::unique_ptr<BallTracker> ball_tracker_;
-    zmq::context_t zmq_context_;
-    zmq::socket_t zmq_socket_;
-    std::atomic<bool> running_;
-    std::string zmq_endpoint_;
-
 public:
-    explicit Engine(const std::string& zmq_endpoint = "tcp://*:5555");
+    Engine(const std::string& config_file);
     ~Engine();
-    
-    bool initialize();
+
     void run();
     void stop();
-    
-    // Command handling
-    void handleCommand(const juggler::v1::EngineCommand& command);
-    void sendResponse(const juggler::v1::EngineResponse& response);
-    
-    // Ball tracker access
-    BallTracker* getBallTracker() { return ball_tracker_.get(); }
-};
 
-} // namespace juggler
+private:
+    void processCommands();
+
+    std::atomic<bool> running_;
+    std::unique_ptr<ModuleBase> active_module_;
+
+    // ZMQ
+    zmq::context_t zmq_context_;
+    zmq::socket_t zmq_publisher_;
+    zmq::socket_t zmq_commander_;
+
+    // RealSense
+    rs2::pipeline pipe_;
+    rs2::config rs_config_;
+    rs2::align align_to_color_;
+};

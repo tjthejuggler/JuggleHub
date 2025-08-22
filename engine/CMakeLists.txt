@@ -7,11 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find required packages
 find_package(PkgConfig REQUIRED)
+pkg_check_modules(ZMQ REQUIRED libzmq)
 pkg_check_modules(realsense2 REQUIRED realsense2)
 find_package(OpenCV REQUIRED)
 find_package(Protobuf REQUIRED)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(ZMQ REQUIRED libzmq)
 
 # Generate Protocol Buffer files
 set(PROTO_FILES "${CMAKE_SOURCE_DIR}/../api/v1/juggler.proto")
@@ -51,11 +50,16 @@ option(ENABLE_HAND_TRACKING "Enable MediaPipe hand tracking feature" OFF)
 add_executable(juggle_engine
     src/main.cpp
     src/BallTracker.cpp
+    src/Engine.cpp
+    src/networking/UdpSender.cpp
+    src/modules/UdpBallColorModule.cpp
 )
 
 # Include directories
 target_include_directories(juggle_engine PRIVATE
     include
+    src/modules
+    src/networking
     ${realsense2_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${Protobuf_INCLUDE_DIRS}

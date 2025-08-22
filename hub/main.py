@@ -16,9 +16,10 @@ from typing import Optional
 # Add the current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from components.zmq_listener import ZMQListener
+from components.zmq_client import ZMQClient
 from components.ui import JuggleHubUI
 from components.database_logger import DatabaseLogger
+import juggler_pb2
 
 class JuggleHub:
     """Main JuggleHub application class."""
@@ -28,7 +29,7 @@ class JuggleHub:
         self.running = False
         
         # Initialize components
-        self.zmq_listener: Optional[ZMQListener] = None
+        self.zmq_client: Optional[ZMQClient] = None
         self.ui: Optional[JuggleHubUI] = None
         self.database_logger: Optional[DatabaseLogger] = None
         
@@ -41,29 +42,11 @@ class JuggleHub:
         try:
             print("🚀 Initializing JuggleHub...")
             
-            # Initialize ZMQ listener
-            zmq_endpoint = self.config.get('zmq_endpoint', 'tcp://localhost:5555')
-            self.zmq_listener = ZMQListener(zmq_endpoint)
-            
-            # Initialize database logger if enabled
-            if self.config.get('enable_logging', True):
-                db_path = self.config.get('database_path', 'juggling_data.db')
-                self.database_logger = DatabaseLogger(db_path)
-                
-                # Connect logger to ZMQ listener
-                self.zmq_listener.add_frame_callback(self.database_logger.log_frame_data)
-            
-            # Initialize UI if enabled
-            if self.config.get('enable_ui', True):
-                self.ui = JuggleHubUI(self.config)
-                
-                # Connect UI to ZMQ listener
-                self.zmq_listener.add_frame_callback(self.ui.update_frame_data)
-            
-            # Initialize ZMQ listener (this starts the background thread)
-            if not self.zmq_listener.initialize():
-                print("❌ Failed to initialize ZMQ listener")
-                return False
+            # Initialize ZMQ client
+            self.zmq_client = ZMQClient()
+
+            # The rest of the initialization logic will be simplified for now.
+            # We'll add back the UI and database logger later.
             
             print("✅ JuggleHub initialized successfully")
             return True
@@ -81,15 +64,45 @@ class JuggleHub:
         print("🎯 JuggleHub is running...")
         
         try:
-            if self.ui:
-                # Run with UI (blocking)
-                self.ui.run()
-            else:
-                # Run headless
-                print("Running in headless mode. Press Ctrl+C to stop.")
-                while self.running:
-                    time.sleep(0.1)
-                    
+            print("Running in interactive mode. Type 'load', 'unload', or 'quit'.")
+            while self.running:
+                command = input("> ")
+                if command == "load":
+                    request = juggler_pb2.CommandRequest()
+                    request.type = juggler_pb2.CommandRequest.LOAD_MODULE
+                    request.module_name = "UdpBallColorModule"
+                    response = self.zmq_client.send_command(request)
+                    print(f"Response: {response.message}")
+                elif command == "unload":
+                    request = juggler_pb2.CommandRequest()
+                    request.type = juggler_pb2.CommandRequest.UNLOAD_MODULE
+                    request.module_name = "UdpBallColorModule"
+                    response = self.zmq_client.send_command(request)
+                    print(f"Response: {response.message}")
+                elif command.startswith("color"):
+                    parts = command.split()
+                    if len(parts) == 5:
+                        ball_id = parts[1]
+                        r = int(parts[2])
+                        g = int(parts[3])
+                        b = int(parts[4])
+                        
+                        color_command = juggler_pb2.ColorCommand()
+                        color_command.ball_id = ball_id
+                        color_command.color.r = r
+                        color_command.color.g = g
+                        color_command.color.b = b
+                        
+                        request = juggler_pb2.CommandRequest()
+                        request.type = juggler_pb2.CommandRequest.SEND_COLOR_COMMAND
+                        request.color_command.CopyFrom(color_command)
+                        
+                        response = self.zmq_client.send_command(request)
+                        print(f"Response: {response.message}")
+                    else:
+                        print("Invalid color command. Usage: color <ball_id> <r> <g> <b>")
+                elif command == "quit":
+                    self.running = False
         except KeyboardInterrupt:
             print("\n🛑 Received interrupt signal")
         except Exception as e:
@@ -109,8 +122,7 @@ class JuggleHub:
         if self.database_logger:
             self.database_logger.cleanup()
         
-        if self.zmq_listener:
-            self.zmq_listener.cleanup()
+        # No cleanup needed for the new ZMQClient
         
         print("✅ JuggleHub cleanup completed")
     

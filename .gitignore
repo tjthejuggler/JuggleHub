@@ -1,0 +1,62 @@
+# Build directories
+build/
+engine/build/
+hub/__pycache__/
+hub/*.pyc
+hub/**/__pycache__/
+hub/**/*.pyc
+
+# Generated Protocol Buffer files
+api/v1/*_pb2.py
+api/v1/*_pb2.h
+api/v1/*_pb2.cc
+api/v1/*.pb.h
+api/v1/*.pb.cc
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Data files
+data/
+recordings/
+*.bag
+*.mp4
+*.avi
+
+# Configuration files (keep templates)
+*.json
+!*_template.json
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Python virtual environment
+venv/
+env/
+.env
+
+# Temporary files
+tmp/
+temp/

@@ -1,0 +1,22 @@
+# Core dependencies
+protobuf>=4.21.0
+pyzmq>=24.0.0
+numpy>=1.21.0
+
+# UI (optional)
+PyQt6>=6.4.0
+
+# Development and testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Data analysis (optional)
+pandas>=1.5.0
+matplotlib>=3.6.0
+scipy>=1.9.0
+
+# Performance monitoring (optional)
+psutil>=5.9.0
+
+# Configuration
+pyyaml>=6.0

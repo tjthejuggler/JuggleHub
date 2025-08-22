@@ -1,0 +1,146 @@
+syntax = "proto3";
+package juggler.v1;
+
+// 3D vector for positions, velocities, accelerations
+message Vector3 {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+// 2D vector for pixel coordinates
+message Vector2 {
+  double x = 1;
+  double y = 2;
+}
+
+// Color information in BGR format
+message Color {
+  uint32 b = 1;  // Blue component (0-255)
+  uint32 g = 2;  // Green component (0-255)
+  uint32 r = 3;  // Red component (0-255)
+}
+
+// HSV color range for ball detection
+message HSVRange {
+  Vector3 min_hsv = 1;  // Minimum HSV values
+  Vector3 max_hsv = 2;  // Maximum HSV values
+}
+
+// Ball detection and tracking information
+message Ball {
+  string id = 1;                    // Unique ball identifier
+  string color_name = 2;            // Color name (pink, orange, green, yellow)
+  Vector3 position_3d = 3;          // 3D position in meters (camera coordinates)
+  Vector2 position_2d = 4;          // 2D pixel position in image
+  Vector3 velocity_3d = 5;          // 3D velocity in m/s
+  double radius_px = 6;             // Radius in pixels
+  double depth_m = 7;               // Depth in meters
+  Color color_bgr = 8;              // Detected color in BGR
+  double confidence = 9;            // Detection confidence (0.0-1.0)
+  bool is_held = 10;                // Whether ball is being held (hand tracking)
+  uint64 timestamp_us = 11;         // Timestamp in microseconds
+  HSVRange color_range = 12;        // HSV color range used for detection
+}
+
+// Hand position and tracking
+message Hand {
+  string side = 1;                  // "left" or "right"
+  Vector2 position_2d = 2;          // 2D pixel position
+  Vector3 position_3d = 3;          // 3D position if available
+  double confidence = 4;            // Detection confidence (0.0-1.0)
+  bool is_visible = 5;              // Whether hand is visible
+}
+
+// IMU data from smartwatches
+message IMUData {
+  string watch_name = 1;            // Watch identifier
+  string watch_ip = 2;              // Watch IP address
+  Vector3 acceleration = 3;         // Acceleration in m/s²
+  Vector3 gyroscope = 4;            // Angular velocity in rad/s
+  Vector3 magnetometer = 5;         // Magnetic field (if available)
+  double accel_magnitude = 6;       // Acceleration magnitude
+  double gyro_magnitude = 7;        // Gyroscope magnitude
+  uint64 timestamp_us = 8;          // Timestamp in microseconds
+  double data_age_ms = 9;           // Age of data in milliseconds
+}
+
+// Camera intrinsics for 3D calculations
+message CameraIntrinsics {
+  double fx = 1;                    // Focal length X
+  double fy = 2;                    // Focal length Y
+  double ppx = 3;                   // Principal point X
+  double ppy = 4;                   // Principal point Y
+  double depth_scale = 5;           // Depth scale factor
+}
+
+// System status and diagnostics
+message SystemStatus {
+  bool camera_connected = 1;        // Camera connection status
+  bool engine_running = 2;          // Engine process status
+  double fps = 3;                   // Current FPS
+  uint32 frame_count = 4;           // Total frames processed
+  string mode = 5;                  // Current mode (live, playback, etc.)
+  string error_message = 6;         // Error message if any
+  uint64 timestamp_us = 7;          // Status timestamp
+}
+
+// Main frame data packet sent from engine to hub
+message FrameData {
+  uint64 timestamp_us = 1;          // Frame timestamp in microseconds
+  repeated Ball balls = 2;          // Detected and tracked balls
+  repeated Hand hands = 3;          // Detected hands
+  repeated IMUData imu_data = 4;    // IMU data from watches
+  CameraIntrinsics intrinsics = 5;  // Camera intrinsics
+  SystemStatus status = 6;          // System status
+  
+  // Frame metadata
+  uint32 frame_width = 7;           // Frame width in pixels
+  uint32 frame_height = 8;          // Frame height in pixels
+  uint32 frame_number = 9;          // Sequential frame number
+  
+  // Optional image data (base64 encoded for streaming)
+  string color_image_b64 = 10;      // Base64 encoded color image
+  string depth_image_b64 = 11;      // Base64 encoded depth image
+}
+
+// Commands sent from hub to engine
+message EngineCommand {
+  enum CommandType {
+    UNKNOWN = 0;
+    START_TRACKING = 1;
+    STOP_TRACKING = 2;
+    CALIBRATE_COLOR = 3;
+    SET_COLOR_RANGE = 4;
+    START_RECORDING = 5;
+    STOP_RECORDING = 6;
+    RESET_TRACKING = 7;
+    SHUTDOWN = 8;
+  }
+  
+  CommandType type = 1;
+  string ball_color = 2;            // For color calibration commands
+  HSVRange color_range = 3;         // For setting color ranges
+  string recording_path = 4;        // For recording commands
+  uint64 timestamp_us = 5;          // Command timestamp
+}
+
+// Response from engine to hub commands
+message EngineResponse {
+  enum ResponseType {
+    UNKNOWN = 0;
+    SUCCESS = 1;
+    ERROR = 2;
+    CALIBRATION_COMPLETE = 3;
+    RECORDING_STARTED = 4;
+    RECORDING_STOPPED = 5;
+  }
+  
+  ResponseType type = 1;
+  string message = 2;               // Response message
+  bool success = 3;                 // Success flag
+  uint64 timestamp_us = 4;          // Response timestamp
+  
+  // Calibration results
+  HSVRange calibrated_range = 5;    // For calibration responses
+}

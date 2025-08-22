@@ -117,6 +117,7 @@ message CommandRequest {
   string module_name = 2;           // Name of the module to load/unload
   uint64 timestamp_us = 3;          // Command timestamp
   ColorCommand color_command = 4;
+  map<string, string> module_args = 5; // Arguments for the module
 }
 
 message ColorCommand {

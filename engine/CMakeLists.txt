@@ -53,6 +53,7 @@ add_executable(juggle_engine
     src/Engine.cpp
     src/networking/UdpSender.cpp
     src/modules/UdpBallColorModule.cpp
+    src/modules/PositionToRgbModule.cpp
 )
 
 # Include directories

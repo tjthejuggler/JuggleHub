@@ -6,6 +6,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <iomanip>
 
 Engine::Engine(const std::string& config_file)
     : running_(false),
@@ -60,13 +61,26 @@ void Engine::run() {
         // Detect balls and populate frame_data
         auto intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
         auto detections = ball_tracker.detectBalls(color_image, depth_frame, intrinsics);
-        for (const auto& det : detections) {
-            auto* ball = frame_data.add_balls();
-            ball->set_color_name(det.color_name);
-            auto* pos = ball->mutable_position_3d();
-            pos->set_x(det.world_x);
-            pos->set_y(det.world_y);
-            pos->set_z(det.world_z);
+        
+        // Console output for streaming ball detection data
+        if (!detections.empty()) {
+            std::cout << "=== Ball Detections (Frame " << frame_data.timestamp_us() << ") ===" << std::endl;
+            for (const auto& det : detections) {
+                std::cout << "Ball: " << det.color_name
+                         << " | Position: (" << std::fixed << std::setprecision(3)
+                         << det.world_x << ", " << det.world_y << ", " << det.world_z << ")"
+                         << " | 2D: (" << (int)det.center.x << ", " << (int)det.center.y << ")"
+                         << " | Confidence: " << det.confidence << std::endl;
+                
+                auto* ball = frame_data.add_balls();
+                ball->set_color_name(det.color_name);
+                auto* pos = ball->mutable_position_3d();
+                pos->set_x(det.world_x);
+                pos->set_y(det.world_y);
+                pos->set_z(det.world_z);
+            }
+            std::cout << "Total balls detected: " << detections.size() << std::endl;
+            std::cout << std::endl;
         }
 
         // Update active module

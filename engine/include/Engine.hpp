@@ -2,7 +2,10 @@
 
 #include "juggler.pb.h"
 #include "../src/modules/ModuleBase.hpp"
+#include "../src/modules/UdpBallColorModule.hpp"
 #include <memory>
+#include <queue>
+#include <mutex>
 #include <string>
 #include <atomic>
 #include <zmq.hpp>
@@ -18,9 +21,16 @@ public:
 
 private:
     void processCommands();
+    void sendCommand(const juggler::v1::CommandRequest& command);
+    std::unique_ptr<ModuleBase> create_module(const juggler::v1::CommandRequest& command);
+
+    // Thread-safe queue for commands
+    std::queue<juggler::v1::CommandRequest> command_queue_;
+    std::mutex command_queue_mutex_;
 
     std::atomic<bool> running_;
     std::unique_ptr<ModuleBase> active_module_;
+    std::unique_ptr<UdpBallColorModule> color_module_;
 
     // ZMQ
     zmq::context_t zmq_context_;

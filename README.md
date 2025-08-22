@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-08-22 19:26:00 UTC
+**Last Updated:** 2025-08-22 21:52:00 UTC
 
 ## 🎯 Overview
 
@@ -100,19 +100,11 @@ JuggleHub/
 
 ### Running the System
 
-1. **Start the C++ engine:**
+1. **Start the system:**
    ```bash
-   # In terminal 1
-   ./engine/build/bin/juggle_engine
+   ./scripts/run_hub.sh
    ```
-
-2. **Start the Python hub:**
-   ```bash
-   # In terminal 2
-   ./scripts/run_hub.sh --use-venv
-   ```
-
-The system will automatically connect and start processing juggling data!
+   This will start both the C++ engine and the Python hub.
 
 ## 📊 Features
 
@@ -191,6 +183,70 @@ python3 hub/main.py --no-logging
    - Press 's' to save settings
    - Press 'q' to exit
 
+## 🎨 Ball Color Control
+
+The system includes a UDP-based ball color control module that can send color commands to smart juggling balls over the network.
+
+### Quick Color Commands
+
+To send color commands to specific balls, use the hub's interactive command interface:
+
+```bash
+# Navigate to hub directory and activate virtual environment
+cd hub && source .venv/bin/activate
+
+# Send a color command to a specific ball
+echo -e "load\ncolor BALL_ID R G B\nquit" | python3 main.py
+```
+
+### Examples
+
+```bash
+# Make ball 205 (IP 10.54.136.205) blue
+cd hub && source .venv/bin/activate && echo -e "load\ncolor 205 0 0 255\nquit" | python3 main.py
+
+# Make ball 201 red
+cd hub && source .venv/bin/activate && echo -e "load\ncolor 201 255 0 0\nquit" | python3 main.py
+
+# Make ball 202 green
+cd hub && source .venv/bin/activate && echo -e "load\ncolor 202 0 255 0\nquit" | python3 main.py
+
+# Make ball 203 white
+cd hub && source .venv/bin/activate && echo -e "load\ncolor 203 255 255 255\nquit" | python3 main.py
+```
+
+### Command Format
+
+- `load`: Loads the UdpBallColorModule
+- `color BALL_ID R G B`: Sends color command to ball
+ - `BALL_ID`: The last octet of the ball's IP address (e.g., 205 for 10.54.136.205)
+ - `R G B`: Red, Green, Blue values (0-255 each)
+- `quit`: Exits the program
+
+### Network Configuration
+
+- **Default IP Range**: `10.54.136.X` where X is the ball ID
+- **Port**: `41412` (UDP)
+- **Protocol**: Custom UDP packets with brightness and color commands
+
+### Interactive Mode
+
+You can also run the hub in interactive mode for multiple commands:
+
+```bash
+cd hub && source .venv/bin/activate && python3 main.py
+```
+
+Then type commands interactively:
+```
+> load
+> color 205 0 0 255
+> color 201 255 0 0
+> quit
+```
+
+**Last Updated:** 2025-08-22 22:44:00 UTC
+
 ## 🧪 Development Workflow
 
 This project is designed for rapid development of new real-time applications without sacrificing performance.
@@ -221,7 +277,7 @@ Here is the step-by-step process for adding a new interactive feature (e.g., a n
 4.  **(Build) Recompile the Engine:** Run `./scripts/build_engine.sh`. This will compile your new module and also regenerate the Protobuf files for both C++ and Python, ensuring everything is in sync.
 
 5.  **(Python) Add Control Logic:**
-    -   In the Python [`hub/`](hub/:1), modify the UI or application logic to send a ZMQ command to the C++ engine to load your new module. For example: `send_command({"command": "LOAD_MODULE", "name": "HeightColorModule"})`.
+    -   In the Python [`hub/`](hub/:1), modify the UI or application logic to send a command to the C++ engine to load your new module.
 
 6.  **Run and Test!**
 
@@ -284,9 +340,7 @@ This architecture provides a foundation for many advanced features:
 - Check that `protoc` is installed and in PATH
 
 **"ZMQ connection failed"**
-- Ensure engine is running first
-- Check firewall settings
-- Verify endpoint addresses match
+- We've identified an issue with ZMQ in some environments. If you're having trouble with ZMQ, you can switch to the standard I/O communication method. See the "Development Workflow" section for more details.
 
 **Low frame rate**
 - Close other camera applications

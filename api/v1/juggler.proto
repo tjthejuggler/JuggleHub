@@ -104,43 +104,28 @@ message FrameData {
   string depth_image_b64 = 11;      // Base64 encoded depth image
 }
 
-// Commands sent from hub to engine
-message EngineCommand {
+// Command and control API for managing engine modules
+message CommandRequest {
   enum CommandType {
     UNKNOWN = 0;
-    START_TRACKING = 1;
-    STOP_TRACKING = 2;
-    CALIBRATE_COLOR = 3;
-    SET_COLOR_RANGE = 4;
-    START_RECORDING = 5;
-    STOP_RECORDING = 6;
-    RESET_TRACKING = 7;
-    SHUTDOWN = 8;
+    LOAD_MODULE = 1;
+    UNLOAD_MODULE = 2;
+    SEND_COLOR_COMMAND = 3;
   }
   
   CommandType type = 1;
-  string ball_color = 2;            // For color calibration commands
-  HSVRange color_range = 3;         // For setting color ranges
-  string recording_path = 4;        // For recording commands
-  uint64 timestamp_us = 5;          // Command timestamp
+  string module_name = 2;           // Name of the module to load/unload
+  uint64 timestamp_us = 3;          // Command timestamp
+  ColorCommand color_command = 4;
 }
 
-// Response from engine to hub commands
-message EngineResponse {
-  enum ResponseType {
-    UNKNOWN = 0;
-    SUCCESS = 1;
-    ERROR = 2;
-    CALIBRATION_COMPLETE = 3;
-    RECORDING_STARTED = 4;
-    RECORDING_STOPPED = 5;
-  }
-  
-  ResponseType type = 1;
-  string message = 2;               // Response message
-  bool success = 3;                 // Success flag
-  uint64 timestamp_us = 4;          // Response timestamp
-  
-  // Calibration results
-  HSVRange calibrated_range = 5;    // For calibration responses
+message ColorCommand {
+  string ball_id = 1;
+  Color color = 2;
+}
+
+message CommandResponse {
+  bool success = 1;                 // Whether the command was successful
+  string message = 2;               // Response message (e.g., error details)
+  uint64 timestamp_us = 3;          // Response timestamp
 }

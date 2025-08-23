@@ -165,6 +165,15 @@ void Engine::processCommands() {
                         response.set_message("No active module");
                     }
                     break;
+                case juggler::v1::CommandRequest::CONFIGURE_MODULE:
+                    if (active_module_) {
+                        active_module_->processCommand(command); // Forward config command to active module
+                        response.set_message("Module configuration sent to " + command.module_name());
+                    } else {
+                        response.set_success(false);
+                        response.set_message("No active module to configure.");
+                    }
+                    break;
                 default:
                     response.set_success(false);
                     response.set_message("Unknown command");

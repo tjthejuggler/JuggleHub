@@ -111,6 +111,7 @@ message CommandRequest {
     LOAD_MODULE = 1;
     UNLOAD_MODULE = 2;
     SEND_COLOR_COMMAND = 3;
+    CONFIGURE_MODULE = 4; // New command type for module-specific configuration
   }
   
   CommandType type = 1;

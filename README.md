@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-08-23 07:35:00 UTC
+**Last Updated:** 2025-08-23 08:45:18 UTC
 
 ## 🎯 Overview
 
@@ -254,7 +254,7 @@ Then type commands interactively:
 > quit
 ```
 
-**Last Updated:** 2025-08-22 22:44:00 UTC
+**Last Updated:** 2025-08-23 08:45:18 UTC
 
 ## 🧪 Development Workflow
 

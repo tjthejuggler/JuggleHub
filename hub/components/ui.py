@@ -175,6 +175,11 @@ if PYQT_AVAILABLE:
             # IMU status
             self.imu_status = QLabel("📱 IMU: 0 sensors")
             system_layout.addWidget(self.imu_status)
+
+            self.imu_list = QTextEdit()
+            self.imu_list.setMaximumHeight(200)
+            self.imu_list.setReadOnly(True)
+            system_layout.addWidget(self.imu_list)
             
             system_layout.addStretch()
             
@@ -263,6 +268,14 @@ if PYQT_AVAILABLE:
             # Update IMU status
             imu_count = len(frame_data.imu_data)
             self.imu_status.setText(f"📱 IMU: {imu_count} sensors")
+
+            imu_text = ""
+            for imu in frame_data.imu_data:
+                imu_text += f"Watch: {imu.watch_name} ({imu.watch_ip})\n"
+                imu_text += f"  Accel: ({imu.acceleration.x:.2f}, {imu.acceleration.y:.2f}, {imu.acceleration.z:.2f})\n"
+                imu_text += f"  Gyro:  ({imu.gyroscope.x:.2f}, {imu.gyroscope.y:.2f}, {imu.gyroscope.z:.2f})\n"
+            
+            self.imu_list.setPlainText(imu_text)
             
             # Update status
             self.status_label.setText(f"✅ Receiving data - Frame {frame_data.frame_number}")

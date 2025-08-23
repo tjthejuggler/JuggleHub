@@ -85,6 +85,7 @@ CREATE_VENV=false
 NO_UI=false
 DEBUG=false
 ZMQ_ENDPOINT="tcp://localhost:5555"
+PASS_THROUGH_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -101,38 +102,23 @@ while [[ $# -gt 0 ]]; do
             USE_VENV=true
             shift
             ;;
-        --no-ui)
-            NO_UI=true
-            shift
-            ;;
-        --debug)
-            DEBUG=true
-            shift
-            ;;
-        --zmq-endpoint)
-            ZMQ_ENDPOINT="$2"
-            shift 2
-            ;;
         -h|--help)
-            echo "Usage: $0 [OPTIONS]"
+            echo "Usage: $0 [OPTIONS] [-- SCRIPT_ARGS]"
             echo "Options:"
             echo "  --install-deps    Install Python dependencies"
             echo "  --create-venv     Create and use virtual environment"
             echo "  --use-venv        Use existing virtual environment"
-            echo "  --no-ui           Run without GUI (console mode)"
-            echo "  --debug           Enable debug mode"
-            echo "  --zmq-endpoint    ZMQ endpoint (default: tcp://localhost:5555)"
             echo "  -h, --help        Show this help message"
             echo ""
-            echo "Examples:"
-            echo "  $0 --create-venv --install-deps    # First time setup"
-            echo "  $0 --use-venv                      # Regular run with venv"
-            echo "  $0 --no-ui --debug                 # Console mode with debug"
+            echo "Script Arguments (passed to hub/main.py):"
+            echo "  All arguments after '--' or any unknown arguments will be passed to the Python script."
+            echo "  Example: $0 -- --watch-ips 192.168.1.101 --debug"
             exit 0
             ;;
         *)
-            echo -e "${RED}❌ Unknown option: $1${NC}"
-            exit 1
+            # Collect any other arguments to pass to the python script
+            PASS_THROUGH_ARGS+=("$1")
+            shift
             ;;
     esac
 done
@@ -208,29 +194,14 @@ fi
 echo -e "${GREEN}✅ All required dependencies found${NC}"
 
 # Build hub arguments
-HUB_ARGS=()
-
-if [ "$NO_UI" = true ]; then
-    HUB_ARGS+=("--no-ui")
-fi
-
-if [ "$DEBUG" = true ]; then
-    HUB_ARGS+=("--debug")
-fi
-
-HUB_ARGS+=("--zmq-endpoint" "$ZMQ_ENDPOINT")
+HUB_ARGS=("${PASS_THROUGH_ARGS[@]}")
 
 # Change to hub directory
 cd "$HUB_DIR"
 
 # Run the hub
 echo -e "${BLUE}🎯 Starting JuggleHub...${NC}"
-echo -e "${BLUE}ZMQ Endpoint: $ZMQ_ENDPOINT${NC}"
-
-if [ "$DEBUG" = true ]; then
-    echo -e "${YELLOW}🐛 Debug mode enabled${NC}"
-    echo -e "${BLUE}Arguments: ${HUB_ARGS[*]}${NC}"
-fi
+echo -e "${BLUE}Arguments passed to hub: ${HUB_ARGS[*]}${NC}"
 
 # Add the API directory to Python path
 export PYTHONPATH="$API_DIR:$PYTHONPATH"

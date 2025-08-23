@@ -64,21 +64,44 @@ class JuggleHub:
         print("🎯 JuggleHub is running...")
         
         try:
-            print("Running in interactive mode. Type 'load', 'unload', or 'quit'.")
+            print("Running in interactive mode. Type 'load <module_name>', 'unload', 'color', or 'quit'.")
             while self.running:
-                command = input("> ")
+                command_line = input("> ")
+                parts = command_line.split()
+                if not parts:
+                    continue
+
+                command = parts[0]
+                args = parts[1:]
+
                 if command == "load":
-                    request = juggler_pb2.CommandRequest()
-                    request.type = juggler_pb2.CommandRequest.LOAD_MODULE
-                    request.module_name = "UdpBallColorModule"
-                    response = self.zmq_client.send_command(request)
-                    print(f"Response: {response.message}")
+                    if len(args) == 1:
+                        module_name = args[0]
+                        load_request = juggler_pb2.CommandRequest()
+                        load_request.type = juggler_pb2.CommandRequest.LOAD_MODULE
+                        load_request.module_name = module_name
+                        load_response = self.zmq_client.send_command(load_request)
+                        print(f"Response: {load_response.message}")
+
+                        if load_response.success and module_name == "PositionToRgbModule":
+                            ball_id = input("Enter target LED ball ID (e.g., 205): ")
+                            if ball_id:
+                                config_request = juggler_pb2.CommandRequest()
+                                config_request.type = juggler_pb2.CommandRequest.CONFIGURE_MODULE
+                                config_request.module_name = module_name
+                                config_request.module_args["target_ball_id"] = ball_id
+                                config_response = self.zmq_client.send_command(config_request)
+                                print(f"Configuration Response: {config_response.message}")
+                            else:
+                                print("No ball ID provided, using default (201).")
+                    else:
+                        print("Invalid load command. Usage: load <module_name>")
                 elif command == "unload":
-                    request = juggler_pb2.CommandRequest()
-                    request.type = juggler_pb2.CommandRequest.UNLOAD_MODULE
-                    request.module_name = "UdpBallColorModule"
-                    response = self.zmq_client.send_command(request)
-                    print(f"Response: {response.message}")
+                    unload_request = juggler_pb2.CommandRequest()
+                    unload_request.type = juggler_pb2.CommandRequest.UNLOAD_MODULE
+                    # We don't need module_name for unload, as the engine unloads the active module.
+                    unload_response = self.zmq_client.send_command(unload_request)
+                    print(f"Response: {unload_response.message}")
                 elif command.startswith("color"):
                     parts = command.split()
                     if len(parts) == 5:

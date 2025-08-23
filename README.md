@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-08-22 21:52:00 UTC
+**Last Updated:** 2025-08-23 07:35:00 UTC
 
 ## 🎯 Overview
 
@@ -150,7 +150,16 @@ The engine supports various command-line options:
 
 # Enable hand tracking (if compiled with support)
 ./engine/build/bin/juggle_engine --track-hands
+
+# Custom output formats
+./engine/build/bin/juggle_engine --output-format=simple
+./engine/build/bin/juggle_engine --output-format=legacy
 ```
+
+The `--output-format` option controls how ball detection data is printed to the console:
+-   `default` (default): A human-readable, formatted output with labels for each field.
+-   `simple`: A comma-separated format with all available data: `timestamp_us,color_name,world_x,world_y,world_z,center_x,center_y,confidence`.
+-   `legacy`: A comma-separated format designed for compatibility with older tools: `color_name,world_x,world_y,world_z,timestamp_us`.
 
 ### Hub Configuration
 

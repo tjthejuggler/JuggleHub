@@ -254,7 +254,177 @@ Then type commands interactively:
 > quit
 ```
 
-**Last Updated:** 2025-08-23 11:46:28 UTC
+**Last Updated:** 2025-08-23 14:45:40 UTC
+
+## 📋 Command Reference
+
+This section provides a comprehensive list of commonly used commands for quick reference.
+
+### Core System Commands
+
+#### Starting the Hub
+```bash
+# Basic hub startup
+./scripts/run_hub.sh
+
+# Hub with virtual environment
+./scripts/run_hub.sh --use-venv
+
+# Hub with IMU streaming from watch
+./scripts/run_hub.sh --use-venv --watch-ips 10.54.136.205
+
+# Hub with multiple watches
+./scripts/run_hub.sh --use-venv --watch-ips 10.54.136.205 10.54.136.206
+
+# Hub in console mode (no GUI)
+./scripts/run_hub.sh --no-ui
+
+# Hub with debug output
+./scripts/run_hub.sh --debug
+```
+
+#### Building the System
+```bash
+# Build C++ engine
+./scripts/build_engine.sh
+
+# Build with debug symbols
+./scripts/build_engine.sh --debug --verbose
+
+# Generate Protocol Buffer files
+./scripts/generate_protos.sh
+
+# Create Python virtual environment and install dependencies
+./scripts/run_hub.sh --create-venv --install-deps
+```
+
+### Real-Time Module Commands
+
+#### Loading Modules
+```bash
+# Load PositionToRgbModule - tracks green ball position and controls LED ball color
+PYTHONPATH=$(pwd)/hub python3 scripts/load_module.py PositionToRgbModule --ip 10.54.136.205
+
+# Load UdpBallColorModule - enables direct ball color control
+PYTHONPATH=$(pwd)/hub python3 scripts/load_module.py UdpBallColorModule --ip 10.54.136.205
+
+# Load module with custom port
+PYTHONPATH=$(pwd)/hub python3 scripts/load_module.py PositionToRgbModule --ip 10.54.136.205 --port 41412
+```
+
+### Ball Control Commands
+
+#### Direct Color Control
+```bash
+# Make ball 205 blue (using hub interactive mode)
+cd hub && source .venv/bin/activate && echo -e "load\ncolor 205 0 0 255\nquit" | python3 main.py
+
+# Make ball 201 red
+cd hub && source .venv/bin/activate && echo -e "load\ncolor 201 255 0 0\nquit" | python3 main.py
+
+# Make ball 202 green
+cd hub && source .venv/bin/activate && echo -e "load\ncolor 202 0 255 0\nquit" | python3 main.py
+
+# Make ball 203 white
+cd hub && source .venv/bin/activate && echo -e "load\ncolor 203 255 255 255\nquit" | python3 main.py
+```
+
+### Engine Commands
+
+#### Direct Engine Usage
+```bash
+# Run engine with high performance
+./engine/build/bin/juggle_engine --high-fps
+
+# Run engine with custom resolution
+./engine/build/bin/juggle_engine --width 1280 --height 720 --fps 60
+
+# Run engine with timestamps
+./engine/build/bin/juggle_engine --timestamp
+
+# Run engine with hand tracking (if compiled with support)
+./engine/build/bin/juggle_engine --track-hands
+
+# Run engine in calibration mode
+./engine/build/bin/juggle_engine calibrate
+```
+
+#### Engine Output Formats
+```bash
+# Simple CSV output: timestamp_us,color_name,world_x,world_y,world_z,center_x,center_y,confidence
+./engine/build/bin/juggle_engine --output-format=simple
+
+# Legacy CSV output: color_name,world_x,world_y,world_z,timestamp_us
+./engine/build/bin/juggle_engine --output-format=legacy
+
+# Default human-readable output
+./engine/build/bin/juggle_engine --output-format=default
+```
+
+### Development & Testing Commands
+
+#### IMU Testing
+```bash
+# Start IMU simulator for testing
+./scripts/imu_simulator.py --watch-id left_watch
+
+# Connect hub to IMU simulator
+./scripts/run_hub.sh --watch-ips 127.0.0.1
+```
+
+#### Debugging
+```bash
+# Engine debug output
+./engine/build/bin/juggle_engine 2>engine_debug.log
+
+# Hub debug mode
+./scripts/run_hub.sh --debug
+
+# Test ZMQ connection
+python3 scripts/test_zmq.py
+```
+
+#### Testing Ball Communication
+```bash
+# Test UDP ball communication
+python3 test_ball_udp.py
+
+# Test blue ball specifically
+python3 test_blue_ball.py
+```
+
+### Network Configuration
+
+#### Default IP Ranges
+- **Balls**: `10.54.136.X` where X is the ball ID (e.g., 205 for ball 205)
+- **Watches**: Any IP address, commonly `10.54.136.X` or `192.168.1.X`
+- **Port**: `41412` (UDP for balls), `8080` (WebSocket for watches)
+
+#### Common IP Examples
+```bash
+# Ball IDs and their corresponding IPs
+# Ball 201: 10.54.136.201
+# Ball 202: 10.54.136.202
+# Ball 203: 10.54.136.203
+# Ball 205: 10.54.136.205
+
+# Watch examples
+# Left watch: 10.54.136.205 or 192.168.1.101
+# Right watch: 10.54.136.206 or 192.168.1.102
+```
+
+### Quick Reference Summary
+
+| Command Purpose | Command |
+|----------------|---------|
+| **Start hub with watch** | `./scripts/run_hub.sh --use-venv --watch-ips 10.54.136.205` |
+| **Load position-to-color module** | `PYTHONPATH=$(pwd)/hub python3 scripts/load_module.py PositionToRgbModule --ip 10.54.136.205` |
+| **Make ball blue** | `cd hub && source .venv/bin/activate && echo -e "load\ncolor 205 0 0 255\nquit" \| python3 main.py` |
+| **Build engine** | `./scripts/build_engine.sh` |
+| **Calibrate colors** | `./engine/build/bin/juggle_engine calibrate` |
+| **Debug mode** | `./scripts/run_hub.sh --debug` |
+
+**Last Updated:** 2025-08-23 14:45:40 UTC
 
 ## ⌚ Real-Time IMU Streaming
 

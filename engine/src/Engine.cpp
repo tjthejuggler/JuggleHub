@@ -8,8 +8,9 @@
 #include <chrono>
 #include <iomanip>
 
-Engine::Engine(const std::string& config_file)
+Engine::Engine(const std::string& config_file, OutputFormat format)
     : running_(false),
+      output_format_(format),
       zmq_context_(1),
       zmq_publisher_(zmq_context_, ZMQ_PUB),
       zmq_commander_(zmq_context_, ZMQ_REP),
@@ -64,14 +65,39 @@ void Engine::run() {
         
         // Console output for streaming ball detection data
         if (!detections.empty()) {
-            std::cout << "=== Ball Detections (Frame " << frame_data.timestamp_us() << ") ===" << std::endl;
+            switch (output_format_) {
+                case OutputFormat::SIMPLE:
+                    for (const auto& det : detections) {
+                        std::cout << frame_data.timestamp_us() << ","
+                                  << det.color_name << ","
+                                  << det.world_x << "," << det.world_y << "," << det.world_z << ","
+                                  << (int)det.center.x << "," << (int)det.center.y << ","
+                                  << det.confidence << std::endl;
+                    }
+                    break;
+                case OutputFormat::LEGACY:
+                    for (const auto& det : detections) {
+                        std::cout << det.color_name << ","
+                                  << det.world_x << "," << det.world_y << "," << det.world_z << ","
+                                  << frame_data.timestamp_us() << std::endl;
+                    }
+                    break;
+                case OutputFormat::DEFAULT:
+                default:
+                    std::cout << "=== Ball Detections (Frame " << frame_data.timestamp_us() << ") ===" << std::endl;
+                    for (const auto& det : detections) {
+                        std::cout << "Ball: " << det.color_name
+                                << " | Position: (" << std::fixed << std::setprecision(3)
+                                << det.world_x << ", " << det.world_y << ", " << det.world_z << ")"
+                                << " | 2D: (" << (int)det.center.x << ", " << (int)det.center.y << ")"
+                                << " | Confidence: " << det.confidence << std::endl;
+                    }
+                    std::cout << "Total balls detected: " << detections.size() << std::endl;
+                    std::cout << std::endl;
+                    break;
+            }
+
             for (const auto& det : detections) {
-                std::cout << "Ball: " << det.color_name
-                         << " | Position: (" << std::fixed << std::setprecision(3)
-                         << det.world_x << ", " << det.world_y << ", " << det.world_z << ")"
-                         << " | 2D: (" << (int)det.center.x << ", " << (int)det.center.y << ")"
-                         << " | Confidence: " << det.confidence << std::endl;
-                
                 auto* ball = frame_data.add_balls();
                 ball->set_color_name(det.color_name);
                 auto* pos = ball->mutable_position_3d();
@@ -79,8 +105,6 @@ void Engine::run() {
                 pos->set_y(det.world_y);
                 pos->set_z(det.world_z);
             }
-            std::cout << "Total balls detected: " << detections.size() << std::endl;
-            std::cout << std::endl;
         }
 
         // Update active module

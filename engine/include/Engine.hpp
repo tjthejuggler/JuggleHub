@@ -13,7 +13,13 @@
 
 class Engine {
 public:
-    Engine(const std::string& config_file);
+    enum class OutputFormat {
+        DEFAULT,
+        SIMPLE,
+        LEGACY
+    };
+
+    Engine(const std::string& config_file, OutputFormat format = OutputFormat::DEFAULT);
     ~Engine();
 
     void run();
@@ -23,6 +29,8 @@ private:
     void processCommands();
     void sendCommand(const juggler::v1::CommandRequest& command);
     std::unique_ptr<ModuleBase> create_module(const juggler::v1::CommandRequest& command);
+
+    OutputFormat output_format_;
 
     // Thread-safe queue for commands
     std::queue<juggler::v1::CommandRequest> command_queue_;

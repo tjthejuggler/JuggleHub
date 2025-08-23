@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-08-23 08:45:18 UTC
+**Last Updated:** 2025-08-23 11:46:28 UTC
 
 ## 🎯 Overview
 
@@ -254,7 +254,50 @@ Then type commands interactively:
 > quit
 ```
 
-**Last Updated:** 2025-08-23 08:45:18 UTC
+**Last Updated:** 2025-08-23 11:46:28 UTC
+
+## ⌚ Real-Time IMU Streaming
+
+JuggleHub now supports real-time data streaming from smartwatches, providing synchronized IMU data alongside the video-based ball tracking. This enables the development of advanced applications that fuse motion data from the user's wrists with the positions of the juggling balls.
+
+### Architecture
+
+- **Protocol**: Data is streamed from the smartwatches to the Python hub using **WebSockets** for low-latency, persistent connections.
+- **Format**: The IMU data (accelerometer and gyroscope) is sent as **JSON** objects.
+- **Component**: A new, asynchronous `IMUListener` component (`hub/components/imu_listener.py`) runs in a separate thread to handle the WebSocket connections and data parsing without blocking the main application.
+
+### Running with IMU Streaming
+
+To run the hub with IMU streaming enabled, provide the IP addresses of your smartwatches using the `--watch-ips` command-line argument.
+
+```bash
+# Run with one watch
+./scripts/run_hub.sh --watch-ips 192.168.1.101
+
+# Run with two watches
+./scripts/run_hub.sh --watch-ips 192.168.1.101 192.168.1.102
+```
+
+### Testing with the IMU Simulator
+
+For development and testing without physical watches, you can use the included IMU simulator. The simulator runs a WebSocket server that mimics the behavior of a watch.
+
+1.  **Start the simulator in a separate terminal:**
+    ```bash
+    # Make the script executable
+    chmod +x scripts/imu_simulator.py
+
+    # Run the simulator for a mock "left_watch"
+    ./scripts/imu_simulator.py --watch-id left_watch
+    ```
+    You can run multiple instances of the simulator on different ports or with different watch IDs if needed.
+
+2.  **Run the JuggleHub:**
+    In another terminal, start the hub and connect to the simulator using the loopback address (`127.0.0.1`).
+    ```bash
+    ./scripts/run_hub.sh --watch-ips 127.0.0.1
+    ```
+    The hub will connect to the simulator, and you will see the IMU data being processed in the debug output.
 
 ## 🧪 Development Workflow
 
@@ -316,7 +359,7 @@ python3 -m pytest
 This architecture provides a foundation for many advanced features:
 
 -   **[ ] Advanced Coaching Modules**: Implement C++ modules for pattern analysis, consistency scoring, and real-time feedback.
--   **[ ] Wearable Sensor Integration**: Add support for IMU data from wearables (gloves, watches) to the Protobuf API and fuse it with vision data in the engine.
+-   **[x] Wearable Sensor Integration**: Add support for IMU data from wearables (gloves, watches) to the Protobuf API and fuse it with vision data in the engine.
 -   **[ ] Web Interface**: Create a web-based dashboard using the Python hub as a backend to view juggling sessions from any device.
 -   **[ ] FPGA/Hardware Acceleration**: Explore offloading parts of the vision pipeline (like color thresholding) to hardware like a Xilinx Kria for even lower latency.
 -   **[ ] ROS Integration**: Add a ROS 2 compatibility layer to allow the engine to publish data as standard ROS topics.

@@ -1,5 +1,6 @@
 # Core dependencies
 protobuf>=4.21.0
+grpcio-tools>=1.49.0 # Added for Protobuf generation
 pyzmq>=24.0.0
 numpy>=1.21.0
 

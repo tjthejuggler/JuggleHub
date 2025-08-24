@@ -279,7 +279,7 @@ class DatabaseLogger:
                             color_bgr_b, color_bgr_g, color_bgr_r
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        self.current_session_id, frame_id, ball.id, ball.color_name,
+                        self.current_session_id, frame_id, ball.track_id, "", # color_name is removed, using empty string for placeholder
                         ball.position_3d.x, ball.position_3d.y, ball.position_3d.z,
                         ball.position_2d.x, ball.position_2d.y,
                         ball.velocity_3d.x, ball.velocity_3d.y, ball.velocity_3d.z,
@@ -391,8 +391,8 @@ if __name__ == "__main__":
     
     # Add test ball
     ball = frame_data.balls.add()
-    ball.id = "test_ball_1"
-    ball.color_name = "red"
+    ball.track_id = 1 # Assuming a default track_id for test ball
+    # ball.color_name = "red" # color_name field removed
     ball.position_3d.x = 0.1
     ball.position_3d.y = 0.2
     ball.position_3d.z = 0.8

@@ -3,14 +3,16 @@
 #include "modules/UdpBallColorModule.hpp"
 #include "modules/PositionToRgbModule.hpp"
 #include "BallTracker.hpp"
+#include "DNNTracker.hpp" // Include the DNNTracker header
 #include <iostream>
 #include <thread>
 #include <chrono>
 #include <iomanip>
 
-Engine::Engine(const std::string& config_file, OutputFormat format)
+Engine::Engine(const std::string& config_file, OutputFormat format, bool use_dnn_tracker)
     : running_(false),
       output_format_(format),
+      use_dnn_tracker_(use_dnn_tracker), // Initialize the flag
       zmq_context_(1),
       zmq_publisher_(zmq_context_, ZMQ_PUB),
       zmq_commander_(zmq_context_, ZMQ_REP),
@@ -19,6 +21,13 @@ Engine::Engine(const std::string& config_file, OutputFormat format)
     // Bind ZMQ sockets
     zmq_publisher_.bind("tcp://127.0.0.1:5555");
     zmq_commander_.bind("tcp://127.0.0.1:5565");
+
+    // Initialize DNNTracker if enabled
+    if (use_dnn_tracker_) {
+        // Model paths relative to the executable location or project root
+        std::string model_path = "engine/models/yolov8n.xml"; // Assuming .xml and .bin are in the same dir
+        dnn_tracker_ = std::make_unique<DNNTracker>(model_path, "CPU"); // "CPU" or "GPU"
+    }
 
     // Setup the default color module
     color_module_->setup();
@@ -39,7 +48,11 @@ void Engine::run() {
     rs_config_.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
     pipe_.start(rs_config_);
 
-    juggler::BallTracker ball_tracker("ball_settings.json");
+    // Initialize the old BallTracker only if DNN tracking is not enabled
+    std::unique_ptr<juggler::BallTracker> ball_tracker_ptr;
+    if (!use_dnn_tracker_) {
+        ball_tracker_ptr = std::make_unique<juggler::BallTracker>("ball_settings.json");
+    }
 
     while (running_) {
         rs2::frameset frames = pipe_.wait_for_frames();
@@ -59,51 +72,142 @@ void Engine::run() {
         frame_data.set_timestamp_us(std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count());
 
-        // Detect balls and populate frame_data
+        // Get camera intrinsics
         auto intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
-        auto detections = ball_tracker.detectBalls(color_image, depth_frame, intrinsics);
-        
-        // Console output for streaming ball detection data
-        if (!detections.empty()) {
-            switch (output_format_) {
-                case OutputFormat::SIMPLE:
-                    for (const auto& det : detections) {
-                        std::cout << frame_data.timestamp_us() << ","
-                                  << det.color_name << ","
-                                  << det.world_x << "," << det.world_y << "," << det.world_z << ","
-                                  << (int)det.center.x << "," << (int)det.center.y << ","
-                                  << det.confidence << std::endl;
-                    }
-                    break;
-                case OutputFormat::LEGACY:
-                    for (const auto& det : detections) {
-                        std::cout << det.color_name << ","
-                                  << det.world_x << "," << det.world_y << "," << det.world_z << ","
-                                  << frame_data.timestamp_us() << std::endl;
-                    }
-                    break;
-                case OutputFormat::DEFAULT:
-                default:
-                    std::cout << "=== Ball Detections (Frame " << frame_data.timestamp_us() << ") ===" << std::endl;
-                    for (const auto& det : detections) {
-                        std::cout << "Ball: " << det.color_name
-                                << " | Position: (" << std::fixed << std::setprecision(3)
-                                << det.world_x << ", " << det.world_y << ", " << det.world_z << ")"
-                                << " | 2D: (" << (int)det.center.x << ", " << (int)det.center.y << ")"
-                                << " | Confidence: " << det.confidence << std::endl;
-                    }
-                    std::cout << "Total balls detected: " << detections.size() << std::endl;
-                    std::cout << std::endl;
-                    break;
-            }
 
-            for (const auto& det : detections) {
-                auto* ball = frame_data.add_balls();
-                ball->set_color_name(det.color_name);
-                auto* pos = ball->mutable_position_3d();
-                pos->set_x(det.world_x);
-                pos->set_y(det.world_y);
-                pos->set_z(det.world_z);
+        if (use_dnn_tracker_) {
+            // New DNN tracking logic
+            std::vector<STrackPtr> tracks = dnn_tracker_->update(color_image);
+
+            if (!tracks.empty()) {
+                switch (output_format_) {
+                    case OutputFormat::SIMPLE:
+                        for (const auto& track_ptr : tracks) {
+                            const STrack& track = *track_ptr;
+                            // Estimate 3D position from 2D bounding box center and depth frame
+                            // We use the center of the bounding box for deprojection
+                            float pixel_x = track.tlwh[0] + track.tlwh[2] / 2.0f;
+                            float pixel_y = track.tlwh[1] + track.tlwh[3] / 2.0f;
+                            uint16_t depth_value = depth_frame.get_distance((int)pixel_x, (int)pixel_y);
+                            float depth_m = depth_value * depth_frame.get_units();
+
+                            float point[3];
+                            rs2_deproject_pixel_to_point(point, &intrinsics, {pixel_x, pixel_y}, depth_m);
+
+                            std::cout << frame_data.timestamp_us() << ","
+                                      << track.track_id << "," // Use track_id as unique identifier
+                                      << point[0] << "," << point[1] << "," << point[2] << ","
+                                      << (int)pixel_x << "," << (int)pixel_y << ","
+                                      << track.score << std::endl;
+                        }
+                        break;
+                    case OutputFormat::LEGACY:
+                        for (const auto& track_ptr : tracks) {
+                            const STrack& track = *track_ptr;
+                            float pixel_x = track.tlwh[0] + track.tlwh[2] / 2.0f;
+                            float pixel_y = track.tlwh[1] + track.tlwh[3] / 2.0f;
+                            uint16_t depth_value = depth_frame.get_distance((int)pixel_x, (int)pixel_y);
+                            float depth_m = depth_value * depth_frame.get_units();
+
+                            float point[3];
+                            rs2_deproject_pixel_to_point(point, &intrinsics, {pixel_x, pixel_y}, depth_m);
+
+                            std::cout << track.track_id << ","
+                                      << point[0] << "," << point[1] << "," << point[2] << ","
+                                      << frame_data.timestamp_us() << std::endl;
+                        }
+                        break;
+                    case OutputFormat::DEFAULT:
+                    default:
+                        std::cout << "=== DNN Ball Detections (Frame " << frame_data.timestamp_us() << ") ===" << std::endl;
+                        for (const auto& track_ptr : tracks) {
+                            const STrack& track = *track_ptr;
+                            float pixel_x = track.tlwh[0] + track.tlwh[2] / 2.0f;
+                            float pixel_y = track.tlwh[1] + track.tlwh[3] / 2.0f;
+                            uint16_t depth_value = depth_frame.get_distance((int)pixel_x, (int)pixel_y);
+                            float depth_m = depth_value * depth_frame.get_units();
+
+                            float point[3];
+                            rs2_deproject_pixel_to_point(point, &intrinsics, {pixel_x, pixel_y}, depth_m);
+
+                            std::cout << "Ball Track ID: " << track.track_id
+                                    << " | Position: (" << std::fixed << std::setprecision(3)
+                                    << point[0] << ", " << point[1] << ", " << point[2] << ")"
+                                    << " | 2D Center: (" << (int)pixel_x << ", " << (int)pixel_y << ")"
+                                    << " | Confidence: " << track.score << std::endl;
+                        }
+                        std::cout << "Total DNN tracks detected: " << tracks.size() << std::endl;
+                        std::cout << std::endl;
+                        break;
+                }
+
+                for (const auto& track_ptr : tracks) {
+                    const STrack& track = *track_ptr;
+                    auto* ball = frame_data.add_balls();
+                    ball->set_track_id(track.track_id); // Use track_id as per new API
+                    // To handle the old color_name, if protobuf is not yet updated
+                    // ball->set_color_name(std::to_string(track.track_id));
+                    auto* pos = ball->mutable_position_3d();
+                    float pixel_x = track.tlwh[0] + track.tlwh[2] / 2.0f;
+                    float pixel_y = track.tlwh[1] + track.tlwh[3] / 2.0f;
+                    uint16_t depth_value = depth_frame.get_distance((int)pixel_x, (int)pixel_y);
+                    float depth_m = depth_value * depth_frame.get_units();
+                    float point[3];
+                    rs2_deproject_pixel_to_point(point, &intrinsics, {pixel_x, pixel_y}, depth_m);
+                    pos->set_x(point[0]);
+                    pos->set_y(point[1]);
+                    pos->set_z(point[2]);
+                }
+            }
+        } else {
+            // Old BallTracker logic
+            auto detections = ball_tracker_ptr->detectBalls(color_image, depth_frame, intrinsics);
+            
+            // Console output for streaming ball detection data
+            if (!detections.empty()) {
+                switch (output_format_) {
+                    case OutputFormat::SIMPLE:
+                        for (const auto& det : detections) {
+                            std::cout << frame_data.timestamp_us() << ","
+                                      << det.color_name << ","
+                                      << det.world_x << "," << det.world_y << "," << det.world_z << ","
+                                      << (int)det.center.x << "," << (int)det.center.y << ","
+                                      << det.confidence << std::endl;
+                        }
+                        break;
+                    case OutputFormat::LEGACY:
+                        for (const auto& det : detections) {
+                            std::cout << det.color_name << ","
+                                      << det.world_x << "," << det.world_y << "," << det.world_z << ","
+                                      << frame_data.timestamp_us() << std::endl;
+                        }
+                        break;
+                    case OutputFormat::DEFAULT:
+                    default:
+                        std::cout << "=== Ball Detections (Frame " << frame_data.timestamp_us() << ") ===" << std::endl;
+                        for (const auto& det : detections) {
+                            std::cout << "Ball: " << det.color_name
+                                    << " | Position: (" << std::fixed << std::setprecision(3)
+                                    << det.world_x << ", " << det.world_y << ", " << det.world_z << ")"
+                                    << " | 2D: (" << (int)det.center.x << ", " << (int)det.center.y << ")"
+                                    << " | Confidence: " << det.confidence << std::endl;
+                        }
+                        std::cout << "Total balls detected: " << detections.size() << std::endl;
+                        std::cout << std::endl;
+                        break;
+                }
+
+                for (const auto& det : detections) {
+                    auto* ball = frame_data.add_balls();
+                    // Assuming ball->set_track_id() is available after protobuf update
+                    // For now, setting color_name as a placeholder or using a default ID if needed.
+                    // For legacy tracker, we still use color_name for output and protobuf.
+                    ball->set_color_name(det.color_name);
+                    auto* pos = ball->mutable_position_3d();
+                    pos->set_x(det.world_x);
+                    pos->set_y(det.world_y);
+                    pos->set_z(det.world_z);
+                }
             }
         }
 

@@ -3,6 +3,7 @@
 #include "juggler.pb.h"
 #include "../src/modules/ModuleBase.hpp"
 #include "../src/modules/UdpBallColorModule.hpp"
+#include "DNNTracker.hpp" // Include the new DNNTracker
 #include <memory>
 #include <queue>
 #include <mutex>
@@ -39,6 +40,8 @@ private:
     std::atomic<bool> running_;
     std::unique_ptr<ModuleBase> active_module_;
     std::unique_ptr<UdpBallColorModule> color_module_;
+    std::unique_ptr<DNNTracker> dnn_tracker_; // New DNNTracker instance
+    bool use_dnn_tracker_; // Flag to switch between old/new tracker
 
     // ZMQ
     zmq::context_t zmq_context_;

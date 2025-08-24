@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 project(JuggleEngine)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find required packages
@@ -10,6 +10,14 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(ZMQ REQUIRED libzmq)
 pkg_check_modules(realsense2 REQUIRED realsense2)
 find_package(OpenCV REQUIRED)
+# Find OpenVINO development package
+# This requires the setupvars.sh script to have been sourced
+find_package(OpenVINO REQUIRED)
+# Find the Eigen3 library dependency
+find_package(Eigen3 REQUIRED)
+
+# Define the location of the ByteTrack-cpp project we just built
+set(BYTETRACK_PROJECT_DIR ${CMAKE_SOURCE_DIR}/vendor/ByteTrack-cpp)
 find_package(Protobuf REQUIRED)
 
 # Generate Protocol Buffer files
@@ -51,6 +59,7 @@ add_executable(juggle_engine
     src/main.cpp
     src/BallTracker.cpp
     src/Engine.cpp
+    src/DNNTracker.cpp
     src/networking/UdpSender.cpp
     src/modules/UdpBallColorModule.cpp
     src/modules/PositionToRgbModule.cpp
@@ -66,12 +75,23 @@ target_include_directories(juggle_engine PRIVATE
     ${Protobuf_INCLUDE_DIRS}
     ${PROTO_GENERATED_DIR}
     ${ZMQ_INCLUDE_DIRS}
+    ${BYTETRACK_PROJECT_DIR}/include
+    ${EIGEN3_INCLUDE_DIRS}
+)
+
+# Tell our juggle_engine where to find the compiled .so library file
+target_link_directories(juggle_engine PRIVATE
+    ${BYTETRACK_PROJECT_DIR}/build
 )
 
 # Link libraries
 target_link_libraries(juggle_engine PRIVATE
     ${realsense2_LIBRARIES}
-    ${OpenCV_LIBS}
+    OpenCV::opencv_core
+    OpenCV::opencv_imgproc
+    OpenCV::opencv_dnn
+    openvino
+    bytetrack
     ${Protobuf_LIBRARIES}
     ${ZMQ_LIBRARIES}
     juggler_proto

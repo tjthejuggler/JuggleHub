@@ -29,18 +29,17 @@ message HSVRange {
 
 // Ball detection and tracking information
 message Ball {
-  string id = 1;                    // Unique ball identifier
-  string color_name = 2;            // Color name (pink, orange, green, yellow)
-  Vector3 position_3d = 3;          // 3D position in meters (camera coordinates)
-  Vector2 position_2d = 4;          // 2D pixel position in image
-  Vector3 velocity_3d = 5;          // 3D velocity in m/s
-  double radius_px = 6;             // Radius in pixels
-  double depth_m = 7;               // Depth in meters
-  Color color_bgr = 8;              // Detected color in BGR
-  double confidence = 9;            // Detection confidence (0.0-1.0)
-  bool is_held = 10;                // Whether ball is being held (hand tracking)
-  uint64 timestamp_us = 11;         // Timestamp in microseconds
-  HSVRange color_range = 12;        // HSV color range used for detection
+  uint32 track_id = 1;              // Unique ball tracking identifier
+  Vector3 position_3d = 2;          // 3D position in meters (camera coordinates)
+  Vector2 position_2d = 3;          // 2D pixel position in image
+  Vector3 velocity_3d = 4;          // 3D velocity in m/s
+  double radius_px = 5;             // Radius in pixels
+  double depth_m = 6;               // Depth in meters
+  Color color_bgr = 7;              // Detected color in BGR
+  double confidence = 8;            // Detection confidence (0.0-1.0)
+  bool is_held = 9;                 // Whether ball is being held (hand tracking)
+  uint64 timestamp_us = 10;         // Timestamp in microseconds
+  HSVRange color_range = 11;        // HSV color range used for detection
 }
 
 // Hand position and tracking

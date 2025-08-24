@@ -56,7 +56,7 @@ class ConsoleUI:
             print(f"\n📊 Frame {frame_data.frame_number} | FPS: {fps:.1f} | Balls: {len(frame_data.balls)}")
             
             for i, ball in enumerate(frame_data.balls):
-                print(f"  🏀 {ball.color_name}: "
+                print(f"  🏀 Track ID {ball.track_id}: "
                       f"3D({ball.position_3d.x:.3f}, {ball.position_3d.y:.3f}, {ball.position_3d.z:.3f}) "
                       f"2D({ball.position_2d.x:.0f}, {ball.position_2d.y:.0f}) "
                       f"conf:{ball.confidence:.2f}")
@@ -245,7 +245,7 @@ if PYQT_AVAILABLE:
             
             ball_text = ""
             for ball in frame_data.balls:
-                ball_text += f"{ball.color_name}: "
+                ball_text += f"Track ID {ball.track_id}: "
                 ball_text += f"3D({ball.position_3d.x:.3f}, {ball.position_3d.y:.3f}, {ball.position_3d.z:.3f}) "
                 ball_text += f"conf:{ball.confidence:.2f}\n"
             
@@ -389,8 +389,8 @@ if __name__ == "__main__":
                 
                 # Add test ball
                 ball = frame_data.balls.add()
-                ball.id = f"test_ball_{i}"
-                ball.color_name = ["red", "green", "blue", "yellow"][i % 4]
+                ball.track_id = i # Assign a simple track ID for testing
+                # ball.color_name = ["red", "green", "blue", "yellow"][i % 4] # color_name field removed
                 ball.position_3d.x = 0.1 * (i % 10 - 5)
                 ball.position_3d.y = 0.1 * ((i // 10) % 10 - 5)
                 ball.position_3d.z = 0.8 + 0.1 * (i % 5)

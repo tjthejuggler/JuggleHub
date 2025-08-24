@@ -217,7 +217,7 @@ if __name__ == "__main__":
         """Test callback function."""
         print(f"📦 Received frame {frame_data.frame_number} with {len(frame_data.balls)} balls")
         for ball in frame_data.balls:
-            print(f"  🏀 {ball.color_name}: ({ball.position_3d.x:.3f}, {ball.position_3d.y:.3f}, {ball.position_3d.z:.3f})")
+            print(f"  🏀 Track ID {ball.track_id}: ({ball.position_3d.x:.3f}, {ball.position_3d.y:.3f}, {ball.position_3d.z:.3f})")
     
     # Create and test listener
     listener = ZMQListener()

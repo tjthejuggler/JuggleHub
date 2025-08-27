@@ -20,7 +20,7 @@ public:
         LEGACY
     };
 
-    Engine(const std::string& config_file, OutputFormat format = OutputFormat::DEFAULT);
+    Engine(const std::string& config_file, OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true);
     ~Engine();
 
     void run();

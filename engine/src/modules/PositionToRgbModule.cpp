@@ -3,22 +3,22 @@
 #include <algorithm> // For std::clamp
 #include <iostream>
 
-PositionToRgbModule::PositionToRgbModule() : target_ball_id_("201") {} // Default to ball 201
+PositionToRgbModule::PositionToRgbModule() : target_ball_id_(1) {} // Default to ball ID 1
 
 void PositionToRgbModule::setup() {
     std::cout << "PositionToRgbModule setup complete." << std::endl;
 }
 
 void PositionToRgbModule::update(const juggler::v1::FrameData& frame_data, const CommandCallback& command_callback) {
-        const juggler::v1::Ball* green_ball = nullptr;
+        const juggler::v1::Ball* target_ball = nullptr;
         for (const auto& ball : frame_data.balls()) {
-            if (ball.color_name() == "green") {
-                green_ball = &ball;
+            if (ball.track_id() == target_ball_id_) {
+                target_ball = &ball;
                 break;
             }
         }
 
-    if (!green_ball) {
+    if (!target_ball) {
         return;
     }
 
@@ -36,9 +36,9 @@ void PositionToRgbModule::update(const juggler::v1::FrameData& frame_data, const
     // calibrated or adjusted based on the actual physical juggling volume.
     // If the ball goes outside this range, the color will be clamped to 0 or 255.
 
-    double raw_x = green_ball->position_3d().x();
-    double raw_y = green_ball->position_3d().y();
-    double raw_z = green_ball->position_3d().z();
+    double raw_x = target_ball->world_x();
+    double raw_y = target_ball->world_y();
+    double raw_z = target_ball->world_z();
 
     // Map to [0, 1] range for 0-255 scaling
     double norm_x = (raw_x + 0.5); // Example: -0.5 -> 0, 0.5 -> 1
@@ -61,7 +61,7 @@ void PositionToRgbModule::update(const juggler::v1::FrameData& frame_data, const
     auto* color_command = command.mutable_color_command();
     
     // Use the configurable target_ball_id_
-    color_command->set_ball_id(target_ball_id_);
+    color_command->set_ball_id(std::to_string(target_ball_id_));
     
     auto* color = color_command->mutable_color();
     color->set_r(r);
@@ -85,7 +85,11 @@ void PositionToRgbModule::processCommand(const juggler::v1::CommandRequest& comm
         // Look for "target_ball_id" argument
         auto it = command.module_args().find("target_ball_id");
         if (it != command.module_args().end()) {
-            target_ball_id_ = it->second;
+            try {
+                target_ball_id_ = std::stoi(it->second);
+            } catch (const std::exception& e) {
+                std::cerr << "Error converting target_ball_id to int: " << e.what() << std::endl;
+            }
             std::cout << "PositionToRgbModule configured with target_ball_id: " << target_ball_id_ << std::endl;
         } else {
             std::cout << "PositionToRgbModule received CONFIGURE_MODULE command without 'target_ball_id' argument." << std::endl;

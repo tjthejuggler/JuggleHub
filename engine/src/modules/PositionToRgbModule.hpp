@@ -13,5 +13,5 @@ public:
     void processCommand(const juggler::v1::CommandRequest& command) override;
 
 private:
-    std::string target_ball_id_; // Stores the ID of the LED ball to control
+    int target_ball_id_; // Stores the ID of the LED ball to control
 };

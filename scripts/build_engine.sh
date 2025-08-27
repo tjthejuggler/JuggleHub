@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Build script for JuggleHub C++ Engine
 # This script builds the C++ engine with Protocol Buffers support
@@ -159,22 +160,22 @@ cmake "${CMAKE_ARGS[@]}" ..
 echo -e "${YELLOW}🔨 Building engine...${NC}"
 
 if [ "$VERBOSE" = true ]; then
-    make -j$(nproc)
+    make -j$(nproc) || exit 1
 else
-    make -j$(nproc) 2>&1 | grep -E "(error|Error|ERROR|warning|Warning|WARNING|\[.*%\])" || true
+    make -j$(nproc) || exit 1
 fi
 
 # Check if build was successful
-if [ -f "$BUILD_DIR/bin/juggle_engine" ]; then
+if [ -f "$BUILD_DIR/juggle_engine" ]; then
     echo -e "${GREEN}✅ Engine built successfully!${NC}"
-    echo -e "${BLUE}📍 Executable location: $BUILD_DIR/bin/juggle_engine${NC}"
+    echo -e "${BLUE}📍 Executable location: $BUILD_DIR/juggle_engine${NC}"
     
     # Show file info
-    ls -lh "$BUILD_DIR/bin/juggle_engine"
+    ls -lh "$BUILD_DIR/juggle_engine"
     
     # Test run (just version check)
     echo -e "${YELLOW}🧪 Testing engine...${NC}"
-    if "$BUILD_DIR/bin/juggle_engine" --help 2>/dev/null || true; then
+    if "$BUILD_DIR/juggle_engine" --help 2>/dev/null || true; then
         echo -e "${GREEN}✅ Engine test passed${NC}"
     else
         echo -e "${YELLOW}⚠️ Engine test inconclusive (this may be normal)${NC}"
@@ -186,4 +187,4 @@ else
 fi
 
 echo -e "${GREEN}🎉 Build completed successfully!${NC}"
-echo -e "${BLUE}To run the engine: $BUILD_DIR/bin/juggle_engine${NC}"
+echo -e "${BLUE}To run the engine: $BUILD_DIR/juggle_engine${NC}"

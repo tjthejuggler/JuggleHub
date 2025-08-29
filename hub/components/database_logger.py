@@ -279,13 +279,13 @@ class DatabaseLogger:
                             color_bgr_b, color_bgr_g, color_bgr_r
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        self.current_session_id, frame_id, ball.track_id, "", # color_name is removed, using empty string for placeholder
-                        ball.position_3d.x, ball.position_3d.y, ball.position_3d.z,
-                        ball.position_2d.x, ball.position_2d.y,
-                        ball.velocity_3d.x, ball.velocity_3d.y, ball.velocity_3d.z,
-                        ball.radius_px, ball.depth_m, ball.confidence, ball.is_held,
-                        ball.timestamp_us,
-                        ball.color_bgr.b, ball.color_bgr.g, ball.color_bgr.r
+                        self.current_session_id, frame_id, ball.id, "", # color_name is removed, using empty string for placeholder
+                        ball.position.x, ball.position.y, ball.position.z,
+                        0, 0, # 2D position is not available in the new format
+                        0, 0, 0, # velocity is not available in the new format
+                        0, 0, 0, False, # radius, depth, confidence, is_held are not available in the new format
+                        frame_data.timestamp_us,
+                        0, 0, 0 # color is not available in the new format
                     ))
                     self.balls_logged += 1
                 
@@ -391,15 +391,10 @@ if __name__ == "__main__":
     
     # Add test ball
     ball = frame_data.balls.add()
-    ball.track_id = 1 # Assuming a default track_id for test ball
-    # ball.color_name = "red" # color_name field removed
-    ball.position_3d.x = 0.1
-    ball.position_3d.y = 0.2
-    ball.position_3d.z = 0.8
-    ball.position_2d.x = 320
-    ball.position_2d.y = 240
-    ball.confidence = 0.95
-    ball.timestamp_us = frame_data.timestamp_us
+    ball.id = 1 # Assuming a default track_id for test ball
+    ball.position.x = 0.1
+    ball.position.y = 0.2
+    ball.position.z = 0.8
     
     # Set camera intrinsics
     frame_data.intrinsics.fx = 600.0

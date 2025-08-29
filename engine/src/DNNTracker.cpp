@@ -12,8 +12,8 @@ DNNTracker::DNNTracker(const std::string& model_path, const std::string& device_
     // 2. Initialize Bytetrack
     // These are the parameters from the Bytetrack library's constructor
     int frame_rate = 30;
-    int track_buffer = 30;
-    float track_thresh = 0.5f;
+    int track_buffer = 150; // Increased from 30 to 150 (5 seconds at 30fps) for more persistent tracking
+    float track_thresh = 0.4f; // Lowered from 0.5f to make it easier to start a new track
     float high_thresh = 0.6f;
     float match_thresh = 0.8f;
     tracker = std::make_unique<byte_track::BYTETracker>(frame_rate, track_buffer, track_thresh, high_thresh, match_thresh);

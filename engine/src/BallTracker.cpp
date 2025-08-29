@@ -46,7 +46,7 @@ std::vector<cv::Point2f> BallTracker::mergeNearbyDetections(const std::vector<cv
             // Check if this center is close to any center in the current cluster
             bool should_merge = false;
             for (const auto& cluster_center : cluster) {
-                if (calculateDistance(centers[j], cluster_center) < MERGE_DISTANCE_THRESHOLD) {
+                if (calculateDistance(centers[j], cluster_center) < merge_distance_threshold_) {
                     should_merge = true;
                     break;
                 }
@@ -94,7 +94,7 @@ void BallTracker::detectBallsForColor(const cv::Mat& hsv_frame, const ColorRange
 
         std::vector<cv::Point2f> initial_centers;
         for (const auto& contour : contours) {
-            if (cv::contourArea(contour) > MIN_CONTOUR_AREA) {
+            if (cv::contourArea(contour) > min_contour_area_) {
                 cv::Moments m = cv::moments(contour);
                 if (m.m00 > 0) {
                     initial_centers.push_back(cv::Point2f(m.m10 / m.m00, m.m01 / m.m00));
@@ -125,7 +125,7 @@ void BallTracker::detectBallsForColor(const cv::Mat& hsv_frame, const ColorRange
         cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
         std::vector<cv::Point2f> initial_centers;
-        double scaled_min_area = MIN_CONTOUR_AREA * downscale_factor * downscale_factor;
+        double scaled_min_area = min_contour_area_ * downscale_factor * downscale_factor;
         for (const auto& contour : contours) {
             if (cv::contourArea(contour) > scaled_min_area) {
                 cv::Moments m = cv::moments(contour);
@@ -187,6 +187,12 @@ bool BallTracker::loadSettings() {
                 }
             }
         }
+        if (j.contains("min_contour_area")) {
+            min_contour_area_ = j["min_contour_area"];
+        }
+        if (j.contains("merge_distance_threshold")) {
+            merge_distance_threshold_ = j["merge_distance_threshold"];
+        }
         std::cerr << "Settings loaded from " << settings_file_ << std::endl;
         return true;
     } catch (const std::exception& e) {
@@ -205,6 +211,8 @@ void BallTracker::saveSettings() {
             j[color.name]["max_hsv2"] = {color.max_hsv2[0], color.max_hsv2[1], color.max_hsv2[2]};
         }
     }
+    j["min_contour_area"] = min_contour_area_;
+    j["merge_distance_threshold"] = merge_distance_threshold_;
     std::ofstream file(settings_file_);
     file << j.dump(4); // pretty print with 4 spaces
     std::cerr << "Settings saved to " << settings_file_ << std::endl;
@@ -318,6 +326,52 @@ void BallTracker::calibrateColor(const std::string& color_name, const cv::Mat& h
     std::cerr << "Calibrated " << color_name << " color from click at (" 
               << click_point.x << "," << click_point.y << ")" << std::endl;
     std::cerr << "HSV values - H:" << (int)mean[0] << " S:" << (int)mean[1] << " V:" << (int)mean[2] << std::endl;
+}
+bool BallTracker::update_setting(const std::string& key, const std::string& value) {
+    try {
+        if (key == "min_contour_area") {
+            set_min_contour_area(std::stod(value));
+        } else if (key == "merge_distance_threshold") {
+            set_merge_distance_threshold(std::stod(value));
+        } else {
+            // Handle HSV updates
+            size_t pos1 = key.find('_');
+            size_t pos2 = key.find('_', pos1 + 1);
+            if (pos1 == std::string::npos || pos2 == std::string::npos) {
+                std::cerr << "Warning: Unknown setting key '" << key << "'" << std::endl;
+                return false;
+            }
+            std::string color_name = key.substr(0, pos1);
+            std::string range_type = key.substr(pos1 + 1, pos2 - pos1 - 1); // min or max
+            std::string hsv_comp = key.substr(pos2 + 1); // h, s, or v
+
+            auto it = std::find_if(colors_.begin(), colors_.end(),
+                                  [&](const ColorRange& c) { return c.name == color_name; });
+            if (it == colors_.end()) {
+                 std::cerr << "Warning: Color '" << color_name << "' not found in settings" << std::endl;
+                 return false;
+            }
+            int val = std::stoi(value);
+            int comp_idx = (hsv_comp == "h" ? 0 : (hsv_comp == "s" ? 1 : 2));
+            if (range_type == "min") {
+                it->min_hsv[comp_idx] = val;
+            } else if (range_type == "max") {
+                it->max_hsv[comp_idx] = val;
+            } else {
+                std::cerr << "Warning: Unknown range type '" << range_type << "'" << std::endl;
+                return false;
+            }
+        }
+        std::cout << "Updated setting " << key << " to " << value << std::endl;
+        return true;
+    } catch (const std::invalid_argument& e) {
+        std::cerr << "Error: Invalid value for " << key << ": " << value << std::endl;
+        return false;
+    } catch (const std::out_of_range& e) {
+        std::cerr << "Error: Value out of range for " << key << ": " << value << std::endl;
+        return false;
+    }
+    return false;
 }
 
 std::vector<BallDetection> BallTracker::detectBalls(const cv::Mat& color_image, 

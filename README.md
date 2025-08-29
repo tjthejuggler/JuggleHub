@@ -89,6 +89,9 @@ JuggleHub/
    # Eigen3 (for mathematical operations)
    sudo apt install libeigen3-dev
    
+   # Asio (for UDP communication)
+   sudo apt install libasio-dev
+
    # Python development
    sudo apt install python3-dev python3-pip python3-venv
    ```

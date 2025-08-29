@@ -41,10 +41,10 @@ private:
     std::vector<ColorRange> colors_;
     std::string settings_file_;
     
-    // Constants
-    static constexpr double MIN_CONTOUR_AREA = 100.0;
+    // Tracking parameters
+    double min_contour_area_ = 100.0;
+    double merge_distance_threshold_ = 80.0;
     static constexpr float MAX_DEPTH = 3.0f;
-    static constexpr double MERGE_DISTANCE_THRESHOLD = 80.0;
     
     // Helper methods
     double calculateDistance(const cv::Point2f& p1, const cv::Point2f& p2);
@@ -61,9 +61,14 @@ public:
     bool loadSettings();
     void saveSettings();
     void resetToDefaults();
+    bool update_setting(const std::string& key, const std::string& value);
+
+    // Setters for tracking parameters
+    void set_min_contour_area(double area) { min_contour_area_ = area; }
+    void set_merge_distance_threshold(double dist) { merge_distance_threshold_ = dist; }
     
     // Color calibration
-    void calibrateColor(const std::string& color_name, const cv::Mat& hsv_image, 
+    void calibrateColor(const std::string& color_name, const cv::Mat& hsv_image,
                        const cv::Point& click_point);
     
     // Ball detection

@@ -59,10 +59,10 @@ void Engine::run() {
     }
 
     // Initialize the old BallTracker only if DNN tracking is not enabled
-    std::unique_ptr<juggler::BallTracker> ball_tracker_ptr;
-    if (!use_dnn_tracker_) {
-        ball_tracker_ptr = std::make_unique<juggler::BallTracker>("ball_settings.json");
-    }
+    ball_tracker_ = std::make_shared<juggler::BallTracker>("ball_settings.json");
+    
+    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(ball_tracker_);
+    settings_module_->setup();
 
     while (running_) {
         rs2::frameset frames = pipe_.wait_for_frames();
@@ -90,12 +90,18 @@ void Engine::run() {
         // Get camera intrinsics
         auto intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
 
-        // --- NEW DNN TRACKING CODE ---
-        if (!dnn_tracker_) return; // Safety check
+        // --- BAll TRACKING CODE ---
+        std::vector<TrackedObject> tracked_objects;
+        if (use_dnn_tracker_) {
+            if (!dnn_tracker_) return; // Safety check
 
-        std::vector<TrackedObject> tracked_objects = dnn_tracker_->update(color_image);
-        if (verbose_) {
-            std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects." << std::endl;
+            tracked_objects = dnn_tracker_->update(color_image);
+            if (verbose_) {
+                std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects." << std::endl;
+            }
+        } else {
+            auto detections = ball_tracker_->detectBalls(color_image, depth_frame, intrinsics);
+            // ... (code to populate frame_data from detections)
         }
 
         // Now, convert the 2D results to 3D and populate your Protobuf message
@@ -158,6 +164,9 @@ void Engine::run() {
 
 void Engine::stop() {
     running_ = false;
+    if (settings_module_) {
+        settings_module_->cleanup();
+    }
 }
 
 void Engine::processCommands() {

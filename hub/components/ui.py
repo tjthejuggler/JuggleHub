@@ -10,6 +10,7 @@ import threading
 from typing import Optional, Dict, Any
 import os
 import base64
+import socket
 
 
 try:
@@ -20,10 +21,10 @@ except ImportError:
 
 # Try to import PyQt6, fall back to console UI if not available
 try:
-    from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                                QHBoxLayout, QLabel, QTextEdit, QPushButton,
-                                QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
-                                QGraphicsScene, QGraphicsPixmapItem)
+    from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                                 QHBoxLayout, QLabel, QTextEdit, QPushButton,
+                                 QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
+                                 QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
     from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter
     PYQT_AVAILABLE = True
@@ -31,6 +32,17 @@ except ImportError:
     print("⚠️ PyQt6 not available. Using console UI.")
     PYQT_AVAILABLE = False
 
+
+class UdpClient:
+    def __init__(self, host="127.0.0.1", port=12346):
+        self.host = host
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def send_setting(self, key: str, value: Any):
+        message = f"{key}={value}"
+        self.sock.sendto(message.encode('utf-8'), (self.host, self.port))
+        print(f"Sent UDP setting: {message}")
 
 class ConsoleUI:
     """Simple console-based UI for systems without PyQt6."""
@@ -89,7 +101,82 @@ if PYQT_AVAILABLE:
     class FrameDataSignal(QObject):
         """Signal emitter for thread-safe UI updates."""
         frame_received = pyqtSignal(object)
-    
+
+    class CalibrationSettingsWidget(QWidget):
+        def __init__(self, udp_client: UdpClient, parent=None):
+            super().__init__(parent)
+            self.udp_client = udp_client
+            self.init_ui()
+
+        def init_ui(self):
+            layout = QVBoxLayout(self)
+            
+            # -- General Settings --
+            general_group = QGroupBox("General Tracking Settings")
+            general_layout = QGridLayout(general_group)
+            
+            # Min Contour Area
+            general_layout.addWidget(QLabel("Min Contour Area:"), 0, 0)
+            self.min_contour_slider = QSlider(Qt.Orientation.Horizontal)
+            self.min_contour_slider.setRange(10, 1000)
+            self.min_contour_slider.setValue(100)
+            self.min_contour_slider.valueChanged.connect(lambda v: self.update_setting('min_contour_area', v))
+            general_layout.addWidget(self.min_contour_slider, 0, 1)
+
+            # Merge Distance
+            general_layout.addWidget(QLabel("Merge Distance:"), 1, 0)
+            self.merge_dist_slider = QSlider(Qt.Orientation.Horizontal)
+            self.merge_dist_slider.setRange(10, 200)
+            self.merge_dist_slider.setValue(80)
+            self.merge_dist_slider.valueChanged.connect(lambda v: self.update_setting('merge_distance_threshold', v))
+            general_layout.addWidget(self.merge_dist_slider, 1, 1)
+
+            layout.addWidget(general_group)
+            
+            # Save button
+            self.save_button = QPushButton("Save Settings")
+            self.save_button.clicked.connect(self.save_settings)
+            layout.addWidget(self.save_button)
+
+            # -- Color-specific Settings --
+            self.color_groups = {}
+            colors = ["pink", "orange", "green", "yellow"]
+            for color in colors:
+                group = QGroupBox(f"{color.capitalize()} HSV Thresholds")
+                grid = QGridLayout(group)
+                
+                # H, S, V sliders
+                for i, comp in enumerate(["H", "S", "V"]):
+                    # Min
+                    grid.addWidget(QLabel(f"Min {comp}:"), i, 0)
+                    min_slider = QSlider(Qt.Orientation.Horizontal)
+                    min_slider.setRange(0, 255)
+                    min_slider.valueChanged.connect(self.make_hsv_updater(color, 'min', comp.lower()))
+                    grid.addWidget(min_slider, i, 1)
+                    # Max
+                    grid.addWidget(QLabel(f"Max {comp}:"), i, 2)
+                    max_slider = QSlider(Qt.Orientation.Horizontal)
+                    max_slider.setRange(0, 255)
+                    max_slider.valueChanged.connect(self.make_hsv_updater(color, 'max', comp.lower()))
+                    grid.addWidget(max_slider, i, 3)
+
+                layout.addWidget(group)
+                self.color_groups[color] = group
+
+            layout.addStretch()
+
+        def save_settings(self):
+            self.udp_client.send_setting('save_settings', '1')
+
+        def update_setting(self, key: str, value: Any):
+            self.udp_client.send_setting(key, value)
+
+        def make_hsv_updater(self, color, range_type, component):
+            def updater(value):
+                key = f"{color}_{range_type}_{component}"
+                self.udp_client.send_setting(key, value)
+            return updater
+
     class JuggleHubMainWindow(QMainWindow):
         """Main window for JuggleHub UI."""
         
@@ -100,6 +187,7 @@ if PYQT_AVAILABLE:
             self.start_time = time.time()
             self.last_frame_data: Optional[juggler_pb2.FrameData] = None
             self.calibration_mode = False
+            self.udp_client = UdpClient()
             
             # Signal for thread-safe updates
             self.signal_emitter = FrameDataSignal()
@@ -167,8 +255,12 @@ if PYQT_AVAILABLE:
             self.video_pixmap_item = QGraphicsPixmapItem()
             self.video_scene.addItem(self.video_pixmap_item)
             self.video_layout.addWidget(self.video_view)
-            self.video_group.setVisible(False) # Initially hidden
-            content_layout.addWidget(self.video_group)
+            content_layout.addWidget(self.video_group, 2) # Give it more stretch factor
+            
+            # Calibration settings panel
+            self.settings_widget = CalibrationSettingsWidget(self.udp_client)
+            self.settings_widget.setVisible(False)
+            content_layout.addWidget(self.settings_widget, 1)
             
             # Right panel - System info
             system_group = QGroupBox("⚙️ System Status")
@@ -330,12 +422,11 @@ if PYQT_AVAILABLE:
             """Toggle the visibility of the calibration video feed."""
             self.calibration_mode = not self.calibration_mode
             self.video_group.setVisible(self.calibration_mode)
+            self.settings_widget.setVisible(self.calibration_mode)
             if self.calibration_mode:
                 self.calibration_button.setText("Exit Calibration Mode")
-                self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
             else:
                 self.calibration_button.setText("Enter Calibration Mode")
-                self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMaximized)
 
         def update_video_feed(self, image_data_b64: bytes, balls: list):
             """Update the video feed with the new frame and bounding boxes."""

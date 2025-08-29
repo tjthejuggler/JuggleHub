@@ -12,6 +12,20 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Function to clean up the engine process
+ENGINE_PID=0
+cleanup() {
+    echo -e "${YELLOW}🧹 Cleaning up engine process...${NC}"
+    if [ $ENGINE_PID -ne 0 ]; then
+        echo "Killing engine process $ENGINE_PID"
+        # Kill the entire process group to ensure child processes are terminated
+        kill -TERM -$ENGINE_PID 2>/dev/null
+    fi
+}
+
+# Set the trap to call cleanup on script exit
+trap cleanup EXIT
+
 echo -e "${BLUE}🚀 Starting JuggleHub Python Hub${NC}"
 
 # Get script directory
@@ -192,6 +206,42 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
 fi
 
 echo -e "${GREEN}✅ All required dependencies found${NC}"
+
+# --- C++ Engine Management ---
+ENGINE_EXECUTABLE="$PROJECT_ROOT/engine/build/juggle_engine"
+
+# Check if engine executable exists
+if [ ! -f "$ENGINE_EXECUTABLE" ]; then
+    echo -e "${RED}❌ Error: C++ engine executable not found at $ENGINE_EXECUTABLE${NC}"
+    echo "Please build the engine first by running: ./scripts/build_engine.sh"
+    exit 1
+fi
+
+# Start the C++ engine in the background
+echo -e "${BLUE}🧠 Starting C++ engine...${NC}"
+ENGINE_ARGS=("--use-dnn-tracker" "--verbose")
+
+echo "Engine command: $ENGINE_EXECUTABLE ${ENGINE_ARGS[@]}"
+
+# Change to the engine directory so it can find its models
+cd "$PROJECT_ROOT/engine"
+
+echo "Engine command: build/juggle_engine ${ENGINE_ARGS[@]}"
+
+# Start the engine as a new process group to allow killing it and its children
+set -m
+# Redirect engine output to a log file for debugging
+"build/juggle_engine" "${ENGINE_ARGS[@]}" > "$PROJECT_ROOT/engine.log" 2>&1 &
+ENGINE_PID=$!
+set +m
+
+# Return to the project root
+cd "$PROJECT_ROOT"
+
+echo -e "${GREEN}✅ C++ engine started with PID $ENGINE_PID${NC}"
+# Give the engine a moment to start up the ZMQ server
+sleep 2
+# --- End C++ Engine Management ---
 
 # Build hub arguments
 HUB_ARGS=("${PASS_THROUGH_ARGS[@]}")

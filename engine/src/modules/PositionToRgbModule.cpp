@@ -12,7 +12,7 @@ void PositionToRgbModule::setup() {
 void PositionToRgbModule::update(const juggler::v1::FrameData& frame_data, const CommandCallback& command_callback) {
         const juggler::v1::Ball* target_ball = nullptr;
         for (const auto& ball : frame_data.balls()) {
-            if (ball.track_id() == target_ball_id_) {
+            if (ball.id() == target_ball_id_) {
                 target_ball = &ball;
                 break;
             }
@@ -36,9 +36,9 @@ void PositionToRgbModule::update(const juggler::v1::FrameData& frame_data, const
     // calibrated or adjusted based on the actual physical juggling volume.
     // If the ball goes outside this range, the color will be clamped to 0 or 255.
 
-    double raw_x = target_ball->world_x();
-    double raw_y = target_ball->world_y();
-    double raw_z = target_ball->world_z();
+    double raw_x = target_ball->position().x();
+    double raw_y = target_ball->position().y();
+    double raw_z = target_ball->position().z();
 
     // Map to [0, 1] range for 0-255 scaling
     double norm_x = (raw_x + 0.5); // Example: -0.5 -> 0, 0.5 -> 1

@@ -20,7 +20,7 @@ public:
         LEGACY
     };
 
-    Engine(const std::string& config_file, OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true);
+    Engine(const std::string& config_file, OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
     ~Engine();
 
     void run();
@@ -42,6 +42,7 @@ private:
     std::unique_ptr<UdpBallColorModule> color_module_;
     std::unique_ptr<DNNTracker> dnn_tracker_; // New DNNTracker instance
     bool use_dnn_tracker_; // Flag to switch between old/new tracker
+    bool verbose_;
 
     // ZMQ
     zmq::context_t zmq_context_;

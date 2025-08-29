@@ -29,13 +29,8 @@ message HSVRange {
 
 // Ball detection and tracking information
 message Ball {
-  // NEW FIELD:
-  int32 track_id = 1; // The stable integer ID from Bytetrack
-
-  float world_x = 2;
-  float world_y = 3;
-  float world_z = 4;
-  // ... other fields are fine ...
+  int32 id = 1;
+  Vector3 position = 2;
 }
 
 // Hand position and tracking

@@ -9,10 +9,11 @@
 #include <chrono>
 #include <iomanip>
 
-Engine::Engine(const std::string& config_file, OutputFormat format, bool use_dnn_tracker)
+Engine::Engine(const std::string& config_file, OutputFormat format, bool use_dnn_tracker, bool verbose)
     : running_(false),
       output_format_(format),
       use_dnn_tracker_(use_dnn_tracker), // Initialize the flag
+      verbose_(verbose),
       zmq_context_(1),
       zmq_publisher_(zmq_context_, ZMQ_PUB),
       zmq_commander_(zmq_context_, ZMQ_REP),
@@ -50,7 +51,12 @@ void Engine::run() {
     // Initialize camera
     rs_config_.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
     rs_config_.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
-    pipe_.start(rs_config_);
+    rs2::pipeline_profile profile = pipe_.start(rs_config_);
+    if (verbose_) {
+        std::cout << "Camera started." << std::endl;
+        auto stream = profile.get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
+        std::cout << "Color stream: " << stream.width() << "x" << stream.height() << " @" << stream.fps() << "fps" << std::endl;
+    }
 
     // Initialize the old BallTracker only if DNN tracking is not enabled
     std::unique_ptr<juggler::BallTracker> ball_tracker_ptr;
@@ -83,6 +89,9 @@ void Engine::run() {
         if (!dnn_tracker_) return; // Safety check
 
         std::vector<TrackedObject> tracked_objects = dnn_tracker_->update(color_image);
+        if (verbose_) {
+            std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects." << std::endl;
+        }
 
         // Now, convert the 2D results to 3D and populate your Protobuf message
         // This part uses your existing RealSense knowledge
@@ -101,8 +110,12 @@ void Engine::run() {
                     rs2_deproject_pixel_to_point(point, &intrinsics, (const float[2]){pixel_x, pixel_y}, depth_in_meters);
                     
                     // point[0] is X, point[1] is Y, point[2] is Z
-                    // Now, use obj.id and the 3D point (point[0], point[1], point[2])
-                    // to populate your Protobuf message that gets sent to the Python hub.
+                    auto* ball = frame_data.add_balls();
+                    ball->set_id(obj.id);
+                    auto* pos = ball->mutable_position();
+                    pos->set_x(point[0]);
+                    pos->set_y(point[1]);
+                    pos->set_z(point[2]);
                 }
             }
         }

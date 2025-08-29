@@ -56,10 +56,8 @@ class ConsoleUI:
             print(f"\n📊 Frame {frame_data.frame_number} | FPS: {fps:.1f} | Balls: {len(frame_data.balls)}")
             
             for i, ball in enumerate(frame_data.balls):
-                print(f"  🏀 Track ID {ball.track_id}: "
-                      f"3D({ball.position_3d.x:.3f}, {ball.position_3d.y:.3f}, {ball.position_3d.z:.3f}) "
-                      f"2D({ball.position_2d.x:.0f}, {ball.position_2d.y:.0f}) "
-                      f"conf:{ball.confidence:.2f}")
+                print(f"  🏀 ID {ball.id}: "
+                      f"3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})")
             
             if frame_data.hands:
                 print(f"  👋 Hands: {len(frame_data.hands)}")
@@ -245,9 +243,8 @@ if PYQT_AVAILABLE:
             
             ball_text = ""
             for ball in frame_data.balls:
-                ball_text += f"Track ID {ball.track_id}: "
-                ball_text += f"3D({ball.position_3d.x:.3f}, {ball.position_3d.y:.3f}, {ball.position_3d.z:.3f}) "
-                ball_text += f"conf:{ball.confidence:.2f}\n"
+                ball_text += f"ID {ball.id}: "
+                ball_text += f"3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
             
             self.ball_list.setPlainText(ball_text)
             
@@ -389,14 +386,10 @@ if __name__ == "__main__":
                 
                 # Add test ball
                 ball = frame_data.balls.add()
-                ball.track_id = i # Assign a simple track ID for testing
-                # ball.color_name = ["red", "green", "blue", "yellow"][i % 4] # color_name field removed
-                ball.position_3d.x = 0.1 * (i % 10 - 5)
-                ball.position_3d.y = 0.1 * ((i // 10) % 10 - 5)
-                ball.position_3d.z = 0.8 + 0.1 * (i % 5)
-                ball.position_2d.x = 320 + 10 * (i % 20 - 10)
-                ball.position_2d.y = 240 + 10 * ((i // 20) % 20 - 10)
-                ball.confidence = 0.8 + 0.2 * (i % 5) / 5
+                ball.id = i # Assign a simple track ID for testing
+                ball.position.x = 0.1 * (i % 10 - 5)
+                ball.position.y = 0.1 * ((i // 10) % 10 - 5)
+                ball.position.z = 0.8 + 0.1 * (i % 5)
                 ball.timestamp_us = frame_data.timestamp_us
                 
                 # Set system status

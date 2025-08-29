@@ -4,7 +4,8 @@
 DNNTracker::DNNTracker(const std::string& model_path, const std::string& device_name) {
     // 1. Initialize OpenVINO
     std::cout << "Loading OpenVINO model: " << model_path << std::endl;
-    compiled_model = core.compile_model(model_path, device_name);
+    // Force CPU usage to avoid GPU initialization errors on systems without a compatible GPU
+    compiled_model = core.compile_model(model_path, "CPU");
     infer_request = compiled_model.create_infer_request();
     std::cout << "Model loaded successfully." << std::endl;
 

@@ -69,22 +69,26 @@ fi
 
 # Generate Python Protocol Buffer files if they don't exist or are outdated
 PROTO_FILE="$API_DIR/juggler.proto"
-PY_PROTO_FILE="$API_DIR/juggler_pb2.py"
+PY_PROTO_FILE="$HUB_DIR/juggler_pb2.py"
 
 if [ ! -f "$PY_PROTO_FILE" ] || [ "$PROTO_FILE" -nt "$PY_PROTO_FILE" ]; then
     echo -e "${YELLOW}🔄 Generating Python Protocol Buffer files...${NC}"
     
-    cd "$API_DIR"
-    protoc --python_out=. juggler.proto
+    # Generate the file directly into the hub directory
+    # Use grpc_tools.protoc to generate both message and gRPC stub files
+    python3 -m grpc_tools.protoc -I="$API_DIR" --python_out="$HUB_DIR" --grpc_python_out="$HUB_DIR" "$API_DIR/juggler.proto"
     
-    if [ -f "juggler_pb2.py" ]; then
-        echo -e "${GREEN}✅ Protocol Buffer files generated${NC}"
+    # Ensure the hub directory is treated as a package
+    touch "$HUB_DIR/__init__.py"
+    
+    if [ -f "$HUB_DIR/juggler_pb2.py" ] && [ -f "$HUB_DIR/juggler_pb2_grpc.py" ]; then
+        echo -e "${GREEN}✅ Protocol Buffer and gRPC files generated${NC}"
     else
         echo -e "${RED}❌ Error: Failed to generate Protocol Buffer files${NC}"
         exit 1
     fi
     
-    cd "$PROJECT_ROOT"
+    # No need to change directories anymore
 else
     echo -e "${GREEN}✅ Protocol Buffer files are up to date${NC}"
 fi
@@ -254,7 +258,6 @@ echo -e "${BLUE}🎯 Starting JuggleHub...${NC}"
 echo -e "${BLUE}Arguments passed to hub: ${HUB_ARGS[*]}${NC}"
 
 # Add the API directory to Python path
-export PYTHONPATH="$API_DIR:$PYTHONPATH"
 
 # Run the hub
 python3 main.py "${HUB_ARGS[@]}"

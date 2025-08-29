@@ -82,6 +82,11 @@ void Engine::run() {
         frame_data.set_timestamp_us(std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count());
 
+        // Encode color image to JPEG and send as bytes
+        std::vector<uchar> buf;
+        cv::imencode(".jpg", color_image, buf);
+        frame_data.set_color_image_b64(buf.data(), buf.size());
+
         // Get camera intrinsics
         auto intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
 
@@ -116,6 +121,13 @@ void Engine::run() {
                     pos->set_x(point[0]);
                     pos->set_y(point[1]);
                     pos->set_z(point[2]);
+
+                    // Populate the new bounding box field
+                    auto* bbox = ball->mutable_bounding_box_2d();
+                    bbox->set_x(obj.box.x);
+                    bbox->set_y(obj.box.y);
+                    bbox->set_width(obj.box.width);
+                    bbox->set_height(obj.box.height);
                 }
             }
         }
@@ -131,6 +143,11 @@ void Engine::run() {
         // Publish FrameData
         std::string serialized_data;
         frame_data.SerializeToString(&serialized_data);
+
+        if (verbose_) {
+            std::cout << "Serialized FrameData size: " << serialized_data.size() << " bytes" << std::endl;
+        }
+
         zmq::message_t message(serialized_data.size());
         memcpy(message.data(), serialized_data.c_str(), serialized_data.size());
         zmq_publisher_.send(message, zmq::send_flags::dontwait);

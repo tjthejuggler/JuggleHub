@@ -9,10 +9,8 @@ import time
 import threading
 from typing import Optional, Dict, Any
 import os
+import base64
 
-# Add the api directory to the path for protobuf imports
-api_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'api', 'v1')
-sys.path.insert(0, api_path)
 
 try:
     import juggler_pb2
@@ -23,10 +21,11 @@ except ImportError:
 # Try to import PyQt6, fall back to console UI if not available
 try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                                QHBoxLayout, QLabel, QTextEdit, QPushButton, 
-                                QGroupBox, QGridLayout, QProgressBar)
+                                QHBoxLayout, QLabel, QTextEdit, QPushButton,
+                                QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
+                                QGraphicsScene, QGraphicsPixmapItem)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
-    from PyQt6.QtGui import QFont, QPalette, QColor
+    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen
     PYQT_AVAILABLE = True
 except ImportError:
     print("⚠️ PyQt6 not available. Using console UI.")
@@ -100,6 +99,7 @@ if PYQT_AVAILABLE:
             self.frame_count = 0
             self.start_time = time.time()
             self.last_frame_data: Optional[juggler_pb2.FrameData] = None
+            self.calibration_mode = False
             
             # Signal for thread-safe updates
             self.signal_emitter = FrameDataSignal()
@@ -152,7 +152,23 @@ if PYQT_AVAILABLE:
             self.ball_list.setReadOnly(True)
             ball_layout.addWidget(self.ball_list)
             
+            # Calibration button
+            self.calibration_button = QPushButton("Enter Calibration Mode")
+            self.calibration_button.clicked.connect(self.toggle_calibration_mode)
+            ball_layout.addWidget(self.calibration_button)
+
             content_layout.addWidget(ball_group)
+
+            # Center panel - Video Feed
+            self.video_group = QGroupBox("📹 Camera Feed")
+            self.video_layout = QVBoxLayout(self.video_group)
+            self.video_scene = QGraphicsScene()
+            self.video_view = QGraphicsView(self.video_scene)
+            self.video_pixmap_item = QGraphicsPixmapItem()
+            self.video_scene.addItem(self.video_pixmap_item)
+            self.video_layout.addWidget(self.video_view)
+            self.video_group.setVisible(False) # Initially hidden
+            content_layout.addWidget(self.video_group)
             
             # Right panel - System info
             system_group = QGroupBox("⚙️ System Status")
@@ -247,6 +263,10 @@ if PYQT_AVAILABLE:
                 ball_text += f"3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
             
             self.ball_list.setPlainText(ball_text)
+
+            # Update video feed if in calibration mode
+            if self.calibration_mode and frame_data.color_image_jpeg:
+                self.update_video_feed(frame_data)
             
             # Update system status
             if frame_data.HasField('status'):
@@ -305,6 +325,38 @@ if PYQT_AVAILABLE:
                 cursor.movePosition(cursor.MoveOperation.Start)
                 cursor.select(cursor.SelectionType.BlockUnderCursor)
                 cursor.removeSelectedText()
+        
+        def toggle_calibration_mode(self):
+            """Toggle the visibility of the calibration video feed."""
+            self.calibration_mode = not self.calibration_mode
+            self.video_group.setVisible(self.calibration_mode)
+            if self.calibration_mode:
+                self.calibration_button.setText("Exit Calibration Mode")
+                self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
+            else:
+                self.calibration_button.setText("Enter Calibration Mode")
+                self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMaximized)
+
+        def update_video_feed(self, frame_data: juggler_pb2.FrameData):
+            """Update the video feed with the new frame and bounding boxes."""
+            image_data = base64.b64decode(frame_data.color_image_b64)
+            image = QImage()
+            image.loadFromData(image_data, "JPEG")
+            pixmap = QPixmap.fromImage(image)
+
+            # Draw bounding boxes
+            painter = QPainter(pixmap)
+            pen = QPen(QColor(255, 0, 0), 2) # Red pen for boxes
+            painter.setPen(pen)
+            
+            for ball in frame_data.balls:
+                bbox = ball.bounding_box_2d
+                painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
+            
+            painter.end()
+
+            self.video_pixmap_item.setPixmap(pixmap)
+            self.video_view.fitInView(self.video_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
 
 class JuggleHubUI:

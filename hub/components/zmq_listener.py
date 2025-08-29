@@ -12,8 +12,6 @@ import sys
 import os
 
 # Add the api directory to the path for protobuf imports
-api_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'api', 'v1')
-sys.path.insert(0, api_path)
 
 try:
     import juggler_pb2

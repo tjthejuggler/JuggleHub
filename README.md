@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-08-29 16:09:00 UTC
+**Last Updated:** 2025-08-29 16:14:00 UTC
 
 ## 🎯 Overview
 
@@ -115,13 +115,24 @@ JuggleHub/
    ./scripts/run_hub.sh --create-venv --install-deps
    ```
 
+   **Note:** If you encounter an "externally-managed-environment" error when installing dependencies, the script will automatically create and use a virtual environment to avoid conflicts with system Python packages.
+
 ### Running the System
 
 1. **Start the system:**
    ```bash
+   # If using virtual environment (recommended)
+   ./scripts/run_hub.sh --use-venv
+   
+   # Or without virtual environment (if system allows)
    ./scripts/run_hub.sh
    ```
    This will start both the C++ engine and the Python hub.
+
+   **Troubleshooting:** If you see "Missing required dependencies: protobuf pyzmq", run:
+   ```bash
+   ./scripts/run_hub.sh --create-venv --install-deps
+   ```
 
 ## 📊 Features
 
@@ -744,6 +755,12 @@ This architecture provides a foundation for many advanced features:
 ## 🔍 Troubleshooting
 
 ### Common Issues
+
+**"Missing required dependencies: protobuf pyzmq"**
+- This occurs when Python dependencies are not installed
+- Solution: Run `./scripts/run_hub.sh --create-venv --install-deps`
+- For subsequent runs, use `./scripts/run_hub.sh --use-venv`
+- The script automatically handles virtual environment creation to avoid system package conflicts
 
 **"No RealSense device found"**
 - Ensure camera is connected to USB 3.0 port

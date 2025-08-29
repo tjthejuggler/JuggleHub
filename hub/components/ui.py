@@ -25,7 +25,7 @@ try:
                                 QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
                                 QGraphicsScene, QGraphicsPixmapItem)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
-    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen
+    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter
     PYQT_AVAILABLE = True
 except ImportError:
     print("⚠️ PyQt6 not available. Using console UI.")
@@ -265,8 +265,8 @@ if PYQT_AVAILABLE:
             self.ball_list.setPlainText(ball_text)
 
             # Update video feed if in calibration mode
-            if self.calibration_mode and frame_data.color_image_jpeg:
-                self.update_video_feed(frame_data)
+            if self.calibration_mode and frame_data.color_image_b64:
+                self.update_video_feed(frame_data.color_image_b64, frame_data.balls)
             
             # Update system status
             if frame_data.HasField('status'):
@@ -337,11 +337,10 @@ if PYQT_AVAILABLE:
                 self.calibration_button.setText("Enter Calibration Mode")
                 self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMaximized)
 
-        def update_video_feed(self, frame_data: juggler_pb2.FrameData):
+        def update_video_feed(self, image_data_b64: bytes, balls: list):
             """Update the video feed with the new frame and bounding boxes."""
-            image_data = base64.b64decode(frame_data.color_image_b64)
             image = QImage()
-            image.loadFromData(image_data, "JPEG")
+            image.loadFromData(image_data_b64, "JPEG")
             pixmap = QPixmap.fromImage(image)
 
             # Draw bounding boxes
@@ -349,7 +348,7 @@ if PYQT_AVAILABLE:
             pen = QPen(QColor(255, 0, 0), 2) # Red pen for boxes
             painter.setPen(pen)
             
-            for ball in frame_data.balls:
+            for ball in balls:
                 bbox = ball.bounding_box_2d
                 painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
             

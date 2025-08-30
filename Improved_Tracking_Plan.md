@@ -197,3 +197,13 @@ Before the LLM begins coding, you will need to set up your environment for data 
 *   **👤 User Actions:**
     *   Test the final system extensively. The ultimate test will be to see if the system can accurately log a complete three-ball cascade: "Ball 1 thrown by Left, Ball 2 thrown by Right, Ball 1 caught by Right, Ball 3 thrown by Left..." etc.
 
+-----------------
+
+FUTURE DATASET TIPS 2025-08-30 19:15:01 
+LED balls that are in the midst of changing colors
+
+
+
+
+there is information here on organizing and currating the dataset
+https://aistudio.google.com/app/prompts/103b1kbwxWr8EP4_0xLqMLrnf3AvapiPz

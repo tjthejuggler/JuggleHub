@@ -101,8 +101,6 @@ message FrameData {
   
   // Optional image data (base64 encoded for streaming)
   repeated BoundingBox2D raw_detections = 10; // New field
-  
-  // Optional image data (base64 encoded for streaming)
   bytes color_image_b64 = 11;      // Base64 encoded color image
   bytes depth_image_b64 = 12;      // Base64 encoded depth image
 }

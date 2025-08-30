@@ -162,6 +162,9 @@ void Engine::run() {
 
         // Publish FrameData
         std::string serialized_data;
+        if (verbose_) {
+            std::cout << "DEBUG: C++ sending " << frame_data.balls_size() << " balls." << std::endl;
+        }
         frame_data.SerializeToString(&serialized_data);
 
         if (verbose_) {

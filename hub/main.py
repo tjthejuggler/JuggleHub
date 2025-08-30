@@ -79,6 +79,8 @@ class JuggleHub:
             try:
                 # 1. Receive ball tracking data from the C++ engine
                 frame_data = self.zmq_client.receive_frame_data()
+                if frame_data:
+                    print(f"DEBUG: Received frame_data with {len(frame_data.balls)} balls.")
 
                 # 2. Get the latest IMU data from the listener
                 if self.imu_listener:
@@ -87,7 +89,7 @@ class JuggleHub:
                     imu_datas = {}
 
                 # If no ball data, create an empty FrameData to carry the IMU data
-                if not frame_data and imu_datas:
+                if frame_data is None and imu_datas:
                     frame_data = juggler_pb2.FrameData()
                     frame_data.timestamp_us = int(time.time() * 1_000_000)
                 
@@ -99,6 +101,7 @@ class JuggleHub:
                     
                     # Pass the combined frame_data to other components
                     if self.ui:
+                        print(f"DEBUG: Updating UI with frame_data containing {len(frame_data.balls)} balls.")
                         self.ui.update_frame_data(frame_data)
                     
                     if self.database_logger:

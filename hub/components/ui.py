@@ -424,7 +424,7 @@ if PYQT_AVAILABLE:
             pen_tracked = QPen(QColor(0, 255, 0), 2)  # Solid green
             painter.setPen(pen_tracked)
             for ball in frame_data.balls:
-                bbox = ball.bounding_box_2d
+                bbox = ball.bounding_box
                 painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
                 painter.drawText(int(bbox.x), int(bbox.y) + int(bbox.height) + 15, f"ID: {ball.id}")
 

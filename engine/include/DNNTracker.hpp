@@ -45,7 +45,7 @@ private:
     // Model & Preprocessing Parameters
     int input_width_ = 640;
     int input_height_ = 640;
-    float confidence_threshold_ = 0.25; // Lowered threshold for more stable tracking
+    float confidence_threshold_ = 0.15; // Lowered threshold to compensate for the generic model's performance
     float nms_threshold_ = 0.5;
 
     // --- Private Methods ---

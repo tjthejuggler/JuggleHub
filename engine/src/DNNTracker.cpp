@@ -13,7 +13,7 @@ DNNTracker::DNNTracker(const std::string& model_path, const std::string& device_
     // These are the parameters from the Bytetrack library's constructor
     int frame_rate = 30;
     int track_buffer = 150; // Increased from 30 to 150 (5 seconds at 30fps) for more persistent tracking
-    float track_thresh = 0.4f; // Lowered from 0.5f to make it easier to start a new track
+    float track_thresh = 0.25f; // Match the confidence_threshold_ to allow new tracks to be created
     float high_thresh = 0.6f;
     float match_thresh = 0.8f;
     tracker = std::make_unique<byte_track::BYTETracker>(frame_rate, track_buffer, track_thresh, high_thresh, match_thresh);
@@ -123,29 +123,25 @@ std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& frame, co
             int width = static_cast<int>(w * scale_x);
             int height = static_cast<int>(h * scale_y);
             
-            // Populate raw detections before confidence thresholding and NMS
+            // Populate raw detections for visualization
             if (max_class_score > raw_detection_threshold) {
                 raw_detections.push_back({cv::Rect_<float>(left, top, width, height), (float)max_class_score});
             }
 
-            if (max_class_score > confidence_threshold_) {
-                boxes.push_back(cv::Rect(left, top, width, height));
-                confidences.push_back(max_class_score);
-                class_ids.push_back(class_id_point.x);
-            }
+            // Add all potential balls to the list for NMS and tracking.
+            // The confidence_threshold will be applied inside the NMSBoxes function.
+            boxes.push_back(cv::Rect(left, top, width, height));
+            confidences.push_back(max_class_score);
+            class_ids.push_back(class_id_point.x);
         }
     }
 
-    // Apply Non-Maximum Suppression (NMS) to remove overlapping boxes
-    std::vector<int> indices;
-    cv::dnn::NMSBoxes(boxes, confidences, confidence_threshold_, nms_threshold_, indices);
-
-    // Format detections for Bytetrack
+    // Bytetrack is designed to handle raw detections, so we will not apply NMS here.
+    // We will format all detections that passed the initial confidence check.
     std::vector<byte_track::Object> objects;
-    for (int idx : indices) {
-        const auto& box = boxes[idx];
-        byte_track::Rect<float> rect(box.x, box.y, box.width, box.height);
-        objects.push_back({rect, class_ids[idx], confidences[idx]});
+    for (size_t i = 0; i < boxes.size(); ++i) {
+        byte_track::Rect<float> rect(boxes[i].x, boxes[i].y, boxes[i].width, boxes[i].height);
+        objects.push_back({rect, class_ids[i], confidences[i]});
     }
     return objects;
 }

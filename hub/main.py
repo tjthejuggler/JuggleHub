@@ -50,7 +50,7 @@ class JuggleHub:
 
             # Initialize UI
             if self.config['enable_ui']:
-                self.ui = JuggleHubUI(self.config)
+                self.ui = JuggleHubUI(self.config, self.zmq_client)
 
             # Initialize DatabaseLogger
             if self.config['enable_logging']:

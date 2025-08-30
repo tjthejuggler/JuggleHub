@@ -9,6 +9,7 @@
 #include <queue>
 #include <mutex>
 #include <string>
+#include <deque>
 #include <atomic>
 #include <zmq.hpp>
 #include <librealsense2/rs.hpp>
@@ -30,6 +31,7 @@ public:
 private:
     void processCommands();
     void sendCommand(const juggler::v1::CommandRequest& command);
+    void saveRecording();
     std::unique_ptr<ModuleBase> create_module(const juggler::v1::CommandRequest& command);
 
     OutputFormat output_format_;
@@ -56,4 +58,9 @@ private:
     rs2::pipeline pipe_;
     rs2::config rs_config_;
     rs2::align align_to_color_;
+
+    // Frame buffer for recording
+    std::deque<cv::Mat> frame_buffer_;
+    std::mutex frame_buffer_mutex_;
+    uint32_t frame_counter_;
 };

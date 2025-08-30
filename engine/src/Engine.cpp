@@ -8,6 +8,11 @@
 #include <thread>
 #include <chrono>
 #include <iomanip>
+#include <filesystem>
+#include <opencv2/imgcodecs.hpp>
+#include <deque>
+
+namespace fs = std::filesystem;
 
 Engine::Engine(const std::string& config_file, OutputFormat format, bool use_dnn_tracker, bool verbose)
     : running_(false),
@@ -18,9 +23,10 @@ Engine::Engine(const std::string& config_file, OutputFormat format, bool use_dnn
       zmq_publisher_(zmq_context_, ZMQ_PUB),
       zmq_commander_(zmq_context_, ZMQ_REP),
       align_to_color_(RS2_STREAM_COLOR),
-      color_module_(std::make_unique<UdpBallColorModule>()) {
-    // Bind ZMQ sockets
-    zmq_publisher_.bind("tcp://127.0.0.1:5555");
+      color_module_(std::make_unique<UdpBallColorModule>()),
+      frame_counter_(0) {
+   // Bind ZMQ sockets
+   zmq_publisher_.bind("tcp://127.0.0.1:5555");
     zmq_commander_.bind("tcp://127.0.0.1:5565");
 
     // Initialize DNNTracker if enabled
@@ -79,11 +85,21 @@ void Engine::run() {
 
         cv::Mat color_image(cv::Size(640, 480), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
         
+        // Add to frame buffer
+        {
+            std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
+            frame_buffer_.push_back(color_image.clone());
+            if (frame_buffer_.size() > 150) {
+                frame_buffer_.pop_front();
+            }
+        }
+        
         // This is a simplified FrameData creation.
         // In a real application, this would be much more complex.
         juggler::v1::FrameData frame_data;
         frame_data.set_timestamp_us(std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count());
+        frame_data.set_frame_number(frame_counter_++);
 
         // Encode color image to JPEG and send as bytes
         std::vector<uchar> buf;
@@ -232,6 +248,10 @@ void Engine::processCommands() {
                         response.set_message("No active module to configure.");
                     }
                     break;
+                case juggler::v1::CommandRequest::RECORD_START:
+                    saveRecording();
+                    response.set_message("Recording saved");
+                    break;
                 default:
                     response.set_success(false);
                     response.set_message("Unknown command");
@@ -293,4 +313,48 @@ std::unique_ptr<ModuleBase> Engine::create_module(const juggler::v1::CommandRequ
         return std::make_unique<PositionToRgbModule>();
     }
     return nullptr;
+}
+
+void Engine::saveRecording() {
+    std::cout << "DEBUG: saveRecording() called." << std::endl;
+    std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
+    
+    if (frame_buffer_.empty()) {
+        std::cout << "DEBUG: Frame buffer is empty. Nothing to save." << std::endl;
+        return;
+    }
+
+    // Create a timestamped directory
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm buf;
+    localtime_r(&in_time_t, &buf);
+    std::stringstream ss;
+    ss << std::put_time(&buf, "%Y-%m-%d_%H-%M-%S");
+    fs::path data_dir = "data";
+    fs::path recording_dir = data_dir / ss.str();
+    
+    std::cout << "DEBUG: Attempting to create directory: " << recording_dir << std::endl;
+
+    try {
+        if (fs::create_directories(recording_dir)) {
+            std::cout << "DEBUG: Successfully created directory." << std::endl;
+        } else {
+            std::cout << "DEBUG: Directory already existed or failed to create." << std::endl;
+        }
+        
+        int frame_num = 0;
+        for (const auto& frame : frame_buffer_) {
+            std::string filename = "frame_" + std::to_string(frame_num++) + ".jpg";
+            fs::path filepath = recording_dir / filename;
+            bool success = cv::imwrite(filepath.string(), frame);
+            if (!success) {
+                std::cerr << "Error: Failed to save frame to " << filepath << std::endl;
+            }
+        }
+        
+        std::cout << "Saved " << frame_buffer_.size() << " frames to " << recording_dir << std::endl;
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Error creating directory or saving frames: " << e.what() << std::endl;
+    }
 }

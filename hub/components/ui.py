@@ -26,7 +26,7 @@ try:
                                  QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
                                  QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
-    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter
+    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence
     PYQT_AVAILABLE = True
 except ImportError:
     print("⚠️ PyQt6 not available. Using console UI.")
@@ -142,9 +142,10 @@ if PYQT_AVAILABLE:
     class JuggleHubMainWindow(QMainWindow):
         """Main window for JuggleHub UI."""
         
-        def __init__(self, config: dict):
+        def __init__(self, config: dict, zmq_client: 'ZMQClient'):
             super().__init__()
             self.config = config
+            self.zmq_client = zmq_client
             self.frame_count = 0
             self.start_time = time.time()
             self.last_frame_data: Optional[juggler_pb2.FrameData] = None
@@ -206,6 +207,11 @@ if PYQT_AVAILABLE:
             self.calibration_button = QPushButton("Enter Calibration Mode")
             self.calibration_button.clicked.connect(self.toggle_calibration_mode)
             ball_layout.addWidget(self.calibration_button)
+
+            # Record button
+            self.record_button = QPushButton("Record 5s Clip")
+            self.record_button.clicked.connect(self.record_clip)
+            ball_layout.addWidget(self.record_button)
 
             content_layout.addWidget(ball_group)
 
@@ -276,6 +282,9 @@ if PYQT_AVAILABLE:
             
             # Apply dark theme
             self.apply_dark_theme()
+            
+            # Enable keyboard focus for the main window
+            self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
         def apply_dark_theme(self):
             """Apply a dark theme to the UI."""
@@ -440,11 +449,37 @@ if PYQT_AVAILABLE:
             self.video_view.fitInView(self.video_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
 
+        def record_clip(self):
+            """Send a command to the engine to record a clip."""
+            self.log_message("Sending record command to engine...")
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.RECORD_START
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    self.log_message(f"✅ Record command acknowledged: {response.message}")
+                else:
+                    self.log_message(f"❌ Record command failed: {response.message}")
+            except Exception as e:
+                self.log_message(f"❌ Error sending record command: {e}")
+        
+        def keyPressEvent(self, event):
+            """Handle keyboard events."""
+            if event.key() == Qt.Key.Key_R:
+                self.log_message("🎹 'R' key pressed - triggering recording")
+                self.record_clip()
+            else:
+                # Pass other key events to the parent
+                super().keyPressEvent(event)
+
+
 class JuggleHubUI:
     """Main UI class that chooses between PyQt6 and console UI."""
     
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, zmq_client: Optional['ZMQClient'] = None):
         self.config = config
+        self.zmq_client = zmq_client
         
         if PYQT_AVAILABLE and config.get('enable_ui', True):
             # Create QApplication if it doesn't exist
@@ -453,7 +488,7 @@ class JuggleHubUI:
             else:
                 self.app = QApplication.instance()
             
-            self.main_window = JuggleHubMainWindow(config)
+            self.main_window = JuggleHubMainWindow(config, self.zmq_client)
             self.ui_type = "pyqt6"
         else:
             self.console_ui = ConsoleUI(config)

@@ -29,17 +29,18 @@ message HSVRange {
 
 // Ball detection and tracking information
 // 2D bounding box for video overlay
-message BoundingBox {
-  float x = 1;      // Top-left x coordinate
-  float y = 2;      // Top-left y coordinate
-  float width = 3;  // Box width
-  float height = 4; // Box height
+message BoundingBox2D {
+  float x = 1;
+  float y = 2;
+  float width = 3;
+  float height = 4;
+  float confidence = 5; // Add confidence score
 }
 
 message Ball {
   int32 id = 1;
   Vector3 position = 2;
-  BoundingBox bounding_box_2d = 3; // For video overlay
+  BoundingBox2D bounding_box_2d = 3; // For video overlay
 }
 
 // Hand position and tracking
@@ -99,8 +100,11 @@ message FrameData {
   uint32 frame_number = 9;          // Sequential frame number
   
   // Optional image data (base64 encoded for streaming)
-  bytes color_image_b64 = 10;      // Base64 encoded color image
-  bytes depth_image_b64 = 11;      // Base64 encoded depth image
+  repeated BoundingBox2D raw_detections = 10; // New field
+  
+  // Optional image data (base64 encoded for streaming)
+  bytes color_image_b64 = 11;      // Base64 encoded color image
+  bytes depth_image_b64 = 12;      // Base64 encoded depth image
 }
 
 // Command and control API for managing engine modules

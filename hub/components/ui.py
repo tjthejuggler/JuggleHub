@@ -217,6 +217,14 @@ if PYQT_AVAILABLE:
             self.video_pixmap_item = QGraphicsPixmapItem()
             self.video_scene.addItem(self.video_pixmap_item)
             self.video_layout.addWidget(self.video_view)
+
+            # Add checkbox for raw detections
+            self.show_raw_detections_checkbox = QPushButton("Show Raw Detections", self)
+            self.show_raw_detections_checkbox.setCheckable(True)
+            self.show_raw_detections_checkbox.setChecked(False)
+            self.show_raw_detections_checkbox.clicked.connect(self.toggle_raw_detections)
+            self.video_layout.addWidget(self.show_raw_detections_checkbox)
+            
             content_layout.addWidget(self.video_group, 2) # Give it more stretch factor
             
             # Calibration settings panel
@@ -320,7 +328,7 @@ if PYQT_AVAILABLE:
 
             # Update video feed if in calibration mode
             if self.calibration_mode and frame_data.color_image_b64:
-                self.update_video_feed(frame_data.color_image_b64, frame_data.balls)
+                self.update_video_feed(frame_data)
             
             # Update system status
             if frame_data.HasField('status'):
@@ -390,21 +398,36 @@ if PYQT_AVAILABLE:
             else:
                 self.calibration_button.setText("Enter Calibration Mode")
 
-        def update_video_feed(self, image_data_b64: bytes, balls: list):
+        def toggle_raw_detections(self):
+            """Force a UI update when the checkbox is toggled."""
+            if self.last_frame_data:
+                self._update_ui(self.last_frame_data)
+
+        def update_video_feed(self, frame_data: juggler_pb2.FrameData):
             """Update the video feed with the new frame and bounding boxes."""
             image = QImage()
-            image.loadFromData(image_data_b64, "JPEG")
+            image.loadFromData(frame_data.color_image_b64, "JPEG")
             pixmap = QPixmap.fromImage(image)
 
-            # Draw bounding boxes
             painter = QPainter(pixmap)
-            pen = QPen(QColor(255, 0, 0), 2) # Red pen for boxes
-            painter.setPen(pen)
             
-            for ball in balls:
+            # Draw raw detections if checkbox is ticked
+            if self.show_raw_detections_checkbox.isChecked():
+                pen_raw = QPen(QColor(255, 0, 0, 100), 2)  # Semi-transparent red
+                painter.setPen(pen_raw)
+                for det in frame_data.raw_detections:
+                    painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
+                    # Render confidence score
+                    painter.drawText(int(det.x), int(det.y) - 5, f"{det.confidence:.2f}")
+
+            # Draw final tracked balls
+            pen_tracked = QPen(QColor(0, 255, 0), 2)  # Solid green
+            painter.setPen(pen_tracked)
+            for ball in frame_data.balls:
                 bbox = ball.bounding_box_2d
                 painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
-            
+                painter.drawText(int(bbox.x), int(bbox.y) + int(bbox.height) + 15, f"ID: {ball.id}")
+
             painter.end()
 
             self.video_pixmap_item.setPixmap(pixmap)

@@ -18,12 +18,17 @@ struct TrackedObject {
     int class_id;
 };
 
+struct RawDetection {
+    cv::Rect_<float> box;
+    float confidence;
+};
+
 class DNNTracker {
 public:
     DNNTracker(const std::string& model_path, const std::string& device_name);
     ~DNNTracker();
 
-    std::vector<TrackedObject> update(const cv::Mat& frame);
+    std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> update(const cv::Mat& frame);
 
     void update_setting(const std::string& key, const std::string& value);
 
@@ -45,5 +50,5 @@ private:
 
     // --- Private Methods ---
     cv::Mat preprocess(const cv::Mat& frame, float& scale_x, float& scale_y);
-    std::vector<byte_track::Object> postprocess(const cv::Mat& frame, const ov::Tensor& output_tensor, float scale_x, float scale_y);
+    std::vector<byte_track::Object> postprocess(const cv::Mat& frame, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<RawDetection>& raw_detections);
 };

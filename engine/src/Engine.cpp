@@ -98,9 +98,20 @@ void Engine::run() {
         if (use_dnn_tracker_) {
             if (!dnn_tracker_) return; // Safety check
 
-            tracked_objects = dnn_tracker_->update(color_image);
+            auto [tracked_objects, raw_detections] = dnn_tracker_->update(color_image);
+
+            // Populate raw detections in protobuf
+            for (const auto& det : raw_detections) {
+                auto* raw_det_pb = frame_data.add_raw_detections();
+                raw_det_pb->set_x(det.box.x);
+                raw_det_pb->set_y(det.box.y);
+                raw_det_pb->set_width(det.box.width);
+                raw_det_pb->set_height(det.box.height);
+                raw_det_pb->set_confidence(det.confidence);
+            }
+
             if (verbose_) {
-                std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects." << std::endl;
+                std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects and " << raw_detections.size() << " raw detections." << std::endl;
             }
         } else {
             auto detections = ball_tracker_->detectBalls(color_image, depth_frame, intrinsics);

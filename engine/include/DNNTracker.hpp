@@ -25,6 +25,8 @@ public:
 
     std::vector<TrackedObject> update(const cv::Mat& frame);
 
+    void update_setting(const std::string& key, const std::string& value);
+
 private:
     // --- Member Variables ---
     // OpenVINO

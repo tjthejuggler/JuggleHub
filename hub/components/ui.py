@@ -111,71 +111,33 @@ if PYQT_AVAILABLE:
         def init_ui(self):
             layout = QVBoxLayout(self)
             
-            # -- General Settings --
-            general_group = QGroupBox("General Tracking Settings")
-            general_layout = QGridLayout(general_group)
+            # -- DNN Tracker Settings --
+            dnn_group = QGroupBox("DNN Tracker Settings")
+            dnn_layout = QGridLayout(dnn_group)
             
-            # Min Contour Area
-            general_layout.addWidget(QLabel("Min Contour Area:"), 0, 0)
-            self.min_contour_slider = QSlider(Qt.Orientation.Horizontal)
-            self.min_contour_slider.setRange(10, 1000)
-            self.min_contour_slider.setValue(100)
-            self.min_contour_slider.valueChanged.connect(lambda v: self.update_setting('min_contour_area', v))
-            general_layout.addWidget(self.min_contour_slider, 0, 1)
+            # Confidence Threshold
+            dnn_layout.addWidget(QLabel("Confidence Threshold:"), 0, 0)
+            self.confidence_slider = QSlider(Qt.Orientation.Horizontal)
+            self.confidence_slider.setRange(0, 100)
+            self.confidence_slider.setValue(25)
+            self.confidence_slider.valueChanged.connect(
+                lambda v: self.update_setting('confidence_threshold', v / 100.0))
+            dnn_layout.addWidget(self.confidence_slider, 0, 1)
 
-            # Merge Distance
-            general_layout.addWidget(QLabel("Merge Distance:"), 1, 0)
-            self.merge_dist_slider = QSlider(Qt.Orientation.Horizontal)
-            self.merge_dist_slider.setRange(10, 200)
-            self.merge_dist_slider.setValue(80)
-            self.merge_dist_slider.valueChanged.connect(lambda v: self.update_setting('merge_distance_threshold', v))
-            general_layout.addWidget(self.merge_dist_slider, 1, 1)
+            # NMS Threshold
+            dnn_layout.addWidget(QLabel("NMS Threshold:"), 1, 0)
+            self.nms_slider = QSlider(Qt.Orientation.Horizontal)
+            self.nms_slider.setRange(0, 100)
+            self.nms_slider.setValue(50)
+            self.nms_slider.valueChanged.connect(
+                lambda v: self.update_setting('nms_threshold', v / 100.0))
+            dnn_layout.addWidget(self.nms_slider, 1, 1)
 
-            layout.addWidget(general_group)
-            
-            # Save button
-            self.save_button = QPushButton("Save Settings")
-            self.save_button.clicked.connect(self.save_settings)
-            layout.addWidget(self.save_button)
-
-            # -- Color-specific Settings --
-            self.color_groups = {}
-            colors = ["pink", "orange", "green", "yellow"]
-            for color in colors:
-                group = QGroupBox(f"{color.capitalize()} HSV Thresholds")
-                grid = QGridLayout(group)
-                
-                # H, S, V sliders
-                for i, comp in enumerate(["H", "S", "V"]):
-                    # Min
-                    grid.addWidget(QLabel(f"Min {comp}:"), i, 0)
-                    min_slider = QSlider(Qt.Orientation.Horizontal)
-                    min_slider.setRange(0, 255)
-                    min_slider.valueChanged.connect(self.make_hsv_updater(color, 'min', comp.lower()))
-                    grid.addWidget(min_slider, i, 1)
-                    # Max
-                    grid.addWidget(QLabel(f"Max {comp}:"), i, 2)
-                    max_slider = QSlider(Qt.Orientation.Horizontal)
-                    max_slider.setRange(0, 255)
-                    max_slider.valueChanged.connect(self.make_hsv_updater(color, 'max', comp.lower()))
-                    grid.addWidget(max_slider, i, 3)
-
-                layout.addWidget(group)
-                self.color_groups[color] = group
-
+            layout.addWidget(dnn_group)
             layout.addStretch()
-
-        def save_settings(self):
-            self.udp_client.send_setting('save_settings', '1')
 
         def update_setting(self, key: str, value: Any):
             self.udp_client.send_setting(key, value)
-
-        def make_hsv_updater(self, color, range_type, component):
-            def updater(value):
-                key = f"{color}_{range_type}_{component}"
-                self.udp_client.send_setting(key, value)
-            return updater
 
     class JuggleHubMainWindow(QMainWindow):
         """Main window for JuggleHub UI."""

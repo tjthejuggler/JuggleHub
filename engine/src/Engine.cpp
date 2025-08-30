@@ -27,7 +27,7 @@ Engine::Engine(const std::string& config_file, OutputFormat format, bool use_dnn
     // In your Engine's setup/initialization function
     try {
         // This assumes your models are in JuggleHub/engine/models/
-        dnn_tracker_ = std::make_unique<DNNTracker>("models/yolov8n.xml", "GPU");
+        dnn_tracker_ = std::make_shared<DNNTracker>("models/yolov8n.xml", "GPU");
     } catch (const std::exception& e) {
         std::cerr << "FATAL ERROR: Failed to initialize DNNTracker: " << e.what() << std::endl;
         // Exit or handle the critical failure appropriately
@@ -59,9 +59,12 @@ void Engine::run() {
     }
 
     // Initialize the old BallTracker only if DNN tracking is not enabled
-    ball_tracker_ = std::make_shared<juggler::BallTracker>("ball_settings.json");
-    
-    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(ball_tracker_);
+    if (use_dnn_tracker_) {
+        settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(dnn_tracker_);
+    } else {
+        ball_tracker_ = std::make_shared<juggler::BallTracker>("ball_settings.json");
+        settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(ball_tracker_);
+    }
     settings_module_->setup();
 
     while (running_) {

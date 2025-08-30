@@ -43,7 +43,7 @@ private:
     std::unique_ptr<UdpBallColorModule> color_module_;
     std::unique_ptr<juggler::modules::UdpBallSettingsModule> settings_module_;
     std::shared_ptr<juggler::BallTracker> ball_tracker_;
-    std::unique_ptr<DNNTracker> dnn_tracker_; // New DNNTracker instance
+    std::shared_ptr<DNNTracker> dnn_tracker_; // Use shared_ptr to pass to other modules
     bool use_dnn_tracker_; // Flag to switch between old/new tracker
     bool verbose_;
 

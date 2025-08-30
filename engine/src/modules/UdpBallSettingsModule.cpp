@@ -5,9 +5,16 @@
 namespace juggler {
 namespace modules {
 
-UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<juggler::BallTracker> tracker)
-    : ball_tracker_(tracker),
-      socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)) {
+UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<juggler::BallTracker> ball_tracker)
+    : ball_tracker_(ball_tracker),
+      socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)),
+      use_dnn_tracker_for_settings_(false) {
+}
+
+UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<DNNTracker> dnn_tracker)
+    : dnn_tracker_(dnn_tracker),
+      socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)),
+      use_dnn_tracker_for_settings_(true) {
 }
 
 UdpBallSettingsModule::~UdpBallSettingsModule() {
@@ -49,11 +56,17 @@ void UdpBallSettingsModule::UdpListen() {
                         std::istringstream iss(message);
                         std::string key, value;
                         if (std::getline(iss, key, '=') && std::getline(iss, value)) {
-                            if (key == "save_settings") {
-                                ball_tracker_->saveSettings();
-                                std::cout << "Settings saved." << std::endl;
+                            if (use_dnn_tracker_for_settings_) {
+                                if (dnn_tracker_) {
+                                    dnn_tracker_->update_setting(key, value);
+                                }
                             } else {
-                                ball_tracker_->update_setting(key, value);
+                                if (key == "save_settings") {
+                                    ball_tracker_->saveSettings();
+                                    std::cout << "Settings saved." << std::endl;
+                                } else {
+                                    ball_tracker_->update_setting(key, value);
+                                }
                             }
                         } else {
                             std::cerr << "Warning: Malformed settings message received." << std::endl;

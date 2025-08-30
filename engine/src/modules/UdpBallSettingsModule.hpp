@@ -2,6 +2,7 @@
 
 #include "ModuleBase.hpp"
 #include "BallTracker.hpp"
+#include "DNNTracker.hpp" // Include DNNTracker header
 #include <memory>
 #include <thread>
 #include <asio.hpp>
@@ -11,7 +12,8 @@ namespace modules {
 
 class UdpBallSettingsModule : public ModuleBase {
 public:
-    UdpBallSettingsModule(std::shared_ptr<juggler::BallTracker> tracker);
+    UdpBallSettingsModule(std::shared_ptr<juggler::BallTracker> ball_tracker);
+    UdpBallSettingsModule(std::shared_ptr<DNNTracker> dnn_tracker); // New constructor for DNNTracker
     ~UdpBallSettingsModule();
 
     // ModuleBase interface
@@ -24,6 +26,9 @@ private:
     void UdpListen();
 
     std::shared_ptr<juggler::BallTracker> ball_tracker_;
+    std::shared_ptr<DNNTracker> dnn_tracker_; // New member for DNNTracker
+    bool use_dnn_tracker_for_settings_ = false; // Flag to indicate which tracker to use for settings
+
     std::unique_ptr<std::thread> listener_thread_;
     asio::io_context io_context_;
     asio::ip::udp::socket socket_;

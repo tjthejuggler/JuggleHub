@@ -51,6 +51,24 @@ std::vector<TrackedObject> DNNTracker::update(const cv::Mat& frame) {
     return tracked_objects;
 }
 
+void DNNTracker::update_setting(const std::string& key, const std::string& value) {
+    try {
+        if (key == "confidence_threshold") {
+            confidence_threshold_ = std::stof(value);
+            std::cout << "Updated confidence_threshold to " << confidence_threshold_ << std::endl;
+        } else if (key == "nms_threshold") {
+            nms_threshold_ = std::stof(value);
+            std::cout << "Updated nms_threshold to " << nms_threshold_ << std::endl;
+        } else {
+            std::cerr << "Warning: Unknown DNNTracker setting key '" << key << "'" << std::endl;
+        }
+    } catch (const std::invalid_argument& e) {
+        std::cerr << "Error: Invalid value for " << key << ": " << value << std::endl;
+    } catch (const std::out_of_range& e) {
+        std::cerr << "Error: Value out of range for " << key << ": " << value << std::endl;
+    }
+}
+
 cv::Mat DNNTracker::preprocess(const cv::Mat& frame, float& scale_x, float& scale_y) {
     // --- Image Preprocessing for YOLOv8 ---
     // YOLOv8 expects a 640x640 BGR image, normalized to [0,1] in NCHW format.

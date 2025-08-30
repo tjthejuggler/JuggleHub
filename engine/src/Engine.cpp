@@ -98,7 +98,8 @@ void Engine::run() {
         if (use_dnn_tracker_) {
             if (!dnn_tracker_) return; // Safety check
 
-            auto [tracked_objects, raw_detections] = dnn_tracker_->update(color_image);
+            auto [tracker_results, raw_detections] = dnn_tracker_->update(color_image);
+            tracked_objects = tracker_results;
 
             // Populate raw detections in protobuf
             for (const auto& det : raw_detections) {

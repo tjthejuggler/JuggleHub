@@ -314,12 +314,18 @@ if PYQT_AVAILABLE:
             """Update UI with new frame data (called from main thread)."""
             self.last_frame_data = frame_data
             self.frame_count += 1
+
+            self.log_message(f"UI received frame {frame_data.frame_number} with {len(frame_data.balls)} balls and "
+                             f"{len(frame_data.raw_detections)} raw detections.")
             
             # Update ball information
             ball_count = len(frame_data.balls)
             self.ball_count_label.setText(f"Balls detected: {ball_count}")
             
             ball_text = ""
+            if not frame_data.balls and frame_data.raw_detections:
+                ball_text = "Raw detections present, but no tracked balls.\n"
+                
             for ball in frame_data.balls:
                 ball_text += f"ID {ball.id}: "
                 ball_text += f"3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"

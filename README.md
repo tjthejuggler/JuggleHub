@@ -899,3 +899,186 @@ The script will:
 - Provide detailed progress output
 
 **Last Updated:** 2025-08-31 08:30:00 UTC
+
+## 🤖 Dataset Preparation for AI Training
+
+JuggleHub includes a comprehensive dataset preparation script that automatically splits your annotated images into training and validation sets using the industry-standard 80/20 rule for machine learning model training.
+
+### The 80/20 Split Rule
+
+The script follows the widely recommended best practice:
+- **80% of images** go into the `train/` folder for model learning
+- **20% of images** go into the `valid/` folder for model validation
+
+This ratio provides the optimal balance between giving the model enough material to learn from while reserving a statistically significant number of images for reliable performance evaluation.
+
+### Dataset Size Examples
+
+| Total Annotated Images | Train Folder (80%) | Valid Folder (20%) |
+|------------------------|-------------------|-------------------|
+| 300 (V1 Goal)         | 240 images        | 60 images         |
+| 500 (V2 Goal)         | 400 images        | 100 images        |
+| 1,000 (Ambitious)     | 800 images        | 200 images        |
+
+### Directory Structure
+
+The script expects and creates the following structure:
+
+```
+JuggleHub/
+├── 2_tagged_and_annotated/          # Source: Your annotated images
+│   ├── good_lighting/               # Tag-based organization
+│   │   ├── image001.jpg
+│   │   ├── image001.txt             # YOLO format annotations
+│   │   └── ...
+│   ├── multiple_balls/
+│   ├── high_contrast/
+│   └── ...
+└── 3_training_datasets/             # Output: Ready-to-train datasets
+    ├── V1_generalist/
+    │   ├── train/
+    │   │   ├── images/              # 80% of images
+    │   │   └── labels/              # 80% of annotations
+    │   ├── valid/
+    │   │   ├── images/              # 20% of images
+    │   │   └── labels/              # 20% of annotations
+    │   └── dataset.yaml             # YOLOv8 configuration
+    └── V2_specialized/
+        └── ...
+```
+
+### Usage Examples
+
+#### Basic Usage
+```bash
+# Create V1 generalist dataset from specific tags
+python3 scripts/prepare_dataset.py --dataset-name V1_generalist --tags good_lighting clear_balls multiple_balls
+
+# Create V2 specialized dataset from high-quality tags
+python3 scripts/prepare_dataset.py --dataset-name V2_specialized --tags perfect_lighting high_contrast professional_setup
+
+# Include all available tags
+python3 scripts/prepare_dataset.py --dataset-name complete_dataset --tags all
+```
+
+#### Advanced Options
+```bash
+# Custom split ratio (70/30 instead of 80/20)
+python3 scripts/prepare_dataset.py --dataset-name custom_split --tags all --train-split 0.7
+
+# Dry run to see what would happen without copying files
+python3 scripts/prepare_dataset.py --dataset-name test_dataset --tags all --dry-run
+
+# Custom directories and multiple classes
+python3 scripts/prepare_dataset.py \
+  --source-dir /path/to/annotations \
+  --output-dir /path/to/datasets \
+  --dataset-name multi_class \
+  --tags all \
+  --class-names ball club ring
+```
+
+### Key Features
+
+#### Intelligent Processing
+- **Random Shuffling**: Ensures both train and validation sets contain representative samples from all conditions
+- **Tag-Based Selection**: Choose specific quality tags or include all available data
+- **Reproducible Results**: Uses fixed random seed for consistent splits across runs
+- **Safety Checks**: Validates input parameters and warns about missing files
+
+#### Professional Output
+- **YOLOv8 Compatible**: Creates proper directory structure and `dataset.yaml` configuration
+- **Progress Tracking**: Shows detailed progress during file copying
+- **Comprehensive Summary**: Reports final statistics and directory structure
+- **Error Handling**: Clear error messages and validation
+
+#### Flexible Configuration
+- **Custom Split Ratios**: Not limited to 80/20 - use any ratio between 10/90 and 90/10
+- **Multiple Classes**: Support for multi-class datasets beyond just "ball"
+- **Custom Paths**: Specify custom source and output directories
+- **Dry Run Mode**: Preview operations without making changes
+
+### Script Output Example
+
+```
+Dataset Preparation Script
+========================================
+Dataset Name: V1_generalist
+Source Directory: 2_tagged_and_annotated
+Output Directory: 3_training_datasets/V1_generalist
+Tags: good_lighting, clear_balls, multiple_balls
+Train/Valid Split: 0.8/0.2
+Random Seed: 42
+
+Processing 3 tag directories:
+  - good_lighting
+  - clear_balls
+  - multiple_balls
+
+Scanning good_lighting...
+  Found 120 image/annotation pairs
+Scanning clear_balls...
+  Found 95 image/annotation pairs
+Scanning multiple_balls...
+  Found 85 image/annotation pairs
+
+Found 300 total image/annotation pairs
+
+Splitting 300 pairs:
+  Training: 240 pairs (80%)
+  Validation: 60 pairs (20%)
+
+Copying training files...
+  Copied 240/240 training pairs
+Copying validation files...
+  Copied 60/60 validation pairs
+
+Created dataset configuration: 3_training_datasets/V1_generalist/dataset.yaml
+
+============================================================
+DATASET PREPARATION COMPLETE
+============================================================
+Dataset Name: V1_generalist
+Output Directory: 3_training_datasets/V1_generalist
+Source Tags: good_lighting, clear_balls, multiple_balls
+
+Dataset Statistics:
+  Total Images: 300
+  Training: 240 (80.0%)
+  Validation: 60 (20.0%)
+
+Directory Structure:
+  3_training_datasets/V1_generalist/
+  ├── train/
+  │   ├── images/ (240 files)
+  │   └── labels/ (240 files)
+  ├── valid/
+  │   ├── images/ (60 files)
+  │   └── labels/ (60 files)
+  └── dataset.yaml
+
+Ready for YOLOv8 training!
+Use: yolo train data=3_training_datasets/V1_generalist/dataset.yaml model=yolov8n.pt
+```
+
+### Integration with YOLOv8
+
+The script creates datasets that are immediately ready for YOLOv8 training:
+
+```bash
+# Train a YOLOv8 model with your prepared dataset
+yolo train data=3_training_datasets/V1_generalist/dataset.yaml model=yolov8n.pt epochs=100 imgsz=640
+
+# Train with custom parameters
+yolo train data=3_training_datasets/V2_specialized/dataset.yaml model=yolov8s.pt epochs=200 imgsz=640 batch=16
+```
+
+### Best Practices
+
+1. **Quality Over Quantity**: Focus on high-quality, diverse annotations rather than just volume
+2. **Tag Organization**: Use descriptive tag names that reflect image characteristics
+3. **Balanced Representation**: Ensure all important scenarios are represented in your tags
+4. **Validation**: Always run with `--dry-run` first to verify your selection
+5. **Reproducibility**: Keep the same random seed for consistent results across experiments
+
+**Last Updated:** 2025-08-31 09:04:00 UTC

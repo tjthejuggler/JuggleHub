@@ -331,7 +331,7 @@ void Engine::saveRecording() {
     localtime_r(&in_time_t, &buf);
     std::stringstream ss;
     ss << std::put_time(&buf, "%Y-%m-%d_%H-%M-%S");
-    fs::path data_dir = "data";
+    fs::path data_dir = "data/1_raw_recordings";
     fs::path recording_dir = data_dir / ss.str();
     
     std::cout << "DEBUG: Attempting to create directory: " << recording_dir << std::endl;
@@ -345,7 +345,7 @@ void Engine::saveRecording() {
         
         int frame_num = 0;
         for (const auto& frame : frame_buffer_) {
-            std::string filename = "frame_" + std::to_string(frame_num++) + ".jpg";
+            std::string filename = ss.str() + "_frame_" + std::to_string(frame_num++) + ".jpg";
             fs::path filepath = recording_dir / filename;
             bool success = cv::imwrite(filepath.string(), frame);
             if (!success) {

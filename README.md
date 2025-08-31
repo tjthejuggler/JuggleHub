@@ -832,3 +832,70 @@ This project is provided as-is for educational and development purposes.
 **Built with ❤️ for the juggling community**
 
 For questions, issues, or contributions, please open an issue on the repository.
+
+## 📹 Recording Feature
+
+JuggleHub includes a built-in recording feature that captures 5 seconds of frames when triggered. The recording system saves frames with consistent naming that includes timestamps for easy identification and organization.
+
+### How Recording Works
+
+The recording feature maintains a rolling buffer of the last 150 frames (approximately 5 seconds at 30 FPS). When a recording is triggered via the `RECORD_START` command, all buffered frames are saved to disk.
+
+### File Organization
+
+Recordings are saved in the `engine/data/` directory with the following structure:
+
+```
+engine/data/
+├── 2025-08-30_17-18-29/           # Directory named with timestamp
+│   ├── 2025-08-30_17-18-29_frame_0.jpg    # Frame files with timestamp prefix
+│   ├── 2025-08-30_17-18-29_frame_1.jpg
+│   ├── 2025-08-30_17-18-29_frame_2.jpg
+│   └── ...
+└── 2025-08-30_17-31-37/           # Another recording session
+    ├── 2025-08-30_17-31-37_frame_0.jpg
+    ├── 2025-08-30_17-31-37_frame_1.jpg
+    └── ...
+```
+
+### File Naming Convention
+
+- **Directory**: `YYYY-MM-DD_HH-MM-SS` (timestamp when recording was triggered)
+- **Files**: `YYYY-MM-DD_HH-MM-SS_frame_N.jpg` (same timestamp + frame number)
+
+This naming convention ensures:
+- Easy chronological sorting
+- Clear association between directory and contained files
+- Unique identifiers for each frame across all recordings
+- Consistent format for automated processing
+
+### Triggering Recordings
+
+Recordings can be triggered through the ZMQ command interface:
+
+```bash
+# Using the hub's command system
+echo -e "record\nquit" | python3 hub/main.py
+```
+
+Or programmatically via the Protocol Buffer API by sending a `RECORD_START` command to the engine.
+
+### Frame Naming Migration
+
+**Note:** If you have existing recordings with the old naming format (`frame_N.jpg`), you can use the provided migration script to update them to the new format:
+
+```bash
+# Run the frame naming fix script
+python3 scripts/fix_frame_names.py
+
+# Or specify a custom data directory
+python3 scripts/fix_frame_names.py /path/to/custom/data
+```
+
+The script will:
+- Process all subdirectories in the data folder
+- Rename files from `frame_N.jpg` to `YYYY-MM-DD_HH-MM-SS_frame_N.jpg`
+- Skip files that are already in the correct format
+- Provide detailed progress output
+
+**Last Updated:** 2025-08-31 08:30:00 UTC

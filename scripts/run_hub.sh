@@ -227,20 +227,12 @@ ENGINE_ARGS=("--use-dnn-tracker" "--verbose")
 
 echo "Engine command: $ENGINE_EXECUTABLE ${ENGINE_ARGS[@]}"
 
-# Change to the engine directory so it can find its models
-cd "$PROJECT_ROOT/engine"
-
-echo "Engine command: build/juggle_engine ${ENGINE_ARGS[@]}"
-
-# Start the engine as a new process group to allow killing it and its children
+# No longer need to change directories. Execute from project root.
 set -m
 # Redirect engine output to a log file for debugging
-"build/juggle_engine" "${ENGINE_ARGS[@]}" > "$PROJECT_ROOT/engine.log" 2>&1 &
+"$ENGINE_EXECUTABLE" "${ENGINE_ARGS[@]}" > "$PROJECT_ROOT/engine.log" 2>&1 &
 ENGINE_PID=$!
 set +m
-
-# Return to the project root
-cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}✅ C++ engine started with PID $ENGINE_PID${NC}"
 # Give the engine a moment to start up the ZMQ server

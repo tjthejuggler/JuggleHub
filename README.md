@@ -303,7 +303,29 @@ The DNN tracking system provides a foundation for advanced features:
 - **Hardware Acceleration**: Utilize Intel GPU or VPU for faster inference
 - **Model Optimization**: Quantization and pruning for embedded deployment
 
-**Last Updated:** 2025-08-29 16:09:00 UTC
+### Device Selection for Inference
+
+JuggleHub supports multiple compute devices for running the DNN-based tracking:
+
+- **CPU**: Default option, works on all systems
+- **GPU**: Accelerated inference using Intel integrated or discrete graphics
+- **NPU**: Neural Processing Unit acceleration on supported hardware
+
+You can switch between these devices by editing the `ENGINE_ARGS` array in the [`scripts/run_hub.sh`](scripts/run_hub.sh:226) file:
+
+```bash
+# In scripts/run_hub.sh
+ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=NPU")
+```
+
+Simply change the `--device=GPU` parameter to one of:
+- `--device=CPU` (for CPU inference)
+- `--device=GPU` (for GPU acceleration)
+- `--device=NPU` (for NPU acceleration)
+
+The NPU option is particularly useful for systems with dedicated neural processing hardware, offering significant performance improvements while reducing CPU load.
+
+**Last Updated:** 2025-09-01 16:14:00 UTC
 
 ## 🔧 Configuration
 

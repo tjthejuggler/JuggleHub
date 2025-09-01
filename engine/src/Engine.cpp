@@ -14,7 +14,7 @@
 
 namespace fs = std::filesystem;
 
-Engine::Engine(const std::string& config_file, OutputFormat format, bool use_dnn_tracker, bool verbose)
+Engine::Engine(const std::string& config_file, const std::string& device_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
     : running_(false),
       output_format_(format),
       use_dnn_tracker_(use_dnn_tracker), // Initialize the flag
@@ -36,7 +36,7 @@ Engine::Engine(const std::string& config_file, OutputFormat format, bool use_dnn
     if (verbose_) std::cout << "Initializing DNNTracker..." << std::endl;
     try {
         // This assumes your models are in JuggleHub/engine/models/
-        dnn_tracker_ = std::make_shared<DNNTracker>("engine/models/yolov8n.xml", "CPU");
+        dnn_tracker_ = std::make_shared<DNNTracker>("engine/models/yolov8n.xml", device_name);
     } catch (const std::exception& e) {
         std::cerr << "FATAL ERROR: Failed to initialize DNNTracker: " << e.what() << std::endl;
         // Exit or handle the critical failure appropriately
@@ -214,16 +214,18 @@ void Engine::stop() {
 }
 
 void Engine::processCommands() {
+    if (verbose_) std::cout << "Command thread started." << std::endl;
     while (running_) {
         // Handle external ZMQ commands
         zmq::message_t request;
+        if (verbose_) std::cout << "Checking for ZMQ commands..." << std::endl;
         auto result = zmq_commander_.recv(request, zmq::recv_flags::dontwait);
         
         if (result) {
             juggler::v1::CommandRequest command;
             command.ParseFromArray(request.data(), request.size());
             
-            std::cout << "Received external command: " << command.type() << std::endl;
+            if (verbose_) std::cout << "Received external command: " << command.type() << std::endl;
 
             juggler::v1::CommandResponse response;
             response.set_success(true);
@@ -289,7 +291,7 @@ void Engine::processCommands() {
         }
 
         if (command_found) {
-            std::cout << "Processing internal command: " << internal_command.type() << std::endl;
+            if (verbose_) std::cout << "Processing internal command: " << internal_command.type() << std::endl;
 
             switch (internal_command.type()) {
                 case juggler::v1::CommandRequest::SEND_COLOR_COMMAND:

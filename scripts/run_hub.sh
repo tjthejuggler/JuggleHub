@@ -223,7 +223,7 @@ fi
 
 # Start the C++ engine in the background
 echo -e "${BLUE}🧠 Starting C++ engine...${NC}"
-ENGINE_ARGS=("--use-dnn-tracker" "--verbose")
+ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=GPU")
 
 echo "Engine command: $ENGINE_EXECUTABLE ${ENGINE_ARGS[@]}"
 

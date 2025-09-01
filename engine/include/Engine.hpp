@@ -22,7 +22,7 @@ public:
         LEGACY
     };
 
-    Engine(const std::string& config_file, OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
+    Engine(const std::string& config_file, const std::string& device_name = "CPU", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
     ~Engine();
 
     void run();

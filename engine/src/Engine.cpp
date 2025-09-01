@@ -25,15 +25,12 @@ Engine::Engine(const std::string& config_file, const std::string& device_name, O
       align_to_color_(RS2_STREAM_COLOR),
       color_module_(std::make_unique<UdpBallColorModule>()),
       frame_counter_(0) {
-    if (verbose_) std::cout << "Binding ZMQ sockets..." << std::endl;
    // Bind ZMQ sockets
    zmq_publisher_.bind("tcp://127.0.0.1:5555");
     zmq_commander_.bind("tcp://127.0.0.1:5565");
-    if (verbose_) std::cout << "ZMQ sockets bound." << std::endl;
 
     // Initialize DNNTracker if enabled
     // In your Engine's setup/initialization function
-    if (verbose_) std::cout << "Initializing DNNTracker..." << std::endl;
     try {
         // This assumes your models are in JuggleHub/engine/models/
         dnn_tracker_ = std::make_shared<DNNTracker>("engine/models/yolov8n.xml", device_name);
@@ -42,12 +39,9 @@ Engine::Engine(const std::string& config_file, const std::string& device_name, O
         // Exit or handle the critical failure appropriately
         return; // or exit(1);
     }
-    if (verbose_) std::cout << "DNNTracker initialized." << std::endl;
 
     // Setup the default color module
-    if (verbose_) std::cout << "Setting up color module..." << std::endl;
     color_module_->setup();
-    if (verbose_) std::cout << "Color module setup complete." << std::endl;
 }
 
 Engine::~Engine() {
@@ -61,7 +55,6 @@ void Engine::run() {
     std::thread command_thread(&Engine::processCommands, this);
 
     // Initialize camera
-    if (verbose_) std::cout << "Initializing camera..." << std::endl;
     rs_config_.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
     rs_config_.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
     rs2::pipeline_profile profile = pipe_.start(rs_config_);
@@ -70,10 +63,8 @@ void Engine::run() {
         auto stream = profile.get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
         std::cout << "Color stream: " << stream.width() << "x" << stream.height() << " @" << stream.fps() << "fps" << std::endl;
     }
-    if (verbose_) std::cout << "Camera initialized." << std::endl;
 
     // Initialize the old BallTracker only if DNN tracking is not enabled
-    if (verbose_) std::cout << "Initializing settings module..." << std::endl;
     if (use_dnn_tracker_) {
         settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(dnn_tracker_);
     } else {
@@ -81,7 +72,6 @@ void Engine::run() {
         settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(ball_tracker_);
     }
     settings_module_->setup();
-    if (verbose_) std::cout << "Settings module initialized." << std::endl;
 
     while (running_) {
         rs2::frameset frames = pipe_.wait_for_frames();
@@ -214,18 +204,16 @@ void Engine::stop() {
 }
 
 void Engine::processCommands() {
-    if (verbose_) std::cout << "Command thread started." << std::endl;
     while (running_) {
         // Handle external ZMQ commands
         zmq::message_t request;
-        if (verbose_) std::cout << "Checking for ZMQ commands..." << std::endl;
         auto result = zmq_commander_.recv(request, zmq::recv_flags::dontwait);
         
         if (result) {
             juggler::v1::CommandRequest command;
             command.ParseFromArray(request.data(), request.size());
             
-            if (verbose_) std::cout << "Received external command: " << command.type() << std::endl;
+            std::cout << "Received external command: " << command.type() << std::endl;
 
             juggler::v1::CommandResponse response;
             response.set_success(true);
@@ -291,7 +279,7 @@ void Engine::processCommands() {
         }
 
         if (command_found) {
-            if (verbose_) std::cout << "Processing internal command: " << internal_command.type() << std::endl;
+            std::cout << "Processing internal command: " << internal_command.type() << std::endl;
 
             switch (internal_command.type()) {
                 case juggler::v1::CommandRequest::SEND_COLOR_COMMAND:

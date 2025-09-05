@@ -33,7 +33,7 @@ Engine::Engine(const std::string& config_file, const std::string& device_name, O
     // In your Engine's setup/initialization function
     try {
         // This assumes your models are in JuggleHub/engine/models/
-        dnn_tracker_ = std::make_shared<DNNTracker>("engine/models/yolov8n.xml", device_name);
+        dnn_tracker_ = std::make_shared<DNNTracker>("engine/models/yolo11n.xml", device_name);
     } catch (const std::exception& e) {
         std::cerr << "FATAL ERROR: Failed to initialize DNNTracker: " << e.what() << std::endl;
         // Exit or handle the critical failure appropriately

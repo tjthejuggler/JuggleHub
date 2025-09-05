@@ -331,7 +331,7 @@ void Engine::saveRecording() {
     localtime_r(&in_time_t, &buf);
     std::stringstream ss;
     ss << "rs455_" << std::put_time(&buf, "%Y-%m-%d_%H-%M-%S");
-    fs::path data_dir = "data/1_raw_recordings";
+    fs::path data_dir = "engine/data/1_raw_recordings";
     fs::path recording_dir = data_dir / ss.str();
     
     std::cout << "DEBUG: Attempting to create directory: " << recording_dir << std::endl;

@@ -151,6 +151,7 @@ if PYQT_AVAILABLE:
             self.last_frame_data: Optional[juggler_pb2.FrameData] = None
             self.calibration_mode = False
             self.udp_client = UdpClient()
+            self.is_continuous_recording = False
             
             # Signal for thread-safe updates
             self.signal_emitter = FrameDataSignal()
@@ -212,6 +213,36 @@ if PYQT_AVAILABLE:
             self.record_button = QPushButton("Record 5s Clip")
             self.record_button.clicked.connect(self.record_clip)
             ball_layout.addWidget(self.record_button)
+
+            # Continuous recording button
+            self.continuous_record_button = QPushButton("Start Recording")
+            self.continuous_record_button.clicked.connect(self.toggle_continuous_recording)
+            self.continuous_record_button.setCheckable(True)
+            self.continuous_record_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    padding: 8px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:checked {
+                    background-color: #f44336;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+                QPushButton:checked:hover {
+                    background-color: #da190b;
+                }
+            """)
+            ball_layout.addWidget(self.continuous_record_button)
+            
+            # Recording status indicator
+            self.recording_status = QLabel("● Not Recording")
+            self.recording_status.setStyleSheet("color: #666666; font-weight: bold;")
+            ball_layout.addWidget(self.recording_status)
 
             content_layout.addWidget(ball_group)
 
@@ -463,6 +494,47 @@ if PYQT_AVAILABLE:
                     self.log_message(f"❌ Record command failed: {response.message}")
             except Exception as e:
                 self.log_message(f"❌ Error sending record command: {e}")
+
+        def toggle_continuous_recording(self):
+            """Toggle continuous recording on/off."""
+            if not self.is_continuous_recording:
+                # Start continuous recording
+                self.log_message("Starting continuous recording...")
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_START
+                
+                try:
+                    response = self.zmq_client.send_command(command)
+                    if response.success:
+                        self.is_continuous_recording = True
+                        self.continuous_record_button.setText("Stop Recording")
+                        self.continuous_record_button.setChecked(True)
+                        self.recording_status.setText("● Recording")
+                        self.recording_status.setStyleSheet("color: #f44336; font-weight: bold;")
+                        self.log_message(f"✅ Continuous recording started: {response.message}")
+                    else:
+                        self.log_message(f"❌ Failed to start continuous recording: {response.message}")
+                except Exception as e:
+                    self.log_message(f"❌ Error starting continuous recording: {e}")
+            else:
+                # Stop continuous recording
+                self.log_message("Stopping continuous recording...")
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_STOP
+                
+                try:
+                    response = self.zmq_client.send_command(command)
+                    if response.success:
+                        self.is_continuous_recording = False
+                        self.continuous_record_button.setText("Start Recording")
+                        self.continuous_record_button.setChecked(False)
+                        self.recording_status.setText("● Not Recording")
+                        self.recording_status.setStyleSheet("color: #666666; font-weight: bold;")
+                        self.log_message(f"✅ Continuous recording stopped: {response.message}")
+                    else:
+                        self.log_message(f"❌ Failed to stop continuous recording: {response.message}")
+                except Exception as e:
+                    self.log_message(f"❌ Error stopping continuous recording: {e}")
         
         def keyPressEvent(self, event):
             """Handle keyboard events."""

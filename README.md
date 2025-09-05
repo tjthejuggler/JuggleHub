@@ -856,35 +856,77 @@ This project is provided as-is for educational and development purposes.
 
 For questions, issues, or contributions, please open an issue on the repository.
 
-## 📹 Recording Feature
+## 📹 Recording Features
 
-JuggleHub includes a built-in recording feature that captures 5 seconds of frames when triggered. The recording system saves frames with consistent naming that includes timestamps for easy identification and organization.
+JuggleHub includes two built-in recording features for capturing juggling sessions:
 
-### How Recording Works
+1. **5-Second Clip Recording**: Captures the last 5 seconds of frames when triggered
+2. **Continuous Recording**: Start/stop recording that captures frames for any duration
 
-The recording feature maintains a rolling buffer of the last 150 frames (approximately 5 seconds at 30 FPS). When a recording is triggered via the `RECORD_START` command, all buffered frames are saved to disk.
+Both recording systems save frames with consistent naming that includes timestamps for easy identification and organization.
+
+### 5-Second Clip Recording
+
+The 5-second recording feature maintains a rolling buffer of the last 150 frames (approximately 5 seconds at 30 FPS). When a recording is triggered via the `RECORD_START` command or by pressing the 'R' key in the UI, all buffered frames are saved to disk.
+
+### Continuous Recording
+
+The continuous recording feature allows you to start and stop recording at any time, capturing frames for any duration. This is perfect for recording entire juggling sessions or specific practice segments.
+
+#### Using Continuous Recording
+
+**Via UI:**
+- Click the "Start Recording" button in the hub interface
+- The button will change to "Stop Recording" and turn red
+- The status indicator will show "● Recording" in red
+- Click "Stop Recording" to end the session and save all frames
+
+**Via Keyboard:**
+- Press 'R' key for 5-second clip recording (existing feature)
+- Use the UI buttons for continuous recording
+
+#### How Continuous Recording Works
+
+- Maintains a separate buffer that grows during recording (no frame limit)
+- Frames are continuously added to the buffer while recording is active
+- When stopped, all frames in the buffer are saved to disk
+- Buffer is cleared when recording starts to ensure clean sessions
+
+**Important Memory Considerations:**
+- Continuous recording captures ALL frames from start to stop
+- Memory usage grows with recording duration (~3MB per second at 30fps)
+- For long recordings, monitor system memory and stop recording when needed
+- Each frame uses approximately 100KB of memory (640x480 JPEG)
 
 ### File Organization
 
-Recordings are saved in the `engine/data/` directory with the following structure:
+Recordings are saved in the `engine/data/1_raw_recordings/` directory with the following structure:
 
 ```
-engine/data/
-├── rs455_2025-08-30_17-18-29/           # Directory named with rs455 prefix + timestamp
-│   ├── rs455_2025-08-30_17-18-29_frame_0.jpg    # Frame files with rs455 prefix + timestamp
-│   ├── rs455_2025-08-30_17-18-29_frame_1.jpg
-│   ├── rs455_2025-08-30_17-18-29_frame_2.jpg
-│   └── ...
-└── rs455_2025-08-30_17-31-37/           # Another recording session
-    ├── rs455_2025-08-30_17-31-37_frame_0.jpg
-    ├── rs455_2025-08-30_17-31-37_frame_1.jpg
+engine/data/1_raw_recordings/
+├── rs455_2025-09-05_17-18-29/           # 5-second clip recording
+│   ├── rs455_2025-09-05_17-18-29_frame_0.jpg
+│   ├── rs455_2025-09-05_17-18-29_frame_1.jpg
+│   └── ... (up to 150 frames)
+├── continuous_2025-09-05_17-25-14/      # Continuous recording session
+│   ├── continuous_2025-09-05_17-25-14_frame_0.jpg
+│   ├── continuous_2025-09-05_17-25-14_frame_1.jpg
+│   └── ... (variable number of frames)
+└── continuous_2025-09-05_17-31-37/      # Another continuous session
+    ├── continuous_2025-09-05_17-31-37_frame_0.jpg
+    ├── continuous_2025-09-05_17-31-37_frame_1.jpg
     └── ...
 ```
 
 ### File Naming Convention
 
+#### 5-Second Clip Recording
 - **Directory**: `rs455_YYYY-MM-DD_HH-MM-SS` (rs455 prefix + timestamp when recording was triggered)
 - **Files**: `rs455_YYYY-MM-DD_HH-MM-SS_frame_N.jpg` (rs455 prefix + same timestamp + frame number)
+
+#### Continuous Recording
+- **Directory**: `continuous_YYYY-MM-DD_HH-MM-SS` (continuous prefix + timestamp when recording started)
+- **Files**: `continuous_YYYY-MM-DD_HH-MM-SS_frame_N.jpg` (continuous prefix + same timestamp + frame number)
 
 This naming convention ensures:
 - Easy chronological sorting
@@ -922,7 +964,7 @@ The script will:
 - Skip files that are already in the correct format
 - Provide detailed progress output
 
-**Last Updated:** 2025-09-05 06:52:00 UTC
+**Last Updated:** 2025-09-05 15:08:00 UTC
 
 ## 🤖 Dataset Preparation for AI Training
 

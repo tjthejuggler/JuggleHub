@@ -114,6 +114,8 @@ message CommandRequest {
     SEND_COLOR_COMMAND = 3;
     CONFIGURE_MODULE = 4; // New command type for module-specific configuration
     RECORD_START = 5;
+    RECORD_CONTINUOUS_START = 6;
+    RECORD_CONTINUOUS_STOP = 7;
   }
   
   CommandType type = 1;

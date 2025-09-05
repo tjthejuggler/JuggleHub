@@ -24,7 +24,8 @@ Engine::Engine(const std::string& config_file, const std::string& device_name, O
       zmq_commander_(zmq_context_, ZMQ_REP),
       align_to_color_(RS2_STREAM_COLOR),
       color_module_(std::make_unique<UdpBallColorModule>()),
-      frame_counter_(0) {
+      frame_counter_(0),
+      continuous_recording_(false) {
    // Bind ZMQ sockets
    zmq_publisher_.bind("tcp://127.0.0.1:5555");
     zmq_commander_.bind("tcp://127.0.0.1:5565");
@@ -92,6 +93,14 @@ void Engine::run() {
             if (frame_buffer_.size() > 150) {
                 frame_buffer_.pop_front();
             }
+        }
+        
+        // Add to continuous recording buffer if recording
+        if (continuous_recording_) {
+            std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
+            continuous_frame_buffer_.push_back(color_image.clone());
+            // No size limit for continuous recording - capture all frames from start to stop
+            // Memory usage will be monitored and user should stop recording when needed
         }
         
         // This is a simplified FrameData creation.
@@ -252,6 +261,14 @@ void Engine::processCommands() {
                     saveRecording();
                     response.set_message("Recording saved");
                     break;
+                case juggler::v1::CommandRequest::RECORD_CONTINUOUS_START:
+                    startContinuousRecording();
+                    response.set_message("Continuous recording started");
+                    break;
+                case juggler::v1::CommandRequest::RECORD_CONTINUOUS_STOP:
+                    stopContinuousRecording();
+                    response.set_message("Continuous recording stopped and saved");
+                    break;
                 default:
                     response.set_success(false);
                     response.set_message("Unknown command");
@@ -354,6 +371,81 @@ void Engine::saveRecording() {
         }
         
         std::cout << "Saved " << frame_buffer_.size() << " frames to " << recording_dir << std::endl;
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Error creating directory or saving frames: " << e.what() << std::endl;
+    }
+}
+
+void Engine::startContinuousRecording() {
+    std::cout << "DEBUG: startContinuousRecording() called." << std::endl;
+    
+    if (continuous_recording_) {
+        std::cout << "DEBUG: Continuous recording already active." << std::endl;
+        return;
+    }
+    
+    // Clear the continuous buffer and start recording
+    {
+        std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
+        continuous_frame_buffer_.clear();
+    }
+    
+    // Create session name with timestamp
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm buf;
+    localtime_r(&in_time_t, &buf);
+    std::stringstream ss;
+    ss << "continuous_" << std::put_time(&buf, "%Y-%m-%d_%H-%M-%S");
+    continuous_recording_session_ = ss.str();
+    
+    continuous_recording_ = true;
+    std::cout << "Continuous recording started: " << continuous_recording_session_ << std::endl;
+}
+
+void Engine::stopContinuousRecording() {
+    std::cout << "DEBUG: stopContinuousRecording() called." << std::endl;
+    
+    if (!continuous_recording_) {
+        std::cout << "DEBUG: No continuous recording active." << std::endl;
+        return;
+    }
+    
+    continuous_recording_ = false;
+    
+    std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
+    
+    if (continuous_frame_buffer_.empty()) {
+        std::cout << "DEBUG: Continuous frame buffer is empty. Nothing to save." << std::endl;
+        return;
+    }
+    
+    // Create directory for continuous recording
+    fs::path data_dir = "engine/data/1_raw_recordings";
+    fs::path recording_dir = data_dir / continuous_recording_session_;
+    
+    std::cout << "DEBUG: Attempting to create directory: " << recording_dir << std::endl;
+    
+    try {
+        if (fs::create_directories(recording_dir)) {
+            std::cout << "DEBUG: Successfully created directory." << std::endl;
+        } else {
+            std::cout << "DEBUG: Directory already existed or failed to create." << std::endl;
+        }
+        
+        int frame_num = 0;
+        for (const auto& frame : continuous_frame_buffer_) {
+            std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num++) + ".jpg";
+            fs::path filepath = recording_dir / filename;
+            bool success = cv::imwrite(filepath.string(), frame);
+            if (!success) {
+                std::cerr << "Error: Failed to save frame to " << filepath << std::endl;
+            }
+        }
+        
+        std::cout << "Saved " << continuous_frame_buffer_.size() << " frames to " << recording_dir << std::endl;
+        continuous_frame_buffer_.clear();
+        
     } catch (const fs::filesystem_error& e) {
         std::cerr << "Error creating directory or saving frames: " << e.what() << std::endl;
     }

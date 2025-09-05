@@ -32,6 +32,8 @@ private:
     void processCommands();
     void sendCommand(const juggler::v1::CommandRequest& command);
     void saveRecording();
+    void startContinuousRecording();
+    void stopContinuousRecording();
     std::unique_ptr<ModuleBase> create_module(const juggler::v1::CommandRequest& command);
 
     OutputFormat output_format_;
@@ -63,4 +65,10 @@ private:
     std::deque<cv::Mat> frame_buffer_;
     std::mutex frame_buffer_mutex_;
     uint32_t frame_counter_;
+    
+    // Continuous recording state
+    std::atomic<bool> continuous_recording_;
+    std::deque<cv::Mat> continuous_frame_buffer_;
+    std::mutex continuous_frame_buffer_mutex_;
+    std::string continuous_recording_session_;
 };

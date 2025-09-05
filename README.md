@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-08-29 16:14:00 UTC
+**Last Updated:** 2025-09-05 06:52:00 UTC
 
 ## 🎯 Overview
 
@@ -33,7 +33,8 @@ JuggleHub/
 │   └── requirements.txt     # Python dependencies
 └── scripts/                 # Build and run scripts
     ├── build_engine.sh      # Build C++ engine
-    └── run_hub.sh           # Run Python hub
+    ├── run_hub.sh           # Run Python hub
+    └── add_prefix.py        # Add prefix to files and directories
 ```
 
 ## 🚀 Quick Start
@@ -869,27 +870,28 @@ Recordings are saved in the `engine/data/` directory with the following structur
 
 ```
 engine/data/
-├── 2025-08-30_17-18-29/           # Directory named with timestamp
-│   ├── 2025-08-30_17-18-29_frame_0.jpg    # Frame files with timestamp prefix
-│   ├── 2025-08-30_17-18-29_frame_1.jpg
-│   ├── 2025-08-30_17-18-29_frame_2.jpg
+├── rs455_2025-08-30_17-18-29/           # Directory named with rs455 prefix + timestamp
+│   ├── rs455_2025-08-30_17-18-29_frame_0.jpg    # Frame files with rs455 prefix + timestamp
+│   ├── rs455_2025-08-30_17-18-29_frame_1.jpg
+│   ├── rs455_2025-08-30_17-18-29_frame_2.jpg
 │   └── ...
-└── 2025-08-30_17-31-37/           # Another recording session
-    ├── 2025-08-30_17-31-37_frame_0.jpg
-    ├── 2025-08-30_17-31-37_frame_1.jpg
+└── rs455_2025-08-30_17-31-37/           # Another recording session
+    ├── rs455_2025-08-30_17-31-37_frame_0.jpg
+    ├── rs455_2025-08-30_17-31-37_frame_1.jpg
     └── ...
 ```
 
 ### File Naming Convention
 
-- **Directory**: `YYYY-MM-DD_HH-MM-SS` (timestamp when recording was triggered)
-- **Files**: `YYYY-MM-DD_HH-MM-SS_frame_N.jpg` (same timestamp + frame number)
+- **Directory**: `rs455_YYYY-MM-DD_HH-MM-SS` (rs455 prefix + timestamp when recording was triggered)
+- **Files**: `rs455_YYYY-MM-DD_HH-MM-SS_frame_N.jpg` (rs455 prefix + same timestamp + frame number)
 
 This naming convention ensures:
 - Easy chronological sorting
 - Clear association between directory and contained files
 - Unique identifiers for each frame across all recordings
 - Consistent format for automated processing
+- 'rs455_' prefix for easy identification and organization
 
 ### Triggering Recordings
 
@@ -916,11 +918,11 @@ python3 scripts/fix_frame_names.py /path/to/custom/data
 
 The script will:
 - Process all subdirectories in the data folder
-- Rename files from `frame_N.jpg` to `YYYY-MM-DD_HH-MM-SS_frame_N.jpg`
+- Rename files from `frame_N.jpg` to `rs455_YYYY-MM-DD_HH-MM-SS_frame_N.jpg`
 - Skip files that are already in the correct format
 - Provide detailed progress output
 
-**Last Updated:** 2025-08-31 08:30:00 UTC
+**Last Updated:** 2025-09-05 06:52:00 UTC
 
 ## 🤖 Dataset Preparation for AI Training
 
@@ -1104,3 +1106,68 @@ yolo train data=3_training_datasets/V2_specialized/dataset.yaml model=yolov8s.pt
 5. **Reproducibility**: Keep the same random seed for consistent results across experiments
 
 **Last Updated:** 2025-08-31 09:04:00 UTC
+
+## 🔧 Utility Scripts
+
+### File Prefix Script
+
+JuggleHub includes a utility script for adding prefixes to files and directories, useful for organizing datasets or preparing files for specific processing workflows.
+
+#### [`scripts/add_prefix.py`](scripts/add_prefix.py)
+
+A simple script that adds the 'rs455_' prefix (or any custom prefix) to the beginning of every file and directory name in a given directory.
+
+**Features:**
+- Add custom prefix to files and directories
+- Optional recursive processing of subdirectories
+- Dry-run mode to preview changes
+- Skip files that already have the prefix
+- Safe handling of naming conflicts
+
+**Usage Examples:**
+
+```bash
+# Basic usage - add 'rs455_' prefix to all items in a directory
+python3 scripts/add_prefix.py /path/to/directory
+
+# Recursive processing - include all subdirectories
+python3 scripts/add_prefix.py /path/to/directory --recursive
+
+# Dry run - see what would be renamed without making changes
+python3 scripts/add_prefix.py /path/to/directory --dry-run
+
+# Custom prefix
+python3 scripts/add_prefix.py /path/to/directory --prefix "custom_prefix_"
+
+# Combine options
+python3 scripts/add_prefix.py /path/to/directory --recursive --dry-run --prefix "dataset_v2_"
+```
+
+**Command Line Options:**
+- `directory`: Directory path to process (required)
+- `-r, --recursive`: Process subdirectories recursively
+- `--prefix PREFIX`: Custom prefix to add (default: rs455_)
+- `--dry-run`: Show what would be renamed without actually renaming
+
+**Example Output:**
+```
+Processing directory: /tmp/test_directory
+Prefix: 'rs455_'
+Recursive: True
+Dry run: False
+--------------------------------------------------
+Renamed: 'file1.txt' -> 'rs455_file1.txt'
+Renamed: 'subdir1' -> 'rs455_subdir1'
+Processing subdirectory: /tmp/test_directory/rs455_subdir1
+Renamed: 'nested_file.txt' -> 'rs455_nested_file.txt'
+--------------------------------------------------
+Successfully renamed 3 items.
+```
+
+**Safety Features:**
+- Skips files that already have the specified prefix
+- Warns about naming conflicts and skips problematic renames
+- Provides detailed progress output
+- Supports dry-run mode for safe testing
+
+**Last Updated:** 2025-09-05 06:52:00 UTC

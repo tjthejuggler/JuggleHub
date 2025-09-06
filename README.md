@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-09-05 06:52:00 UTC
+**Last Updated:** 2025-09-06 18:23:00 UTC
 
 ## 🎯 Overview
 
@@ -138,6 +138,15 @@ JuggleHub/
    ./scripts/run_hub.sh --create-venv --install-deps
    ```
 
+2. **Using custom camera settings:**
+   ```bash
+   # Use default camera settings (auto exposure enabled)
+   ./scripts/run_hub.sh --use-venv --camera-settings default.json
+   
+   # Use no-blur settings (manual exposure for consistent lighting)
+   ./scripts/run_hub.sh --use-venv --camera-settings no_blur.json
+   ```
+
 ## 📊 Features
 
 ### C++ Engine Features
@@ -148,6 +157,7 @@ JuggleHub/
   - **YOLOv8 object detection** optimized with Intel OpenVINO for real-time inference
   - **ByteTrack multi-object tracking** for consistent ball ID assignment across frames
   - **Automatic model loading** from OpenVINO IR format (.xml/.bin files)
+- **Camera Settings Management**: Load custom camera settings from JSON files for optimal performance
 - **Interactive calibration** with click-to-calibrate functionality
 - **Smart occlusion handling** - merges nearby detections
 - **High-performance streaming** at up to 90 FPS
@@ -157,6 +167,7 @@ JuggleHub/
 
 ### Python Hub Features
 - **Real-time visualization** with PyQt6 GUI
+- **Camera settings selection** with dropdown interface for easy configuration switching
 - **SQLite database logging** for session analysis
 - **ZeroMQ data streaming** with automatic reconnection
 - **Console mode** for headless operation
@@ -328,7 +339,7 @@ The NPU option is particularly useful for systems with dedicated neural processi
 
 **Last Updated:** 2025-09-01 16:14:00 UTC
 
-## 🔧 Configuration
+##  Configuration
 
 ### Engine Configuration
 

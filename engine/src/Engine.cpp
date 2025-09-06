@@ -11,13 +11,17 @@
 #include <filesystem>
 #include <opencv2/imgcodecs.hpp>
 #include <deque>
+#include <fstream>
+#include <sstream>
+#include <librealsense2/rs_advanced_mode.hpp>
 
 namespace fs = std::filesystem;
 
-Engine::Engine(const std::string& config_file, const std::string& device_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
-    : running_(false),
+Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
+    : camera_settings_path_(camera_settings_path),
+      running_(false),
       output_format_(format),
-      use_dnn_tracker_(use_dnn_tracker), // Initialize the flag
+      use_dnn_tracker_(use_dnn_tracker),
       verbose_(verbose),
       zmq_context_(1),
       zmq_publisher_(zmq_context_, ZMQ_PUB),
@@ -54,16 +58,9 @@ void Engine::run() {
 
     // Start command processing thread
     std::thread command_thread(&Engine::processCommands, this);
-
-    // Initialize camera
-    rs_config_.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
-    rs_config_.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
-    rs2::pipeline_profile profile = pipe_.start(rs_config_);
-    if (verbose_) {
-        std::cout << "Camera started." << std::endl;
-        auto stream = profile.get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
-        std::cout << "Color stream: " << stream.width() << "x" << stream.height() << " @" << stream.fps() << "fps" << std::endl;
-    }
+    
+    // Initialize camera with selected settings
+    initializeCamera();
 
     // Initialize the old BallTracker only if DNN tracking is not enabled
     if (use_dnn_tracker_) {
@@ -448,5 +445,124 @@ void Engine::stopContinuousRecording() {
         
     } catch (const fs::filesystem_error& e) {
         std::cerr << "Error creating directory or saving frames: " << e.what() << std::endl;
+    }
+}
+
+void Engine::initializeCamera() {
+    // Load camera settings from JSON file first
+    if (!camera_settings_path_.empty()) {
+        if (verbose_) {
+            std::cout << "Loading camera settings from: " << camera_settings_path_ << std::endl;
+        }
+        loadCameraSettingsFromJson(camera_settings_path_);
+    } else {
+        if (verbose_) {
+            std::cout << "No camera settings path provided." << std::endl;
+        }
+    }
+
+    // Initialize camera
+    rs_config_.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
+    rs_config_.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
+    rs2::pipeline_profile profile = pipe_.start(rs_config_);
+    
+    if (verbose_) {
+        std::cout << "Camera started." << std::endl;
+    }
+
+    // Apply the selected camera settings AFTER camera is started but before main loop
+    applyCameraSettings();
+}
+
+void Engine::loadCameraSettingsFromJson(const std::string& json_path) {
+    try {
+        std::ifstream file(json_path);
+        if (!file.is_open()) {
+            throw std::runtime_error("Could not open camera settings file: " + json_path);
+        }
+        
+        // Read the entire JSON file content into a string
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        json_content_ = buffer.str();
+        
+        if (verbose_) {
+            std::cout << "Loaded camera settings from: " << json_path << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading camera settings: " << e.what() << std::endl;
+        throw;
+    }
+}
+
+void Engine::applyCameraSettings() {
+    if (json_content_.empty()) {
+        if (verbose_) std::cout << "No camera settings loaded, using defaults." << std::endl;
+        return;
+    }
+
+    try {
+        if (verbose_) std::cout << "Applying camera settings from JSON..." << std::endl;
+
+        // Stop the pipeline first
+        pipe_.stop();
+        
+        // Wait a moment for the pipeline to fully stop
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        // Get the device context to apply settings
+        rs2::context ctx;
+        auto devices = ctx.query_devices();
+        if (devices.size() == 0) {
+            throw std::runtime_error("No RealSense devices found");
+        }
+        
+        rs2::device dev = devices[0];
+
+        // Check if the device supports advanced mode and is serializable
+        if (dev.is<rs2::serializable_device>()) {
+            // Cast the device to a serializable_device
+            rs2::serializable_device serializable_dev = dev.as<rs2::serializable_device>();
+
+            try {
+                // Load the JSON content into the device
+                serializable_dev.load_json(json_content_);
+                
+                if (verbose_) std::cout << "Camera settings applied successfully using RealSense JSON loader." << std::endl;
+                
+            } catch (const rs2::error& e) {
+                std::cerr << "Failed to load JSON settings: " << e.what() << std::endl;
+                // Continue anyway - don't throw, just use default settings
+            }
+        } else {
+            if (verbose_) std::cout << "Device does not support advanced mode / serialization. Using default settings." << std::endl;
+        }
+        
+        // Wait a moment after applying settings
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        
+        // Restart the pipeline with the same configuration
+        rs2::pipeline_profile profile = pipe_.start(rs_config_);
+        
+        if (verbose_) std::cout << "Camera restarted with new settings." << std::endl;
+        
+    } catch (const rs2::error & e) {
+        std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
+        // Try to restart the pipeline anyway
+        try {
+            rs2::pipeline_profile profile = pipe_.start(rs_config_);
+            if (verbose_) std::cout << "Camera restarted with default settings after error." << std::endl;
+        } catch (...) {
+            throw std::runtime_error("Failed to restart camera after settings application error");
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error applying camera settings: " << e.what() << std::endl;
+        // Try to restart the pipeline anyway
+        try {
+            rs2::pipeline_profile profile = pipe_.start(rs_config_);
+            if (verbose_) std::cout << "Camera restarted with default settings after error." << std::endl;
+        } catch (...) {
+            throw std::runtime_error("Failed to restart camera after settings application error");
+        }
     }
 }

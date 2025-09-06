@@ -24,7 +24,8 @@ try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                  QHBoxLayout, QLabel, QTextEdit, QPushButton,
                                  QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
-                                 QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit)
+                                 QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit,
+                                 QComboBox, QMessageBox)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
     from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence
     PYQT_AVAILABLE = True
@@ -103,13 +104,48 @@ if PYQT_AVAILABLE:
         frame_received = pyqtSignal(object)
 
     class CalibrationSettingsWidget(QWidget):
-        def __init__(self, udp_client: UdpClient, parent=None):
+        def __init__(self, udp_client: UdpClient, zmq_client: 'ZMQClient', hub_instance=None, parent=None):
             super().__init__(parent)
             self.udp_client = udp_client
+            self.zmq_client = zmq_client
+            self.hub_instance = hub_instance
             self.init_ui()
 
         def init_ui(self):
             layout = QVBoxLayout(self)
+            
+            # -- Camera Settings --
+            camera_group = QGroupBox("📷 Camera Settings")
+            camera_layout = QGridLayout(camera_group)
+            
+            # Camera settings dropdown
+            camera_layout.addWidget(QLabel("Settings Profile:"), 0, 0)
+            self.camera_settings_combo = QComboBox()
+            self.populate_camera_settings()
+            camera_layout.addWidget(self.camera_settings_combo, 0, 1)
+            
+            # Apply settings button
+            self.apply_settings_button = QPushButton("Apply Settings & Restart")
+            self.apply_settings_button.clicked.connect(self.apply_camera_settings)
+            self.apply_settings_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    border: none;
+                    padding: 8px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+                QPushButton:pressed {
+                    background-color: #0D47A1;
+                }
+            """)
+            camera_layout.addWidget(self.apply_settings_button, 1, 0, 1, 2)
+            
+            layout.addWidget(camera_group)
             
             # -- DNN Tracker Settings --
             dnn_group = QGroupBox("DNN Tracker Settings")
@@ -136,16 +172,64 @@ if PYQT_AVAILABLE:
             layout.addWidget(dnn_group)
             layout.addStretch()
 
+        def populate_camera_settings(self):
+            """Populate the camera settings dropdown with hardcoded profiles."""
+            self.camera_settings_combo.clear()
+            self.camera_settings_combo.addItem("Default", "default")
+            self.camera_settings_combo.addItem("No Blur", "no_blur")
+
+        def apply_camera_settings(self):
+            """Apply selected camera settings and request a hub restart."""
+            selected_profile = self.camera_settings_combo.currentData()
+            settings_name = self.camera_settings_combo.currentText()
+
+            reply = QMessageBox.question(
+                self,
+                "Restart System",
+                f"This will restart the entire system with '{settings_name}' camera settings.\n\nContinue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    # Save the selected profile name to a config file
+                    config_file = os.path.join("..", "current_camera_settings.txt")
+                    with open(config_file, 'w') as f:
+                        f.write(selected_profile)
+                    
+                    QMessageBox.information(
+                        self,
+                        "Restarting Hub",
+                        f"The hub will now close. The run script will restart it with '{settings_name}' settings."
+                    )
+
+                    # Request a restart and quit the application
+                    if self.hub_instance:
+                        self.hub_instance.restart_requested = True
+                    
+                    if hasattr(self.parent(), 'app') and self.parent().app:
+                        self.parent().app.quit()
+                    else:
+                        sys.exit(0)
+
+                except Exception as e:
+                    QMessageBox.critical(
+                        self,
+                        "Error",
+                        f"Error preparing for restart: {str(e)}"
+                    )
+
         def update_setting(self, key: str, value: Any):
             self.udp_client.send_setting(key, value)
 
     class JuggleHubMainWindow(QMainWindow):
         """Main window for JuggleHub UI."""
         
-        def __init__(self, config: dict, zmq_client: 'ZMQClient'):
+        def __init__(self, config: dict, zmq_client: 'ZMQClient', hub_instance=None):
             super().__init__()
             self.config = config
             self.zmq_client = zmq_client
+            self.hub_instance = hub_instance
             self.frame_count = 0
             self.start_time = time.time()
             self.last_frame_data: Optional[juggler_pb2.FrameData] = None
@@ -265,7 +349,7 @@ if PYQT_AVAILABLE:
             content_layout.addWidget(self.video_group, 2) # Give it more stretch factor
             
             # Calibration settings panel
-            self.settings_widget = CalibrationSettingsWidget(self.udp_client)
+            self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance)
             self.settings_widget.setVisible(False)
             content_layout.addWidget(self.settings_widget, 1)
             
@@ -549,9 +633,10 @@ if PYQT_AVAILABLE:
 class JuggleHubUI:
     """Main UI class that chooses between PyQt6 and console UI."""
     
-    def __init__(self, config: dict, zmq_client: Optional['ZMQClient'] = None):
+    def __init__(self, config: dict, zmq_client: Optional['ZMQClient'] = None, hub_instance=None):
         self.config = config
         self.zmq_client = zmq_client
+        self.hub_instance = hub_instance
         
         if PYQT_AVAILABLE and config.get('enable_ui', True):
             # Create QApplication if it doesn't exist
@@ -560,7 +645,7 @@ class JuggleHubUI:
             else:
                 self.app = QApplication.instance()
             
-            self.main_window = JuggleHubMainWindow(config, self.zmq_client)
+            self.main_window = JuggleHubMainWindow(config, self.zmq_client, self.hub_instance)
             self.ui_type = "pyqt6"
         else:
             self.console_ui = ConsoleUI(config)

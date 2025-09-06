@@ -1,3 +1,125 @@
+Excellent idea. Consolidating everything into a single, definitive guide is the best way to ensure consistency. I have taken your existing guide and expanded it with all the nuanced details from our conversation, structuring it for maximum clarity.
+
+I have preserved your core class structure (`led_on`, `led_off`, `dropped_ball`) and the two-profile filming approach, as they are a solid foundation. This expanded guide adds the crucial layers of manual control, data diversity, and labeling precision we discussed.
+
+---
+
+### **The Complete Guide to Filming and Labeling the JuggleHub Dataset (v2.0)**
+
+This is the definitive guide for creating and labeling a high-quality juggling dataset. The core strategy is built on a methodical approach to data collection and a strict set of labeling rules. Following this guide precisely will result in a robust and reliable AI model.
+
+The strategy is built on three key decisions:
+1.  **One Unified Model:** We will train a single AI model to handle all conditions.
+2.  **A Controlled, Multi-Profile Filming Strategy:** We will use meticulously controlled camera settings—not just "auto" vs. "manual"—to create a dataset that is both diverse and high-quality.
+3.  **A Three-Class System:** We will use three specific classes to give the model the context it needs to identify the state of each ball.
+
+---
+
+### **The Three-Class System: The Foundation of Our Dataset**
+
+This is what you will be labeling. Understanding these classes is the most critical step.
+
+1.  **`led_on`**: This class is exclusively for a ball that is **visibly glowing**.
+2.  **`led_off`**: This class is for any ball that is **not glowing**. This single class correctly covers both a normal, non-LED juggling ball *and* an LED ball that is powered off.
+3.  **`dropped_ball`**: This class is for **any type of ball** (glowing or not) that is on the **floor** after an uncontrolled drop. This class overrides the other two; if a ball is on the floor, it is always a `dropped_ball`.
+
+---
+
+### **Part 1: Filming the Dataset - A Scientific Approach to Data Capture**
+
+The core principle of this phase is **Controlled Variation**. We will not rely on "auto" mode, as it hides challenging conditions and produces inconsistent data. We will become scientists, controlling the camera settings to create a complete education for our model.
+
+#### **Critical Camera Configuration:**
+*   **Turn IR Projector ON:** The RealSense projector is required for good depth data during inference, so it **must be on** during all training data collection to ensure consistency.
+*   **Use Manual Settings for ALL Captures:** Disable auto-exposure, auto-gain, and auto-white-balance for all filming sessions. This gives us complete control and repeatability.
+
+#### **Filming Strategy: The Multi-Profile Method**
+
+For each distinct filming environment, we will capture several "sets" of data, each with a specific purpose.
+
+*   **Profile 1: "Sharp/Nominal" (For `led_off` balls):**
+    *   **Goal:** Capture a large volume of crisp, blur-free images. This is the foundation of your dataset and allows for perfect labeling.
+    *   **Settings:**
+        1.  **Set Exposure:** Set a fast shutter speed (e.g., start at 4000µs and go lower if needed) until all motion blur is eliminated.
+        2.  **Set Gain:** After setting exposure, increase the gain until the scene is well-lit.
+        3.  **Set White Balance:** Briefly toggle "auto" to find a good value, then lock it in manually.
+    *   **Use Case:** This profile is for capturing **`led_off`** and **`dropped_ball`** classes.
+
+*   **Profile 2: "LED/Glow" (For `led_on` balls):**
+    *   **Goal:** Capture the true color and shape of glowing balls without them appearing as washed-out white blobs.
+    *   **Settings:**
+        1.  **Set Exposure:** Use a **very fast** shutter speed (e.g., 500-2000µs). This is the key to preventing overexposure from the LEDs.
+        2.  **Set Gain:** Keep the gain relatively low. The scene will be dark, but the glowing balls will be perfectly exposed.
+    *   **Use Case:** Exclusively for capturing the **`led_on`** class.
+
+*   **Profile 3: "Intentional Blur" (For both `led_on` and `led_off`):**
+    *   **Goal:** To teach the model what motion blur looks like in a controlled, consistent way.
+    *   **Settings:**
+        1.  **Set Exposure:** Use a **slower**, fixed shutter speed (e.g., 16667µs or 1/60s).
+        2.  **Set Gain:** Adjust gain to get a usable image brightness at this slower shutter.
+    *   **Use Case:** Capture a dedicated portion (~15%) of your data with this profile to create consistent blur examples.
+
+#### **What to Film (The Comprehensive Shot List):**
+
+*   **Vary Environments (Critical):** Record in at least 4-5 diverse locations: a brightly sunlit room, a room with only warm lamp light, an office with cool overhead light, outdoors in shade, etc.
+*   **Vary Yourself:** Do not be a constant in the scene. Systematically change your shirt (patterns, solids, light, dark), pants, and even have a friend with a different build or skin tone juggle for some clips.
+*   **Vary Backgrounds:** Film against complex backgrounds (bookshelves, patterned walls) and simple ones (plain walls). Intentionally include clutter.
+*   **Capture All Angles:** Film from low angles, high angles, and straight on.
+*   **Capture All Distances:** Get footage where the balls are very close and large, and very far away and small.
+*   **Film Challenging Cases Systematically:**
+    *   **Occlusion:** Intentionally film balls partially hidden by your hands, arms, and other objects.
+    *   **Truncation:** Film so that balls are frequently cut off by the edges of the frame.
+    *   **Drops:** Dedicate sessions to intentionally dropping balls. Capture them falling, bouncing, and settling on the floor.
+*   **Create "Hard Negatives":**
+    *   Place confusing, ball-like objects (oranges, doorknobs, decorations) in the background while juggling.
+    *   Record short clips of the scene containing *only* these confusing objects, with no juggling balls present. These will be your "negative" images.
+
+---
+
+### **Part 2: Labeling the Dataset - Precision and Consistency**
+
+Your labels are the "answer key" for the model. Their quality is more important than anything else. **Our mantra is "Consistently Snug, Not Obsessively Perfect."**
+
+#### **The Labeling Litmus Test: Your Step-by-Step Guide**
+For any ball in any frame, follow this exact decision process:
+
+1.  **Is the ball on the floor after a drop?**
+    *   **YES:** Label it as **`dropped_ball`**. Stop here.
+    *   **NO:** Proceed to the next question.
+
+2.  **Is the ball visibly glowing?**
+    *   **YES:** Label it as **`led_on`**.
+    *   **NO:** Label it as **`led_off`**.
+
+#### **Detailed Labeling Rules (DOs):**
+
+*   **Bounding Box Precision:** For sharp objects, **zoom in**. Align the four sides of the box to be tangent to the object's edges. The box should be a "snug fit" with minimal background inside. Do not obsess over a single pixel, but do not be sloppy.
+*   **Labeling Motion Blur (CRITICAL RULE):**
+    *   The bounding box must be the **actual size of the ball**, not the size of the blurred streak.
+    *   Consistently place the box on the **leading edge** of the blur (the side furthest along the direction of motion). Some of the blur trail will correctly be outside the box.
+*   **Partially Occluded Balls:** If a ball is hidden behind your hand, draw the bounding box around the **inferred full shape** of the ball, as if you could see through the obstruction.
+*   **Truncated Balls (Off-Screen):** Draw the bounding box to cover **only the visible portion**, stopping exactly at the image border.
+*   **Merged LED Balls:** If two `led_on` balls merge into one indistinguishable blob of light, draw **one single bounding box** around the entire merged shape. However, if you can see any visual boundary between them, label them as two separate, overlapping objects.
+*   **Negative Images:** For frames containing only "hard negative" background objects (or no objects at all), create a corresponding **completely empty** label file. This is crucial.
+
+#### **Critical "DON'T" Rules:**
+
+*   **DO NOT Label Stationary Scenery:** **Never** label a ball that is sitting on a **table, shelf, or in a box** and was not part of the active juggling pattern. These are background objects. Labeling them `dropped_ball` will break your drop detection.
+*   **DO NOT Label Reflections:** Never draw a bounding box around a reflection in a mirror or window.
+*   **DO NOT Guess with Merged Blobs:** Do not use your knowledge to draw two separate boxes inside a single, visually merged blob of light. Label what you see.
+*   **DO NOT Label Tiny Fragments:** If so little of a ball is visible (e.g., less than 25%) that it's unidentifiable, do not label it.
+*   **DO NOT Create New Classes:** Never create a "Not a Ball" class for confusing objects. The model learns to ignore them by having them be unlabeled parts of the background in your labeled images.
+*   **DO NOT Use Your Old "Auto" Data (Unless Curated):** Discard any blurry images captured with auto-settings. You may keep the perfectly sharp ones, but it is safer and cleaner to start fresh with your new, controlled methodology.
+
+### **Part 3: Dataset Balance - Ensuring a Smart Model**
+
+Your final dataset should follow these guidelines to prevent the model from becoming biased.
+
+*   **Balance `led_on` vs. `led_off`:** Aim for a roughly equal number of images featuring each class. A 50/50 or 60/40 split is ideal. This ensures the model is equally skilled at recognizing balls in both camera modes.
+*   **Over-Sample the Rare Event (`dropped_ball`):** Drops are rare, but important. The `dropped_ball` class should represent **10% to 20%** of your total dataset instances. If you have 1000 images of balls in play, you should aim for 100-200 images that contain a dropped ball. This is why intentionally filming drops is so important.
+
+--------------
+
 #### Condensed list of advice for when filming and labelling a dataset
 
 Below is a condensed set of guidelines for creating and labeling a juggling dataset, based on the advice provided.

@@ -103,43 +103,49 @@ CREATE_VENV=false
 NO_UI=false
 DEBUG=false
 ZMQ_ENDPOINT="tcp://localhost:5555"
+CAMERA_SETTINGS=""
 PASS_THROUGH_ARGS=()
-
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --install-deps)
-            INSTALL_DEPS=true
-            shift
-            ;;
-        --create-venv)
-            CREATE_VENV=true
-            USE_VENV=true
-            shift
-            ;;
-        --use-venv)
-            USE_VENV=true
-            shift
-            ;;
-        -h|--help)
-            echo "Usage: $0 [OPTIONS] [-- SCRIPT_ARGS]"
-            echo "Options:"
-            echo "  --install-deps    Install Python dependencies"
-            echo "  --create-venv     Create and use virtual environment"
-            echo "  --use-venv        Use existing virtual environment"
-            echo "  -h, --help        Show this help message"
-            echo ""
-            echo "Script Arguments (passed to hub/main.py):"
-            echo "  All arguments after '--' or any unknown arguments will be passed to the Python script."
-            echo "  Example: $0 -- --watch-ips 192.168.1.101 --debug"
-            exit 0
-            ;;
-        *)
-            # Collect any other arguments to pass to the python script
-            PASS_THROUGH_ARGS+=("$1")
-            shift
-            ;;
-    esac
-done
+ 
+ while [[ $# -gt 0 ]]; do
+     case $1 in
+         --install-deps)
+             INSTALL_DEPS=true
+             shift
+             ;;
+         --create-venv)
+             CREATE_VENV=true
+             USE_VENV=true
+             shift
+             ;;
+         --use-venv)
+             USE_VENV=true
+             shift
+             ;;
+         --camera-settings)
+             CAMERA_SETTINGS="$2"
+             shift 2
+             ;;
+         -h|--help)
+             echo "Usage: $0 [OPTIONS] [-- SCRIPT_ARGS]"
+             echo "Options:"
+             echo "  --install-deps              Install Python dependencies"
+             echo "  --create-venv               Create and use virtual environment"
+             echo "  --use-venv                  Use existing virtual environment"
+             echo "  --camera-settings <file>    Camera settings JSON file (e.g., default.json)"
+             echo "  -h, --help                  Show this help message"
+             echo ""
+             echo "Script Arguments (passed to hub/main.py):"
+             echo "  All arguments after '--' or any unknown arguments will be passed to the Python script."
+             echo "  Example: $0 --camera-settings default.json -- --watch-ips 192.168.1.101 --debug"
+             exit 0
+             ;;
+         *)
+             # Collect any other arguments to pass to the python script
+             PASS_THROUGH_ARGS+=("$1")
+             shift
+             ;;
+     esac
+ done
 
 # Create virtual environment if requested
 if [ "$CREATE_VENV" = true ]; then
@@ -225,6 +231,28 @@ fi
 echo -e "${BLUE}🧠 Starting C++ engine...${NC}"
 ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=GPU")
 
+# Determine which camera settings to use
+if [ -n "$CAMERA_SETTINGS" ]; then
+    CAMERA_SETTINGS_PATH="$PROJECT_ROOT/camera_settings/$CAMERA_SETTINGS"
+    if [ -f "$CAMERA_SETTINGS_PATH" ]; then
+        echo -e "${BLUE}📷 Using camera settings: $CAMERA_SETTINGS${NC}"
+        ENGINE_ARGS+=("--camera-settings=$CAMERA_SETTINGS_PATH")
+    else
+        echo -e "${RED}❌ Error: Camera settings file not found: $CAMERA_SETTINGS_PATH${NC}"
+        exit 1
+    fi
+else
+    # Default to default.json if no camera settings specified
+    DEFAULT_SETTINGS_PATH="$PROJECT_ROOT/camera_settings/default.json"
+    if [ -f "$DEFAULT_SETTINGS_PATH" ]; then
+        echo -e "${BLUE}📷 Using default camera settings: default.json${NC}"
+        ENGINE_ARGS+=("--camera-settings=$DEFAULT_SETTINGS_PATH")
+    else
+        echo -e "${RED}❌ Error: Default camera settings file not found: $DEFAULT_SETTINGS_PATH${NC}"
+        exit 1
+    fi
+fi
+
 echo "Engine command: $ENGINE_EXECUTABLE ${ENGINE_ARGS[@]}"
 
 # No longer need to change directories. Execute from project root.
@@ -252,6 +280,16 @@ echo -e "${BLUE}Arguments passed to hub: ${HUB_ARGS[*]}${NC}"
 # Add the API directory to Python path
 
 # Run the hub
-python3 main.py "${HUB_ARGS[@]}"
+# Loop to allow for restarts
+while true; do
+    python3 main.py "${HUB_ARGS[@]}"
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 10 ]; then
+        break # Exit the loop if the exit code is not 10 (our restart code)
+    fi
+    echo -e "${YELLOW}🔄 Restarting hub as requested...${NC}"
+    # The cleanup function will run, killing the old engine.
+    # The loop will then restart it.
+done
 
 echo -e "${GREEN}✅ JuggleHub hub stopped${NC}"

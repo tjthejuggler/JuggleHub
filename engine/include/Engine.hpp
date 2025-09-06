@@ -5,6 +5,7 @@
 #include "../src/modules/UdpBallColorModule.hpp"
 #include "../src/modules/UdpBallSettingsModule.hpp"
 #include "DNNTracker.hpp" // Include the new DNNTracker
+#include "json.hpp" // Include nlohmann/json
 #include <memory>
 #include <queue>
 #include <mutex>
@@ -22,7 +23,7 @@ public:
         LEGACY
     };
 
-    Engine(const std::string& config_file, const std::string& device_name = "CPU", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
+    Engine(const std::string& camera_settings_path, const std::string& device_name = "CPU", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
     ~Engine();
 
     void run();
@@ -34,8 +35,13 @@ private:
     void saveRecording();
     void startContinuousRecording();
     void stopContinuousRecording();
+    void initializeCamera();
+    void applyCameraSettings();
+    void loadCameraSettingsFromJson(const std::string& json_path);
     std::unique_ptr<ModuleBase> create_module(const juggler::v1::CommandRequest& command);
 
+    std::string camera_settings_path_;
+    std::string json_content_;
     OutputFormat output_format_;
 
     // Thread-safe queue for commands

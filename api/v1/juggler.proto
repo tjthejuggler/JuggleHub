@@ -116,6 +116,7 @@ message CommandRequest {
     RECORD_START = 5;
     RECORD_CONTINUOUS_START = 6;
     RECORD_CONTINUOUS_STOP = 7;
+    RESTART_WITH_CAMERA_SETTINGS = 8; // New command for camera settings
   }
   
   CommandType type = 1;
@@ -123,6 +124,7 @@ message CommandRequest {
   uint64 timestamp_us = 3;          // Command timestamp
   ColorCommand color_command = 4;
   map<string, string> module_args = 5; // Arguments for the module
+  string camera_settings_file = 6;  // Path to camera settings JSON file
 }
 
 message ColorCommand {

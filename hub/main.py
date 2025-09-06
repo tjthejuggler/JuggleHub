@@ -27,6 +27,7 @@ class JuggleHub:
     def __init__(self, config: dict):
         self.config = config
         self.running = False
+        self.restart_requested = False
         
         # Initialize components
         self.zmq_client: Optional[ZMQClient] = None
@@ -50,7 +51,7 @@ class JuggleHub:
 
             # Initialize UI
             if self.config['enable_ui']:
-                self.ui = JuggleHubUI(self.config, self.zmq_client)
+                self.ui = JuggleHubUI(self.config, self.zmq_client, self)
 
             # Initialize DatabaseLogger
             if self.config['enable_logging']:
@@ -251,6 +252,11 @@ def main():
             stats.print_stats(20)  # Print top 20 functions
     else:
         hub.run()
+
+        # Exit with a special code if a restart was requested
+        if hub.restart_requested:
+            print("🔄 Hub requested restart. Exiting with code 10.")
+            sys.exit(10)
 
 
 if __name__ == '__main__':

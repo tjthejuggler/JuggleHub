@@ -229,6 +229,9 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.color_command_)*/nullptr
   , /*decltype(_impl_.timestamp_us_)*/uint64_t{0u}
   , /*decltype(_impl_.type_)*/0
+  , /*decltype(_impl_.camera_width_)*/0u
+  , /*decltype(_impl_.camera_height_)*/0u
+  , /*decltype(_impl_.camera_fps_)*/0u
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct CommandRequestDefaultTypeInternal {
   PROTOBUF_CONSTEXPR CommandRequestDefaultTypeInternal()
@@ -419,6 +422,9 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.color_command_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.module_args_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.camera_settings_file_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.camera_width_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.camera_height_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.camera_fps_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorCommand, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -451,8 +457,8 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 104, -1, -1, sizeof(::juggler::v1::FrameData)},
   { 122, 130, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
   { 132, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 144, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 152, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 147, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 155, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -511,29 +517,31 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "rame_height\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\022"
   "1\n\016raw_detections\030\n \003(\0132\031.juggler.v1.Bou"
   "ndingBox2D\022\027\n\017color_image_b64\030\013 \001(\014\022\027\n\017d"
-  "epth_image_b64\030\014 \001(\014\"\263\004\n\016CommandRequest\022"
+  "epth_image_b64\030\014 \001(\014\"\364\004\n\016CommandRequest\022"
   "4\n\004type\030\001 \001(\0162&.juggler.v1.CommandReques"
   "t.CommandType\022\023\n\013module_name\030\002 \001(\t\022\024\n\014ti"
   "mestamp_us\030\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132"
   "\030.juggler.v1.ColorCommand\022\?\n\013module_args"
   "\030\005 \003(\0132*.juggler.v1.CommandRequest.Modul"
   "eArgsEntry\022\034\n\024camera_settings_file\030\006 \001(\t"
-  "\0321\n\017ModuleArgsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005valu"
-  "e\030\002 \001(\t:\0028\001\"\374\001\n\013CommandType\022\013\n\007UNKNOWN\020\000"
-  "\022\017\n\013LOAD_MODULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022"
-  "SEND_COLOR_COMMAND\020\003\022\024\n\020CONFIGURE_MODULE"
-  "\020\004\022\020\n\014RECORD_START\020\005\022\033\n\027RECORD_CONTINUOU"
-  "S_START\020\006\022\032\n\026RECORD_CONTINUOUS_STOP\020\007\022 \n"
-  "\034RESTART_WITH_CAMERA_SETTINGS\020\010\022\017\n\013CAMER"
-  "A_STOP\020\t\022\020\n\014CAMERA_START\020\n\"A\n\014ColorComma"
-  "nd\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.jug"
-  "gler.v1.Color\"I\n\017CommandResponse\022\017\n\007succ"
-  "ess\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014timestamp_"
-  "us\030\003 \001(\004b\006proto3"
+  "\022\024\n\014camera_width\030\007 \001(\r\022\025\n\rcamera_height\030"
+  "\010 \001(\r\022\022\n\ncamera_fps\030\t \001(\r\0321\n\017ModuleArgsE"
+  "ntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\374\001\n"
+  "\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE"
+  "\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMM"
+  "AND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_ST"
+  "ART\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026RE"
+  "CORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WITH_C"
+  "AMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CAM"
+  "ERA_START\020\n\"A\n\014ColorCommand\022\017\n\007ball_id\030\001"
+  " \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color\"I"
+  "\n\017CommandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007me"
+  "ssage\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto"
+  "3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 2216, descriptor_table_protodef_juggler_2eproto,
+    false, false, 2281, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 15,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -4406,6 +4414,9 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.timestamp_us_){}
     , decltype(_impl_.type_){}
+    , decltype(_impl_.camera_width_){}
+    , decltype(_impl_.camera_height_){}
+    , decltype(_impl_.camera_fps_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -4430,8 +4441,8 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     _this->_impl_.color_command_ = new ::juggler::v1::ColorCommand(*from._impl_.color_command_);
   }
   ::memcpy(&_impl_.timestamp_us_, &from._impl_.timestamp_us_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.type_) -
-    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.type_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.camera_fps_) -
+    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.camera_fps_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.CommandRequest)
 }
 
@@ -4446,6 +4457,9 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.timestamp_us_){uint64_t{0u}}
     , decltype(_impl_.type_){0}
+    , decltype(_impl_.camera_width_){0u}
+    , decltype(_impl_.camera_height_){0u}
+    , decltype(_impl_.camera_fps_){0u}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.module_name_.InitDefault();
@@ -4499,8 +4513,8 @@ void CommandRequest::Clear() {
   }
   _impl_.color_command_ = nullptr;
   ::memset(&_impl_.timestamp_us_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.type_) -
-      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.type_));
+      reinterpret_cast<char*>(&_impl_.camera_fps_) -
+      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.camera_fps_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -4565,6 +4579,30 @@ const char* CommandRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.CommandRequest.camera_settings_file"));
+        } else
+          goto handle_unusual;
+        continue;
+      // uint32 camera_width = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 56)) {
+          _impl_.camera_width_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint32 camera_height = 8;
+      case 8:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 64)) {
+          _impl_.camera_height_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint32 camera_fps = 9;
+      case 9:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 72)) {
+          _impl_.camera_fps_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -4667,6 +4705,24 @@ uint8_t* CommandRequest::_InternalSerialize(
         6, this->_internal_camera_settings_file(), target);
   }
 
+  // uint32 camera_width = 7;
+  if (this->_internal_camera_width() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteUInt32ToArray(7, this->_internal_camera_width(), target);
+  }
+
+  // uint32 camera_height = 8;
+  if (this->_internal_camera_height() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteUInt32ToArray(8, this->_internal_camera_height(), target);
+  }
+
+  // uint32 camera_fps = 9;
+  if (this->_internal_camera_fps() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteUInt32ToArray(9, this->_internal_camera_fps(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -4724,6 +4780,21 @@ size_t CommandRequest::ByteSizeLong() const {
       ::_pbi::WireFormatLite::EnumSize(this->_internal_type());
   }
 
+  // uint32 camera_width = 7;
+  if (this->_internal_camera_width() != 0) {
+    total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(this->_internal_camera_width());
+  }
+
+  // uint32 camera_height = 8;
+  if (this->_internal_camera_height() != 0) {
+    total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(this->_internal_camera_height());
+  }
+
+  // uint32 camera_fps = 9;
+  if (this->_internal_camera_fps() != 0) {
+    total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(this->_internal_camera_fps());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -4759,6 +4830,15 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (from._internal_type() != 0) {
     _this->_internal_set_type(from._internal_type());
   }
+  if (from._internal_camera_width() != 0) {
+    _this->_internal_set_camera_width(from._internal_camera_width());
+  }
+  if (from._internal_camera_height() != 0) {
+    _this->_internal_set_camera_height(from._internal_camera_height());
+  }
+  if (from._internal_camera_fps() != 0) {
+    _this->_internal_set_camera_fps(from._internal_camera_fps());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -4788,8 +4868,8 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
       &other->_impl_.camera_settings_file_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.type_)
-      + sizeof(CommandRequest::_impl_.type_)
+      PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.camera_fps_)
+      + sizeof(CommandRequest::_impl_.camera_fps_)
       - PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.color_command_)>(
           reinterpret_cast<char*>(&_impl_.color_command_),
           reinterpret_cast<char*>(&other->_impl_.color_command_));

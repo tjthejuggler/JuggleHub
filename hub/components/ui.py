@@ -114,6 +114,18 @@ if PYQT_AVAILABLE:
         def init_ui(self):
             layout = QVBoxLayout(self)
             
+            # Initialize resolution-FPS mapping first
+            self.resolution_fps_map = {
+                "1280 x 800": [60, 30, 15, 6],
+                "1280 x 720": [60, 30, 15, 6],
+                "960 x 540": [60, 30, 15, 6],
+                "848 x 480": [60, 30, 15, 6],
+                "640 x 480": [60, 30, 15, 6],
+                "640 x 360": [60, 30, 15, 6],
+                "424 x 240": [60, 30, 15, 6],
+                "320 x 240": [60, 30, 15, 6]
+            }
+            
             # -- Camera Settings --
             camera_group = QGroupBox("📷 Camera Settings")
             camera_layout = QGridLayout(camera_group)
@@ -123,6 +135,19 @@ if PYQT_AVAILABLE:
             self.camera_settings_combo = QComboBox()
             self.populate_camera_settings()
             camera_layout.addWidget(self.camera_settings_combo, 0, 1)
+            
+            # Resolution dropdown
+            camera_layout.addWidget(QLabel("Resolution:"), 1, 0)
+            self.resolution_combo = QComboBox()
+            self.populate_resolution_options()
+            self.resolution_combo.currentTextChanged.connect(self.on_resolution_changed)
+            camera_layout.addWidget(self.resolution_combo, 1, 1)
+            
+            # FPS dropdown
+            camera_layout.addWidget(QLabel("Frame Rate (FPS):"), 2, 0)
+            self.fps_combo = QComboBox()
+            self.populate_fps_options()
+            camera_layout.addWidget(self.fps_combo, 2, 1)
             
             # Camera control buttons
             camera_control_layout = QHBoxLayout()
@@ -173,15 +198,15 @@ if PYQT_AVAILABLE:
                     background-color: #666666;
                 }
             """)
-            self.start_camera_button.setEnabled(False)  # Initially disabled
+            self.start_camera_button.setEnabled(True)
             camera_control_layout.addWidget(self.start_camera_button)
             
-            camera_layout.addLayout(camera_control_layout, 1, 0, 1, 2)
+            camera_layout.addLayout(camera_control_layout, 3, 0, 1, 2)
             
             # Camera status indicator
-            self.camera_status_label = QLabel("● Camera Running")
-            self.camera_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-            camera_layout.addWidget(self.camera_status_label, 2, 0, 1, 2)
+            self.camera_status_label = QLabel("● Camera Stopped")
+            self.camera_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
+            camera_layout.addWidget(self.camera_status_label, 4, 0, 1, 2)
             
             layout.addWidget(camera_group)
             
@@ -230,6 +255,38 @@ if PYQT_AVAILABLE:
                 self.camera_settings_combo.addItem("Default", "default")
                 self.camera_settings_combo.addItem("No Blur", "no_blur")
 
+        def populate_resolution_options(self):
+            """Populate the resolution dropdown with D455 supported resolutions."""
+            self.resolution_combo.clear()
+            for resolution in self.resolution_fps_map.keys():
+                self.resolution_combo.addItem(resolution)
+            
+            # Set default to 640x480
+            default_index = self.resolution_combo.findText("640 x 480")
+            if default_index >= 0:
+                self.resolution_combo.setCurrentIndex(default_index)
+
+        def populate_fps_options(self):
+            """Populate the FPS dropdown based on selected resolution."""
+            current_resolution = self.resolution_combo.currentText()
+            if current_resolution in self.resolution_fps_map:
+                fps_options = self.resolution_fps_map[current_resolution]
+                
+                self.fps_combo.clear()
+                for fps in fps_options:
+                    self.fps_combo.addItem(f"{fps} FPS", fps)
+                
+                # Set default to 30 FPS if available, otherwise first option
+                default_index = self.fps_combo.findText("30 FPS")
+                if default_index >= 0:
+                    self.fps_combo.setCurrentIndex(default_index)
+                elif self.fps_combo.count() > 0:
+                    self.fps_combo.setCurrentIndex(0)
+
+        def on_resolution_changed(self):
+            """Handle resolution change to update FPS options."""
+            self.populate_fps_options()
+
         def stop_camera_feed(self):
             """Stop the camera feed."""
             try:
@@ -256,6 +313,13 @@ if PYQT_AVAILABLE:
                 selected_profile = self.camera_settings_combo.currentData()
                 settings_name = self.camera_settings_combo.currentText()
                 
+                # Get selected resolution and FPS
+                selected_resolution = self.resolution_combo.currentText()
+                selected_fps = self.fps_combo.currentData()
+                
+                # Parse resolution (e.g., "640 x 480" -> width=640, height=480)
+                width, height = map(int, selected_resolution.split(' x '))
+                
                 # Construct the full path to the camera settings file
                 settings_file_path = f"camera_settings/{selected_profile}.json"
                 
@@ -263,13 +327,18 @@ if PYQT_AVAILABLE:
                 command.type = juggler_pb2.CommandRequest.CommandType.CAMERA_START
                 command.camera_settings_file = settings_file_path
                 
+                # Add resolution and FPS parameters
+                command.camera_width = width
+                command.camera_height = height
+                command.camera_fps = selected_fps
+                
                 response = self.zmq_client.send_command(command)
                 if response.success:
                     self.stop_camera_button.setEnabled(True)
                     self.start_camera_button.setEnabled(False)
-                    self.camera_status_label.setText("● Camera Running")
+                    self.camera_status_label.setText(f"● Camera Running ({selected_resolution} @ {selected_fps} FPS)")
                     self.camera_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-                    print(f"✅ Camera started with {settings_name}: {response.message}")
+                    print(f"✅ Camera started with {settings_name} at {selected_resolution} @ {selected_fps} FPS: {response.message}")
                 else:
                     QMessageBox.critical(self, "Error", f"Failed to start camera: {response.message}")
                     print(f"❌ Failed to start camera: {response.message}")

@@ -41,6 +41,7 @@ private:
     void stopCamera();
     void startCamera();
     void startCameraWithSettings(const std::string& settings_file);
+    void startCameraWithSettings(const std::string& settings_file, uint32_t width, uint32_t height, uint32_t fps);
     std::unique_ptr<ModuleBase> create_module(const juggler::v1::CommandRequest& command);
 
     std::string camera_settings_path_;
@@ -70,6 +71,11 @@ private:
     rs2::config rs_config_;
     rs2::align align_to_color_;
     std::atomic<bool> camera_running_;
+    
+    // Camera configuration parameters
+    uint32_t camera_width_;
+    uint32_t camera_height_;
+    uint32_t camera_fps_;
 
     // Frame buffer for recording
     std::deque<cv::Mat> frame_buffer_;

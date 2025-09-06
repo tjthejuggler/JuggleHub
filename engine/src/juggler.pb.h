@@ -2652,6 +2652,9 @@ class CommandRequest final :
     kColorCommandFieldNumber = 4,
     kTimestampUsFieldNumber = 3,
     kTypeFieldNumber = 1,
+    kCameraWidthFieldNumber = 7,
+    kCameraHeightFieldNumber = 8,
+    kCameraFpsFieldNumber = 9,
   };
   // map<string, string> module_args = 5;
   int module_args_size() const;
@@ -2734,6 +2737,33 @@ class CommandRequest final :
   void _internal_set_type(::juggler::v1::CommandRequest_CommandType value);
   public:
 
+  // uint32 camera_width = 7;
+  void clear_camera_width();
+  uint32_t camera_width() const;
+  void set_camera_width(uint32_t value);
+  private:
+  uint32_t _internal_camera_width() const;
+  void _internal_set_camera_width(uint32_t value);
+  public:
+
+  // uint32 camera_height = 8;
+  void clear_camera_height();
+  uint32_t camera_height() const;
+  void set_camera_height(uint32_t value);
+  private:
+  uint32_t _internal_camera_height() const;
+  void _internal_set_camera_height(uint32_t value);
+  public:
+
+  // uint32 camera_fps = 9;
+  void clear_camera_fps();
+  uint32_t camera_fps() const;
+  void set_camera_fps(uint32_t value);
+  private:
+  uint32_t _internal_camera_fps() const;
+  void _internal_set_camera_fps(uint32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.CommandRequest)
  private:
   class _Internal;
@@ -2752,6 +2782,9 @@ class CommandRequest final :
     ::juggler::v1::ColorCommand* color_command_;
     uint64_t timestamp_us_;
     int type_;
+    uint32_t camera_width_;
+    uint32_t camera_height_;
+    uint32_t camera_fps_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -5599,6 +5632,66 @@ inline void CommandRequest::set_allocated_camera_settings_file(std::string* came
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.camera_settings_file)
+}
+
+// uint32 camera_width = 7;
+inline void CommandRequest::clear_camera_width() {
+  _impl_.camera_width_ = 0u;
+}
+inline uint32_t CommandRequest::_internal_camera_width() const {
+  return _impl_.camera_width_;
+}
+inline uint32_t CommandRequest::camera_width() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.camera_width)
+  return _internal_camera_width();
+}
+inline void CommandRequest::_internal_set_camera_width(uint32_t value) {
+  
+  _impl_.camera_width_ = value;
+}
+inline void CommandRequest::set_camera_width(uint32_t value) {
+  _internal_set_camera_width(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.camera_width)
+}
+
+// uint32 camera_height = 8;
+inline void CommandRequest::clear_camera_height() {
+  _impl_.camera_height_ = 0u;
+}
+inline uint32_t CommandRequest::_internal_camera_height() const {
+  return _impl_.camera_height_;
+}
+inline uint32_t CommandRequest::camera_height() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.camera_height)
+  return _internal_camera_height();
+}
+inline void CommandRequest::_internal_set_camera_height(uint32_t value) {
+  
+  _impl_.camera_height_ = value;
+}
+inline void CommandRequest::set_camera_height(uint32_t value) {
+  _internal_set_camera_height(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.camera_height)
+}
+
+// uint32 camera_fps = 9;
+inline void CommandRequest::clear_camera_fps() {
+  _impl_.camera_fps_ = 0u;
+}
+inline uint32_t CommandRequest::_internal_camera_fps() const {
+  return _impl_.camera_fps_;
+}
+inline uint32_t CommandRequest::camera_fps() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.camera_fps)
+  return _internal_camera_fps();
+}
+inline void CommandRequest::_internal_set_camera_fps(uint32_t value) {
+  
+  _impl_.camera_fps_ = value;
+}
+inline void CommandRequest::set_camera_fps(uint32_t value) {
+  _internal_set_camera_fps(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.camera_fps)
 }
 
 // -------------------------------------------------------------------

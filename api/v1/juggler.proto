@@ -127,6 +127,9 @@ message CommandRequest {
   ColorCommand color_command = 4;
   map<string, string> module_args = 5; // Arguments for the module
   string camera_settings_file = 6;  // Path to camera settings JSON file
+  uint32 camera_width = 7;          // Camera resolution width
+  uint32 camera_height = 8;         // Camera resolution height
+  uint32 camera_fps = 9;            // Camera frame rate
 }
 
 message ColorCommand {

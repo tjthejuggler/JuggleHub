@@ -117,6 +117,8 @@ message CommandRequest {
     RECORD_CONTINUOUS_START = 6;
     RECORD_CONTINUOUS_STOP = 7;
     RESTART_WITH_CAMERA_SETTINGS = 8; // New command for camera settings
+    CAMERA_STOP = 9; // Stop camera feed
+    CAMERA_START = 10; // Start camera feed with settings
   }
   
   CommandType type = 1;

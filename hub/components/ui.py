@@ -124,12 +124,15 @@ if PYQT_AVAILABLE:
             self.populate_camera_settings()
             camera_layout.addWidget(self.camera_settings_combo, 0, 1)
             
-            # Apply settings button
-            self.apply_settings_button = QPushButton("Apply Settings & Restart")
-            self.apply_settings_button.clicked.connect(self.apply_camera_settings)
-            self.apply_settings_button.setStyleSheet("""
+            # Camera control buttons
+            camera_control_layout = QHBoxLayout()
+            
+            # Stop camera button
+            self.stop_camera_button = QPushButton("Stop Camera")
+            self.stop_camera_button.clicked.connect(self.stop_camera_feed)
+            self.stop_camera_button.setStyleSheet("""
                 QPushButton {
-                    background-color: #2196F3;
+                    background-color: #f44336;
                     color: white;
                     border: none;
                     padding: 8px;
@@ -137,13 +140,48 @@ if PYQT_AVAILABLE:
                     font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #1976D2;
+                    background-color: #da190b;
                 }
                 QPushButton:pressed {
-                    background-color: #0D47A1;
+                    background-color: #b71c1c;
+                }
+                QPushButton:disabled {
+                    background-color: #666666;
                 }
             """)
-            camera_layout.addWidget(self.apply_settings_button, 1, 0, 1, 2)
+            camera_control_layout.addWidget(self.stop_camera_button)
+            
+            # Start camera button
+            self.start_camera_button = QPushButton("Start Camera")
+            self.start_camera_button.clicked.connect(self.start_camera_feed)
+            self.start_camera_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    padding: 8px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+                QPushButton:pressed {
+                    background-color: #2e7d32;
+                }
+                QPushButton:disabled {
+                    background-color: #666666;
+                }
+            """)
+            self.start_camera_button.setEnabled(False)  # Initially disabled
+            camera_control_layout.addWidget(self.start_camera_button)
+            
+            camera_layout.addLayout(camera_control_layout, 1, 0, 1, 2)
+            
+            # Camera status indicator
+            self.camera_status_label = QLabel("● Camera Running")
+            self.camera_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            camera_layout.addWidget(self.camera_status_label, 2, 0, 1, 2)
             
             layout.addWidget(camera_group)
             
@@ -173,51 +211,71 @@ if PYQT_AVAILABLE:
             layout.addStretch()
 
         def populate_camera_settings(self):
-            """Populate the camera settings dropdown with hardcoded profiles."""
+            """Populate the camera settings dropdown with available JSON files."""
             self.camera_settings_combo.clear()
-            self.camera_settings_combo.addItem("Default", "default")
-            self.camera_settings_combo.addItem("No Blur", "no_blur")
+            
+            # Look for camera settings files in the camera_settings directory
+            camera_settings_dir = os.path.join("..", "camera_settings")
+            if os.path.exists(camera_settings_dir):
+                for filename in os.listdir(camera_settings_dir):
+                    if filename.endswith('.json'):
+                        # Remove .json extension for display name
+                        display_name = filename[:-5].replace('_', ' ').title()
+                        # Use filename without extension as the data value
+                        profile_name = filename[:-5]
+                        self.camera_settings_combo.addItem(display_name, profile_name)
+            
+            # If no files found, add default options
+            if self.camera_settings_combo.count() == 0:
+                self.camera_settings_combo.addItem("Default", "default")
+                self.camera_settings_combo.addItem("No Blur", "no_blur")
 
-        def apply_camera_settings(self):
-            """Apply selected camera settings and request a hub restart."""
-            selected_profile = self.camera_settings_combo.currentData()
-            settings_name = self.camera_settings_combo.currentText()
+        def stop_camera_feed(self):
+            """Stop the camera feed."""
+            try:
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.CAMERA_STOP
+                
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    self.stop_camera_button.setEnabled(False)
+                    self.start_camera_button.setEnabled(True)
+                    self.camera_status_label.setText("● Camera Stopped")
+                    self.camera_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
+                    print(f"✅ Camera stopped: {response.message}")
+                else:
+                    QMessageBox.critical(self, "Error", f"Failed to stop camera: {response.message}")
+                    print(f"❌ Failed to stop camera: {response.message}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error stopping camera: {str(e)}")
+                print(f"❌ Error stopping camera: {e}")
 
-            reply = QMessageBox.question(
-                self,
-                "Restart System",
-                f"This will restart the entire system with '{settings_name}' camera settings.\n\nContinue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-
-            if reply == QMessageBox.StandardButton.Yes:
-                try:
-                    # Save the selected profile name to a config file
-                    config_file = os.path.join("..", "current_camera_settings.txt")
-                    with open(config_file, 'w') as f:
-                        f.write(selected_profile)
-                    
-                    QMessageBox.information(
-                        self,
-                        "Restarting Hub",
-                        f"The hub will now close. The run script will restart it with '{settings_name}' settings."
-                    )
-
-                    # Request a restart and quit the application
-                    if self.hub_instance:
-                        self.hub_instance.restart_requested = True
-                    
-                    if hasattr(self.parent(), 'app') and self.parent().app:
-                        self.parent().app.quit()
-                    else:
-                        sys.exit(0)
-
-                except Exception as e:
-                    QMessageBox.critical(
-                        self,
-                        "Error",
-                        f"Error preparing for restart: {str(e)}"
-                    )
+        def start_camera_feed(self):
+            """Start the camera feed with selected settings."""
+            try:
+                selected_profile = self.camera_settings_combo.currentData()
+                settings_name = self.camera_settings_combo.currentText()
+                
+                # Construct the full path to the camera settings file
+                settings_file_path = f"camera_settings/{selected_profile}.json"
+                
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.CAMERA_START
+                command.camera_settings_file = settings_file_path
+                
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    self.stop_camera_button.setEnabled(True)
+                    self.start_camera_button.setEnabled(False)
+                    self.camera_status_label.setText("● Camera Running")
+                    self.camera_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+                    print(f"✅ Camera started with {settings_name}: {response.message}")
+                else:
+                    QMessageBox.critical(self, "Error", f"Failed to start camera: {response.message}")
+                    print(f"❌ Failed to start camera: {response.message}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error starting camera: {str(e)}")
+                print(f"❌ Error starting camera: {e}")
 
         def update_setting(self, key: str, value: Any):
             self.udp_client.send_setting(key, value)

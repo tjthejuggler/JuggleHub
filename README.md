@@ -147,6 +147,17 @@ JuggleHub/
    ./scripts/run_hub.sh --use-venv --camera-settings no_blur.json
    ```
 
+3. **Live Camera Settings Control:**
+  
+  Once the hub is running, you can dynamically change camera settings without restarting:
+  
+  - Open the **Calibration Mode** in the hub UI
+  - Use the **Camera Settings** dropdown to select different presets
+  - Click **"Stop Camera"** to pause the video feed
+  - Click **"Start Camera"** to resume with the selected settings
+  
+  This allows you to quickly switch between different camera configurations (like default auto-exposure vs. no-blur manual settings) during your juggling session without interrupting the application.
+
 ## 📊 Features
 
 ### C++ Engine Features
@@ -168,6 +179,7 @@ JuggleHub/
 ### Python Hub Features
 - **Real-time visualization** with PyQt6 GUI
 - **Camera settings selection** with dropdown interface for easy configuration switching
+- **Live camera control** with stop/start functionality for seamless settings switching
 - **SQLite database logging** for session analysis
 - **ZeroMQ data streaming** with automatic reconnection
 - **Console mode** for headless operation

@@ -1,10 +1,4 @@
-Excellent idea. Consolidating everything into a single, definitive guide is the best way to ensure consistency. I have taken your existing guide and expanded it with all the nuanced details from our conversation, structuring it for maximum clarity.
-
-I have preserved your core class structure (`led_on`, `led_off`, `dropped_ball`) and the two-profile filming approach, as they are a solid foundation. This expanded guide adds the crucial layers of manual control, data diversity, and labeling precision we discussed.
-
----
-
-### **The Complete Guide to Filming and Labeling the JuggleHub Dataset (v2.0)**
+### **The Complete Guide to Filming and Labeling the JuggleHub Dataset (v3.0)**
 
 This is the definitive guide for creating and labeling a high-quality juggling dataset. The core strategy is built on a methodical approach to data collection and a strict set of labeling rules. Following this guide precisely will result in a robust and reliable AI model.
 
@@ -27,7 +21,22 @@ This is what you will be labeling. Understanding these classes is the most criti
 
 ### **Part 1: Filming the Dataset - A Scientific Approach to Data Capture**
 
-The core principle of this phase is **Controlled Variation**. We will not rely on "auto" mode, as it hides challenging conditions and produces inconsistent data. We will become scientists, controlling the camera settings to create a complete education for our model.
+#### **The Core Philosophy: Train for Quality, Deploy for Speed**
+
+It is tempting to collect data using the exact same settings (e.g., 60 FPS) you'll use in the final app. However, the professional approach separates the goals of data collection and deployment.
+
+*   **Phase 1: Training Data Collection (Goal: Maximum Quality):** Your single most important goal is to teach the model what the world looks like as accurately as possible. For this, you should use settings that produce the cleanest, sharpest, lowest-noise images. Real-time performance does not matter here. We create a "golden dataset" of pristine images.
+*   **Phase 2: Real-Time Inference (Goal: Maximum Speed):** In your live app, your goal is to minimize latency. You will use settings that meet your speed requirements (e.g., 60 FPS or 90 FPS), even if it introduces some motion blur or noise.
+
+The model trained on the pristine data will be robust enough to handle the slightly degraded inference images. To perfect this, a technique called **Data Augmentation** is used during training, where we artificially add motion blur and noise to our clean images. This explicitly teaches the model to be robust to the exact conditions it will see during real-time inference.
+
+| Phase | **Data Collection & Training** | **Real-Time Inference** |
+| :--- | :--- | :--- |
+| **Goal** | Highest possible image quality. | Lowest possible latency. |
+| **FPS** | **30 FPS** | **60 FPS** (or higher) |
+| **Exposure** | **As low as needed** (e.g., < 159 µs) to freeze motion. | **As low as possible** (e.g., 160 µs) for the FPS setting. |
+| **Gain** | **As low as possible** to minimize noise. | **As high as needed** for a "good enough" image. |
+| **Key Action**| Create a pristine dataset. Use **data augmentation** during training. | Deploy the robust model for fast, real-time decisions. |
 
 #### **Critical Camera Configuration:**
 *   **Turn IR Projector ON:** The RealSense projector is required for good depth data during inference, so it **must be on** during all training data collection to ensure consistency.
@@ -35,14 +44,15 @@ The core principle of this phase is **Controlled Variation**. We will not rely o
 
 #### **Filming Strategy: The Multi-Profile Method**
 
-For each distinct filming environment, we will capture several "sets" of data, each with a specific purpose.
+For each distinct filming environment, we will capture several "sets" of data. This multi-profile method is designed for the **data collection phase** to create our "golden dataset".
 
 *   **Profile 1: "Sharp/Nominal" (For `led_off` balls):**
     *   **Goal:** Capture a large volume of crisp, blur-free images. This is the foundation of your dataset and allows for perfect labeling.
     *   **Settings:**
-        1.  **Set Exposure:** Set a fast shutter speed (e.g., start at 4000µs and go lower if needed) until all motion blur is eliminated.
-        2.  **Set Gain:** After setting exposure, increase the gain until the scene is well-lit.
-        3.  **Set White Balance:** Briefly toggle "auto" to find a good value, then lock it in manually.
+        1.  **Set FPS to 30:** This gives you the timing budget for very fast shutter speeds.
+        2.  **Set Exposure:** Set a fast shutter speed (e.g., start at 4000µs and go lower, even below 159µs if possible) until all motion blur is eliminated.
+        3.  **Set Gain:** After setting exposure, increase the gain until the scene is well-lit, but keep it as low as possible.
+        4.  **Set White Balance:** Briefly toggle "auto" to find a good value, then lock it in manually.
     *   **Use Case:** This profile is for capturing **`led_off`** and **`dropped_ball`** classes.
 
 *   **Profile 2: "LED/Glow" (For `led_on` balls):**
@@ -53,7 +63,7 @@ For each distinct filming environment, we will capture several "sets" of data, e
     *   **Use Case:** Exclusively for capturing the **`led_on`** class.
 
 *   **Profile 3: "Intentional Blur" (For both `led_on` and `led_off`):**
-    *   **Goal:** To teach the model what motion blur looks like in a controlled, consistent way.
+    *   **Goal:** To teach the model what severe motion blur looks like in a controlled, consistent way. This is different from the minor blur encountered during high-FPS inference.
     *   **Settings:**
         1.  **Set Exposure:** Use a **slower**, fixed shutter speed (e.g., 16667µs or 1/60s).
         2.  **Set Gain:** Adjust gain to get a usable image brightness at this slower shutter.
@@ -118,7 +128,17 @@ Your final dataset should follow these guidelines to prevent the model from beco
 *   **Balance `led_on` vs. `led_off`:** Aim for a roughly equal number of images featuring each class. A 50/50 or 60/40 split is ideal. This ensures the model is equally skilled at recognizing balls in both camera modes.
 *   **Over-Sample the Rare Event (`dropped_ball`):** Drops are rare, but important. The `dropped_ball` class should represent **10% to 20%** of your total dataset instances. If you have 1000 images of balls in play, you should aim for 100-200 images that contain a dropped ball. This is why intentionally filming drops is so important.
 
---------------
+
+
+
+
+
+
+
+
+
+
+
 
 #### Condensed list of advice for when filming and labelling a dataset
 

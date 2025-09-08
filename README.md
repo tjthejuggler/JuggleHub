@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-09-06 18:23:00 UTC
+**Last Updated:** 2025-09-08 17:24:00 UTC
 
 ## 🎯 Overview
 
@@ -145,6 +145,21 @@ JuggleHub/
    
    # Use no-blur settings (manual exposure for consistent lighting)
    ./scripts/run_hub.sh --use-venv --camera-settings no_blur.json
+   ```
+
+3. **Selecting inference device:**
+   ```bash
+   # Use NPU for power-efficient AI inference (Intel Core Ultra processors)
+   ./scripts/run_hub.sh --use-venv --device NPU
+   
+   # Use GPU for maximum performance (Intel integrated/discrete graphics)
+   ./scripts/run_hub.sh --use-venv --device GPU
+   
+   # Use CPU for compatibility (default fallback)
+   ./scripts/run_hub.sh --use-venv --device CPU
+   
+   # Let OpenVINO automatically select the best device
+   ./scripts/run_hub.sh --use-venv --device AUTO
    ```
 
 3. **Live Camera Settings Control:**
@@ -332,22 +347,27 @@ The DNN tracking system provides a foundation for advanced features:
 JuggleHub supports multiple compute devices for running the DNN-based tracking:
 
 - **CPU**: Default option, works on all systems
-- **GPU**: Accelerated inference using Intel integrated or discrete graphics
+- **GPU**: Accelerated inference using Intel integrated or discrete graphics (default)
 - **NPU**: Neural Processing Unit acceleration on supported hardware
+- **AUTO**: Let OpenVINO automatically select the best available device
 
-You can switch between these devices by editing the `ENGINE_ARGS` array in the [`scripts/run_hub.sh`](scripts/run_hub.sh:226) file:
+You can specify the device using the `--device` command-line argument:
 
 ```bash
-# In scripts/run_hub.sh
-ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=NPU")
+# Use NPU for power-efficient inference
+./scripts/run_hub.sh --use-venv --device NPU
+
+# Use GPU for maximum performance (default)
+./scripts/run_hub.sh --use-venv --device GPU
+
+# Use CPU for compatibility
+./scripts/run_hub.sh --use-venv --device CPU
+
+# Let OpenVINO choose automatically
+./scripts/run_hub.sh --use-venv --device AUTO
 ```
 
-Simply change the `--device=GPU` parameter to one of:
-- `--device=CPU` (for CPU inference)
-- `--device=GPU` (for GPU acceleration)
-- `--device=NPU` (for NPU acceleration)
-
-The NPU option is particularly useful for systems with dedicated neural processing hardware, offering significant performance improvements while reducing CPU load.
+The NPU option is particularly useful for systems with Intel Core Ultra processors and dedicated neural processing hardware, offering significant performance improvements while reducing CPU load and power consumption.
 
 **Last Updated:** 2025-09-01 16:14:00 UTC
 
@@ -495,11 +515,14 @@ This section provides a comprehensive list of commonly used commands for quick r
 # Hub with virtual environment
 ./scripts/run_hub.sh --use-venv
 
+# Hub with NPU acceleration
+./scripts/run_hub.sh --use-venv --device NPU
+
 # Hub with IMU streaming from watch
 ./scripts/run_hub.sh --use-venv --watch-ips 10.54.136.205
 
-# Hub with multiple watches
-./scripts/run_hub.sh --use-venv --watch-ips 10.54.136.205 10.54.136.206
+# Hub with multiple watches and NPU
+./scripts/run_hub.sh --use-venv --device NPU --watch-ips 10.54.136.205 10.54.136.206
 
 # Hub in console mode (no GUI)
 ./scripts/run_hub.sh --no-ui
@@ -652,6 +675,7 @@ python3 test_blue_ball.py
 | Command Purpose | Command |
 |----------------|---------|
 | **Start hub with watch** | `./scripts/run_hub.sh --use-venv --watch-ips 10.54.136.205` |
+| **Start hub with NPU** | `./scripts/run_hub.sh --use-venv --device NPU` |
 | **Load position-to-color module** | `PYTHONPATH=$(pwd)/hub python3 scripts/load_module.py PositionToRgbModule --ip 10.54.136.205` |
 | **Make ball blue** | `cd hub && source .venv/bin/activate && echo -e "load\ncolor 205 0 0 255\nquit" \| python3 main.py` |
 | **Build engine** | `./scripts/build_engine.sh` |

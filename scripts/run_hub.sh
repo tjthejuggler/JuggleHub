@@ -104,6 +104,7 @@ NO_UI=false
 DEBUG=false
 ZMQ_ENDPOINT="tcp://localhost:5555"
 CAMERA_SETTINGS=""
+ENGINE_DEVICE="GPU"  # Default device for the engine
 PASS_THROUGH_ARGS=()
  
  while [[ $# -gt 0 ]]; do
@@ -125,6 +126,10 @@ PASS_THROUGH_ARGS=()
              CAMERA_SETTINGS="$2"
              shift 2
              ;;
+         --device)
+             ENGINE_DEVICE="$2"
+             shift 2
+             ;;
          -h|--help)
              echo "Usage: $0 [OPTIONS] [-- SCRIPT_ARGS]"
              echo "Options:"
@@ -132,11 +137,12 @@ PASS_THROUGH_ARGS=()
              echo "  --create-venv               Create and use virtual environment"
              echo "  --use-venv                  Use existing virtual environment"
              echo "  --camera-settings <file>    Camera settings JSON file (e.g., default.json)"
+             echo "  --device <device>           Engine inference device (CPU, GPU, NPU, AUTO) [default: GPU]"
              echo "  -h, --help                  Show this help message"
              echo ""
              echo "Script Arguments (passed to hub/main.py):"
              echo "  All arguments after '--' or any unknown arguments will be passed to the Python script."
-             echo "  Example: $0 --camera-settings default.json -- --watch-ips 192.168.1.101 --debug"
+             echo "  Example: $0 --use-venv --device NPU --camera-settings default.json -- --watch-ips 192.168.1.101 --debug"
              exit 0
              ;;
          *)
@@ -228,8 +234,8 @@ if [ ! -f "$ENGINE_EXECUTABLE" ]; then
 fi
 
 # Start the C++ engine in the background
-echo -e "${BLUE}🧠 Starting C++ engine...${NC}"
-ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=GPU")
+echo -e "${BLUE}🧠 Starting C++ engine with device: $ENGINE_DEVICE${NC}"
+ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=$ENGINE_DEVICE")
 
 # Determine which camera settings to use
 if [ -n "$CAMERA_SETTINGS" ]; then

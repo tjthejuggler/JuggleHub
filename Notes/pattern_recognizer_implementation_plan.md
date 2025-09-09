@@ -1,6 +1,4 @@
-Of course. This is the most critical phase: translating the high-level vision into a concrete, actionable data and training plan. Getting this right is the key to the entire project's success.
-
-Here is the exact, step-by-step process. We will treat this as a formal project plan.
+from here: https://aistudio.google.com/app/u/2/prompts/1WnlzTa2my3cgE7LTigKlz4H-4bqxK9Oq
 
 ### **Project Phase: Training the JuggleHub Analytical Engine**
 

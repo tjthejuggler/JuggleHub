@@ -1,3 +1,6 @@
+2025-09-11 13:41:08
+i think these notes are outdated now
+
 # Number of Balls
 
 Why Multi-Ball Images are Critical

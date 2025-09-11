@@ -120,25 +120,14 @@ For any ball in any frame, follow this exact decision process:
 *   **DO NOT Label Tiny Fragments:** If so little of a ball is visible (e.g., less than 25%) that it's unidentifiable, do not label it.
 *   **DO NOT Create New Classes:** Never create a "Not a Ball" class for confusing objects. The model learns to ignore them by having them be unlabeled parts of the background in your labeled images.
 *   **DO NOT Use Your Old "Auto" Data (Unless Curated):** Discard any blurry images captured with auto-settings. You may keep the perfectly sharp ones, but it is safer and cleaner to start fresh with your new, controlled methodology.
+*   **DO NOT Label Stationary Scenery**: Never label a ball that is sitting on a table, shelf, or in a box and was not part of the active juggling pattern. The dropped_ball class is exclusively for a ball that has left a juggling pattern in an uncontrolled way. Labeling scenery as a dropped_ball will fundamentally break your drop detection logic.
 
 ### **Part 3: Dataset Balance - Ensuring a Smart Model**
 
 Your final dataset should follow these guidelines to prevent the model from becoming biased.
 
 *   **Balance `led_on` vs. `led_off`:** Aim for a roughly equal number of images featuring each class. A 50/50 or 60/40 split is ideal. This ensures the model is equally skilled at recognizing balls in both camera modes.
-*   **Over-Sample the Rare Event (`dropped_ball`):** Drops are rare, but important. The `dropped_ball` class should represent **10% to 20%** of your total dataset instances. If you have 1000 images of balls in play, you should aim for 100-200 images that contain a dropped ball. This is why intentionally filming drops is so important.
-
-
-
-
-
-
-
-
-
-
-
-
+*   **Over-Sample the Rare Event** (dropped_ball): Drops are rare but critically important. The dropped_ball class should represent 10% to 20% of your total labeled instances (not images). This means you must dedicate specific filming sessions to intentionally dropping balls. Capture them falling, bouncing on different surfaces (carpet vs. wood), rolling under furniture, and coming to a rest. This is the only way to teach the model what failure looks like.
 
 #### Condensed list of advice for when filming and labelling a dataset
 
@@ -162,7 +151,7 @@ Below is a condensed set of guidelines for creating and labeling a juggling data
 ### **Labeling the Dataset: What to Do and Not Do**
 
 #### **DO:**
-*   **Label What the Camera Sees:** Your labeling must reflect the visual information present in the image, not your real-world knowledge.
+*   **Label What the Camera Sees, Not What You Know**: If two led_on balls merge into one indistinguishable blob of light due to motion blur and overexposure, you must draw one single bounding box around the entire merged shape and label it led_on. Do not use your real-world knowledge to draw two separate boxes inside the blob. This will confuse the model. Trust your tracker (ByteTrack) to re-identify the individual balls once they separate and become visually distinct again in a later frame.
 *   **Partially Occluded Balls:** If a ball is hidden behind your hand or another ball, draw the bounding box around the **inferred full shape** of the ball, including the hidden part.
 *   **Truncated Balls (Off-Screen):** If a ball is cut off by the edge of the frame, draw the bounding box to cover **only the visible portion**, stopping exactly at the image border.
 *   **Merged LED Balls:** If two glowing balls merge into one indistinguishable blob of light, draw **one single bounding box** around the entire merged shape. However, if you can see any visual boundary between them, label them as two separate, overlapping objects.

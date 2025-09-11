@@ -1,3 +1,7 @@
+2025-09-11 13:40:00
+i think this one is slightly out-dated, but maybe there is still some useful stuff in here
+
+
 the conversation where the new plan originated from is here:
 https://aistudio.google.com/app/prompts/1Udq_bHsWh1X8-liP2wIfYShBRUaX0ymm
 

@@ -178,9 +178,9 @@ JuggleHub/
 ### C++ Engine Features
 - **Dual Tracking Systems**:
   - **Color-based tracking** of colored juggling balls (pink, orange, green, yellow)
-  - **DNN-based tracking** using YOLOv8 + ByteTrack for robust object detection and tracking
+  - **DNN-based tracking** using YOLOv11 + ByteTrack for robust object detection and tracking
 - **Advanced AI Tracking**:
-  - **YOLOv8 object detection** optimized with Intel OpenVINO for real-time inference
+  - **YOLOv11 object detection** optimized with Intel OpenVINO for real-time inference
   - **ByteTrack multi-object tracking** for consistent ball ID assignment across frames
   - **Automatic model loading** from OpenVINO IR format (.xml/.bin files)
 - **Camera Settings Management**: Load custom camera settings from JSON files for optimal performance
@@ -216,27 +216,27 @@ JuggleHub now features a state-of-the-art deep neural network tracking system th
 
 The DNN tracking system consists of two main components:
 
-1. **YOLOv8 Object Detection**: Uses a pre-trained YOLOv8 model optimized with Intel OpenVINO for real-time inference
+1. **YOLOv11 Object Detection**: Uses a pre-trained YOLOv11 model optimized with Intel OpenVINO for real-time inference
 2. **ByteTrack Multi-Object Tracking**: Maintains consistent object IDs across frames, handling occlusions and temporary disappearances
 
 ### Key Components
 
 #### DNNTracker Class ([`engine/include/DNNTracker.hpp`](engine/include/DNNTracker.hpp))
-- **OpenVINO Integration**: Loads and runs YOLOv8 models in OpenVINO IR format
+- **OpenVINO Integration**: Loads and runs YOLOv11 models in OpenVINO IR format
 - **Preprocessing Pipeline**: Handles image resizing, normalization, and format conversion
 - **Postprocessing**: Converts model outputs to detection boxes with confidence scores
 - **ByteTrack Integration**: Maintains object tracking across frames
 
 #### Model Files
-- **YOLOv8 Model**: [`engine/models/yolov8n.xml`](engine/models/yolov8n.xml) (OpenVINO IR format)
-- **Model Weights**: [`engine/models/yolov8n.bin`](engine/models/yolov8n.bin) (Binary weights)
+- **YOLOv11 Model**: [`engine/models/yolo11n.xml`](engine/models/yolo11n.xml) (OpenVINO IR format)
+- **Model Weights**: [`engine/models/yolo11n.bin`](engine/models/yolo11n.bin) (Binary weights)
 - **Metadata**: [`engine/models/metadata.yaml`](engine/models/metadata.yaml) (Model configuration)
 
 ### Technical Specifications
 
 #### Model Configuration
 - **Input Resolution**: 640x640 pixels
-- **Model Type**: YOLOv8n (nano variant for speed)
+- **Model Type**: YOLOv11n (nano variant for speed)
 - **Inference Backend**: Intel OpenVINO 2025.2.0
 - **Confidence Threshold**: 0.45 (configurable)
 - **NMS Threshold**: 0.5 (configurable)
@@ -250,7 +250,7 @@ The DNN tracking system consists of two main components:
 ### Usage
 
 #### Enabling DNN Tracking
-The DNN tracker is automatically available when the engine is built with OpenVINO support. The engine will detect and load the YOLOv8 model from the `engine/models/` directory.
+The DNN tracker is automatically available when the engine is built with OpenVINO support. The engine will detect and load the YOLOv11 model from the `engine/models/` directory.
 
 ```bash
 # Build with DNN tracking support (requires OpenVINO)
@@ -262,8 +262,8 @@ The DNN tracker is automatically available when the engine is built with OpenVIN
 
 #### Model Requirements
 Ensure the following files are present in `engine/models/`:
-- `yolov8n.xml` - OpenVINO IR model file
-- `yolov8n.bin` - Model weights
+- `yolo11n.xml` - OpenVINO IR model file
+- `yolo11n.bin` - Model weights
 - `metadata.yaml` - Model metadata (optional)
 
 ### Integration with Existing System
@@ -297,7 +297,7 @@ python3 -c "import openvino; print(f'OpenVINO version: {openvino.__version__}')"
 
 # Verify model files
 ls -la engine/models/
-# Should show: yolov8n.xml, yolov8n.bin, metadata.yaml
+# Should show: yolo11n.xml, yolo11n.bin, metadata.yaml
 ```
 
 ### Troubleshooting
@@ -336,7 +336,7 @@ print('Available devices:', core.available_devices)
 
 The DNN tracking system provides a foundation for advanced features:
 
-- **Custom Model Training**: Train YOLOv8 models on specific juggling ball datasets
+- **Custom Model Training**: Train YOLOv11 models on specific juggling ball datasets
 - **Multi-Class Detection**: Detect different types of juggling objects (balls, clubs, rings)
 - **Pose Integration**: Combine object detection with human pose estimation
 - **Hardware Acceleration**: Utilize Intel GPU or VPU for faster inference
@@ -558,7 +558,7 @@ find /snap/intel-npu-driver -name "*ze*" | head -5
 
 #### Supported Models
 
-- **YOLOv8**: Full support for all YOLOv8 variants (n, s, m, l, x)
+- **YOLOv11**: Full support for all YOLOv11 variants (n, s, m, l, x)
 - **YOLOv11**: Compatible with YOLOv11 models
 - **Custom Models**: Any OpenVINO-compatible detection model
 - **Quantization**: Supports INT8 quantized models for optimal NPU performance
@@ -1021,7 +1021,7 @@ This architecture provides a foundation for many advanced features:
 
 #### DNN-Based Tracking
 - **Engine**: 30-60 FPS at 640x640 (model input), 20-45 FPS at higher resolutions
-- **Inference Time**: 10-15ms per frame (YOLOv8n on modern CPU)
+- **Inference Time**: 10-15ms per frame (YOLOv11n on modern CPU)
 - **Memory**: ~150MB engine (additional 50MB for model), ~50MB hub
 - **CPU**: 25-40% on modern quad-core systems
 - **GPU Acceleration**: 2-5ms per frame (when available with OpenVINO GPU plugin)
@@ -1035,7 +1035,7 @@ This architecture provides a foundation for many advanced features:
 - Enable hardware acceleration where available
 
 #### DNN Tracking Optimization
-- Use YOLOv8n (nano) model for fastest inference
+- Use YOLOv11n (nano) model for fastest inference
 - Enable OpenVINO optimizations: `export OV_CPU_THREADS_NUM=4`
 - Use GPU acceleration if available: Install OpenVINO GPU plugin
 - Reduce model input resolution for speed vs accuracy trade-off
@@ -1062,7 +1062,7 @@ This architecture provides a foundation for many advanced features:
 
 **"OpenVINO model not found" or "DNN tracking failed"**
 - Verify OpenVINO installation: `source /opt/intel/openvino_2025.2.0/setupvars.sh`
-- Check model files exist: `ls -la engine/models/yolov8n.*`
+- Check model files exist: `ls -la engine/models/yolo11n.*`
 - Rebuild with clean build: `./scripts/build_engine.sh --clean`
 - Verify OpenVINO can load model: Test with sample OpenVINO applications
 
@@ -1271,7 +1271,7 @@ JuggleHub/
     │   ├── valid/
     │   │   ├── images/              # 20% of images
     │   │   └── labels/              # 20% of annotations
-    │   └── dataset.yaml             # YOLOv8 configuration
+    │   └── dataset.yaml             # YOLOv11 configuration
     └── V2_specialized/
         └── ...
 ```
@@ -1316,7 +1316,7 @@ python3 scripts/prepare_dataset.py \
 - **Safety Checks**: Validates input parameters and warns about missing files
 
 #### Professional Output
-- **YOLOv8 Compatible**: Creates proper directory structure and `dataset.yaml` configuration
+- **YOLOv11 Compatible**: Creates proper directory structure and `dataset.yaml` configuration
 - **Progress Tracking**: Shows detailed progress during file copying
 - **Comprehensive Summary**: Reports final statistics and directory structure
 - **Error Handling**: Clear error messages and validation
@@ -1386,20 +1386,20 @@ Directory Structure:
   │   └── labels/ (60 files)
   └── dataset.yaml
 
-Ready for YOLOv8 training!
-Use: yolo train data=3_training_datasets/V1_generalist/dataset.yaml model=yolov8n.pt
+Ready for YOLOv11 training!
+Use: yolo train data=3_training_datasets/V1_generalist/dataset.yaml model=yolo11n.pt
 ```
 
-### Integration with YOLOv8
+### Integration with YOLOv11
 
-The script creates datasets that are immediately ready for YOLOv8 training:
+The script creates datasets that are immediately ready for YOLOv11 training:
 
 ```bash
-# Train a YOLOv8 model with your prepared dataset
-yolo train data=3_training_datasets/V1_generalist/dataset.yaml model=yolov8n.pt epochs=100 imgsz=640
+# Train a YOLOv11 model with your prepared dataset
+yolo train data=3_training_datasets/V1_generalist/dataset.yaml model=yolo11n.pt epochs=100 imgsz=640
 
 # Train with custom parameters
-yolo train data=3_training_datasets/V2_specialized/dataset.yaml model=yolov8s.pt epochs=200 imgsz=640 batch=16
+yolo train data=3_training_datasets/V2_specialized/dataset.yaml model=yolo11s.pt epochs=200 imgsz=640 batch=16
 ```
 
 ### Best Practices

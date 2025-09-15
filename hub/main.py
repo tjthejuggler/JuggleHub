@@ -19,6 +19,8 @@ from components.zmq_client import ZMQClient
 from components.ui import JuggleHubUI
 from components.database_logger import DatabaseLogger
 from components.imu_listener import IMUListener
+from components.web_ui import WebUI
+from components.screen_controller import ScreenController
 import juggler_pb2
 
 class JuggleHub:
@@ -34,6 +36,8 @@ class JuggleHub:
         self.ui: Optional[JuggleHubUI] = None
         self.database_logger: Optional[DatabaseLogger] = None
         self.imu_listener: Optional[IMUListener] = None
+        self.web_ui: Optional[WebUI] = None
+        self.screen_controller: Optional[ScreenController] = None
         
         self._data_thread: Optional[threading.Thread] = None
         
@@ -52,6 +56,15 @@ class JuggleHub:
             # Initialize UI
             if self.config['enable_ui']:
                 self.ui = JuggleHubUI(self.config, self.zmq_client, self)
+
+            # Initialize ScreenController
+            self.screen_controller = ScreenController()
+
+            # Initialize WebUI
+            self.web_ui = WebUI(self.screen_controller)
+
+            # Initialize ScreenController
+            self.screen_controller = ScreenController()
 
             # Initialize DatabaseLogger
             if self.config['enable_logging']:

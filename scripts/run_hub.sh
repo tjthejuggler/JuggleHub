@@ -95,7 +95,7 @@ fi
 
 # Check if virtual environment should be used
 USE_VENV=false
-VENV_DIR="$PROJECT_ROOT/venv"
+VENV_DIR="$PROJECT_ROOT/hub/.venv"
 
 # Parse command line arguments
 INSTALL_DEPS=false

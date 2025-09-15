@@ -11,6 +11,8 @@ from typing import Optional, Dict, Any
 import os
 import base64
 import socket
+import qrcode
+import io
 
 
 try:
@@ -25,7 +27,7 @@ try:
                                  QHBoxLayout, QLabel, QTextEdit, QPushButton,
                                  QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
                                  QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit,
-                                 QComboBox, QMessageBox)
+                                 QComboBox, QMessageBox, QDialog, QVBoxLayout as QVBoxLayout_Dialog)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
     from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence
     PYQT_AVAILABLE = True
@@ -498,6 +500,25 @@ if PYQT_AVAILABLE:
             
             # IMU status
             self.imu_status = QLabel("📱 IMU: 0 sensors")
+
+            # Web UI controls
+            web_ui_layout = QHBoxLayout()
+            self.web_ui_button = QPushButton("Start Web UI")
+            self.web_ui_button.clicked.connect(self.toggle_web_ui)
+            web_ui_layout.addWidget(self.web_ui_button)
+
+            # Screen control buttons
+            screen_control_layout = QHBoxLayout()
+            self.disable_top_button = QPushButton("Disable Top Screen")
+            self.disable_top_button.clicked.connect(self.disable_top_screen)
+            screen_control_layout.addWidget(self.disable_top_button)
+
+            self.disable_bottom_button = QPushButton("Disable Bottom Screen")
+            self.disable_bottom_button.clicked.connect(self.disable_bottom_screen)
+            screen_control_layout.addWidget(self.disable_bottom_button)
+            
+            system_layout.addLayout(web_ui_layout)
+            system_layout.addLayout(screen_control_layout)
             system_layout.addWidget(self.imu_status)
 
             self.imu_list = QTextEdit()
@@ -755,6 +776,58 @@ if PYQT_AVAILABLE:
             else:
                 # Pass other key events to the parent
                 super().keyPressEvent(event)
+        
+        def toggle_web_ui(self):
+            """Start or stop the web UI."""
+            if not self.hub_instance.web_ui.is_running:
+                self.hub_instance.web_ui.start()
+                self.web_ui_button.setText("Stop Web UI")
+                self.show_qr_code()
+            else:
+                self.hub_instance.web_ui.stop()
+                self.web_ui_button.setText("Start Web UI")
+
+        def show_qr_code(self):
+            """Display a QR code with the web UI URL."""
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Scan QR Code")
+            layout = QVBoxLayout_Dialog(dialog)
+            
+            qr_label = QLabel()
+            # Generate QR code
+            ip_address = self.hub_instance.web_ui.get_ip_address()
+            port = self.hub_instance.web_ui.port
+            url = f"http://{ip_address}:{port}"
+            
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(url)
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Convert to QPixmap
+            buffer = io.BytesIO()
+            img.save(buffer, "PNG")
+            qt_image = QImage.fromData(buffer.getvalue())
+            pixmap = QPixmap.fromImage(qt_image)
+            
+            qr_label.setPixmap(pixmap)
+            
+            layout.addWidget(qr_label)
+            dialog.exec()
+        
+        def disable_top_screen(self):
+            """Disables the top screen."""
+            self.hub_instance.screen_controller.disable_top_screen()
+
+        def disable_bottom_screen(self):
+            """Disables the bottom screen."""
+            self.hub_instance.screen_controller.disable_bottom_screen()
 
 
 class JuggleHubUI:

@@ -103,6 +103,7 @@ message FrameData {
   repeated BoundingBox2D raw_detections = 10; // New field
   bytes color_image_b64 = 11;      // Base64 encoded color image
   bytes depth_image_b64 = 12;      // Base64 encoded depth image
+  bool ir_projector_active = 13;   // Status of the IR projector
 }
 
 // Command and control API for managing engine modules

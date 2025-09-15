@@ -1,3 +1,10 @@
+to get into the realsense settings
+realsense-viewer
+
+BEST SETTINGS:
+medium-high lighting, led off - 12exp_20gain, 30fps
+medium lights on, led on - 12exp_128gain, 30fps
+
 2025-09-06 21:03:30
 no_blur.json, medium lights on, led balls, 30fps - there really is no blur, but everything is very dark and i dont think hand tracking would be possible(although maybe with the other camera, but this would require syncing up both cameras positions)
 
@@ -26,6 +33,10 @@ no_blur.json, medium lights on, led balls, 30fps - there really is no blur, but 
 35exp_100gain, 30fps, medium-high lights on, led off - very little blur, skeleton should be fine, quite bright, can see colors fine
 
 12exp_20gain, 30fps, medium-high lights on, led off - no blur, skeleton should be fine, barely slightly dark, can see colors fine
+
+2025-09-15 12:06:22
+
+20exp_50gain, 30fps, medium lights on, led off - slight blur, skeleton should be fine, barely slightly dark, can see colors fine
 
 needs fixed:
 025-09-06 21:13:45,819 - DEBUG - Received raw data: 136097 bytes

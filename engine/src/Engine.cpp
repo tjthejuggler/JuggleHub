@@ -31,6 +31,7 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       frame_counter_(0),
       continuous_recording_(false),
       camera_running_(false),
+      ir_projector_active_(false),
       camera_width_(640),
       camera_height_(480),
       camera_fps_(30) {
@@ -139,6 +140,7 @@ void Engine::run() {
         std::vector<uchar> buf;
         cv::imencode(".jpg", color_image, buf);
         frame_data.set_color_image_b64(buf.data(), buf.size());
+        frame_data.set_ir_projector_active(ir_projector_active_);
 
         // Get camera intrinsics
         auto intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
@@ -600,6 +602,7 @@ void Engine::stopCamera() {
             std::cout << "[LOG] Camera stopped successfully." << std::endl;
         }
         camera_running_ = false;
+        ir_projector_active_ = false;
     } catch (const rs2::error& e) {
         std::cerr << "[ERROR] Error stopping camera: " << e.what() << std::endl;
     }
@@ -624,6 +627,19 @@ void Engine::startCamera() {
 
         // Apply advanced settings from JSON now that the pipeline is active.
         applyCameraSettings();
+
+        // Programmatically enable the IR projector
+        try {
+            auto sensor = profile.get_device().first<rs2::depth_sensor>();
+            if (sensor.supports(RS2_OPTION_EMITTER_ENABLED)) {
+                sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 1.f); // 1.f is for ON
+                ir_projector_active_ = true;
+                if (verbose_) std::cout << "[LOG] IR Emitter enabled programmatically." << std::endl;
+            }
+        } catch (const rs2::error& e) {
+            std::cerr << "[WARNING] Could not set IR emitter option: " << e.what() << std::endl;
+            ir_projector_active_ = false;
+        }
 
     } catch (const rs2::error& e) {
         std::cerr << "[ERROR] Error starting camera: " << e.what() << std::endl;

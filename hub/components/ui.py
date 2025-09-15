@@ -209,6 +209,10 @@ if PYQT_AVAILABLE:
             self.camera_status_label = QLabel("● Camera Stopped")
             self.camera_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
             camera_layout.addWidget(self.camera_status_label, 4, 0, 1, 2)
+
+            # IR Projector status
+            self.ir_status_label = QLabel("🔆 IR Projector: Unknown")
+            camera_layout.addWidget(self.ir_status_label, 5, 0, 1, 2)
             
             layout.addWidget(camera_group)
             
@@ -236,6 +240,15 @@ if PYQT_AVAILABLE:
 
             layout.addWidget(dnn_group)
             layout.addStretch()
+
+        def update_ir_status(self, is_active: bool):
+            """Update the IR projector status label."""
+            if is_active:
+                self.ir_status_label.setText("🔆 IR Projector: ON")
+                self.ir_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            else:
+                self.ir_status_label.setText("🔆 IR Projector: OFF")
+                self.ir_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
 
         def populate_camera_settings(self):
             """Populate the camera settings dropdown with available JSON files."""
@@ -301,6 +314,7 @@ if PYQT_AVAILABLE:
                     self.start_camera_button.setEnabled(True)
                     self.camera_status_label.setText("● Camera Stopped")
                     self.camera_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
+                    self.update_ir_status(False)
                     print(f"✅ Camera stopped: {response.message}")
                 else:
                     QMessageBox.critical(self, "Error", f"Failed to stop camera: {response.message}")
@@ -608,6 +622,13 @@ if PYQT_AVAILABLE:
             if self.calibration_mode and frame_data.color_image_b64:
                 self.update_video_feed(frame_data)
             
+            # Update IR projector status in calibration widget
+            if self.settings_widget:
+                # The camera_status_label is the source of truth.
+                # Only update from frame_data if the camera is running.
+                is_camera_running = "Running" in self.settings_widget.camera_status_label.text()
+                self.settings_widget.update_ir_status(frame_data.ir_projector_active and is_camera_running)
+
             # Update system status
             if frame_data.HasField('status'):
                 status = frame_data.status

@@ -63,9 +63,6 @@ class JuggleHub:
             # Initialize WebUI
             self.web_ui = WebUI(self.screen_controller)
 
-            # Initialize ScreenController
-            self.screen_controller = ScreenController()
-
             # Initialize DatabaseLogger
             if self.config['enable_logging']:
                 self.database_logger = DatabaseLogger(self.config['database_path'])

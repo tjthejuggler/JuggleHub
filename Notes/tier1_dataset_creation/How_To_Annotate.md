@@ -555,7 +555,115 @@ print(f"✅ All training results have been saved to '{GDRIVE_PROJECT_PATH}/Juggl
 
 This complete, two-part workflow allows you to scientifically prove the value of your custom augmentation strategy.
 
+This is a fantastic `README.md`. It's comprehensive, well-structured, and clearly documents a very sophisticated project. Thank you for providing it.
 
+Based on this, I have everything I need. The key takeaways are:
+1.  **Engine:** Your C++ engine is the core of your real-time system.
+2.  **Model Format:** The engine consumes models in the **OpenVINO Intermediate Representation (IR)** format (`.xml` and `.bin`).
+3.  **Model Location:** The engine expects these files to be in `engine/models/`.
+4.  **Model Name:** The engine is hard-coded (or configured) to look for a model named `yolo11n.xml` and `yolo11n.bin`.
+
+This means our goal is to take the `best.pt` file produced by Colab and convert it into the OpenVINO IR format that your C++ engine can understand.
+
+---
+
+### **The Exact Workflow: From Colab to Your C++ Engine**
+
+Here is the precise, step-by-step process.
+
+### **Phase 1: Download Your Trained Model from Colab**
+
+Your non-augmented training run is almost done. Once it finishes, a `best.pt` file will be created.
+
+1.  **Locate the File in Colab:**
+    *   In the Colab file browser (left sidebar), navigate to the results folder:
+        `JuggleHub_Training_Results` -> `baseline_4_class_run` -> `weights/`
+    *   Inside this folder, you will find `best.pt`.
+
+2.  **Download to Your Local Machine:**
+    *   Right-click on `best.pt` and select "Download".
+    *   Save this file somewhere convenient on your local computer, for example, your `~/Downloads` folder.
+
+### **Phase 2: Convert the Model to OpenVINO Format**
+
+This is the critical conversion step. We will use the `yolo` command-line tool, which has a built-in exporter for OpenVINO.
+
+1.  **Open a Terminal on Your Local Machine:** Make sure it's a terminal where your JuggleHub project's Python virtual environment is activated and your OpenVINO environment is sourced.
+    ```bash
+    # Navigate to your JuggleHub project root
+    cd ~/Projects/JuggleHub
+
+    # Activate your Python virtual environment
+    source ./hub/.venv/bin/activate
+
+    # Source the OpenVINO environment variables
+    source /opt/intel/openvino_2025.2.0/setupvars.sh
+    ```
+
+2.  **Run the Export Command:**
+    Execute the following command. This tells YOLO to take your downloaded `.pt` file and export it to the OpenVINO format.
+
+    ```bash
+    yolo export model=~/Downloads/best.pt format=openvino imgsz=640
+    ```
+    *   `model=~/Downloads/best.pt`: The path to the model you just downloaded.
+    *   `format=openvino`: The target format for conversion.
+    *   `imgsz=640`: It's crucial to specify the same image size you trained with (640x640).
+
+3.  **Verify the Output:**
+    *   The command will create a new directory named `best_openvino_model/`.
+    *   Inside this directory, you will find several files, including the two we need: `best.xml` and `best.bin`.
+
+### **Phase 3: Deploy the New Model to Your Engine**
+
+Now, we replace the old model files in your engine with the new, fine-tuned ones.
+
+1.  **Navigate to Your Engine's Model Directory:**
+    ```bash
+    cd ~/Projects/JuggleHub/engine/models
+    ```
+
+2.  **Backup the Old Model (IMPORTANT):**
+    Never delete the original model. Just in case something goes wrong, you'll want to be able to revert.
+    ```bash
+    # Create a backup directory if it doesn't exist
+    mkdir -p old_models
+
+    # Move the existing model files to the backup folder
+    mv yolo11n.xml yolo11n.bin metadata.yaml old_models/
+    ```
+
+3.  **Copy and Rename the New Model:**
+    Copy the `best.xml` and `best.bin` files from the export directory and rename them to what your engine expects (`yolo11n.xml` and `yolo11n.bin`).
+
+    ```bash
+    # Copy and rename the .xml file
+    cp ~/Downloads/best_openvino_model/best.xml ./yolo11n.xml
+
+    # Copy and rename the .bin file
+    cp ~/Downloads/best_openvino_model/best.bin ./yolo11n.bin
+    ```
+
+Your fine-tuned model is now deployed.
+
+### **Phase 4: Run and Test Your Engine**
+
+You are now ready to see the results of your hard work.
+
+1.  **Run Your System:** Use your standard script to launch the hub and engine. It's a good idea to select a specific device for testing.
+    ```bash
+    # Example: Run using the GPU for good performance
+    ./scripts/run_hub.sh --use-venv --device GPU
+    ```
+
+2.  **Evaluate Performance:**
+    *   **Does it run?** The first check is to ensure the engine loads the new model without crashing.
+    *   **What does it detect?** Point the camera at your juggling balls (both LED and non-LED) and your hands. The UI should now draw bounding boxes for all four classes.
+    *   **How accurate is it?** Check the confidence scores. Are they high for the correct objects?
+    *   **Are there false positives?** Does it incorrectly identify background objects as balls or hands?
+    *   **How does it handle `dropped_ball`?** Drop a ball and see if it is correctly re-classified as `dropped_ball` once it hits the floor.
+
+By following this four-phase process, you have successfully completed the full "train-convert-deploy-test" cycle. You can repeat this exact same process for your augmented model (`run...augmented_blur/weights/best.pt`) to compare its real-world performance directly against this baseline.
 
 
 

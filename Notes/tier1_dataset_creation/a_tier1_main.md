@@ -1,3 +1,9 @@
+I just annotated:
+#### **Phase 3: Conversion & Assembly (Do This After Annotating)** in How_To_Annotate.md @ line 225
+
+I just downloaded fine-tuned model from colab:
+### **Phase 2: Convert the Model to OpenVINO Format** in How_To_Annotate.md @ line 587
+
 2025-09-11 20:01:40
 
 Tier 1 Ball/Hand Detection

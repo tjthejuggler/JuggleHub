@@ -245,10 +245,10 @@ Once you have several completed annotation sessions and their corresponding `via
     *   **Example Command:**
     ```bash
     python scripts/prepare_dataset.py \
-        --dataset-name V2_with_hands \
-        --source-dir data/annotation_sessions \
-        --output-dir data/3_training_datasets \
-        --tags session_name_1 session_name_2
+        --dataset-name V2_cleaned_more_blur \
+        --source-dir /home/twain/Projects/JuggleHub/engine/data/annotation_sessions \
+        --output-dir /home/twain/Projects/JuggleHub/engine/data/3_training_datasets \
+        --tags V2rs455_normal_balls_mixedlight_sessions_intentional_realsense V2rs455_normal_balls_daylight_sessions_auto_realsense
     ```
     *   **Result:** A new folder like `data/3_training_datasets/V2_with_hands/` is created.
 
@@ -257,7 +257,7 @@ This is where we prevent the label mismatch error at its source. We will create 
 
 3.  **Run the create_yaml.py Script:** From your terminal, run this script, providing the path to your newly assembled dataset and your full list of class names in the correct order.
     ```bash
-    python scripts/create_yaml.py data/3_training_datasets/V2_with_hands led_on led_off dropped_ball hand
+    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V2_cleaned_more_blur led_on led_off dropped_ball hand
     ```
     *   **Result:** A perfect `dataset.yaml` file is now inside your `V2_with_hands` folder. The dataset is now self-contained and correct.
 

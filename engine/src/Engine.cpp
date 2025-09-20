@@ -161,6 +161,7 @@ void Engine::run() {
                 raw_det_pb->set_width(det.box.width);
                 raw_det_pb->set_height(det.box.height);
                 raw_det_pb->set_confidence(det.confidence);
+                raw_det_pb->set_class_id(det.class_id);
             }
 
             if (verbose_) {
@@ -201,6 +202,9 @@ void Engine::run() {
                     bbox->set_y(obj.box.y);
                     bbox->set_width(obj.box.width);
                     bbox->set_height(obj.box.height);
+
+                    // Set class name for the tracked ball
+                    ball->set_class_name(obj.class_name);
                 }
             }
         }

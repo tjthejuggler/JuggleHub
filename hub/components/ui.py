@@ -482,12 +482,18 @@ if PYQT_AVAILABLE:
             self.video_scene.addItem(self.video_pixmap_item)
             self.video_layout.addWidget(self.video_view)
 
-            # Add checkbox for raw detections
+            # Add checkboxes for raw and tracked detections
             self.show_raw_detections_checkbox = QPushButton("Show Raw Detections", self)
             self.show_raw_detections_checkbox.setCheckable(True)
-            self.show_raw_detections_checkbox.setChecked(False)
-            self.show_raw_detections_checkbox.clicked.connect(self.toggle_raw_detections)
+            self.show_raw_detections_checkbox.setChecked(True) # Default to on
+            self.show_raw_detections_checkbox.clicked.connect(self.toggle_overlays)
             self.video_layout.addWidget(self.show_raw_detections_checkbox)
+
+            self.show_tracked_objects_checkbox = QPushButton("Show Tracked Objects", self)
+            self.show_tracked_objects_checkbox.setCheckable(True)
+            self.show_tracked_objects_checkbox.setChecked(True) # Default to on
+            self.show_tracked_objects_checkbox.clicked.connect(self.toggle_overlays)
+            self.video_layout.addWidget(self.show_tracked_objects_checkbox)
             
             content_layout.addWidget(self.video_group, 2) # Give it more stretch factor
             
@@ -613,7 +619,8 @@ if PYQT_AVAILABLE:
                 ball_text = "Raw detections present, but no tracked balls.\n"
                 
             for ball in frame_data.balls:
-                ball_text += f"ID {ball.id}: "
+                class_name = f" ({ball.class_name})" if ball.class_name else ""
+                ball_text += f"ID {ball.id}{class_name}: "
                 ball_text += f"3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
             
             self.ball_list.setPlainText(ball_text)
@@ -697,10 +704,10 @@ if PYQT_AVAILABLE:
             else:
                 self.calibration_button.setText("Enter Calibration Mode")
 
-        def toggle_raw_detections(self):
-            """Force a UI update when the checkbox is toggled."""
+        def toggle_overlays(self):
+            """Force a UI update when any overlay checkbox is toggled."""
             if self.last_frame_data:
-                self._update_ui(self.last_frame_data)
+                self.update_video_feed(self.last_frame_data)
 
         def update_video_feed(self, frame_data: juggler_pb2.FrameData):
             """Update the video feed with the new frame and bounding boxes."""
@@ -716,16 +723,33 @@ if PYQT_AVAILABLE:
                 painter.setPen(pen_raw)
                 for det in frame_data.raw_detections:
                     painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
-                    # Render confidence score
-                    painter.drawText(int(det.x), int(det.y) - 5, f"{det.confidence:.2f}")
+                    label = f"Raw: {det.class_name} ({det.confidence:.2f})" if det.class_name else f"Raw: ({det.confidence:.2f})"
+                    painter.drawText(int(det.x), int(det.y) - 5, label)
 
-            # Draw final tracked balls
-            pen_tracked = QPen(QColor(0, 255, 0), 2)  # Solid green
-            painter.setPen(pen_tracked)
-            for ball in frame_data.balls:
-                bbox = ball.bounding_box
-                painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
-                painter.drawText(int(bbox.x), int(bbox.y) + int(bbox.height) + 15, f"ID: {ball.id}")
+            # Define colors for different classes
+            class_colors = {
+                "led_on": QColor(0, 255, 0),      # Bright Green
+                "led_off": QColor(255, 0, 0),     # Bright Red
+                "dropped_ball": QColor(255, 165, 0), # Orange
+                "hand": QColor(0, 100, 255),       # Bright Blue
+                "ball": QColor(200, 200, 200)      # Gray for generic "ball"
+            }
+            
+            # Draw final tracked objects (balls) if checkbox is ticked
+            if self.show_tracked_objects_checkbox.isChecked():
+                for ball in frame_data.balls:
+                    bbox = ball.bounding_box_2d
+                    
+                    class_name = ball.class_name if ball.class_name else "ball"
+                    
+                    # Use a distinct, solid pen for tracked objects
+                    pen_tracked = QPen(class_colors.get(class_name, QColor(255, 255, 255)), 3) # Default to solid white
+                    painter.setPen(pen_tracked)
+
+                    painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
+                    
+                    label = f"Tracked ID: {ball.id} ({class_name})"
+                    painter.drawText(int(bbox.x), int(bbox.y) + int(bbox.height) + 15, label)
 
             painter.end()
 

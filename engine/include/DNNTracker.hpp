@@ -16,11 +16,13 @@ struct TrackedObject {
     cv::Rect_<float> box;
     int id;
     int class_id;
+    std::string class_name;
 };
 
 struct RawDetection {
     cv::Rect_<float> box;
     float confidence;
+    int class_id;
 };
 
 class DNNTracker {
@@ -45,7 +47,7 @@ private:
     // Model & Preprocessing Parameters
     int input_width_ = 640;
     int input_height_ = 640;
-    float confidence_threshold_ = 0.45;
+    float confidence_threshold_ = 0.25; // Lowered from 0.45
     float nms_threshold_ = 0.5;
 
     // --- NEW MODEL CONFIGURATION MEMBERS ---

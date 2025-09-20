@@ -43,8 +43,8 @@ DNNTracker::DNNTracker(const std::string& model_path, const std::string& device_
     int frame_rate = 30;
     int track_buffer = 150; 
     float track_thresh = 0.25f;
-    float high_thresh = 0.6f;
-    float match_thresh = 0.8f;
+    float high_thresh = 0.5f; // Slightly lower to allow weaker detections to start a track
+    float match_thresh = 0.7f; // Lower to make association easier
     tracker = std::make_unique<byte_track::BYTETracker>(frame_rate, track_buffer, track_thresh, high_thresh, match_thresh);
 }
 
@@ -86,12 +86,16 @@ std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::upd
             }
         }
         
-        if (best_iou > 0.8f) {
+        // Lower the IoU threshold for association to improve robustness
+        if (best_iou > 0.5f) {
+            std::string class_name = (associated_class_id >= 0 && associated_class_id < class_names_.size())
+                                         ? class_names_[associated_class_id]
+                                         : "unknown";
             tracked_objects.push_back({
-                // Also corrected here to use function calls
                 cv::Rect_<float>(track_rect.x(), track_rect.y(), track_rect.width(), track_rect.height()),
                 (int)track->getTrackId(),
-                associated_class_id
+                associated_class_id,
+                class_name
             });
         }
     }
@@ -178,7 +182,7 @@ std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& frame, co
             int top = static_cast<int>((cy - 0.5 * h) * scale_y);
             int width = static_cast<int>(w * scale_x);
             int height = static_cast<int>(h * scale_y);
-            raw_detections.push_back({cv::Rect_<float>(left, top, width, height), confidence});
+            raw_detections.push_back({cv::Rect_<float>(left, top, width, height), confidence, class_id_point.x});
         }
     }
 

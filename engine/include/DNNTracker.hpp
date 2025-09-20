@@ -45,8 +45,12 @@ private:
     // Model & Preprocessing Parameters
     int input_width_ = 640;
     int input_height_ = 640;
-    float confidence_threshold_ = 0.15; // Lowered threshold to compensate for the generic model's performance
+    float confidence_threshold_ = 0.45;
     float nms_threshold_ = 0.5;
+
+    // --- NEW MODEL CONFIGURATION MEMBERS ---
+    const int num_classes_ = 4;
+    const std::vector<std::string> class_names_ = {"led_on", "led_off", "dropped_ball", "hand"};
 
     // --- Private Methods ---
     cv::Mat preprocess(const cv::Mat& frame, float& scale_x, float& scale_y);

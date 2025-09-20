@@ -134,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--class_list',
         type=str,
-        default='data/classes.txt',
+        default='/home/twain/Projects/JuggleHub/engine/data/classes.txt',
         help="Path to the file containing class names, one per line. \n(default: data/classes.txt)"
     )
 

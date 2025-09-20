@@ -240,29 +240,329 @@ Once you have several completed annotation sessions and their corresponding `via
     ```
     *   **Result:** The script will run and create a `.txt` file next to every single image you annotated inside the `images` subfolders of your session directories. Your data is now in the correct YOLO format.
 
-#### **Phase 4: Final Dataset Assembly (The Last Step Before Training)**
-
-This final, automated step takes all your converted annotations and splits them into the final `train/` and `valid/` folders.
-
-1.  **Create the Dataset Preparation Script:**
-    *   The LLM programmer will now provide you with the `scripts/prepare_dataset.py` script. This script will be designed to read from your `data/annotation_sessions/` folders, gather all the image/text pairs, shuffle them, and split them 80/20 into a new training-ready folder.
-
-2.  **Run the Preparation Script:**
-    *   From your `JuggleHub` root directory, you will run a command like this:
-
-    **Example Command:**
+#### **Step A2: Assemble the Dataset**
+1.  Run your `prepare_dataset.py` script to split your data into `train/` and `valid/` sets.
+    *   **Example Command:**
     ```bash
     python scripts/prepare_dataset.py \
-      --output data/3_training_datasets/V1_generalist \
-      data/annotation_sessions/normal_balls_daylight_session \
-      data/annotation_sessions/normal_balls_lowlight_session \
-      data/annotation_sessions/led_balls_red_session
+        --dataset-name V2_with_hands \
+        --source-dir data/annotation_sessions \
+        --output-dir data/3_training_datasets \
+        --tags session_name_1 session_name_2
     ```
-    *   **Result:** The script will create the `V1_generalist` folder. Inside, you will find the `train/` and `valid/` folders, both containing `images/` and `labels/` subdirectories. The data will be randomly shuffled and correctly split.
+    *   **Result:** A new folder like `data/3_training_datasets/V2_with_hands/` is created.
 
-You have now successfully completed the entire data preparation pipeline. The `data/3_training_datasets/V1_generalist` folder is a high-quality, professional-grade dataset, perfectly structured and ready to be fed into the training script.
+#### **Step A3: Create the Perfect `dataset.yaml` (The Most Important New Step)**
+This is where we prevent the label mismatch error at its source. We will create the `dataset.yaml` file locally.
 
-------------
+3.  **Run the create_yaml.py Script:** From your terminal, run this script, providing the path to your newly assembled dataset and your full list of class names in the correct order.
+    ```bash
+    python scripts/create_yaml.py data/3_training_datasets/V2_with_hands led_on led_off dropped_ball hand
+    ```
+    *   **Result:** A perfect `dataset.yaml` file is now inside your `V2_with_hands` folder. The dataset is now self-contained and correct.
+
+#### **Step A4: Prepare Your Assets for Upload**
+1.  **Compress the Dataset:** Navigate to the `3_training_datasets` directory and zip your final dataset folder.
+    ```bash
+    cd data/3_training_datasets/
+    zip -r V2_with_hands.zip V2_with_hands/
+    ```
+2.  **Locate Your Custom Model:** Find your `yolo11n.pt` file. You will need to upload this alongside your dataset.
+
+---
+
+### **Phase B: Cloud Setup (Google Drive)**
+
+1.  **Organize Google Drive:**
+    *   In your Google Drive, ensure you have a `JuggleHub` folder.
+    *   Inside `JuggleHub`, create two folders: `datasets` and `models`.
+2.  **Upload Your Assets:**
+    *   Upload `V2_with_hands.zip` to the `JuggleHub/datasets/` folder.
+    *   Upload `yolo11n.pt` to the `JuggleHub/models/` folder.
+
+---
+
+### **Phase C: Colab Execution (The Smooth & Repeatable Workflow)**
+
+This is your new template for all future training notebooks.
+
+#### **Step C1: Initial Setup (Boilerplate)**
+Run this cell first to connect to your GPU and Google Drive.
+```python
+# 1. Verify GPU is active
+!nvidia-smi
+
+# 2. Mount Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# 3. Define project paths
+# (Adjust if you used a different folder structure on Drive)
+GDRIVE_PROJECT_PATH = "/content/drive/MyDrive/JuggleHub"
+DATASET_NAME = "V2_with_hands" # <-- CHANGE THIS FOR EACH NEW DATASET
+MODEL_NAME = "yolo11n.pt"      # <-- Your custom model name
+```
+
+#### **Step C2: Transfer Assets to Colab**
+This copies your dataset and custom model from Drive to the fast local storage of the Colab machine.
+```python
+# 1. Copy the dataset zip file from Drive
+!cp "{GDRIVE_PROJECT_PATH}/datasets/{DATASET_NAME}.zip" /content/
+
+# 2. Unzip the dataset
+!unzip -q /content/{DATASET_NAME}.zip -d /content/
+
+# 3. Copy your custom model file from Drive
+!cp "{GDRIVE_PROJECT_PATH}/models/{MODEL_NAME}" /content/
+
+print("✅ Dataset and custom model are ready in the Colab environment.")
+```
+
+#### **Step C3: Update YAML and Clean Cache (The "No More Errors" Step)**
+This block performs two critical actions: it updates the path in your YAML file and proactively deletes any old cache files.
+```python
+import yaml
+import os
+
+# --- 1. Update the YAML path ---
+yaml_path = f"/content/{DATASET_NAME}/dataset.yaml"
+colab_dataset_path = f"/content/{DATASET_NAME}"
+
+with open(yaml_path, 'r') as f:
+    data = yaml.safe_load(f)
+data['path'] = colab_dataset_path
+with open(yaml_path, 'w') as f:
+    yaml.dump(data, f, sort_keys=False)
+print("✅ dataset.yaml path updated for Colab.")
+!echo "--- Current YAML contents: ---"
+!cat {yaml_path}
+
+# --- 2. Proactively delete stale cache files ---
+train_cache = f"/content/{DATASET_NAME}/train/labels.cache"
+val_cache = f"/content/{DATASET_NAME}/valid/labels.cache"
+if os.path.exists(train_cache):
+    os.remove(train_cache)
+    print("🗑️ Deleted stale training cache.")
+if os.path.exists(val_cache):
+    os.remove(val_cache)
+    print("🗑️ Deleted stale validation cache.")
+```
+
+#### **Step C4: Install Dependencies & Run Training**
+Finally, you're ready to train.
+```python
+# 1. Install Ultralytics
+!pip install -q ultralytics
+
+# 2. Run the Training
+from ultralytics import YOLO
+
+# Load your CUSTOM model from the local path in Colab
+model = YOLO(f"/content/{MODEL_NAME}")
+
+# Train the model
+results = model.train(
+    data=f"/content/{DATASET_NAME}/dataset.yaml",
+    epochs=100,
+    imgsz=640,
+    project='JuggleHub_Training_Results', # All results will save here
+    name=f'run_{DATASET_NAME}'           # A specific sub-folder for this run
+)
+```
+
+### **Why This New Workflow is Better**
+
+*   **Correct From the Start:** By creating the `dataset.yaml` locally with a script (**Step A3**), you eliminate any chance of a class mismatch. The dataset is guaranteed to be correct before you even upload it.
+*   **Explicit Model Handling:** The workflow recognizes that `yolo11n.pt` is a special file you provide. It makes uploading it and loading it from a specific path (**Step C2 & C4**) a required step, preventing `FileNotFoundError`.
+*   **Proactive Cache Cleaning:** The "Cache Buster" (**Step C3**) automatically deletes old cache files before every training run. This completely prevents the stale cache error, even if you have to stop and restart a training session.
+
+This comprehensive process makes your workflow robust, repeatable, and far less prone to the common errors of dataset preparation.
+
+Excellent point. You're absolutely right to ask for the second half of the experiment.
+
+The workflow for the augmented run is nearly identical, with one key addition: injecting the custom augmentation code before training.
+
+Here is the exact, step-by-step process for the **augmented fine-tuning run**.
+
+---
+
+### **Augmented Fine-Tuning Workflow (Complete)**
+
+You will perform this *after* your baseline training run is complete. You can do this in the same Colab notebook.
+
+### **Phase D: Augmented Training (Building on the Previous Setup)**
+
+Assume you have just completed **Phases A, B, and C** from the previous guide. Your dataset and custom `yolo11n.pt` model are already in the Colab environment.
+
+#### **Step D1: Define and Register the Custom Augmentation**
+
+This is the new and most important step for this run. We define our custom blur function and the "callback" function that will inject it into the training loop.
+
+**Copy this entire block into a new Colab code cell and run it.**
+
+```python
+import torch
+import cv2
+import numpy as np
+import random
+from ultralytics import YOLO
+
+# 1. THE CUSTOM AUGMENTATION FUNCTION
+# This is the code that performs the actual image manipulation.
+def apply_object_motion_blur(image, bboxes, blur_limit=(3, 15), p=0.5):
+    """Applies motion blur to objects within their bounding boxes."""
+    if random.random() > p:
+        return image # Apply augmentation with a probability of p
+    
+    output_image = image.copy()
+    for bbox in bboxes:
+        x_min, y_min, x_max, y_max = [int(v) for v in bbox]
+        if x_min >= x_max or y_min >= y_max:
+            continue
+        
+        object_crop = output_image[y_min:y_max, x_min:x_max]
+        if object_crop.size == 0: continue # Skip if crop is empty
+        
+        kernel_size = random.randint(blur_limit[0], blur_limit[1])
+        if kernel_size % 2 == 0:
+            kernel_size += 1 # Ensure kernel size is odd
+            
+        kernel = np.zeros((kernel_size, kernel_size))
+        
+        # Randomly choose horizontal or vertical blur
+        if random.random() > 0.5:
+            center = (kernel_size - 1) // 2
+            kernel[center, :] = np.ones(kernel_size)
+        else:
+            center = (kernel_size - 1) // 2
+            kernel[:, center] = np.ones(kernel_size)
+            
+        kernel = kernel / kernel_size # Normalize
+        
+        blurred_crop = cv2.filter2D(object_crop, -1, kernel)
+        output_image[y_min:y_max, x_min:x_max] = blurred_crop
+        
+    return output_image
+
+
+# 2. THE CALLBACK FUNCTION (THE "HOOK")
+# This function is the bridge between the YOLO trainer and our custom code.
+# It runs automatically on every single batch of training data.
+def on_train_batch_start(trainer):
+    """Callback to apply custom augmentation at the start of each training batch."""
+    batch = trainer.batch
+    images = batch['img']
+    labels = batch['bboxes']
+    device = trainer.device
+
+    processed_images = []
+    # Loop through each image in the batch
+    for i in range(len(images)):
+        image_tensor = images[i]
+        
+        # Get the labels corresponding to the current image
+        bboxes_for_image = labels[labels[:, 0] == i]
+
+        # Convert tensor image to OpenCV format (HWC, BGR, uint8)
+        img_np = image_tensor.permute(1, 2, 0).cpu().numpy()
+        img_np = (img_np * 255).astype(np.uint8)
+        img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+
+        # Convert normalized YOLO bboxes [class_id, cx, cy, w, h] to pixel [xmin, ymin, xmax, ymax]
+        h, w, _ = img_bgr.shape
+        pixel_bboxes = []
+        for bbox in bboxes_for_image:
+            _, cx, cy, bw, bh = bbox
+            x_min = (cx - bw / 2) * w
+            y_min = (cy - bh / 2) * h
+            x_max = (cx + bw / 2) * w
+            y_max = (cy + bh / 2) * h
+            pixel_bboxes.append([x_min, y_min, x_max, y_max])
+        
+        # Apply our custom blur augmentation
+        # We target a 60% probability to ensure the model still sees plenty of non-blurred examples.
+        blurred_img_bgr = apply_object_motion_blur(img_bgr, pixel_bboxes, p=0.6)
+
+        # Convert back to tensor format (CHW, RGB, float)
+        img_rgb = cv2.cvtColor(blurred_img_bgr, cv2.COLOR_BGR2RGB)
+        img_tensor_back = torch.from_numpy(img_rgb).float() / 255.0
+        img_tensor_back = img_tensor_back.permute(2, 0, 1)
+
+        processed_images.append(img_tensor_back)
+    
+    # Replace the original images in the batch with our new, augmented images
+    trainer.batch['img'] = torch.stack(processed_images).to(device)
+
+print("✅ Custom augmentation functions defined and ready.")
+```
+
+#### **Step D2: Run the Augmented Training**
+
+Now we perform the training, but with two key differences:
+1.  We load a **fresh copy** of your `yolo11n.pt` model to ensure a fair comparison with the baseline.
+2.  We **add the callback** before starting the training.
+3.  We give it a **different name** to keep the results separate.
+
+**Run this code in the final cell.**
+
+```python
+# 1. Set the names from your setup cell again for clarity
+DATASET_NAME = "V2_with_hands"
+MODEL_NAME = "yolo11n.pt"
+
+# 2. Load a FRESH, UNTRAINED copy of your custom model
+# This ensures we are starting from the same point as the baseline run.
+model_augmented = YOLO(f"/content/{MODEL_NAME}")
+
+# 3. ATTACH THE HOOK: This is the magic step.
+# We are telling the trainer to run our on_train_batch_start function on every batch.
+model_augmented.add_callback("on_train_batch_start", on_train_batch_start)
+
+print(f"🚀 Starting augmented training run for '{DATASET_NAME}'...")
+
+# 4. Train the model
+results_augmented = model_augmented.train(
+    data=f"/content/{DATASET_NAME}/dataset.yaml",
+    epochs=100,
+    imgsz=640,
+    project='JuggleHub_Training_Results',
+    name=f'run_{DATASET_NAME}_augmented_blur' # <-- A new, descriptive name!
+)
+
+print("🎉 Augmented training complete!")
+```
+
+### **Phase E: Analysis and Saving**
+
+After both the baseline and augmented runs are complete, your `JuggleHub_Training_Results` folder in Colab will contain two subfolders, for example:
+*   `run_V2_with_hands`
+*   `run_V2_with_hands_augmented_blur`
+
+#### **Step E1: Save Everything to Google Drive**
+
+Run this command to copy all your results back to Google Drive for permanent storage.
+
+```python
+# Copy the entire training results folder to your Google Drive
+!cp -r /content/JuggleHub_Training_Results "{GDRIVE_PROJECT_PATH}/"
+print(f"✅ All training results have been saved to '{GDRIVE_PROJECT_PATH}/JuggleHub_Training_Results'")
+```
+
+#### **Step E2: Compare the Models**
+
+1.  **Quantitative Analysis:** In your Google Drive, navigate to the results folders. Open the `results.png` file in each. Compare the graphs, especially the **mAP50-95** score. The goal is for the augmented run to have a higher (or at least more stable) mAP score.
+2.  **Qualitative Analysis:** Download the `best.pt` file from the `weights/` subfolder of each run. Use these two models on your local machine to perform inference on test videos that were *not* part of your training set, especially videos with lots of motion. Visually determine which model performs better in the real-world scenarios you care about.
+
+This complete, two-part workflow allows you to scientifically prove the value of your custom augmentation strategy.
+
+
+
+
+
+
+
+
+before 2025-09-20 10:04:00:
 
 These are two of the most important and challenging edge cases in object detection labeling. Getting this right is what separates a decent model from a great one.
 

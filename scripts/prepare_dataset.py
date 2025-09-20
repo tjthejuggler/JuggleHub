@@ -25,7 +25,7 @@ def find_image_annotation_pairs(source_dir: Path, tags: List[str]) -> List[Tuple
     Find all image/annotation pairs in the specified tagged directories.
     
     Args:
-        source_dir: Path to 2_tagged_and_annotated directory
+        source_dir: Path to the parent directory of annotation sessions
         tags: List of tag directories to include, or ['all'] for all directories
         
     Returns:
@@ -53,13 +53,22 @@ def find_image_annotation_pairs(source_dir: Path, tags: List[str]) -> List[Tuple
     
     # Find all image/annotation pairs
     for tag_dir in tag_dirs:
-        if not tag_dir.is_dir():
+        # --- MODIFICATION START ---
+        # The script now specifically looks inside the 'images' subdirectory
+        image_dir = tag_dir / "images"
+        
+        if not image_dir.is_dir():
+            print(f"\nWarning: 'images' subdirectory not found in {tag_dir.name}. Skipping.")
             continue
+        # --- MODIFICATION END ---
             
         print(f"\nScanning {tag_dir.name}...")
         tag_pairs = 0
         
-        for image_file in tag_dir.iterdir():
+        # --- MODIFICATION START ---
+        # The loop now iterates over the correct directory
+        for image_file in image_dir.iterdir():
+        # --- MODIFICATION END ---
             if image_file.suffix.lower() not in image_extensions:
                 continue
                 
@@ -70,7 +79,11 @@ def find_image_annotation_pairs(source_dir: Path, tags: List[str]) -> List[Tuple
                 pairs.append((image_file, annotation_file))
                 tag_pairs += 1
             else:
-                print(f"  Warning: No annotation found for {image_file.name}")
+                # This is a common case for negative images, so we'll make this less alarming
+                # print(f"  Info: No annotation found for {image_file.name} (This is expected for negative images)")
+                # For simplicity, we only add pairs that have annotations. 
+                # Negative images are handled by the empty .txt file. If a .txt file is missing, we assume it's not part of the dataset.
+                pass
         
         print(f"  Found {tag_pairs} image/annotation pairs")
     

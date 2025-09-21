@@ -217,29 +217,133 @@ if PYQT_AVAILABLE:
             layout.addWidget(camera_group)
             
             # -- DNN Tracker Settings --
-            dnn_group = QGroupBox("DNN Tracker Settings")
+            dnn_group = QGroupBox("YOLO Tracker Settings")
             dnn_layout = QGridLayout(dnn_group)
+
+            self.confidence_slider, self.confidence_value_label = self._create_slider_widget(
+                parent_layout=dnn_layout,
+                row=0,
+                label_text="Confidence Threshold",
+                tooltip_text="Minimum confidence for an object to be detected by YOLO.\n"
+                             "Range: 0.00 to 1.00. Default: 0.25.\n"
+                             "Lower values detect more objects but increase false positives.",
+                range_min=0,
+                range_max=100,
+                initial_value=25,
+                update_func=lambda v: self.update_setting('confidence_threshold', v / 100.0),
+                is_float=True
+            )
+
+            self.nms_slider, self.nms_value_label = self._create_slider_widget(
+                parent_layout=dnn_layout,
+                row=1,
+                label_text="NMS Threshold",
+                tooltip_text="Non-Maximum Suppression threshold for merging overlapping boxes.\n"
+                             "Range: 0.00 to 1.00. Default: 0.50.\n"
+                             "Higher values allow more overlap.",
+                range_min=0,
+                range_max=100,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('nms_threshold', v / 100.0),
+                is_float=True
+            )
             
-            # Confidence Threshold
-            dnn_layout.addWidget(QLabel("Confidence Threshold:"), 0, 0)
-            self.confidence_slider = QSlider(Qt.Orientation.Horizontal)
-            self.confidence_slider.setRange(0, 100)
-            self.confidence_slider.setValue(25)
-            self.confidence_slider.valueChanged.connect(
-                lambda v: self.update_setting('confidence_threshold', v / 100.0))
-            dnn_layout.addWidget(self.confidence_slider, 0, 1)
-
-            # NMS Threshold
-            dnn_layout.addWidget(QLabel("NMS Threshold:"), 1, 0)
-            self.nms_slider = QSlider(Qt.Orientation.Horizontal)
-            self.nms_slider.setRange(0, 100)
-            self.nms_slider.setValue(50)
-            self.nms_slider.valueChanged.connect(
-                lambda v: self.update_setting('nms_threshold', v / 100.0))
-            dnn_layout.addWidget(self.nms_slider, 1, 1)
-
             layout.addWidget(dnn_group)
+
+            # -- ByteTrack Settings --
+            bytetrack_group = QGroupBox("ByteTrack Settings")
+            bytetrack_layout = QGridLayout(bytetrack_group)
+
+            self.track_buffer_slider, self.track_buffer_value_label = self._create_slider_widget(
+                parent_layout=bytetrack_layout,
+                row=0,
+                label_text="Track Buffer (Frames)",
+                tooltip_text="How long (in frames) ByteTrack remembers a lost object.\n"
+                             "Range: 1 to 300. Default: 150.\n"
+                             "Increase this for objects that get occluded for longer periods.",
+                range_min=1,
+                range_max=300,
+                initial_value=150,
+                update_func=lambda v: self.update_setting('track_buffer', v)
+            )
+
+            self.track_thresh_slider, self.track_thresh_value_label = self._create_slider_widget(
+                parent_layout=bytetrack_layout,
+                row=1,
+                label_text="Track Threshold",
+                tooltip_text="Confidence score needed to start a new track.\n"
+                             "Range: 0.00 to 1.00. Default: 0.25.\n"
+                             "This is the threshold for low-confidence detections.",
+                range_min=0,
+                range_max=100,
+                initial_value=25,
+                update_func=lambda v: self.update_setting('track_thresh', v / 100.0),
+                is_float=True
+            )
+
+            self.high_thresh_slider, self.high_thresh_value_label = self._create_slider_widget(
+                parent_layout=bytetrack_layout,
+                row=2,
+                label_text="High Confidence Threshold",
+                tooltip_text="Confidence score for a detection to be considered 'high confidence'.\n"
+                             "Range: 0.00 to 1.00. Default: 0.50.\n"
+                             "These detections are matched first.",
+                range_min=0,
+                range_max=100,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('high_thresh', v / 100.0),
+                is_float=True
+            )
+
+            self.match_thresh_slider, self.match_thresh_value_label = self._create_slider_widget(
+                parent_layout=bytetrack_layout,
+                row=3,
+                label_text="Match Threshold (IoU)",
+                tooltip_text="The minimum Intersection over Union (IoU) to match a detection to a track.\n"
+                             "Range: 0.00 to 1.00. Default: 0.70.\n"
+                             "Lower values make it easier to maintain a track ID, even with jittery detections.",
+                range_min=0,
+                range_max=100,
+                initial_value=70,
+                update_func=lambda v: self.update_setting('match_thresh', v / 100.0),
+                is_float=True
+            )
+
+            layout.addWidget(bytetrack_group)
             layout.addStretch()
+
+        def _create_slider_widget(self, parent_layout, row, label_text, tooltip_text,
+                                  range_min, range_max, initial_value,
+                                  update_func, is_float=False):
+            """Helper function to create a labeled slider with a value display."""
+            label = QLabel(label_text)
+            label.setToolTip(tooltip_text)
+            parent_layout.addWidget(label, row, 0)
+            
+            slider = QSlider(Qt.Orientation.Horizontal)
+            slider.setRange(range_min, range_max)
+            slider.setValue(initial_value)
+            parent_layout.addWidget(slider, row, 1)
+
+            value_label = QLabel()
+            value_label.setMinimumWidth(40) # Ensure consistent width
+            parent_layout.addWidget(value_label, row, 2)
+            
+            def on_value_changed(value):
+                if is_float:
+                    display_value = f"{value / 100.0:.2f}"
+                    update_func(value)
+                else:
+                    display_value = str(value)
+                    update_func(value)
+                value_label.setText(display_value)
+
+            slider.valueChanged.connect(on_value_changed)
+            
+            # Set initial value display
+            on_value_changed(initial_value)
+            
+            return slider, value_label
 
         def update_ir_status(self, is_active: bool):
             """Update the IR projector status label."""

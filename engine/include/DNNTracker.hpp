@@ -35,6 +35,8 @@ public:
     void update_setting(const std::string& key, const std::string& value);
 
 private:
+    void reinitialize_tracker();
+
     // --- Member Variables ---
     // OpenVINO
     ov::Core core;
@@ -47,8 +49,14 @@ private:
     // Model & Preprocessing Parameters
     int input_width_ = 640;
     int input_height_ = 640;
-    float confidence_threshold_ = 0.25; // Lowered from 0.45
+    float confidence_threshold_ = 0.25;
     float nms_threshold_ = 0.5;
+
+    // ByteTrack Parameters
+    int track_buffer_ = 150;
+    float track_thresh_ = 0.25f;
+    float high_thresh_ = 0.5f;
+    float match_thresh_ = 0.7f;
 
     // --- NEW MODEL CONFIGURATION MEMBERS ---
     const int num_classes_ = 4;

@@ -208,6 +208,19 @@ JuggleHub/
 - **System status monitoring**
 - **Command/response patterns** for engine control
 
+### Tracking Control
+
+The hub UI provides real-time control over the DNN-based tracking system. These settings can be adjusted in the "Calibration Mode" panel.
+
+#### DNN Tracker Settings
+- **Confidence Threshold**: Adjusts the minimum confidence level for a detected object to be considered a valid detection. Higher values reduce false positives but may miss less clear objects.
+- **NMS Threshold**: Controls the "non-maximum suppression" threshold, which merges overlapping bounding boxes. Higher values allow more overlap, while lower values are stricter.
+
+#### ByteTrack Settings
+- **Track Buffer (Frames)**: Defines how many frames a "lost" track is kept in memory before being deleted. Increasing this value helps maintain consistent IDs for objects that are temporarily occluded.
+- **Track Threshold**: The confidence threshold required to initiate a new track.
+- **High Confidence Threshold**: The confidence threshold for the first association step, where high-confidence detections are matched to existing tracks.
+- **Match Threshold**: The IoU (Intersection over Union) threshold for associating detections with existing tracks. A lower value makes it easier to associate a detection with a track, even if they don't perfectly overlap.
 ## 🤖 DNN-Based Tracking System
 
 JuggleHub now features a state-of-the-art deep neural network tracking system that provides robust, AI-powered ball detection and tracking capabilities alongside the traditional color-based tracking.

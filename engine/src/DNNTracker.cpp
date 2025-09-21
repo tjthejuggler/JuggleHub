@@ -40,12 +40,7 @@ DNNTracker::DNNTracker(const std::string& model_path, const std::string& device_
     std::cout << "Model loaded successfully." << std::endl;
 
     // 2. Initialize Bytetrack
-    int frame_rate = 30;
-    int track_buffer = 150; 
-    float track_thresh = 0.25f;
-    float high_thresh = 0.5f; // Slightly lower to allow weaker detections to start a track
-    float match_thresh = 0.7f; // Lower to make association easier
-    tracker = std::make_unique<byte_track::BYTETracker>(frame_rate, track_buffer, track_thresh, high_thresh, match_thresh);
+    reinitialize_tracker();
 }
 
 DNNTracker::~DNNTracker() {}
@@ -111,6 +106,22 @@ void DNNTracker::update_setting(const std::string& key, const std::string& value
         } else if (key == "nms_threshold") {
             nms_threshold_ = std::stof(value);
             std::cout << "Updated nms_threshold to " << nms_threshold_ << std::endl;
+        } else if (key == "track_buffer") {
+            track_buffer_ = std::stoi(value);
+            reinitialize_tracker();
+            std::cout << "Re-initialized tracker with track_buffer = " << track_buffer_ << std::endl;
+        } else if (key == "track_thresh") {
+            track_thresh_ = std::stof(value);
+            reinitialize_tracker();
+            std::cout << "Re-initialized tracker with track_thresh = " << track_thresh_ << std::endl;
+        } else if (key == "high_thresh") {
+            high_thresh_ = std::stof(value);
+            reinitialize_tracker();
+            std::cout << "Re-initialized tracker with high_thresh = " << high_thresh_ << std::endl;
+        } else if (key == "match_thresh") {
+            match_thresh_ = std::stof(value);
+            reinitialize_tracker();
+            std::cout << "Re-initialized tracker with match_thresh = " << match_thresh_ << std::endl;
         } else {
             std::cerr << "Warning: Unknown DNNTracker setting key '" << key << "'" << std::endl;
         }
@@ -119,6 +130,11 @@ void DNNTracker::update_setting(const std::string& key, const std::string& value
     } catch (const std::out_of_range& e) {
         std::cerr << "Error: Value out of range for " << key << ": " << value << std::endl;
     }
+}
+
+void DNNTracker::reinitialize_tracker() {
+    int frame_rate = 30; // Assuming a fixed frame rate for now
+    tracker = std::make_unique<byte_track::BYTETracker>(frame_rate, track_buffer_, track_thresh_, high_thresh_, match_thresh_);
 }
 
 cv::Mat DNNTracker::preprocess(const cv::Mat& frame, float& scale_x, float& scale_y) {

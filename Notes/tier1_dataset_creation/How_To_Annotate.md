@@ -245,10 +245,10 @@ Once you have several completed annotation sessions and their corresponding `via
     *   **Example Command:**
     ```bash
     python scripts/prepare_dataset.py \
-        --dataset-name V2_cleaned_more_blur \
+        --dataset-name V2_1_just_hands \
         --source-dir /home/twain/Projects/JuggleHub/engine/data/annotation_sessions \
         --output-dir /home/twain/Projects/JuggleHub/engine/data/3_training_datasets \
-        --tags V2rs455_normal_balls_mixedlight_sessions_intentional_realsense V2rs455_normal_balls_daylight_sessions_auto_realsense
+        --tags V2rs455_normal_balls_mixedlight_sessions_intentional_realsense V2rs455_normal_balls_daylight_sessions_auto_realsense V2rs455_just_hands_low_light_intentional_and_auto_realsense
     ```
     *   **Result:** A new folder like `data/3_training_datasets/V2_with_hands/` is created.
 
@@ -257,14 +257,14 @@ This is where we prevent the label mismatch error at its source. We will create 
 
 3.  **Run the create_yaml.py Script:** From your terminal, run this script, providing the path to your newly assembled dataset and your full list of class names in the correct order.
     ```bash
-    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V2_cleaned_more_blur led_on led_off dropped_ball hand
+    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V2_1_just_hands led_on led_off dropped_ball hand
     ```
     *   **Result:** A perfect `dataset.yaml` file is now inside your `V2_with_hands` folder. The dataset is now self-contained and correct.
 
 #### **Step A4: Prepare Your Assets for Upload**
 1.  **Compress the Dataset:** Navigate to the `3_training_datasets` directory and zip your final dataset folder.
     ```bash
-    cd data/3_training_datasets/
+    cd engine/data/3_training_datasets/
     zip -r V2_with_hands.zip V2_with_hands/
     ```
 2.  **Locate Your Custom Model:** Find your `yolo11n.pt` file. You will need to upload this alongside your dataset.

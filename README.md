@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-09-08 17:24:00 UTC
+**Last Updated:** 2025-09-22 10:29:00 UTC
 
 ## 🎯 Overview
 
@@ -204,7 +204,7 @@ JuggleHub/
 - **Real-time visualization** with PyQt6 GUI
 - **Camera settings selection** with dropdown interface for easy configuration switching
 - **Live camera control** with stop/start functionality for seamless settings switching
-- **SQLite database logging** for session analysis
+- **SQLite database logging** for session analysis (runtime data files are automatically ignored by git)
 - **ZeroMQ data streaming** with automatic reconnection
 - **Console mode** for headless operation
 - **Performance monitoring** and statistics
@@ -1500,4 +1500,49 @@ Successfully renamed 3 items.
 - Provides detailed progress output
 - Supports dry-run mode for safe testing
 
-**Last Updated:** 2025-09-05 06:52:00 UTC
+## 🗃️ Database and Runtime Files
+
+JuggleHub automatically creates SQLite database files during operation to store juggling session data, including ball tracking information, IMU data, and performance metrics. These files are automatically excluded from version control.
+
+### Database Files
+
+The following database files are created during runtime and are automatically ignored by git:
+
+- **`hub/juggling_data.db`**: Main SQLite database containing session data
+- **`hub/juggling_data.db-shm`**: Shared memory file for SQLite WAL mode
+- **`hub/juggling_data.db-wal`**: Write-ahead log file for SQLite transactions
+
+### Why Database Files Are Ignored
+
+Database files are excluded from version control because they:
+
+- **Contain runtime data**: Generated during application usage, not source code
+- **Can grow very large**: May exceed GitHub's 100MB file size limit
+- **Are user-specific**: Contain personal juggling session data
+- **Are regenerated**: Created automatically when the application runs
+
+### Database Location and Configuration
+
+By default, the database is created as `juggling_data.db` in the hub directory. You can specify a custom location using the `--database-path` argument:
+
+```bash
+# Use custom database location
+./scripts/run_hub.sh --use-venv --database-path /path/to/custom/juggling_data.db
+
+# Disable database logging entirely
+./scripts/run_hub.sh --use-venv --no-logging
+```
+
+### Data Persistence
+
+While database files are not tracked in git, your juggling session data persists locally. To backup or share session data:
+
+```bash
+# Backup your database
+cp hub/juggling_data.db ~/backups/juggling_data_$(date +%Y%m%d).db
+
+# View session statistics
+sqlite3 hub/juggling_data.db "SELECT session_id, start_time, total_frames, total_balls FROM sessions;"
+```
+
+**Last Updated:** 2025-09-22 10:29:00 UTC

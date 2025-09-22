@@ -73,6 +73,7 @@ private:
     std::atomic<bool> camera_running_;
     std::atomic<bool> ir_projector_active_;
     CameraIntrinsics camera_intrinsics_; // Store camera intrinsics
+    cv::Mat last_depth_frame_; // Cache for calibration
     
     // Camera configuration parameters
     uint32_t camera_width_;

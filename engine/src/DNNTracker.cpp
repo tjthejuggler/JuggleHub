@@ -48,264 +48,279 @@ DNNTracker::DNNTracker(const std::string& model_path, const std::string& device_
     infer_request = compiled_model.create_infer_request();
     std::cout << "Model loaded successfully." << std::endl;
     reinitialize_tracker();
+    initialize_logical_trackers();
     last_update_time_ = std::chrono::steady_clock::now();
 }
 
 DNNTracker::~DNNTracker() {}
+
+void DNNTracker::initialize_logical_trackers() {
+    logical_ball_trackers_.clear();
+    for (int i = 0; i < NUM_BALLS; ++i) {
+        logical_ball_trackers_.emplace_back(i, "ball");
+    }
+
+    logical_hand_trackers_.clear();
+    for (int i = 0; i < NUM_HANDS; ++i) {
+        logical_hand_trackers_.emplace_back(i + NUM_BALLS, "hand"); // Give hands unique IDs
+    }
+}
 
 std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
     auto current_time = std::chrono::steady_clock::now();
     float dt = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - last_update_time_).count();
     last_update_time_ = current_time;
 
-    // --- 1. PREDICTION ---
-    for (auto& pair : kalman_filters_) {
-        int track_id = pair.first;
-        if (track_class_ids_.count(track_id)) {
-            int class_id = track_class_ids_[track_id];
-            if (class_id == 0 || class_id == 1 || class_id == 2) { // Ball
-                pair.second.predict_ball(dt);
-            } else { // Hand
-                pair.second.predict(dt);
+    // --- 1. PREDICT ---
+    for (auto& ball : logical_ball_trackers_) {
+        if (ball.status != TrackerStatus::LOST) {
+            if (ball.is_in_freefall) {
+                ball.kf.predict_ball(dt);
+            } else {
+                ball.kf.predict(dt); // Constant velocity prediction if held or stationary
             }
-        } else {
-            pair.second.predict(dt);
         }
     }
+    for (auto& hand : logical_hand_trackers_) {
+        if (hand.status != TrackerStatus::LOST) hand.kf.predict(dt);
+    }
 
-    // --- 2. DETECTION ---
+    // --- 2. DETECT ---
     float scale_x, scale_y;
     cv::Mat preprocessed_image = preprocess(color_frame, scale_x, scale_y);
     ov::Tensor input_tensor(compiled_model.input().get_element_type(), compiled_model.input().get_shape(), preprocessed_image.data);
     infer_request.set_input_tensor(input_tensor);
     infer_request.infer();
     const ov::Tensor& output_tensor = infer_request.get_output_tensor();
-    std::vector<RawDetection> raw_detections;
-    std::vector<byte_track::Object> detections_for_bytetrack = postprocess(color_frame, depth_frame, intrinsics, output_tensor, scale_x, scale_y, raw_detections);
+    last_raw_detections_.clear();
+    std::vector<byte_track::Object> detections_for_bytetrack = postprocess(color_frame, depth_frame, intrinsics, output_tensor, scale_x, scale_y, last_raw_detections_);
 
-    // --- 3. TRACKING (via ByteTrack) ---
-    std::vector<std::shared_ptr<byte_track::STrack>> tracks = tracker->update(detections_for_bytetrack);
+    // --- 3. TRACK (ByteTrack) ---
+    std::vector<std::shared_ptr<byte_track::STrack>> byte_tracks = tracker->update(detections_for_bytetrack);
 
-    std::vector<TrackedObject> tracked_objects;
-    std::set<int> active_track_ids;
-    std::set<int> associated_detection_indices;
+    // --- 4. ASSOCIATE Persistent Trackers with ByteTrack Tracks ---
+    std::set<int> matched_byte_track_ids;
+    
+    std::vector<PersistentTracker*> all_logical_trackers;
+    for(auto& ball : logical_ball_trackers_) all_logical_trackers.push_back(&ball);
+    for(auto& hand : logical_hand_trackers_) all_logical_trackers.push_back(&hand);
 
-    // --- 4. ASSOCIATION & UPDATE ---
-    for (const auto& track : tracks) {
-        int track_id = (int)track->getTrackId();
-        active_track_ids.insert(track_id);
-        const auto& track_rect = track->getRect();
-        int best_detection_idx = -1;
+    for(auto* tracker : all_logical_trackers) {
+        if (tracker->status == TrackerStatus::TRACKED) tracker->status = TrackerStatus::PREDICTED;
+        if (tracker->status != TrackerStatus::LOST) tracker->frames_since_seen++;
+    }
 
-        if (kalman_filters_.count(track_id)) {
-            // --- Logic for EXISTING tracks: Associate via 3D distance ---
-            float min_dist = 0.3f; // 30cm search radius
-            cv::Point3f predicted_pos;
-            auto state = kalman_filters_.at(track_id).get_position();
-            predicted_pos = cv::Point3f(state.x(), state.y(), state.z());
+    for (const auto& b_track : byte_tracks) {
+        int b_track_id = (int)b_track->getTrackId();
+        
+        const RawDetection* best_det = nullptr;
+        float best_iou = 0.0f;
+        for(const auto& det : last_raw_detections_){
+            byte_track::Rect<float> det_rect(det.box.x, det.box.y, det.box.width, det.box.height);
+            float iou = calculate_iou(b_track->getRect(), det_rect);
+            if(iou > best_iou){
+                best_iou = iou;
+                best_det = &det;
+            }
+        }
+        if (!best_det || best_det->world_pos.z < 0.2f || best_det->world_pos.z > 2.0f) continue;
 
-            for (int i = 0; i < raw_detections.size(); ++i) {
-                if (associated_detection_indices.count(i)) continue;
-                if (raw_detections[i].world_pos.z > 0) {
-                    float dist = calculate_distance(predicted_pos, raw_detections[i].world_pos);
+        PersistentTracker* best_match_tracker = nullptr;
+
+        for(auto* p_tracker : all_logical_trackers) {
+            if (p_tracker->last_seen_bytetrack_id == b_track_id && p_tracker->class_name == (best_det->class_id == 3 ? "hand" : "ball")) {
+                best_match_tracker = p_tracker;
+                break;
+            }
+        }
+        
+        if (!best_match_tracker) {
+            float min_dist = 0.5f; // Increased to 50 cm for more robust re-acquisition
+            for(auto* p_tracker : all_logical_trackers) {
+                if ((p_tracker->status == TrackerStatus::PREDICTED || p_tracker->status == TrackerStatus::OCCLUDED) && p_tracker->class_name == (best_det->class_id == 3 ? "hand" : "ball")) {
+                    p_tracker->update_from_kf();
+                    cv::Point3f predicted_pos(p_tracker->position.x(), p_tracker->position.y(), p_tracker->position.z());
+                    float dist = calculate_distance(predicted_pos, best_det->world_pos);
                     if (dist < min_dist) {
                         min_dist = dist;
-                        best_detection_idx = i;
+                        best_match_tracker = p_tracker;
                     }
                 }
             }
-            if (best_detection_idx != -1) {
-                const auto& matched_det = raw_detections[best_detection_idx];
-                kalman_filters_[track_id].update(KalmanFilter3D::MeasurementVector(matched_det.world_pos.x, matched_det.world_pos.y, matched_det.world_pos.z));
-                track_class_ids_[track_id] = matched_det.class_id;
-            }
-        } else {
-            // --- Logic for NEW tracks: Associate via 2D IoU to initialize ---
-            float best_iou = 0.5f;
-            for (int i = 0; i < raw_detections.size(); ++i) {
-                if (associated_detection_indices.count(i)) continue;
-                const auto& det_box = raw_detections[i].box;
-                byte_track::Rect<float> det_rect(det_box.x, det_box.y, det_box.width, det_box.height);
-                float iou = calculate_iou(track_rect, det_rect);
-                if (iou > best_iou) {
-                    best_iou = iou;
-                    best_detection_idx = i;
-                }
-            }
-            if (best_detection_idx != -1) {
-                const auto& matched_det = raw_detections[best_detection_idx];
-                kalman_filters_[track_id].init(KalmanFilter3D::MeasurementVector(matched_det.world_pos.x, matched_det.world_pos.y, matched_det.world_pos.z));
-                track_class_ids_[track_id] = matched_det.class_id;
+            if(best_match_tracker) {
+                std::cout << "Re-acquired predicted tracker " << best_match_tracker->logical_id << " with new bytetrack_id " << b_track_id << std::endl;
             }
         }
-
-        if (best_detection_idx != -1) {
-            associated_detection_indices.insert(best_detection_idx);
-        }
-
-        // Create the TrackedObject with the smoothed, filtered position
-        auto filtered_state = kalman_filters_[track_id].get_position();
-        cv::Point3f filtered_pos(filtered_state.x(), filtered_state.y(), filtered_state.z());
         
-        // If this ball is held, overwrite its position with the hand's position.
-        if (held_ball_states_.count(track_id)) {
-            int hand_id = held_ball_states_[track_id];
-            if (kalman_filters_.count(hand_id)) {
-                auto hand_state = kalman_filters_[hand_id].get_position();
-                filtered_pos.x = hand_state.x();
-                filtered_pos.y = hand_state.y();
-                filtered_pos.z = hand_state.z();
+        if (!best_match_tracker) {
+            for(auto* p_tracker : all_logical_trackers) {
+                 if (p_tracker->status == TrackerStatus::LOST && p_tracker->class_name == (best_det->class_id == 3 ? "hand" : "ball")) {
+                     best_match_tracker = p_tracker;
+                     best_match_tracker->kf.init(KalmanFilter3D::MeasurementVector(best_det->world_pos.x, best_det->world_pos.y, best_det->world_pos.z));
+                     break;
+                 }
             }
         }
 
-        int class_id = track_class_ids_.count(track_id) ? track_class_ids_[track_id] : -1;
-        std::string class_name = (class_id != -1 && class_id < class_names_.size()) ? class_names_[class_id] : "unknown";
+        if (best_match_tracker) {
+            best_match_tracker->kf.update(KalmanFilter3D::MeasurementVector(best_det->world_pos.x, best_det->world_pos.y, best_det->world_pos.z));
+            best_match_tracker->status = TrackerStatus::TRACKED;
+            best_match_tracker->box_2d = best_det->box;
+            best_match_tracker->frames_since_seen = 0;
+            best_match_tracker->last_seen_bytetrack_id = b_track_id;
+            best_match_tracker->parent_id = -1;
+            matched_byte_track_ids.insert(b_track_id);
+        }
+    }
 
-        tracked_objects.push_back({
-            cv::Rect_<float>(track->getRect().x(), track->getRect().y(), track->getRect().width(), track->getRect().height()),
-            filtered_pos,
-            track_id,
-            class_id,
-            class_name
+    // --- 5. MANAGE HEURISTICS ---
+    std::vector<RawDetection> hand_detections;
+    for(const auto& det : last_raw_detections_) if(det.class_id == 3) hand_detections.push_back(det);
+    manage_hand_tracks(hand_detections);
+    manage_ball_occlusion();
+
+    // --- 6. COMPILE FINAL RESULTS ---
+    std::vector<TrackedObject> final_tracked_objects;
+    for(auto* tracker : all_logical_trackers) {
+        if (tracker->status == TrackerStatus::LOST) continue;
+        
+        tracker->update_from_kf();
+        auto pos = tracker->position;
+
+        final_tracked_objects.push_back({
+            tracker->box_2d,
+            cv::Point3f(pos.x(), pos.y(), pos.z()),
+            tracker->last_seen_bytetrack_id,
+            -1, // class id
+            tracker->class_name,
+            tracker->status,
+            tracker->logical_id,
+            tracker->is_left_hand
         });
     }
-    
-    // --- 5. CLEANUP ---
-    std::vector<int> tracks_to_remove;
-    for (const auto& pair : kalman_filters_) {
-        if (active_track_ids.find(pair.first) == active_track_ids.end()) {
-            tracks_to_remove.push_back(pair.first);
-        }
-    }
-    for (int id : tracks_to_remove) {
-        kalman_filters_.erase(id);
-        track_class_ids_.erase(id);
-    }
 
-    manage_hand_tracks(tracked_objects, raw_detections);
-    manage_ball_occlusion(tracked_objects);
-
-    return {tracked_objects, raw_detections};
+    return {final_tracked_objects, last_raw_detections_};
 }
 
-void DNNTracker::manage_hand_tracks(std::vector<TrackedObject>& tracks, const std::vector<RawDetection>& raw_detections) {
-    // 1. Filter all raw detections to find only hands.
-    std::vector<RawDetection> hand_detections;
-    for (const auto& det : raw_detections) {
-        if (det.class_id == 3) { // Assuming class_id 3 is "hand"
-            hand_detections.push_back(det);
-        }
+
+void DNNTracker::manage_hand_tracks(const std::vector<RawDetection>& hand_detections) {
+    // This logic is now stateful. It tries to maintain left/right assignment.
+    PersistentTracker* left_hand = nullptr;
+    PersistentTracker* right_hand = nullptr;
+    for(auto& hand : logical_hand_trackers_) {
+        if (hand.is_left_hand) left_hand = &hand;
+        else right_hand = &hand;
     }
 
-    // 2. Sort hand detections by confidence.
-    std::sort(hand_detections.begin(), hand_detections.end(), [](const RawDetection& a, const RawDetection& b) {
-        return a.confidence > b.confidence;
-    });
-
-    // 3. Identify the top two hand candidates.
-    std::vector<RawDetection> top_hands;
-    if (hand_detections.size() > 0) top_hands.push_back(hand_detections[0]);
-    if (hand_detections.size() > 1) top_hands.push_back(hand_detections[1]);
-
-    // 4. Identify the final track IDs for left and right hands.
-    int current_left_id = -1;
-    int current_right_id = -1;
-
-    if (top_hands.size() == 1) {
-        // If one hand, find its track and decide if it's left or right based on position.
-        // For now, let's just assign it to the closest existing hand track or make a new one.
-        // This logic will be more robust later.
-        // Find the track associated with this detection.
-        for(const auto& track : tracks) {
-            if (track.box.contains(cv::Point2f(top_hands[0].box.x + top_hands[0].box.width / 2, top_hands[0].box.y + top_hands[0].box.height / 2))) {
-                if (top_hands[0].box.x < 320) { // rough center screen split
-                    current_left_id = track.id;
-                } else {
-                    current_right_id = track.id;
-                }
-                break;
-            }
-        }
-    } else if (top_hands.size() == 2) {
-        // Determine which is left and which is right.
-        RawDetection& hand1 = top_hands[0];
-        RawDetection& hand2 = top_hands[1];
-        RawDetection* left_hand_det = (hand1.box.x < hand2.box.x) ? &hand1 : &hand2;
-        RawDetection* right_hand_det = (hand1.box.x < hand2.box.x) ? &hand2 : &hand1;
-
-        for(const auto& track : tracks) {
-            if (track.box.contains(cv::Point2f(left_hand_det->box.x + left_hand_det->box.width / 2, left_hand_det->box.y + left_hand_det->box.height / 2))) {
-                current_left_id = track.id;
-            }
-            if (track.box.contains(cv::Point2f(right_hand_det->box.x + right_hand_det->box.width / 2, right_hand_det->box.y + right_hand_det->box.height / 2))) {
-                current_right_id = track.id;
-            }
-        }
+    // Simple assignment based on x-coordinate for now if both are visible
+    if (logical_hand_trackers_[0].status == TrackerStatus::TRACKED && logical_hand_trackers_[1].status == TrackerStatus::TRACKED) {
+         if (logical_hand_trackers_[0].position.x() < logical_hand_trackers_[1].position.x()) {
+            logical_hand_trackers_[0].is_left_hand = true;
+            logical_hand_trackers_[1].is_left_hand = false;
+         } else {
+            logical_hand_trackers_[0].is_left_hand = false;
+            logical_hand_trackers_[1].is_left_hand = true;
+         }
     }
-    
-    left_hand_track_id_ = current_left_id;
-    right_hand_track_id_ = current_right_id;
-
-    // 5. Cull any other tracks that are incorrectly classified as hands.
-    std::vector<TrackedObject> final_tracks;
-    for (const auto& track : tracks) {
-        if (track.class_id == 3) { // It's a hand
-            if (track.id == left_hand_track_id_ || track.id == right_hand_track_id_) {
-                final_tracks.push_back(track);
-            }
-        } else { // Not a hand, keep it
-            final_tracks.push_back(track);
-        }
-    }
-    tracks = final_tracks;
 }
 
-void DNNTracker::manage_ball_occlusion(std::vector<TrackedObject>& tracks) {
-    // Logic to determine if a ball is "in hand"
-    const float occlusion_threshold = 0.1f; // 10cm distance threshold
-    std::set<int> balls_to_remove_from_occlusion;
 
-    // First, check if any currently held balls should be released.
-    for (auto const& [ball_id, hand_id] : held_ball_states_) {
-        bool ball_is_visible = false;
-        for (const auto& track : tracks) {
-            if (track.id == ball_id) {
-                ball_is_visible = true;
-                break;
+void DNNTracker::manage_ball_occlusion() {
+    const float CATCH_THRESHOLD = 0.15f; // 15cm distance threshold for a catch
+    const float THROW_THRESHOLD = 0.20f; // 20cm distance threshold for a throw
+
+    PersistentTracker* left_hand = nullptr;
+    PersistentTracker* right_hand = nullptr;
+    for(auto& hand : logical_hand_trackers_) {
+        if (hand.is_left_hand) left_hand = &hand;
+        else right_hand = &hand;
+    }
+
+    for (auto& ball : logical_ball_trackers_) {
+        // --- CATCH LOGIC ---
+        // A predicted (unseen) ball is considered caught if it gets close to a tracked hand.
+        if (ball.status == TrackerStatus::PREDICTED) {
+            ball.update_from_kf();
+            cv::Point3f predicted_ball_pos(ball.position.x(), ball.position.y(), ball.position.z());
+            
+            auto check_catch = [&](PersistentTracker* hand) {
+                if (hand && hand->status == TrackerStatus::TRACKED) {
+                    hand->update_from_kf();
+                    cv::Point3f hand_pos(hand->position.x(), hand->position.y(), hand->position.z());
+                    if (calculate_distance(predicted_ball_pos, hand_pos) < CATCH_THRESHOLD) {
+                        ball.status = TrackerStatus::OCCLUDED;
+                        ball.parent_id = hand->logical_id;
+                        ball.is_in_freefall = false; // The ball has been caught, stop gravity.
+                        // Snap ball position and velocity to the hand's state
+                        ball.position = hand->position;
+                        KalmanFilter3D::StateVector hand_state = hand->kf.get_state();
+                        KalmanFilter3D::StateVector& ball_state = ball.kf.get_state();
+                        ball_state.tail<3>() = hand_state.tail<3>();
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            if (check_catch(left_hand)) continue;
+            check_catch(right_hand);
+        }
+
+        // --- THROW LOGIC ---
+        // An occluded ball is considered thrown if it becomes tracked again far from its parent hand.
+        if (ball.status == TrackerStatus::TRACKED && ball.parent_id != -1) {
+             PersistentTracker* parent_hand = nullptr;
+             for(auto& hand : logical_hand_trackers_) {
+                 if(hand.logical_id == ball.parent_id) {
+                     parent_hand = &hand;
+                     break;
+                 }
+             }
+
+            if (parent_hand && parent_hand->status == TrackerStatus::TRACKED) {
+                ball.update_from_kf();
+                parent_hand->update_from_kf();
+                cv::Point3f ball_pos(ball.position.x(), ball.position.y(), ball.position.z());
+                cv::Point3f hand_pos(parent_hand->position.x(), parent_hand->position.y(), parent_hand->position.z());
+
+                if (calculate_distance(ball_pos, hand_pos) > THROW_THRESHOLD) {
+                    ball.is_in_freefall = true; // The ball has been thrown, start gravity.
+                    ball.parent_id = -1; // It is no longer associated with the hand.
+                }
+            } else {
+                // If the parent hand is lost, the ball is also considered thrown.
+                ball.is_in_freefall = true;
+                ball.parent_id = -1;
             }
         }
-        if (ball_is_visible) {
-            balls_to_remove_from_occlusion.insert(ball_id);
+    }
+}
+
+void DNNTracker::calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
+    float min_dist = 20.0f; // 20 pixel search radius
+    const RawDetection* closest_det = nullptr;
+
+    for(const auto& det : last_raw_detections_) {
+        cv::Point2f center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
+        float dist = cv::norm(pixel_coords - center);
+        if (dist < min_dist) {
+            min_dist = dist;
+            closest_det = &det;
         }
     }
 
-    for (int ball_id : balls_to_remove_from_occlusion) {
-        held_ball_states_.erase(ball_id);
-    }
-
-    // Next, check for new occlusions.
-    for (const auto& track : tracks) {
-        if (track.class_id >= 0 && track.class_id <= 2) { // It's a ball
-            if (held_ball_states_.count(track.id)) continue; // Already handled
-
-            cv::Point3f ball_pos = track.world_pos;
-            
-            // Check against left hand
-            if (left_hand_track_id_ != -1 && kalman_filters_.count(left_hand_track_id_)) {
-                auto hand_state = kalman_filters_[left_hand_track_id_].get_position();
-                cv::Point3f hand_pos(hand_state.x(), hand_state.y(), hand_state.z());
-                if (calculate_distance(ball_pos, hand_pos) < occlusion_threshold) {
-                    held_ball_states_[track.id] = left_hand_track_id_;
+    if (closest_det) {
+        // Find the logical tracker
+        for (auto& tracker : logical_ball_trackers_) {
+            if (tracker.logical_id == logical_id) {
+                if (closest_det->world_pos.z > 0.2 && closest_det->world_pos.z < 2.0) {
+                     tracker.kf.init(KalmanFilter3D::MeasurementVector(closest_det->world_pos.x, closest_det->world_pos.y, closest_det->world_pos.z));
+                     tracker.status = TrackerStatus::TRACKED;
+                     tracker.frames_since_seen = 0;
+                     tracker.is_in_freefall = false; // When calibrating, assume it's held/stationary.
+                     std::cout << "Calibrated Ball " << logical_id << " at " << closest_det->world_pos << std::endl;
                 }
-            }
-            
-            // Check against right hand
-            if (right_hand_track_id_ != -1 && kalman_filters_.count(right_hand_track_id_)) {
-                auto hand_state = kalman_filters_[right_hand_track_id_].get_position();
-                cv::Point3f hand_pos(hand_state.x(), hand_state.y(), hand_state.z());
-                if (calculate_distance(ball_pos, hand_pos) < occlusion_threshold) {
-                    held_ball_states_[track.id] = right_hand_track_id_;
-                }
+                return;
             }
         }
     }

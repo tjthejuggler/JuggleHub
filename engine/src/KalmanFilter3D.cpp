@@ -19,12 +19,12 @@ KalmanFilter3D::KalmanFilter3D() {
 
     // Covariance of the process noise
     // This needs tuning. A higher value means the model is less certain.
-    Q_ = Eigen::Matrix<float, 6, 6>::Identity();
-    Q_.bottomRightCorner<3, 3>() *= 0.1; // Lower uncertainty for velocity
-
+    Q_ = Eigen::Matrix<float, 6, 6>::Identity() * 0.01; // Start with low process noise
+    Q_.topLeftCorner<3, 3>() *= 10.0; // Higher uncertainty for position
+    
     // Covariance of the measurement noise
-    // This should be based on the sensor's accuracy.
-    R_ = Eigen::Matrix<float, 3, 3>::Identity() * 0.1;
+    // A higher value smooths the output by trusting the noisy measurement less.
+    R_ = Eigen::Matrix<float, 3, 3>::Identity() * 5.0;
 
     I_ = Eigen::Matrix<float, 6, 6>::Identity();
 }
@@ -65,14 +65,15 @@ void KalmanFilter3D::predict_ball(float dt, float gravity) {
     B.setZero();
     B(4) = 0.5f * gravity * dt * dt; // y = y_prev + vy*dt + 0.5*g*dt^2
     
-    StateVector u;
-    u.setZero();
-    u(4) = gravity * dt; // Change in velocity due to gravity
+    // In many camera coordinate systems, the Y axis points DOWN.
+    // Therefore, a positive gravity value should be used to pull objects down.
+    float effective_gravity = std::abs(gravity);
 
-    // Predict the next state
+    // Predict the next state based on constant velocity
     x_ = F_ * x_;
-    x_(4) += u(4); // Apply gravitational acceleration to vy
-    x_(1) += 0.5 * u(4) * dt; // Apply gravitational acceleration to y
+    // Apply acceleration due to gravity on the Y-axis velocity and position
+    x_(1) += x_(4) * dt + 0.5 * effective_gravity * dt * dt; // y = y_prev + vy*dt + 0.5*g*dt^2
+    x_(4) += effective_gravity * dt;                        // vy = vy_prev + g*dt
 
     P_ = F_ * P_ * F_.transpose() + Q_;
 }
@@ -101,6 +102,10 @@ void KalmanFilter3D::update(const MeasurementVector& measurement) {
 }
 
 KalmanFilter3D::StateVector KalmanFilter3D::get_state() const {
+    return x_;
+}
+
+KalmanFilter3D::StateVector& KalmanFilter3D::get_state() {
     return x_;
 }
 

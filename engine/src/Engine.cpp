@@ -113,6 +113,7 @@ void Engine::run() {
 
         cv::Mat color_image(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
         cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
+        last_depth_frame_ = depth_image.clone();
         
         // Add to frame buffer
         {
@@ -167,38 +168,52 @@ void Engine::run() {
             // ... (code to populate frame_data from detections)
         }
 
-        // Get the held ball states from the tracker.
-        const auto& held_ball_states = dnn_tracker_->get_held_ball_states();
+        // Helper to map our internal status to the protobuf enum
+        auto to_proto_status = [](TrackerStatus status) {
+            switch (status) {
+                case TrackerStatus::TRACKED: return juggler::v1::Ball::Status::Ball_Status_TRACKED;
+                case TrackerStatus::PREDICTED: return juggler::v1::Ball::Status::Ball_Status_PREDICTED;
+                case TrackerStatus::OCCLUDED: return juggler::v1::Ball::Status::Ball_Status_OCCLUDED;
+                default: return juggler::v1::Ball::Status::Ball_Status_PREDICTED; // Default case
+            }
+        };
 
         for (const auto& obj : tracked_objects) {
-            // The 3D position is now calculated inside the DNNTracker, so we just copy it.
-            if (obj.world_pos.z > 0) { // Only process objects with valid depth
+             if (obj.world_pos.z <= 0 && obj.status != TrackerStatus::OCCLUDED) continue;
+
+            if (obj.class_name == "ball") {
                 auto* ball = frame_data.add_balls();
                 ball->set_id(obj.id);
-                
-                // Set the is_held status.
-                ball->set_is_held(held_ball_states.count(obj.id));
+                ball->set_logical_id(obj.logical_id);
+                ball->set_status(to_proto_status(obj.status));
 
                 auto* pos = ball->mutable_position();
                 pos->set_x(obj.world_pos.x);
                 pos->set_y(obj.world_pos.y);
                 pos->set_z(obj.world_pos.z);
 
-                // Populate the new bounding box field
                 auto* bbox = ball->mutable_bounding_box_2d();
                 bbox->set_x(obj.box.x);
                 bbox->set_y(obj.box.y);
                 bbox->set_width(obj.box.width);
                 bbox->set_height(obj.box.height);
 
-                // Set class name for the tracked ball
                 ball->set_class_name(obj.class_name);
-
-                // Project the 3D position to 2D and populate the new field.
+                
                 cv::Point2f projected_pos = DNNTracker::project_3d_to_2d(obj.world_pos, camera_intrinsics_);
                 auto* proj_pos_2d = ball->mutable_projected_pos_2d();
                 proj_pos_2d->set_x(projected_pos.x);
                 proj_pos_2d->set_y(projected_pos.y);
+
+            } else if (obj.class_name == "hand") {
+                auto* hand = frame_data.add_hands();
+                // For now, just sending position and side.
+                auto* pos = hand->mutable_position_3d();
+                pos->set_x(obj.world_pos.x);
+                pos->set_y(obj.world_pos.y);
+                pos->set_z(obj.world_pos.z);
+                hand->set_is_visible(obj.status == TrackerStatus::TRACKED);
+                hand->set_side(obj.is_left ? "left" : "right");
             }
         }
 
@@ -316,6 +331,16 @@ void Engine::processCommands() {
                         if (verbose_) std::cout << "[LOG] Calling startCamera() with current settings." << std::endl;
                         startCamera();
                         response.set_message("Camera started with current settings");
+                    }
+                    break;
+                case juggler::v1::CommandRequest::CALIBRATE_OBJECT:
+                    if (dnn_tracker_ && !last_depth_frame_.empty()) {
+                        cv::Point2f pixel_coords(command.calibration_pixel_pos().x(), command.calibration_pixel_pos().y());
+                        dnn_tracker_->calibrate_object(command.logical_id_to_calibrate(), pixel_coords, last_depth_frame_, camera_intrinsics_);
+                        response.set_message("Calibration command sent to tracker.");
+                    } else {
+                        response.set_success(false);
+                        response.set_message("Tracker not ready for calibration.");
                     }
                     break;
                 default:

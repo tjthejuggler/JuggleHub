@@ -484,6 +484,7 @@ if PYQT_AVAILABLE:
             self.udp_client = UdpClient()
             self.is_continuous_recording = False
             self.tracker_history = {} # For drawing tails
+            self.calibrating_id = -1 # ID of the ball we are currently calibrating
             
             # Signal for thread-safe updates
             self.signal_emitter = FrameDataSignal()
@@ -585,23 +586,34 @@ if PYQT_AVAILABLE:
             self.video_view = QGraphicsView(self.video_scene)
             self.video_pixmap_item = QGraphicsPixmapItem()
             self.video_scene.addItem(self.video_pixmap_item)
+            self.video_view.mousePressEvent = self.video_view_clicked
             self.video_layout.addWidget(self.video_view)
+
+            # --- Calibration Controls ---
+            calib_layout = QHBoxLayout()
+            self.calib_status_label = QLabel("Click a button to start calibration.")
+            calib_layout.addWidget(self.calib_status_label)
+            for i in range(3): # Assuming 3 balls
+                btn = QPushButton(f"Calibrate Ball {i}")
+                btn.clicked.connect(lambda checked, b_id=i: self.start_calibration(b_id))
+                calib_layout.addWidget(btn)
+            self.video_layout.addLayout(calib_layout)
 
             # --- NEW: Visualization Toggles ---
             toggles_layout = QHBoxLayout()
-            self.show_raw_detections_toggle = QPushButton("Raw Detections")
+            self.show_raw_detections_toggle = QPushButton("YOLO Detections")
             self.show_raw_detections_toggle.setCheckable(True)
             self.show_raw_detections_toggle.setChecked(False)
             self.show_raw_detections_toggle.clicked.connect(self.toggle_overlays)
             toggles_layout.addWidget(self.show_raw_detections_toggle)
 
-            self.show_tracked_boxes_toggle = QPushButton("Tracked Boxes")
+            self.show_tracked_boxes_toggle = QPushButton("ByteTrack Boxes")
             self.show_tracked_boxes_toggle.setCheckable(True)
             self.show_tracked_boxes_toggle.setChecked(False)
             self.show_tracked_boxes_toggle.clicked.connect(self.toggle_overlays)
             toggles_layout.addWidget(self.show_tracked_boxes_toggle)
 
-            self.show_3d_trackers_toggle = QPushButton("3D Trackers")
+            self.show_3d_trackers_toggle = QPushButton("Logical Trackers")
             self.show_3d_trackers_toggle.setCheckable(True)
             self.show_3d_trackers_toggle.setChecked(True) # Default to on
             self.show_3d_trackers_toggle.clicked.connect(self.toggle_overlays)
@@ -729,19 +741,29 @@ if PYQT_AVAILABLE:
             ball_count = len(frame_data.balls)
             self.ball_count_label.setText(f"Balls detected: {ball_count}")
             ball_text = ""
+            # Define a mapping from enum to string for display
+            status_map = {
+                juggler_pb2.Ball.TRACKED: "Tracked",
+                juggler_pb2.Ball.PREDICTED: "Predicted",
+                juggler_pb2.Ball.OCCLUDED: "Occluded",
+            }
+
             for ball in frame_data.balls:
-                class_name = f" ({ball.class_name})" if ball.class_name else ""
-                ball_text += f"ID {ball.id}{class_name}: 3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
+                status_str = status_map.get(ball.status, "Unknown")
+                ball_text += f"Ball {ball.logical_id} ({status_str}): 3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
                 
-                # Update tracker history
-                if ball.id not in self.tracker_history:
-                    self.tracker_history[ball.id] = []
-                self.tracker_history[ball.id].append((ball.projected_pos_2d.x, ball.projected_pos_2d.y))
+                # Update tracker history using logical_id
+                if ball.logical_id not in self.tracker_history:
+                    self.tracker_history[ball.logical_id] = []
+                
+                # Only add to history if the point is valid
+                if ball.projected_pos_2d.x > 0 and ball.projected_pos_2d.y > 0:
+                    self.tracker_history[ball.logical_id].append((ball.projected_pos_2d.x, ball.projected_pos_2d.y))
                 
                 # Prune history to tail length
                 max_len = self.tail_length_slider.value()
-                while len(self.tracker_history[ball.id]) > max_len:
-                    self.tracker_history[ball.id].pop(0)
+                while len(self.tracker_history[ball.logical_id]) > max_len:
+                    self.tracker_history[ball.logical_id].pop(0)
 
             self.ball_list.setPlainText(ball_text)
 
@@ -802,46 +824,56 @@ if PYQT_AVAILABLE:
             pixmap = QPixmap.fromImage(image)
             painter = QPainter(pixmap)
             
-            # --- Draw Raw Detections ---
+            # --- Draw YOLO Detections ---
             if self.show_raw_detections_toggle.isChecked():
                 painter.setPen(QPen(QColor(255, 0, 0, 100), 2)) # Semi-transparent red
                 for det in frame_data.raw_detections:
                     painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
 
-            # --- Draw Tracked Boxes (from ByteTrack) ---
+            # --- Draw ByteTrack Boxes ---
             if self.show_tracked_boxes_toggle.isChecked():
                 painter.setPen(QPen(QColor(255, 165, 0, 150), 2, Qt.PenStyle.DashLine)) # Orange dash
                 for obj in frame_data.balls:
-                    bbox = obj.bounding_box_2d
-                    painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
+                    if obj.status == juggler_pb2.Ball.TRACKED:
+                        bbox = obj.bounding_box_2d
+                        painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
 
-            # --- Draw 3D Trackers (Kalman Filtered) ---
+            # --- Draw Logical Trackers (Kalman Filtered) ---
             if self.show_3d_trackers_toggle.isChecked():
                 colors = [QColor(255, 87, 34), QColor(255, 193, 7), QColor(139, 195, 74),
                           QColor(0, 188, 212), QColor(3, 169, 244), QColor(63, 81, 181)]
                 for obj in frame_data.balls:
-                    bbox = obj.bounding_box_2d
-                    center_x, center_y = int(bbox.x + bbox.width / 2), int(bbox.y + bbox.height / 2)
+                    # Use the projected 3D point for the center, which is more stable
+                    center_x, center_y = int(obj.projected_pos_2d.x), int(obj.projected_pos_2d.y)
+                    
                     # Get the average color from the bounding box for color matching.
                     color = self.get_average_color(image, obj.bounding_box_2d)
                     
-                    if obj.is_held:
-                        # Draw a hollow circle for held balls.
-                        painter.setBrush(Qt.BrushStyle.NoBrush)
-                        painter.setPen(QPen(color, 3)) # Thicker pen
-                        painter.drawEllipse(center_x - 10, center_y - 10, 20, 20) # Larger circle
-                    else:
-                        # Draw a large, solid circle for airborne balls.
+                    radius = 12
+                    
+                    # Render based on the new status field
+                    if obj.status == juggler_pb2.Ball.TRACKED:
                         painter.setBrush(QBrush(color))
-                        painter.setPen(QPen(QColor(0,0,0,100), 1)) # Add a subtle border
-                        painter.drawEllipse(center_x - 10, center_y - 10, 20, 20) # Larger circle
+                        painter.setPen(QPen(QColor(0,0,0,100), 1))
+                    elif obj.status == juggler_pb2.Ball.OCCLUDED:
+                        painter.setBrush(Qt.BrushStyle.NoBrush)
+                        pen = QPen(color, 3)
+                        pen.setStyle(Qt.PenStyle.DashLine)
+                        painter.setPen(pen)
+                    elif obj.status == juggler_pb2.Ball.PREDICTED:
+                        transparent_color = QColor(color)
+                        transparent_color.setAlpha(100) # Semi-transparent
+                        painter.setBrush(QBrush(transparent_color))
+                        painter.setPen(QPen(QColor(0,0,0,50), 1))
+
+                    painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
                     
                     painter.setPen(QPen(QColor(255, 255, 255)))
                     painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                    label = f"ID: {obj.id}"
-                    pos_label = f"({obj.position.x:.2f}, {obj.position.y:.2f}, {obj.position.z:.2f})m"
-                    painter.drawText(center_x + 10, center_y, label)
-                    painter.drawText(center_x + 10, center_y + 15, pos_label)
+                    label = f"Ball {obj.logical_id}"
+                    pos_label = f"({obj.position.z:.2f}m)" # Show depth for simplicity
+                    painter.drawText(center_x + 15, center_y, label)
+                    painter.drawText(center_x + 15, center_y + 15, pos_label)
 
             # --- Draw Hand Trackers ---
             painter.setPen(QPen(QColor(3, 169, 244), 4)) # Bright blue, thick line
@@ -855,7 +887,7 @@ if PYQT_AVAILABLE:
                 # Draw hand side label
                 painter.setPen(QPen(QColor(255, 255, 255)))
                 painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-                side_label = "L" if hand.side == juggler_pb2.Hand.LEFT else "R"
+                side_label = "L" if hand.side == "left" else "R"
                 painter.drawText(center_x - 5, center_y + 5, side_label)
 
 
@@ -864,7 +896,7 @@ if PYQT_AVAILABLE:
                 for ball_id, history in self.tracker_history.items():
                     if len(history) > 1:
                         # Find the corresponding ball to get its color
-                        ball_for_tail = next((b for b in frame_data.balls if b.id == ball_id), None)
+                        ball_for_tail = next((b for b in frame_data.balls if b.logical_id == ball_id), None)
                         if ball_for_tail:
                             color = self.get_average_color(image, ball_for_tail.bounding_box_2d)
                             pen = QPen(color, 2)
@@ -976,6 +1008,39 @@ if PYQT_AVAILABLE:
         
         def disable_top_screen(self): self.hub_instance.screen_controller.disable_top_screen()
         def disable_bottom_screen(self): self.hub_instance.screen_controller.disable_bottom_screen()
+
+        def start_calibration(self, ball_id: int):
+            self.calibrating_id = ball_id
+            self.calib_status_label.setText(f"Click on Ball {ball_id} in the video feed...")
+            self.log_message(f"Waiting for user to click on Ball {ball_id} to calibrate.")
+
+        def video_view_clicked(self, event):
+            if self.calibrating_id != -1:
+                scene_pos = self.video_view.mapToScene(event.pos())
+                pixmap_item = self.video_pixmap_item
+                
+                # Check if the click is within the pixmap bounds
+                if pixmap_item.pixmap() and pixmap_item.sceneBoundingRect().contains(scene_pos):
+                    # Transform scene coordinates to pixmap (image) coordinates
+                    img_pos = pixmap_item.mapFromScene(scene_pos)
+                    
+                    self.log_message(f"Calibrating Ball {self.calibrating_id} at pixel ({img_pos.x():.1f}, {img_pos.y():.1f})")
+
+                    command = juggler_pb2.CommandRequest(
+                        type=juggler_pb2.CommandRequest.CommandType.CALIBRATE_OBJECT,
+                        logical_id_to_calibrate=self.calibrating_id,
+                        calibration_pixel_pos=juggler_pb2.Vector2(x=img_pos.x(), y=img_pos.y())
+                    )
+                    try:
+                        response = self.zmq_client.send_command(command)
+                        self.log_message(f"✅ Calibration command sent: {response.message}")
+                    except Exception as e:
+                        self.log_message(f"❌ Error sending calibration command: {e}")
+
+                    self.calibrating_id = -1
+                    self.calib_status_label.setText("Click a button to start calibration.")
+            # Call original event handler
+            QGraphicsView.mousePressEvent(self.video_view, event)
 
 class JuggleHubUI:
     def __init__(self, config: dict, zmq_client: Optional['ZMQClient'] = None, hub_instance=None):

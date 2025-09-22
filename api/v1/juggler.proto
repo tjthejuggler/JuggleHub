@@ -40,12 +40,20 @@ message BoundingBox2D {
 }
 
 message Ball {
-  int32 id = 1;
+  int32 id = 1; // The raw bytetrack ID, can change. May be -1 if predicted.
   Vector3 position = 2;
   BoundingBox2D bounding_box_2d = 3; // For video overlay
   string class_name = 4;
-  bool is_held = 5;
+
+  enum Status {
+    TRACKED = 0;   // Directly observed in this frame
+    PREDICTED = 1; // Position is a physics-based prediction
+    OCCLUDED = 2;  // Assumed to be held in a hand
+  }
+  Status status = 5;
+
   Vector2 projected_pos_2d = 6;
+  int32 logical_id = 7; // The persistent, logical ID of the ball (e.g., 0, 1, 2)
 }
 
 // Hand position and tracking
@@ -125,6 +133,7 @@ message CommandRequest {
     RESTART_WITH_CAMERA_SETTINGS = 8; // New command for camera settings
     CAMERA_STOP = 9; // Stop camera feed
     CAMERA_START = 10; // Start camera feed with settings
+    CALIBRATE_OBJECT = 11; // Force-set the position of a logical tracker
   }
   
   CommandType type = 1;
@@ -136,6 +145,10 @@ message CommandRequest {
   uint32 camera_width = 7;          // Camera resolution width
   uint32 camera_height = 8;         // Camera resolution height
   uint32 camera_fps = 9;            // Camera frame rate
+  
+  // For CALIBRATE_OBJECT
+  int32 logical_id_to_calibrate = 10;
+  Vector2 calibration_pixel_pos = 11;
 }
 
 message ColorCommand {

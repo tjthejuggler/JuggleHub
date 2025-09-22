@@ -25,6 +25,7 @@ public:
 
     // Get the current estimated state
     StateVector get_state() const;
+    StateVector& get_state(); // Non-const version to allow modification
     
     // Get just the position from the state
     Eigen::Vector3f get_position() const;

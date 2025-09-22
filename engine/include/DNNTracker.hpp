@@ -13,6 +13,7 @@
 // Local headers
 #include "ByteTrack/BYTETracker.h"
 #include "KalmanFilter3D.hpp"
+#include "PersistentTracker.hpp" // New persistent tracker data structure
 
 // Simple struct to hold camera intrinsics needed for deprojection
 struct CameraIntrinsics {
@@ -27,6 +28,9 @@ struct TrackedObject {
     int id;
     int class_id;
     std::string class_name;
+    TrackerStatus status; // The current state of the tracker (e.g., TRACKED, PREDICTED)
+    int logical_id;       // The persistent ID of the object
+    bool is_left;         // For hands, true if it's the left hand
 };
 
 struct RawDetection {
@@ -44,11 +48,13 @@ public:
     std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
 
     void update_setting(const std::string& key, const std::string& value);
-    const std::map<int, int>& get_held_ball_states() const { return held_ball_states_; };
+    void calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
+    const std::vector<PersistentTracker>& get_ball_trackers() const { return logical_ball_trackers_; }
     static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
 
 private:
     void reinitialize_tracker();
+    void initialize_logical_trackers();
 
     // --- Member Variables ---
     // Timing
@@ -59,10 +65,17 @@ private:
     ov::CompiledModel compiled_model;
     ov::InferRequest infer_request;
 
-    // Bytetrack & Kalman Filters
+    // Bytetrack
     std::unique_ptr<byte_track::BYTETracker> tracker;
-    std::map<int, KalmanFilter3D> kalman_filters_; // Map track ID to its own filter
-    std::map<int, int> track_class_ids_; // Map track ID to its class ID for model selection
+
+    // --- Persistent Logical Trackers ---
+    std::vector<PersistentTracker> logical_ball_trackers_;
+    std::vector<PersistentTracker> logical_hand_trackers_;
+    const int NUM_BALLS = 3; // Configurable number of balls
+    const int NUM_HANDS = 2; // Configurable number of hands
+
+    // --- State Caching ---
+    std::vector<RawDetection> last_raw_detections_;
 
     // Model & Preprocessing Parameters
     int input_width_ = 640;
@@ -80,16 +93,9 @@ private:
     const int num_classes_ = 4;
     const std::vector<std::string> class_names_ = {"led_on", "led_off", "dropped_ball", "hand"};
 
-    // --- Hand Tracking ---
-    int left_hand_track_id_ = -1;
-    int right_hand_track_id_ = -1;
-
-    // --- Ball Occlusion ---
-    std::map<int, int> held_ball_states_; // Map ball track ID -> hand track ID
-
     // --- Private Methods ---
-    void manage_hand_tracks(std::vector<TrackedObject>& tracks, const std::vector<RawDetection>& raw_detections);
-    void manage_ball_occlusion(std::vector<TrackedObject>& tracks);
+    void manage_hand_tracks(const std::vector<RawDetection>& hand_detections);
+    void manage_ball_occlusion();
     cv::Mat preprocess(const cv::Mat& frame, float& scale_x, float& scale_y);
     std::vector<byte_track::Object> postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<RawDetection>& raw_detections);
 };

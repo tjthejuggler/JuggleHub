@@ -1,3 +1,8 @@
+2025-09-22 18:49:31
+current bests(according to results):
+yolo11n - V2_3_lonely_hands
+yolo11s - V3_no_hands
+
 V1 - there was some mislabeled data
 V2_cleaned_more_blur - i fixed the mislabeled hands from V1 and i labelled some of the blurrier hands and balls
 V2_1_empty_hands - an extra 200ish images of empty hands, no juggling balls

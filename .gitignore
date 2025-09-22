@@ -35,6 +35,11 @@ recordings/
 *.mp4
 *.avi
 
+# Database files (runtime data)
+*.db
+*.db-shm
+*.db-wal
+
 # Configuration files (keep templates)
 *.json
 !*_template.json

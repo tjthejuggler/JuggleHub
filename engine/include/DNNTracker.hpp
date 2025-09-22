@@ -44,6 +44,7 @@ public:
     std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
 
     void update_setting(const std::string& key, const std::string& value);
+    const std::map<int, int>& get_held_ball_states() const { return held_ball_states_; };
 
 private:
     void reinitialize_tracker();
@@ -78,7 +79,16 @@ private:
     const int num_classes_ = 4;
     const std::vector<std::string> class_names_ = {"led_on", "led_off", "dropped_ball", "hand"};
 
+    // --- Hand Tracking ---
+    int left_hand_track_id_ = -1;
+    int right_hand_track_id_ = -1;
+
+    // --- Ball Occlusion ---
+    std::map<int, int> held_ball_states_; // Map ball track ID -> hand track ID
+
     // --- Private Methods ---
+    void manage_hand_tracks(std::vector<TrackedObject>& tracks, const std::vector<RawDetection>& raw_detections);
+    void manage_ball_occlusion(std::vector<TrackedObject>& tracks);
     cv::Mat preprocess(const cv::Mat& frame, float& scale_x, float& scale_y);
     std::vector<byte_track::Object> postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<RawDetection>& raw_detections);
 };

@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-09-22 10:29:00 UTC
+**Last Updated:** 2025-09-22 12:56:00 UTC
 
 ## 🎯 Overview
 
@@ -202,6 +202,7 @@ JuggleHub/
 
 ### Python Hub Features
 - **Real-time visualization** with PyQt6 GUI
+- **Enhanced Visualization**: Large, solid, color-matched ball trackers and thick, highly visible hand trackers for clear and intuitive visual feedback.
 - **Camera settings selection** with dropdown interface for easy configuration switching
 - **Live camera control** with stop/start functionality for seamless settings switching
 - **SQLite database logging** for session analysis (runtime data files are automatically ignored by git)
@@ -209,6 +210,10 @@ JuggleHub/
 - **Console mode** for headless operation
 - **Performance monitoring** and statistics
 - **Extensible architecture** for custom analysis
+
+### Heuristic Intelligence Layer
+- **Robust Hand Tracking**: Enforces a two-hand limit and maintains persistent left/right identity.
+- **Ball-in-Hand Occlusion Model**: Intelligently infers when a ball is held, linking its state to the corresponding hand to prevent track loss.
 
 ### API Features
 - **Type-safe communication** via Protocol Buffers

@@ -44,6 +44,7 @@ message Ball {
   Vector3 position = 2;
   BoundingBox2D bounding_box_2d = 3; // For video overlay
   string class_name = 4;
+  bool is_held = 5;
 }
 
 // Hand position and tracking

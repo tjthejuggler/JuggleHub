@@ -137,6 +137,18 @@ std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::upd
         // Create the TrackedObject with the smoothed, filtered position
         auto filtered_state = kalman_filters_[track_id].get_position();
         cv::Point3f filtered_pos(filtered_state.x(), filtered_state.y(), filtered_state.z());
+        
+        // If this ball is held, overwrite its position with the hand's position.
+        if (held_ball_states_.count(track_id)) {
+            int hand_id = held_ball_states_[track_id];
+            if (kalman_filters_.count(hand_id)) {
+                auto hand_state = kalman_filters_[hand_id].get_position();
+                filtered_pos.x = hand_state.x();
+                filtered_pos.y = hand_state.y();
+                filtered_pos.z = hand_state.z();
+            }
+        }
+
         int class_id = track_class_ids_.count(track_id) ? track_class_ids_[track_id] : -1;
         std::string class_name = (class_id != -1 && class_id < class_names_.size()) ? class_names_[class_id] : "unknown";
 
@@ -161,7 +173,133 @@ std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::upd
         track_class_ids_.erase(id);
     }
 
+    manage_hand_tracks(tracked_objects, raw_detections);
+    manage_ball_occlusion(tracked_objects);
+
     return {tracked_objects, raw_detections};
+}
+
+void DNNTracker::manage_hand_tracks(std::vector<TrackedObject>& tracks, const std::vector<RawDetection>& raw_detections) {
+    // 1. Filter all raw detections to find only hands.
+    std::vector<RawDetection> hand_detections;
+    for (const auto& det : raw_detections) {
+        if (det.class_id == 3) { // Assuming class_id 3 is "hand"
+            hand_detections.push_back(det);
+        }
+    }
+
+    // 2. Sort hand detections by confidence.
+    std::sort(hand_detections.begin(), hand_detections.end(), [](const RawDetection& a, const RawDetection& b) {
+        return a.confidence > b.confidence;
+    });
+
+    // 3. Identify the top two hand candidates.
+    std::vector<RawDetection> top_hands;
+    if (hand_detections.size() > 0) top_hands.push_back(hand_detections[0]);
+    if (hand_detections.size() > 1) top_hands.push_back(hand_detections[1]);
+
+    // 4. Identify the final track IDs for left and right hands.
+    int current_left_id = -1;
+    int current_right_id = -1;
+
+    if (top_hands.size() == 1) {
+        // If one hand, find its track and decide if it's left or right based on position.
+        // For now, let's just assign it to the closest existing hand track or make a new one.
+        // This logic will be more robust later.
+        // Find the track associated with this detection.
+        for(const auto& track : tracks) {
+            if (track.box.contains(cv::Point2f(top_hands[0].box.x + top_hands[0].box.width / 2, top_hands[0].box.y + top_hands[0].box.height / 2))) {
+                if (top_hands[0].box.x < 320) { // rough center screen split
+                    current_left_id = track.id;
+                } else {
+                    current_right_id = track.id;
+                }
+                break;
+            }
+        }
+    } else if (top_hands.size() == 2) {
+        // Determine which is left and which is right.
+        RawDetection& hand1 = top_hands[0];
+        RawDetection& hand2 = top_hands[1];
+        RawDetection* left_hand_det = (hand1.box.x < hand2.box.x) ? &hand1 : &hand2;
+        RawDetection* right_hand_det = (hand1.box.x < hand2.box.x) ? &hand2 : &hand1;
+
+        for(const auto& track : tracks) {
+            if (track.box.contains(cv::Point2f(left_hand_det->box.x + left_hand_det->box.width / 2, left_hand_det->box.y + left_hand_det->box.height / 2))) {
+                current_left_id = track.id;
+            }
+            if (track.box.contains(cv::Point2f(right_hand_det->box.x + right_hand_det->box.width / 2, right_hand_det->box.y + right_hand_det->box.height / 2))) {
+                current_right_id = track.id;
+            }
+        }
+    }
+    
+    left_hand_track_id_ = current_left_id;
+    right_hand_track_id_ = current_right_id;
+
+    // 5. Cull any other tracks that are incorrectly classified as hands.
+    std::vector<TrackedObject> final_tracks;
+    for (const auto& track : tracks) {
+        if (track.class_id == 3) { // It's a hand
+            if (track.id == left_hand_track_id_ || track.id == right_hand_track_id_) {
+                final_tracks.push_back(track);
+            }
+        } else { // Not a hand, keep it
+            final_tracks.push_back(track);
+        }
+    }
+    tracks = final_tracks;
+}
+
+void DNNTracker::manage_ball_occlusion(std::vector<TrackedObject>& tracks) {
+    // Logic to determine if a ball is "in hand"
+    const float occlusion_threshold = 0.1f; // 10cm distance threshold
+    std::set<int> balls_to_remove_from_occlusion;
+
+    // First, check if any currently held balls should be released.
+    for (auto const& [ball_id, hand_id] : held_ball_states_) {
+        bool ball_is_visible = false;
+        for (const auto& track : tracks) {
+            if (track.id == ball_id) {
+                ball_is_visible = true;
+                break;
+            }
+        }
+        if (ball_is_visible) {
+            balls_to_remove_from_occlusion.insert(ball_id);
+        }
+    }
+
+    for (int ball_id : balls_to_remove_from_occlusion) {
+        held_ball_states_.erase(ball_id);
+    }
+
+    // Next, check for new occlusions.
+    for (const auto& track : tracks) {
+        if (track.class_id >= 0 && track.class_id <= 2) { // It's a ball
+            if (held_ball_states_.count(track.id)) continue; // Already handled
+
+            cv::Point3f ball_pos = track.world_pos;
+            
+            // Check against left hand
+            if (left_hand_track_id_ != -1 && kalman_filters_.count(left_hand_track_id_)) {
+                auto hand_state = kalman_filters_[left_hand_track_id_].get_position();
+                cv::Point3f hand_pos(hand_state.x(), hand_state.y(), hand_state.z());
+                if (calculate_distance(ball_pos, hand_pos) < occlusion_threshold) {
+                    held_ball_states_[track.id] = left_hand_track_id_;
+                }
+            }
+            
+            // Check against right hand
+            if (right_hand_track_id_ != -1 && kalman_filters_.count(right_hand_track_id_)) {
+                auto hand_state = kalman_filters_[right_hand_track_id_].get_position();
+                cv::Point3f hand_pos(hand_state.x(), hand_state.y(), hand_state.z());
+                if (calculate_distance(ball_pos, hand_pos) < occlusion_threshold) {
+                    held_ball_states_[track.id] = right_hand_track_id_;
+                }
+            }
+        }
+    }
 }
 
 void DNNTracker::update_setting(const std::string& key, const std::string& value) {

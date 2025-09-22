@@ -792,11 +792,19 @@ if PYQT_AVAILABLE:
                 for obj in frame_data.balls:
                     bbox = obj.bounding_box_2d
                     center_x, center_y = int(bbox.x + bbox.width / 2), int(bbox.y + bbox.height / 2)
-                    color = colors[obj.id % len(colors)]
+                    # Get the average color from the bounding box for color matching.
+                    color = self.get_average_color(image, obj.bounding_box_2d)
                     
-                    painter.setBrush(QBrush(color))
-                    painter.setPen(Qt.PenStyle.NoPen)
-                    painter.drawEllipse(center_x - 5, center_y - 5, 10, 10)
+                    if obj.is_held:
+                        # Draw a hollow circle for held balls.
+                        painter.setBrush(Qt.BrushStyle.NoBrush)
+                        painter.setPen(QPen(color, 3)) # Thicker pen
+                        painter.drawEllipse(center_x - 10, center_y - 10, 20, 20) # Larger circle
+                    else:
+                        # Draw a large, solid circle for airborne balls.
+                        painter.setBrush(QBrush(color))
+                        painter.setPen(QPen(QColor(0,0,0,100), 1)) # Add a subtle border
+                        painter.drawEllipse(center_x - 10, center_y - 10, 20, 20) # Larger circle
                     
                     painter.setPen(QPen(QColor(255, 255, 255)))
                     painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
@@ -805,9 +813,54 @@ if PYQT_AVAILABLE:
                     painter.drawText(center_x + 10, center_y, label)
                     painter.drawText(center_x + 10, center_y + 15, pos_label)
 
+            # --- Draw Hand Trackers ---
+            painter.setPen(QPen(QColor(3, 169, 244), 4)) # Bright blue, thick line
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            for hand in frame_data.hands:
+                # Draw a large circle for high visibility
+                center_x, center_y = int(hand.position_2d.x), int(hand.position_2d.y)
+                radius = 20 # Large radius for visibility
+                painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
+                
+                # Draw hand side label
+                painter.setPen(QPen(QColor(255, 255, 255)))
+                painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+                side_label = "L" if hand.side == juggler_pb2.Hand.LEFT else "R"
+                painter.drawText(center_x - 5, center_y + 5, side_label)
+
+
             painter.end()
             self.video_pixmap_item.setPixmap(pixmap)
             self.video_view.fitInView(self.video_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+
+        def get_average_color(self, image: QImage, bbox: juggler_pb2.BoundingBox2D) -> QColor:
+            """Calculates the average color within a bounding box."""
+            x, y, w, h = int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height)
+            
+            # Clamp the bounding box to the image dimensions.
+            x = max(0, x)
+            y = max(0, y)
+            w = min(w, image.width() - x)
+            h = min(h, image.height() - y)
+
+            if w <= 0 or h <= 0:
+                return QColor(255, 255, 255) # Return white if the box is invalid.
+
+            total_r, total_g, total_b = 0, 0, 0
+            pixel_count = 0
+            
+            for i in range(x, x + w):
+                for j in range(y, y + h):
+                    pixel_color = image.pixelColor(i, j)
+                    total_r += pixel_color.red()
+                    total_g += pixel_color.green()
+                    total_b += pixel_color.blue()
+                    pixel_count += 1
+            
+            if pixel_count == 0:
+                return QColor(255, 255, 255) # Return white if no pixels were processed.
+
+            return QColor(total_r // pixel_count, total_g // pixel_count, total_b // pixel_count)
 
         def record_clip(self):
             self.log_message("Sending record command to engine...")

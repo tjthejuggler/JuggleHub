@@ -167,11 +167,18 @@ void Engine::run() {
             // ... (code to populate frame_data from detections)
         }
 
+        // Get the held ball states from the tracker.
+        const auto& held_ball_states = dnn_tracker_->get_held_ball_states();
+
         for (const auto& obj : tracked_objects) {
             // The 3D position is now calculated inside the DNNTracker, so we just copy it.
             if (obj.world_pos.z > 0) { // Only process objects with valid depth
                 auto* ball = frame_data.add_balls();
                 ball->set_id(obj.id);
+                
+                // Set the is_held status.
+                ball->set_is_held(held_ball_states.count(obj.id));
+
                 auto* pos = ball->mutable_position();
                 pos->set_x(obj.world_pos.x);
                 pos->set_y(obj.world_pos.y);

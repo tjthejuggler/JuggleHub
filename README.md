@@ -162,6 +162,15 @@ JuggleHub/
    ./scripts/run_hub.sh --use-venv --device AUTO
    ```
 
+4. **Selecting Model:**
+   ```bash
+   # Use yolo11s model
+   ./scripts/run_hub.sh --use-venv --model yolo11s
+   
+   # Use yolo11n model (default)
+   ./scripts/run_hub.sh --use-venv --model yolo11n
+   ```
+
 3. **Live Camera Settings Control:**
   
   Once the hub is running, you can dynamically change camera settings without restarting:
@@ -621,6 +630,9 @@ The engine supports various command-line options:
 
 # Enable hand tracking (if compiled with support)
 ./engine/build/juggle_engine --track-hands
+
+# Select a specific model (e.g., yolo11s)
+./engine/build/juggle_engine --use-dnn-tracker --model yolo11s
 
 # Combine DNN tracking with high performance
 ./engine/build/juggle_engine --use-dnn-tracker --high-fps

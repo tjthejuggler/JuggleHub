@@ -23,7 +23,7 @@ public:
         LEGACY
     };
 
-    Engine(const std::string& camera_settings_path, const std::string& device_name = "CPU", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
+    Engine(const std::string& camera_settings_path, const std::string& device_name = "CPU", const std::string& model_name = "yolo11n", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
     ~Engine();
 
     void run();

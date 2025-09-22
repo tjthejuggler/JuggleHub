@@ -105,6 +105,7 @@ DEBUG=false
 ZMQ_ENDPOINT="tcp://localhost:5555"
 CAMERA_SETTINGS=""
 ENGINE_DEVICE="GPU"  # Default device for the engine
+ENGINE_MODEL="yolo11n" # Default model
 PASS_THROUGH_ARGS=()
  
  while [[ $# -gt 0 ]]; do
@@ -130,6 +131,10 @@ PASS_THROUGH_ARGS=()
              ENGINE_DEVICE="$2"
              shift 2
              ;;
+         --model)
+             ENGINE_MODEL="$2"
+             shift 2
+             ;;
          -h|--help)
              echo "Usage: $0 [OPTIONS] [-- SCRIPT_ARGS]"
              echo "Options:"
@@ -138,6 +143,7 @@ PASS_THROUGH_ARGS=()
              echo "  --use-venv                  Use existing virtual environment"
              echo "  --camera-settings <file>    Camera settings JSON file (e.g., default.json)"
              echo "  --device <device>           Engine inference device (CPU, GPU, NPU, AUTO) [default: GPU]"
+             echo "  --model <model>             Engine model name (e.g., yolo11s) [default: yolo11n]"
              echo "  -h, --help                  Show this help message"
              echo ""
              echo "Script Arguments (passed to hub/main.py):"
@@ -235,7 +241,7 @@ fi
 
 # Start the C++ engine in the background
 echo -e "${BLUE}🧠 Starting C++ engine with device: $ENGINE_DEVICE${NC}"
-ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=$ENGINE_DEVICE")
+ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=$ENGINE_DEVICE" "--model=$ENGINE_MODEL")
 
 # Determine which camera settings to use
 if [ -n "$CAMERA_SETTINGS" ]; then

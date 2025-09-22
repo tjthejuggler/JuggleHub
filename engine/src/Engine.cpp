@@ -17,7 +17,7 @@
 
 namespace fs = std::filesystem;
 
-Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
+Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, const std::string& model_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
     : camera_settings_path_(camera_settings_path),
       running_(false),
       output_format_(format),
@@ -47,7 +47,8 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
     // In your Engine's setup/initialization function
     try {
         // This assumes your models are in JuggleHub/engine/models/
-        dnn_tracker_ = std::make_shared<DNNTracker>("engine/models/yolo11n.xml", device_name);
+        const std::string model_path = "engine/models/" + model_name + ".xml";
+        dnn_tracker_ = std::make_shared<DNNTracker>(model_path, device_name);
     } catch (const std::exception& e) {
         std::cerr << "FATAL ERROR: Failed to initialize DNNTracker: " << e.what() << std::endl;
         // Exit or handle the critical failure appropriately

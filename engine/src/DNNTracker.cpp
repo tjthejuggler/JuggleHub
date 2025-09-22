@@ -1,98 +1,164 @@
 #include "DNNTracker.hpp"
 #include <iostream>
 #include <algorithm> // Required for std::max and std::min
+#include <cmath>     // Required for std::sqrt
+#include <set>
 
-// --- CORRECTED HELPER FUNCTION ---
-// The function now calls the member functions x(), y(), width(), height()
-// with parentheses, which is the correct syntax.
+// --- HELPER FUNCTIONS ---
+static cv::Point3f deproject_2d_to_3d(const cv::Point2f& pixel, float depth, const CameraIntrinsics& intrinsics) {
+    if (depth > 0) {
+        float x = (pixel.x - intrinsics.ppx) * depth / intrinsics.fx;
+        float y = (pixel.y - intrinsics.ppy) * depth / intrinsics.fy;
+        return cv::Point3f(x, y, depth);
+    }
+    return cv::Point3f(0.0f, 0.0f, 0.0f);
+}
+
+static float calculate_distance(const cv::Point3f& p1, const cv::Point3f& p2) {
+    return std::sqrt(std::pow(p1.x - p2.x, 2) +
+                     std::pow(p1.y - p2.y, 2) +
+                     std::pow(p1.z - p2.z, 2));
+}
+
 static float calculate_iou(const byte_track::Rect<float>& box1, const byte_track::Rect<float>& box2) {
-    // Find the coordinates of the intersection rectangle
     float xA = std::max(box1.x(), box2.x());
     float yA = std::max(box1.y(), box2.y());
     float xB = std::min(box1.x() + box1.width(), box2.x() + box2.width());
-    float yB = std::min(box1.y() + box1.height(), box2.y() + box2.height());
-
-    // Compute the area of intersection
+    float yB = std::min(box1.y() + box1.height(), box2.y() + box1.height());
     float intersection_area = std::max(0.0f, xB - xA) * std::max(0.0f, yB - yA);
-
-    // Compute the area of both bounding boxes
     float box1_area = box1.width() * box1.height();
     float box2_area = box2.width() * box2.height();
-
-    // Compute the area of the union
     float union_area = box1_area + box2_area - intersection_area;
-
-    // Compute the IoU
-    if (union_area > 0) {
-        return intersection_area / union_area;
-    } else {
-        return 0.0f;
-    }
+    return (union_area > 0) ? intersection_area / union_area : 0.0f;
 }
 
-
 DNNTracker::DNNTracker(const std::string& model_path, const std::string& device_name) {
-    // 1. Initialize OpenVINO
     std::cout << "Loading OpenVINO model: " << model_path << std::endl;
     std::cout << "Compiling model for device: " << device_name << std::endl;
     compiled_model = core.compile_model(model_path, device_name);
     infer_request = compiled_model.create_infer_request();
     std::cout << "Model loaded successfully." << std::endl;
-
-    // 2. Initialize Bytetrack
     reinitialize_tracker();
+    last_update_time_ = std::chrono::steady_clock::now();
 }
 
 DNNTracker::~DNNTracker() {}
 
-std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::update(const cv::Mat& frame) {
-    // --- Main Inference Pipeline ---
+std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
+    auto current_time = std::chrono::steady_clock::now();
+    float dt = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - last_update_time_).count();
+    last_update_time_ = current_time;
 
-    // 1. Preprocess
+    // --- 1. PREDICTION ---
+    for (auto& pair : kalman_filters_) {
+        int track_id = pair.first;
+        if (track_class_ids_.count(track_id)) {
+            int class_id = track_class_ids_[track_id];
+            if (class_id == 0 || class_id == 1 || class_id == 2) { // Ball
+                pair.second.predict_ball(dt);
+            } else { // Hand
+                pair.second.predict(dt);
+            }
+        } else {
+            pair.second.predict(dt);
+        }
+    }
+
+    // --- 2. DETECTION ---
     float scale_x, scale_y;
-    cv::Mat preprocessed_image = preprocess(frame, scale_x, scale_y);
-    
+    cv::Mat preprocessed_image = preprocess(color_frame, scale_x, scale_y);
     ov::Tensor input_tensor(compiled_model.input().get_element_type(), compiled_model.input().get_shape(), preprocessed_image.data);
     infer_request.set_input_tensor(input_tensor);
-
-    // 2. Run Inference
     infer_request.infer();
     const ov::Tensor& output_tensor = infer_request.get_output_tensor();
-
-    // 3. Postprocess to get raw detections (these have class IDs)
     std::vector<RawDetection> raw_detections;
-    std::vector<byte_track::Object> detections = postprocess(frame, output_tensor, scale_x, scale_y, raw_detections);
+    std::vector<byte_track::Object> detections_for_bytetrack = postprocess(color_frame, depth_frame, intrinsics, output_tensor, scale_x, scale_y, raw_detections);
 
-    // 4. Update Bytetrack to get tracks (these have stable track IDs but no class IDs)
-    std::vector<std::shared_ptr<byte_track::STrack>> tracks = tracker->update(detections);
+    // --- 3. TRACKING (via ByteTrack) ---
+    std::vector<std::shared_ptr<byte_track::STrack>> tracks = tracker->update(detections_for_bytetrack);
 
-    // 5. Re-associate tracks with their original detections to get the class ID
     std::vector<TrackedObject> tracked_objects;
-    for (const auto& track : tracks) {
-        const auto& track_rect = track->getRect();
-        float best_iou = 0.0f;
-        int associated_class_id = -1;
+    std::set<int> active_track_ids;
+    std::set<int> associated_detection_indices;
 
-        for (const auto& det : detections) {
-            float iou = calculate_iou(track_rect, det.rect);
-            if (iou > best_iou) {
-                best_iou = iou;
-                associated_class_id = det.label; // 'label' holds the class_id
+    // --- 4. ASSOCIATION & UPDATE ---
+    for (const auto& track : tracks) {
+        int track_id = (int)track->getTrackId();
+        active_track_ids.insert(track_id);
+        const auto& track_rect = track->getRect();
+        int best_detection_idx = -1;
+
+        if (kalman_filters_.count(track_id)) {
+            // --- Logic for EXISTING tracks: Associate via 3D distance ---
+            float min_dist = 0.3f; // 30cm search radius
+            cv::Point3f predicted_pos;
+            auto state = kalman_filters_.at(track_id).get_position();
+            predicted_pos = cv::Point3f(state.x(), state.y(), state.z());
+
+            for (int i = 0; i < raw_detections.size(); ++i) {
+                if (associated_detection_indices.count(i)) continue;
+                if (raw_detections[i].world_pos.z > 0) {
+                    float dist = calculate_distance(predicted_pos, raw_detections[i].world_pos);
+                    if (dist < min_dist) {
+                        min_dist = dist;
+                        best_detection_idx = i;
+                    }
+                }
+            }
+            if (best_detection_idx != -1) {
+                const auto& matched_det = raw_detections[best_detection_idx];
+                kalman_filters_[track_id].update(KalmanFilter3D::MeasurementVector(matched_det.world_pos.x, matched_det.world_pos.y, matched_det.world_pos.z));
+                track_class_ids_[track_id] = matched_det.class_id;
+            }
+        } else {
+            // --- Logic for NEW tracks: Associate via 2D IoU to initialize ---
+            float best_iou = 0.5f;
+            for (int i = 0; i < raw_detections.size(); ++i) {
+                if (associated_detection_indices.count(i)) continue;
+                const auto& det_box = raw_detections[i].box;
+                byte_track::Rect<float> det_rect(det_box.x, det_box.y, det_box.width, det_box.height);
+                float iou = calculate_iou(track_rect, det_rect);
+                if (iou > best_iou) {
+                    best_iou = iou;
+                    best_detection_idx = i;
+                }
+            }
+            if (best_detection_idx != -1) {
+                const auto& matched_det = raw_detections[best_detection_idx];
+                kalman_filters_[track_id].init(KalmanFilter3D::MeasurementVector(matched_det.world_pos.x, matched_det.world_pos.y, matched_det.world_pos.z));
+                track_class_ids_[track_id] = matched_det.class_id;
             }
         }
-        
-        // Lower the IoU threshold for association to improve robustness
-        if (best_iou > 0.5f) {
-            std::string class_name = (associated_class_id >= 0 && associated_class_id < class_names_.size())
-                                         ? class_names_[associated_class_id]
-                                         : "unknown";
-            tracked_objects.push_back({
-                cv::Rect_<float>(track_rect.x(), track_rect.y(), track_rect.width(), track_rect.height()),
-                (int)track->getTrackId(),
-                associated_class_id,
-                class_name
-            });
+
+        if (best_detection_idx != -1) {
+            associated_detection_indices.insert(best_detection_idx);
         }
+
+        // Create the TrackedObject with the smoothed, filtered position
+        auto filtered_state = kalman_filters_[track_id].get_position();
+        cv::Point3f filtered_pos(filtered_state.x(), filtered_state.y(), filtered_state.z());
+        int class_id = track_class_ids_.count(track_id) ? track_class_ids_[track_id] : -1;
+        std::string class_name = (class_id != -1 && class_id < class_names_.size()) ? class_names_[class_id] : "unknown";
+
+        tracked_objects.push_back({
+            cv::Rect_<float>(track->getRect().x(), track->getRect().y(), track->getRect().width(), track->getRect().height()),
+            filtered_pos,
+            track_id,
+            class_id,
+            class_name
+        });
+    }
+    
+    // --- 5. CLEANUP ---
+    std::vector<int> tracks_to_remove;
+    for (const auto& pair : kalman_filters_) {
+        if (active_track_ids.find(pair.first) == active_track_ids.end()) {
+            tracks_to_remove.push_back(pair.first);
+        }
+    }
+    for (int id : tracks_to_remove) {
+        kalman_filters_.erase(id);
+        track_class_ids_.erase(id);
     }
 
     return {tracked_objects, raw_detections};
@@ -100,61 +166,36 @@ std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::upd
 
 void DNNTracker::update_setting(const std::string& key, const std::string& value) {
     try {
-        if (key == "confidence_threshold") {
-            confidence_threshold_ = std::stof(value);
-            std::cout << "Updated confidence_threshold to " << confidence_threshold_ << std::endl;
-        } else if (key == "nms_threshold") {
-            nms_threshold_ = std::stof(value);
-            std::cout << "Updated nms_threshold to " << nms_threshold_ << std::endl;
-        } else if (key == "track_buffer") {
-            track_buffer_ = std::stoi(value);
-            reinitialize_tracker();
-            std::cout << "Re-initialized tracker with track_buffer = " << track_buffer_ << std::endl;
-        } else if (key == "track_thresh") {
-            track_thresh_ = std::stof(value);
-            reinitialize_tracker();
-            std::cout << "Re-initialized tracker with track_thresh = " << track_thresh_ << std::endl;
-        } else if (key == "high_thresh") {
-            high_thresh_ = std::stof(value);
-            reinitialize_tracker();
-            std::cout << "Re-initialized tracker with high_thresh = " << high_thresh_ << std::endl;
-        } else if (key == "match_thresh") {
-            match_thresh_ = std::stof(value);
-            reinitialize_tracker();
-            std::cout << "Re-initialized tracker with match_thresh = " << match_thresh_ << std::endl;
-        } else {
-            std::cerr << "Warning: Unknown DNNTracker setting key '" << key << "'" << std::endl;
-        }
-    } catch (const std::invalid_argument& e) {
-        std::cerr << "Error: Invalid value for " << key << ": " << value << std::endl;
-    } catch (const std::out_of_range& e) {
-        std::cerr << "Error: Value out of range for " << key << ": " << value << std::endl;
+        if (key == "confidence_threshold") confidence_threshold_ = std::stof(value);
+        else if (key == "nms_threshold") nms_threshold_ = std::stof(value);
+        else if (key == "track_buffer") { track_buffer_ = std::stoi(value); reinitialize_tracker(); }
+        else if (key == "track_thresh") { track_thresh_ = std::stof(value); reinitialize_tracker(); }
+        else if (key == "high_thresh") { high_thresh_ = std::stof(value); reinitialize_tracker(); }
+        else if (key == "match_thresh") { match_thresh_ = std::stof(value); reinitialize_tracker(); }
+        else std::cerr << "Warning: Unknown DNNTracker setting key '" << key << "'" << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Error updating setting " << key << " with value " << value << ": " << e.what() << std::endl;
     }
 }
 
 void DNNTracker::reinitialize_tracker() {
-    int frame_rate = 30; // Assuming a fixed frame rate for now
+    int frame_rate = 30;
     tracker = std::make_unique<byte_track::BYTETracker>(frame_rate, track_buffer_, track_thresh_, high_thresh_, match_thresh_);
 }
 
 cv::Mat DNNTracker::preprocess(const cv::Mat& frame, float& scale_x, float& scale_y) {
     cv::Mat resized_frame;
     cv::resize(frame, resized_frame, cv::Size(input_width_, input_height_));
-    
     scale_x = (float)frame.cols / input_width_;
     scale_y = (float)frame.rows / input_height_;
-
     cv::Mat float_frame;
     resized_frame.convertTo(float_frame, CV_32F, 1.0 / 255.0);
-
     return cv::dnn::blobFromImage(float_frame);
 }
 
-std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& frame, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<RawDetection>& raw_detections) {
+std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<RawDetection>& raw_detections) {
     raw_detections.clear();
-
     const float* output_data = output_tensor.data<const float>();
-
     const int num_channels = 4 + num_classes_;
     
     cv::Mat output_buffer(num_channels, output_tensor.get_shape()[2], CV_32F, (void*)output_data);
@@ -174,31 +215,32 @@ std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& frame, co
 
         float confidence = static_cast<float>(max_class_score);
         
-        if (confidence > confidence_threshold_) {
-            float cx = output_buffer.at<float>(i, 0);
-            float cy = output_buffer.at<float>(i, 1);
-            float w = output_buffer.at<float>(i, 2);
-            float h = output_buffer.at<float>(i, 3);
-            int left = static_cast<int>((cx - 0.5 * w) * scale_x);
-            int top = static_cast<int>((cy - 0.5 * h) * scale_y);
-            int width = static_cast<int>(w * scale_x);
-            int height = static_cast<int>(h * scale_y);
+        float cx = output_buffer.at<float>(i, 0);
+        float cy = output_buffer.at<float>(i, 1);
+        float w = output_buffer.at<float>(i, 2);
+        float h = output_buffer.at<float>(i, 3);
+        int left = static_cast<int>((cx - 0.5 * w) * scale_x);
+        int top = static_cast<int>((cy - 0.5 * h) * scale_y);
+        int width = static_cast<int>(w * scale_x);
+        int height = static_cast<int>(h * scale_y);
 
+        if (confidence > confidence_threshold_) {
             boxes.push_back(cv::Rect(left, top, width, height));
             confidences.push_back(confidence);
             class_ids.push_back(class_id_point.x);
         }
 
         if (confidence > raw_detection_threshold) {
-            float cx = output_buffer.at<float>(i, 0);
-            float cy = output_buffer.at<float>(i, 1);
-            float w = output_buffer.at<float>(i, 2);
-            float h = output_buffer.at<float>(i, 3);
-            int left = static_cast<int>((cx - 0.5 * w) * scale_x);
-            int top = static_cast<int>((cy - 0.5 * h) * scale_y);
-            int width = static_cast<int>(w * scale_x);
-            int height = static_cast<int>(h * scale_y);
-            raw_detections.push_back({cv::Rect_<float>(left, top, width, height), confidence, class_id_point.x});
+            cv::Point2f center_pixel(left + width / 2.0f, top + height / 2.0f);
+            cv::Point3f world_pos(0,0,0);
+
+            if (center_pixel.x >= 0 && center_pixel.x < depth_frame.cols &&
+                center_pixel.y >= 0 && center_pixel.y < depth_frame.rows) {
+                uint16_t depth_value_mm = depth_frame.at<uint16_t>(center_pixel.y, center_pixel.x);
+                float depth_value_m = depth_value_mm / 1000.0f;
+                world_pos = deproject_2d_to_3d(center_pixel, depth_value_m, intrinsics);
+            }
+            raw_detections.push_back({cv::Rect_<float>(left, top, width, height), world_pos, confidence, class_id_point.x});
         }
     }
 

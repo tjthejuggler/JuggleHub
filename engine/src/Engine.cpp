@@ -112,6 +112,7 @@ void Engine::run() {
         }
 
         cv::Mat color_image(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
+        cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
         
         // Add to frame buffer
         {
@@ -126,32 +127,24 @@ void Engine::run() {
         if (continuous_recording_) {
             std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
             continuous_frame_buffer_.push_back(color_image.clone());
-            // No size limit for continuous recording - capture all frames from start to stop
-            // Memory usage will be monitored and user should stop recording when needed
         }
         
-        // This is a simplified FrameData creation.
-        // In a real application, this would be much more complex.
         juggler::v1::FrameData frame_data;
         frame_data.set_timestamp_us(std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count());
         frame_data.set_frame_number(frame_counter_++);
 
-        // Encode color image to JPEG and send as bytes
         std::vector<uchar> buf;
         cv::imencode(".jpg", color_image, buf);
         frame_data.set_color_image_b64(buf.data(), buf.size());
         frame_data.set_ir_projector_active(ir_projector_active_);
-
-        // Get camera intrinsics
-        auto intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
 
         // --- BAll TRACKING CODE ---
         std::vector<TrackedObject> tracked_objects;
         if (use_dnn_tracker_) {
             if (!dnn_tracker_) return; // Safety check
 
-            auto [tracker_results, raw_detections] = dnn_tracker_->update(color_image);
+            auto [tracker_results, raw_detections] = dnn_tracker_->update(color_image, depth_image, camera_intrinsics_);
             tracked_objects = tracker_results;
 
             // Populate raw detections in protobuf
@@ -169,49 +162,33 @@ void Engine::run() {
                 std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects and " << raw_detections.size() << " raw detections." << std::endl;
             }
         } else {
-            auto detections = ball_tracker_->detectBalls(color_image, depth_frame, intrinsics);
+             auto rs_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
+             auto detections = ball_tracker_->detectBalls(color_image, depth_frame, rs_intrinsics);
             // ... (code to populate frame_data from detections)
         }
 
-        // Now, convert the 2D results to 3D and populate your Protobuf message
-        // This part uses your existing RealSense knowledge
-
         for (const auto& obj : tracked_objects) {
-            // Center of the bounding box
-            float pixel_x = obj.box.x + obj.box.width / 2.0f;
-            float pixel_y = obj.box.y + obj.box.height / 2.0f;
+            // The 3D position is now calculated inside the DNNTracker, so we just copy it.
+            if (obj.world_pos.z > 0) { // Only process objects with valid depth
+                auto* ball = frame_data.add_balls();
+                ball->set_id(obj.id);
+                auto* pos = ball->mutable_position();
+                pos->set_x(obj.world_pos.x);
+                pos->set_y(obj.world_pos.y);
+                pos->set_z(obj.world_pos.z);
 
-            // Ensure pixel is within frame bounds before querying depth
-            if (pixel_x >= 0 && pixel_y >= 0 && pixel_x < depth_frame.get_width() && pixel_y < depth_frame.get_height()) {
-                float depth_in_meters = depth_frame.get_distance(pixel_x, pixel_y);
+                // Populate the new bounding box field
+                auto* bbox = ball->mutable_bounding_box_2d();
+                bbox->set_x(obj.box.x);
+                bbox->set_y(obj.box.y);
+                bbox->set_width(obj.box.width);
+                bbox->set_height(obj.box.height);
 
-                if (depth_in_meters > 0) { // Only process valid depth readings
-                    float point[3];
-                    rs2_deproject_pixel_to_point(point, &intrinsics, (const float[2]){pixel_x, pixel_y}, depth_in_meters);
-                    
-                    // point[0] is X, point[1] is Y, point[2] is Z
-                    auto* ball = frame_data.add_balls();
-                    ball->set_id(obj.id);
-                    auto* pos = ball->mutable_position();
-                    pos->set_x(point[0]);
-                    pos->set_y(point[1]);
-                    pos->set_z(point[2]);
-
-                    // Populate the new bounding box field
-                    auto* bbox = ball->mutable_bounding_box_2d();
-                    bbox->set_x(obj.box.x);
-                    bbox->set_y(obj.box.y);
-                    bbox->set_width(obj.box.width);
-                    bbox->set_height(obj.box.height);
-
-                    // Set class name for the tracked ball
-                    ball->set_class_name(obj.class_name);
-                }
+                // Set class name for the tracked ball
+                ball->set_class_name(obj.class_name);
             }
         }
-        // --- END NEW DNN TRACKING CODE ---
 
-        // Update active module
         if (active_module_) {
             active_module_->update(frame_data, [this](const juggler::v1::CommandRequest& command) {
                 sendCommand(command);
@@ -626,6 +603,19 @@ void Engine::startCamera() {
         rs2::pipeline_profile profile = pipe_.start(rs_config_);
         camera_running_ = true;
         if (verbose_) std::cout << "[LOG] Camera pipeline started successfully." << std::endl;
+
+        // --- Store Camera Intrinsics ---
+        auto stream = profile.get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
+        auto intrinsics = stream.get_intrinsics();
+        camera_intrinsics_.fx = intrinsics.fx;
+        camera_intrinsics_.fy = intrinsics.fy;
+        camera_intrinsics_.ppx = intrinsics.ppx;
+        camera_intrinsics_.ppy = intrinsics.ppy;
+        if (verbose_) {
+            std::cout << "[LOG] Stored camera intrinsics: fx=" << camera_intrinsics_.fx
+                      << ", fy=" << camera_intrinsics_.fy << ", ppx=" << camera_intrinsics_.ppx
+                      << ", ppy=" << camera_intrinsics_.ppy << std::endl;
+        }
 
         // Wait for a moment to ensure the device is ready.
         std::this_thread::sleep_for(std::chrono::milliseconds(500));

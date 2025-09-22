@@ -72,6 +72,7 @@ private:
     rs2::align align_to_color_;
     std::atomic<bool> camera_running_;
     std::atomic<bool> ir_projector_active_;
+    CameraIntrinsics camera_intrinsics_; // Store camera intrinsics
     
     // Camera configuration parameters
     uint32_t camera_width_;

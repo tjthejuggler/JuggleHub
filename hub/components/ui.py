@@ -29,7 +29,7 @@ try:
                                  QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit,
                                  QComboBox, QMessageBox, QDialog, QVBoxLayout as QVBoxLayout_Dialog)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
-    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence
+    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence, QBrush
     PYQT_AVAILABLE = True
 except ImportError:
     print("⚠️ PyQt6 not available. Using console UI.")
@@ -586,20 +586,29 @@ if PYQT_AVAILABLE:
             self.video_scene.addItem(self.video_pixmap_item)
             self.video_layout.addWidget(self.video_view)
 
-            # Add checkboxes for raw and tracked detections
-            self.show_raw_detections_checkbox = QPushButton("Show Raw Detections", self)
-            self.show_raw_detections_checkbox.setCheckable(True)
-            self.show_raw_detections_checkbox.setChecked(True) # Default to on
-            self.show_raw_detections_checkbox.clicked.connect(self.toggle_overlays)
-            self.video_layout.addWidget(self.show_raw_detections_checkbox)
+            # --- NEW: Visualization Toggles ---
+            toggles_layout = QHBoxLayout()
+            self.show_raw_detections_toggle = QPushButton("Raw Detections")
+            self.show_raw_detections_toggle.setCheckable(True)
+            self.show_raw_detections_toggle.setChecked(False)
+            self.show_raw_detections_toggle.clicked.connect(self.toggle_overlays)
+            toggles_layout.addWidget(self.show_raw_detections_toggle)
 
-            self.show_tracked_objects_checkbox = QPushButton("Show Tracked Objects", self)
-            self.show_tracked_objects_checkbox.setCheckable(True)
-            self.show_tracked_objects_checkbox.setChecked(True) # Default to on
-            self.show_tracked_objects_checkbox.clicked.connect(self.toggle_overlays)
-            self.video_layout.addWidget(self.show_tracked_objects_checkbox)
+            self.show_tracked_boxes_toggle = QPushButton("Tracked Boxes")
+            self.show_tracked_boxes_toggle.setCheckable(True)
+            self.show_tracked_boxes_toggle.setChecked(False)
+            self.show_tracked_boxes_toggle.clicked.connect(self.toggle_overlays)
+            toggles_layout.addWidget(self.show_tracked_boxes_toggle)
+
+            self.show_3d_trackers_toggle = QPushButton("3D Trackers")
+            self.show_3d_trackers_toggle.setCheckable(True)
+            self.show_3d_trackers_toggle.setChecked(True) # Default to on
+            self.show_3d_trackers_toggle.clicked.connect(self.toggle_overlays)
+            toggles_layout.addWidget(self.show_3d_trackers_toggle)
             
-            content_layout.addWidget(self.video_group, 2) # Give it more stretch factor
+            self.video_layout.addLayout(toggles_layout)
+            
+            content_layout.addWidget(self.video_group, 2)
             
             # Calibration settings panel
             self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance)
@@ -667,131 +676,81 @@ if PYQT_AVAILABLE:
             
             main_layout.addWidget(log_group)
             
-            # Apply dark theme
             self.apply_dark_theme()
-            
-            # Enable keyboard focus for the main window
             self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
         def apply_dark_theme(self):
             """Apply a dark theme to the UI."""
             self.setStyleSheet("""
-                QMainWindow {
-                    background-color: #2b2b2b;
-                    color: #ffffff;
-                }
+                QMainWindow, QDialog { background-color: #2b2b2b; color: #ffffff; }
                 QGroupBox {
-                    font-weight: bold;
-                    border: 2px solid #555555;
-                    border-radius: 5px;
-                    margin-top: 1ex;
-                    padding-top: 10px;
+                    font-weight: bold; border: 2px solid #555555;
+                    border-radius: 5px; margin-top: 1ex; padding-top: 10px;
                 }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    left: 10px;
-                    padding: 0 5px 0 5px;
+                QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
+                QLabel { color: #ffffff; }
+                QTextEdit { background-color: #1e1e1e; border: 1px solid #555555; color: #ffffff; }
+                QPushButton {
+                    background-color: #555; color: white; border: 1px solid #777;
+                    padding: 5px; border-radius: 3px;
                 }
-                QLabel {
-                    color: #ffffff;
-                }
-                QTextEdit {
-                    background-color: #1e1e1e;
-                    border: 1px solid #555555;
-                    color: #ffffff;
-                }
+                QPushButton:hover { background-color: #666; }
+                QPushButton:pressed { background-color: #444; }
+                QPushButton:checked { background-color: #007ACC; border-color: #005A9E; }
             """)
         
         def update_frame_data(self, frame_data: juggler_pb2.FrameData):
-            """Update with new frame data (called from worker thread)."""
             self.signal_emitter.frame_received.emit(frame_data)
         
         def _update_ui(self, frame_data: juggler_pb2.FrameData):
-            """Update UI with new frame data (called from main thread)."""
             self.last_frame_data = frame_data
             self.frame_count += 1
-
-            self.log_message(f"UI received frame {frame_data.frame_number} with {len(frame_data.balls)} balls and "
-                             f"{len(frame_data.raw_detections)} raw detections.")
+            self.log_message(f"UI received frame {frame_data.frame_number} with {len(frame_data.balls)} balls.")
             
-            # Update ball information
             ball_count = len(frame_data.balls)
             self.ball_count_label.setText(f"Balls detected: {ball_count}")
-            
             ball_text = ""
-            if not frame_data.balls and frame_data.raw_detections:
-                ball_text = "Raw detections present, but no tracked balls.\n"
-                
             for ball in frame_data.balls:
                 class_name = f" ({ball.class_name})" if ball.class_name else ""
-                ball_text += f"ID {ball.id}{class_name}: "
-                ball_text += f"3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
-            
+                ball_text += f"ID {ball.id}{class_name}: 3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
             self.ball_list.setPlainText(ball_text)
 
-            # Update video feed if in calibration mode
             if self.calibration_mode and frame_data.color_image_b64:
                 self.update_video_feed(frame_data)
             
-            # Update IR projector status in calibration widget
             if self.settings_widget:
-                # The camera_status_label is the source of truth.
-                # Only update from frame_data if the camera is running.
                 is_camera_running = "Running" in self.settings_widget.camera_status_label.text()
                 self.settings_widget.update_ir_status(frame_data.ir_projector_active and is_camera_running)
 
-            # Update system status
             if frame_data.HasField('status'):
                 status = frame_data.status
                 self.camera_status.setText(f"📷 Camera: {'Connected' if status.camera_connected else 'Disconnected'}")
                 self.engine_status.setText(f"🔧 Engine: {'Running' if status.engine_running else 'Stopped'}")
                 self.mode_status.setText(f"🎯 Mode: {status.mode}")
-                
-                if status.error_message:
-                    self.log_message(f"❌ Error: {status.error_message}")
+                if status.error_message: self.log_message(f"❌ Error: {status.error_message}")
             
-            # Update hand status
-            hand_count = len(frame_data.hands)
-            self.hand_status.setText(f"👋 Hands: {hand_count}")
-            
-            # Update IMU status
-            imu_count = len(frame_data.imu_data)
-            self.imu_status.setText(f"📱 IMU: {imu_count} sensors")
-
+            self.hand_status.setText(f"👋 Hands: {len(frame_data.hands)}")
+            self.imu_status.setText(f"📱 IMU: {len(frame_data.imu_data)} sensors")
             imu_text = ""
             for imu in frame_data.imu_data:
                 imu_text += f"Watch: {imu.watch_name} ({imu.watch_ip})\n"
                 imu_text += f"  Accel: ({imu.acceleration.x:.2f}, {imu.acceleration.y:.2f}, {imu.acceleration.z:.2f})\n"
                 imu_text += f"  Gyro:  ({imu.gyroscope.x:.2f}, {imu.gyroscope.y:.2f}, {imu.gyroscope.z:.2f})\n"
-            
             self.imu_list.setPlainText(imu_text)
-            
-            # Update status
             self.status_label.setText(f"✅ Receiving data - Frame {frame_data.frame_number}")
         
         def _periodic_update(self):
-            """Periodic UI updates."""
-            # Calculate FPS
             elapsed = time.time() - self.start_time
             fps = self.frame_count / elapsed if elapsed > 0 else 0
-            
             self.fps_label.setText(f"FPS: {fps:.1f}")
             self.frame_count_label.setText(f"Frames: {self.frame_count}")
-            
-            # Check if we're still receiving data
             if self.last_frame_data:
-                current_time = time.time() * 1000000  # Convert to microseconds
-                time_since_last = (current_time - self.last_frame_data.timestamp_us) / 1000000
-                
-                if time_since_last > 2.0:  # No data for 2 seconds
-                    self.status_label.setText("⚠️ No data received recently")
+                time_since_last = (time.time() * 1000000 - self.last_frame_data.timestamp_us) / 1000000
+                if time_since_last > 2.0: self.status_label.setText("⚠️ No data received recently")
         
         def log_message(self, message: str):
-            """Add a message to the activity log."""
             timestamp = time.strftime("%H:%M:%S")
             self.log_text.append(f"[{timestamp}] {message}")
-            
-            # Keep log size manageable
             if self.log_text.document().blockCount() > 100:
                 cursor = self.log_text.textCursor()
                 cursor.movePosition(cursor.MoveOperation.Start)
@@ -799,135 +758,93 @@ if PYQT_AVAILABLE:
                 cursor.removeSelectedText()
         
         def toggle_calibration_mode(self):
-            """Toggle the visibility of the calibration video feed."""
             self.calibration_mode = not self.calibration_mode
             self.video_group.setVisible(self.calibration_mode)
             self.settings_widget.setVisible(self.calibration_mode)
-            if self.calibration_mode:
-                self.calibration_button.setText("Exit Calibration Mode")
-            else:
-                self.calibration_button.setText("Enter Calibration Mode")
+            self.calibration_button.setText("Exit Calibration Mode" if self.calibration_mode else "Enter Calibration Mode")
 
         def toggle_overlays(self):
-            """Force a UI update when any overlay checkbox is toggled."""
-            if self.last_frame_data:
-                self.update_video_feed(self.last_frame_data)
+            if self.last_frame_data: self.update_video_feed(self.last_frame_data)
 
         def update_video_feed(self, frame_data: juggler_pb2.FrameData):
-            """Update the video feed with the new frame and bounding boxes."""
             image = QImage()
             image.loadFromData(frame_data.color_image_b64, "JPEG")
             pixmap = QPixmap.fromImage(image)
-
             painter = QPainter(pixmap)
             
-            # Draw raw detections if checkbox is ticked
-            if self.show_raw_detections_checkbox.isChecked():
-                pen_raw = QPen(QColor(255, 0, 0, 100), 2)  # Semi-transparent red
-                painter.setPen(pen_raw)
+            # --- Draw Raw Detections ---
+            if self.show_raw_detections_toggle.isChecked():
+                painter.setPen(QPen(QColor(255, 0, 0, 100), 2)) # Semi-transparent red
                 for det in frame_data.raw_detections:
                     painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
-                    label = f"Raw: {det.class_name} ({det.confidence:.2f})" if det.class_name else f"Raw: ({det.confidence:.2f})"
-                    painter.drawText(int(det.x), int(det.y) - 5, label)
 
-            # Define colors for different classes
-            class_colors = {
-                "led_on": QColor(0, 255, 0),      # Bright Green
-                "led_off": QColor(255, 0, 0),     # Bright Red
-                "dropped_ball": QColor(255, 165, 0), # Orange
-                "hand": QColor(0, 100, 255),       # Bright Blue
-                "ball": QColor(200, 200, 200)      # Gray for generic "ball"
-            }
-            
-            # Draw final tracked objects (balls) if checkbox is ticked
-            if self.show_tracked_objects_checkbox.isChecked():
-                for ball in frame_data.balls:
-                    bbox = ball.bounding_box_2d
-                    
-                    class_name = ball.class_name if ball.class_name else "ball"
-                    
-                    # Use a distinct, solid pen for tracked objects
-                    pen_tracked = QPen(class_colors.get(class_name, QColor(255, 255, 255)), 3) # Default to solid white
-                    painter.setPen(pen_tracked)
-
+            # --- Draw Tracked Boxes (from ByteTrack) ---
+            if self.show_tracked_boxes_toggle.isChecked():
+                painter.setPen(QPen(QColor(255, 165, 0, 150), 2, Qt.PenStyle.DashLine)) # Orange dash
+                for obj in frame_data.balls:
+                    bbox = obj.bounding_box_2d
                     painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
+
+            # --- Draw 3D Trackers (Kalman Filtered) ---
+            if self.show_3d_trackers_toggle.isChecked():
+                colors = [QColor(255, 87, 34), QColor(255, 193, 7), QColor(139, 195, 74),
+                          QColor(0, 188, 212), QColor(3, 169, 244), QColor(63, 81, 181)]
+                for obj in frame_data.balls:
+                    bbox = obj.bounding_box_2d
+                    center_x, center_y = int(bbox.x + bbox.width / 2), int(bbox.y + bbox.height / 2)
+                    color = colors[obj.id % len(colors)]
                     
-                    label = f"Tracked ID: {ball.id} ({class_name})"
-                    painter.drawText(int(bbox.x), int(bbox.y) + int(bbox.height) + 15, label)
+                    painter.setBrush(QBrush(color))
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.drawEllipse(center_x - 5, center_y - 5, 10, 10)
+                    
+                    painter.setPen(QPen(QColor(255, 255, 255)))
+                    painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                    label = f"ID: {obj.id}"
+                    pos_label = f"({obj.position.x:.2f}, {obj.position.y:.2f}, {obj.position.z:.2f})m"
+                    painter.drawText(center_x + 10, center_y, label)
+                    painter.drawText(center_x + 10, center_y + 15, pos_label)
 
             painter.end()
-
             self.video_pixmap_item.setPixmap(pixmap)
             self.video_view.fitInView(self.video_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
-
         def record_clip(self):
-            """Send a command to the engine to record a clip."""
             self.log_message("Sending record command to engine...")
-            command = juggler_pb2.CommandRequest()
-            command.type = juggler_pb2.CommandRequest.CommandType.RECORD_START
-            
+            command = juggler_pb2.CommandRequest(type=juggler_pb2.CommandRequest.CommandType.RECORD_START)
             try:
                 response = self.zmq_client.send_command(command)
-                if response.success:
-                    self.log_message(f"✅ Record command acknowledged: {response.message}")
-                else:
-                    self.log_message(f"❌ Record command failed: {response.message}")
+                self.log_message(f"✅ Record command acknowledged: {response.message}" if response.success else f"❌ Record command failed: {response.message}")
             except Exception as e:
                 self.log_message(f"❌ Error sending record command: {e}")
 
         def toggle_continuous_recording(self):
-            """Toggle continuous recording on/off."""
-            if not self.is_continuous_recording:
-                # Start continuous recording
-                self.log_message("Starting continuous recording...")
-                command = juggler_pb2.CommandRequest()
-                command.type = juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_START
-                
-                try:
-                    response = self.zmq_client.send_command(command)
-                    if response.success:
-                        self.is_continuous_recording = True
-                        self.continuous_record_button.setText("Stop Recording")
-                        self.continuous_record_button.setChecked(True)
-                        self.recording_status.setText("● Recording")
-                        self.recording_status.setStyleSheet("color: #f44336; font-weight: bold;")
-                        self.log_message(f"✅ Continuous recording started: {response.message}")
-                    else:
-                        self.log_message(f"❌ Failed to start continuous recording: {response.message}")
-                except Exception as e:
-                    self.log_message(f"❌ Error starting continuous recording: {e}")
-            else:
-                # Stop continuous recording
-                self.log_message("Stopping continuous recording...")
-                command = juggler_pb2.CommandRequest()
-                command.type = juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_STOP
-                
-                try:
-                    response = self.zmq_client.send_command(command)
-                    if response.success:
-                        self.is_continuous_recording = False
-                        self.continuous_record_button.setText("Start Recording")
-                        self.continuous_record_button.setChecked(False)
-                        self.recording_status.setText("● Not Recording")
-                        self.recording_status.setStyleSheet("color: #666666; font-weight: bold;")
-                        self.log_message(f"✅ Continuous recording stopped: {response.message}")
-                    else:
-                        self.log_message(f"❌ Failed to stop continuous recording: {response.message}")
-                except Exception as e:
-                    self.log_message(f"❌ Error stopping continuous recording: {e}")
+            is_starting = not self.is_continuous_recording
+            self.log_message(f"{'Starting' if is_starting else 'Stopping'} continuous recording...")
+            command_type = juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_START if is_starting else juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_STOP
+            command = juggler_pb2.CommandRequest(type=command_type)
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    self.is_continuous_recording = is_starting
+                    self.continuous_record_button.setText("Stop Recording" if is_starting else "Start Recording")
+                    self.continuous_record_button.setChecked(is_starting)
+                    self.recording_status.setText(f"● {'Recording' if is_starting else 'Not Recording'}")
+                    self.recording_status.setStyleSheet(f"color: {'#f44336' if is_starting else '#666666'}; font-weight: bold;")
+                    self.log_message(f"✅ Continuous recording {'started' if is_starting else 'stopped'}: {response.message}")
+                else:
+                    self.log_message(f"❌ Failed to {'start' if is_starting else 'stop'} continuous recording: {response.message}")
+            except Exception as e:
+                self.log_message(f"❌ Error {'starting' if is_starting else 'stopping'} continuous recording: {e}")
         
         def keyPressEvent(self, event):
-            """Handle keyboard events."""
             if event.key() == Qt.Key.Key_R:
                 self.log_message("🎹 'R' key pressed - triggering recording")
                 self.record_clip()
             else:
-                # Pass other key events to the parent
                 super().keyPressEvent(event)
         
         def toggle_web_ui(self):
-            """Start or stop the web UI."""
             if not self.hub_instance.web_ui.is_running:
                 self.hub_instance.web_ui.start()
                 self.web_ui_button.setText("Stop Web UI")
@@ -937,80 +854,40 @@ if PYQT_AVAILABLE:
                 self.web_ui_button.setText("Start Web UI")
 
         def show_qr_code(self):
-            """Display a QR code with the web UI URL."""
             dialog = QDialog(self)
             dialog.setWindowTitle("Scan QR Code")
             layout = QVBoxLayout_Dialog(dialog)
-            
             qr_label = QLabel()
-            # Generate QR code
-            ip_address = self.hub_instance.web_ui.get_ip_address()
-            port = self.hub_instance.web_ui.port
-            url = f"http://{ip_address}:{port}"
-            
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=4,
-            )
-            qr.add_data(url)
-            qr.make(fit=True)
-            
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            # Convert to QPixmap
+            url = f"http://{self.hub_instance.web_ui.get_ip_address()}:{self.hub_instance.web_ui.port}"
+            qr = qrcode.make(url)
             buffer = io.BytesIO()
-            img.save(buffer, "PNG")
-            qt_image = QImage.fromData(buffer.getvalue())
-            pixmap = QPixmap.fromImage(qt_image)
-            
+            qr.save(buffer, "PNG")
+            pixmap = QPixmap()
+            pixmap.loadFromData(buffer.getvalue())
             qr_label.setPixmap(pixmap)
-            
             layout.addWidget(qr_label)
             dialog.exec()
         
-        def disable_top_screen(self):
-            """Disables the top screen."""
-            self.hub_instance.screen_controller.disable_top_screen()
-
-        def disable_bottom_screen(self):
-            """Disables the bottom screen."""
-            self.hub_instance.screen_controller.disable_bottom_screen()
-
+        def disable_top_screen(self): self.hub_instance.screen_controller.disable_top_screen()
+        def disable_bottom_screen(self): self.hub_instance.screen_controller.disable_bottom_screen()
 
 class JuggleHubUI:
-    """Main UI class that chooses between PyQt6 and console UI."""
-    
     def __init__(self, config: dict, zmq_client: Optional['ZMQClient'] = None, hub_instance=None):
         self.config = config
         self.zmq_client = zmq_client
         self.hub_instance = hub_instance
-        
         if PYQT_AVAILABLE and config.get('enable_ui', True):
-            # Create QApplication if it doesn't exist
-            if not QApplication.instance():
-                self.app = QApplication(sys.argv)
-            else:
-                self.app = QApplication.instance()
-            
+            self.app = QApplication.instance() or QApplication(sys.argv)
             self.main_window = JuggleHubMainWindow(config, self.zmq_client, self.hub_instance)
             self.ui_type = "pyqt6"
         else:
             self.console_ui = ConsoleUI(config)
             self.ui_type = "console"
-            self.app = None
-            self.main_window = None
     
     def update_frame_data(self, frame_data: juggler_pb2.FrameData):
-        """Update with new frame data."""
-        if self.ui_type == "pyqt6":
-            self.main_window.update_frame_data(frame_data)
-        else:
-            self.console_ui.update_frame_data(frame_data)
+        getattr(self.main_window if self.ui_type == "pyqt6" else self.console_ui, 'update_frame_data')(frame_data)
     
     def run(self):
-        """Run the UI."""
         if self.ui_type == "pyqt6":
             print("🖥️ Starting PyQt6 UI...")
             self.main_window.show()
@@ -1019,67 +896,26 @@ class JuggleHubUI:
             self.console_ui.run()
     
     def cleanup(self):
-        """Clean up UI resources."""
         print("🧹 Cleaning up UI...")
-        
         if self.ui_type == "pyqt6":
-            if self.main_window:
-                self.main_window.close()
-            if self.app:
-                self.app.quit()
+            if self.main_window: self.main_window.close()
+            if self.app: self.app.quit()
         else:
             self.console_ui.cleanup()
-        
         print("✅ UI cleanup completed")
 
-
-# Example usage and testing
 if __name__ == "__main__":
-    import threading
-    
     def test_ui():
-        """Test the UI with simulated data."""
-        config = {
-            'enable_ui': True,
-            'debug': True
-        }
-        
+        config = {'enable_ui': True, 'debug': True}
         ui = JuggleHubUI(config)
-        
-        # Create test data in a separate thread
         def generate_test_data():
-            time.sleep(2)  # Wait for UI to start
-            
+            time.sleep(2)
             for i in range(100):
-                # Create test frame data
-                frame_data = juggler_pb2.FrameData()
-                frame_data.timestamp_us = int(time.time() * 1000000)
-                frame_data.frame_number = i + 1
-                frame_data.frame_width = 640
-                frame_data.frame_height = 480
-                
-                # Add test ball
-                ball = frame_data.balls.add()
-                ball.id = i # Assign a simple track ID for testing
-                ball.position.x = 0.1 * (i % 10 - 5)
-                ball.position.y = 0.1 * ((i // 10) % 10 - 5)
-                ball.position.z = 0.8 + 0.1 * (i % 5)
-                ball.timestamp_us = frame_data.timestamp_us
-                
-                # Set system status
-                frame_data.status.camera_connected = True
-                frame_data.status.engine_running = True
-                frame_data.status.fps = 30.0
-                frame_data.status.mode = "tracking"
-                
+                frame_data = juggler_pb2.FrameData(timestamp_us=int(time.time() * 1000000), frame_number=i+1)
+                ball = frame_data.balls.add(id=i, position={'x': 0.1 * (i % 10 - 5), 'y': 0.1 * ((i // 10) % 10 - 5), 'z': 0.8 + 0.1 * (i % 5)})
                 ui.update_frame_data(frame_data)
-                time.sleep(0.033)  # ~30 FPS
-        
-        # Start test data generation
-        test_thread = threading.Thread(target=generate_test_data, daemon=True)
-        test_thread.start()
-        
-        # Run UI
+                time.sleep(0.033)
+        threading.Thread(target=generate_test_data, daemon=True).start()
         ui.run()
     
     print("🧪 Testing JuggleHub UI...")

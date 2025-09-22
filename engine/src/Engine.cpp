@@ -193,6 +193,12 @@ void Engine::run() {
 
                 // Set class name for the tracked ball
                 ball->set_class_name(obj.class_name);
+
+                // Project the 3D position to 2D and populate the new field.
+                cv::Point2f projected_pos = DNNTracker::project_3d_to_2d(obj.world_pos, camera_intrinsics_);
+                auto* proj_pos_2d = ball->mutable_projected_pos_2d();
+                proj_pos_2d->set_x(projected_pos.x);
+                proj_pos_2d->set_y(projected_pos.y);
             }
         }
 

@@ -14,6 +14,15 @@ static cv::Point3f deproject_2d_to_3d(const cv::Point2f& pixel, float depth, con
     return cv::Point3f(0.0f, 0.0f, 0.0f);
 }
 
+cv::Point2f DNNTracker::project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics) {
+    if (world_pos.z > 0) {
+        float x_2d = (world_pos.x * intrinsics.fx) / world_pos.z + intrinsics.ppx;
+        float y_2d = (world_pos.y * intrinsics.fy) / world_pos.z + intrinsics.ppy;
+        return cv::Point2f(x_2d, y_2d);
+    }
+    return cv::Point2f(-1, -1); // Invalid point
+}
+
 static float calculate_distance(const cv::Point3f& p1, const cv::Point3f& p2) {
     return std::sqrt(std::pow(p1.x - p2.x, 2) +
                      std::pow(p1.y - p2.y, 2) +

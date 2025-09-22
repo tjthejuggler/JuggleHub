@@ -483,6 +483,7 @@ if PYQT_AVAILABLE:
             self.calibration_mode = False
             self.udp_client = UdpClient()
             self.is_continuous_recording = False
+            self.tracker_history = {} # For drawing tails
             
             # Signal for thread-safe updates
             self.signal_emitter = FrameDataSignal()
@@ -605,8 +606,26 @@ if PYQT_AVAILABLE:
             self.show_3d_trackers_toggle.setChecked(True) # Default to on
             self.show_3d_trackers_toggle.clicked.connect(self.toggle_overlays)
             toggles_layout.addWidget(self.show_3d_trackers_toggle)
+
+            self.show_tails_toggle = QPushButton("Show Tails")
+            self.show_tails_toggle.setCheckable(True)
+            self.show_tails_toggle.setChecked(False)
+            self.show_tails_toggle.clicked.connect(self.toggle_overlays)
+            toggles_layout.addWidget(self.show_tails_toggle)
             
             self.video_layout.addLayout(toggles_layout)
+
+            # --- NEW: Tail Length Slider ---
+            tail_layout = QHBoxLayout()
+            tail_layout.addWidget(QLabel("Tail Length:"))
+            self.tail_length_slider = QSlider(Qt.Orientation.Horizontal)
+            self.tail_length_slider.setRange(10, 200) # 10 to 200 frames
+            self.tail_length_slider.setValue(50)
+            self.tail_length_slider.valueChanged.connect(self.update_tail_length)
+            tail_layout.addWidget(self.tail_length_slider)
+            self.tail_length_label = QLabel("50 frames")
+            tail_layout.addWidget(self.tail_length_label)
+            self.video_layout.addLayout(tail_layout)
             
             content_layout.addWidget(self.video_group, 2)
             
@@ -713,6 +732,17 @@ if PYQT_AVAILABLE:
             for ball in frame_data.balls:
                 class_name = f" ({ball.class_name})" if ball.class_name else ""
                 ball_text += f"ID {ball.id}{class_name}: 3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
+                
+                # Update tracker history
+                if ball.id not in self.tracker_history:
+                    self.tracker_history[ball.id] = []
+                self.tracker_history[ball.id].append((ball.projected_pos_2d.x, ball.projected_pos_2d.y))
+                
+                # Prune history to tail length
+                max_len = self.tail_length_slider.value()
+                while len(self.tracker_history[ball.id]) > max_len:
+                    self.tracker_history[ball.id].pop(0)
+
             self.ball_list.setPlainText(ball_text)
 
             if self.calibration_mode and frame_data.color_image_b64:
@@ -829,9 +859,32 @@ if PYQT_AVAILABLE:
                 painter.drawText(center_x - 5, center_y + 5, side_label)
 
 
+            # --- Draw Tracker Tails ---
+            if self.show_tails_toggle.isChecked():
+                for ball_id, history in self.tracker_history.items():
+                    if len(history) > 1:
+                        # Find the corresponding ball to get its color
+                        ball_for_tail = next((b for b in frame_data.balls if b.id == ball_id), None)
+                        if ball_for_tail:
+                            color = self.get_average_color(image, ball_for_tail.bounding_box_2d)
+                            pen = QPen(color, 2)
+                            
+                            # Draw lines between consecutive points in the history
+                            for i in range(len(history) - 1):
+                                p1 = history[i]
+                                p2 = history[i+1]
+                                if p1[0] > 0 and p1[1] > 0 and p2[0] > 0 and p2[1] > 0: # Check for valid points
+                                    painter.setPen(pen)
+                                    painter.drawLine(int(p1[0]), int(p1[1]), int(p2[0]), int(p2[1]))
+
             painter.end()
             self.video_pixmap_item.setPixmap(pixmap)
             self.video_view.fitInView(self.video_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+
+        def update_tail_length(self, value):
+            self.tail_length_label.setText(f"{value} frames")
+            # The actual tail length will be used during rendering.
+            if self.last_frame_data: self.update_video_feed(self.last_frame_data)
 
         def get_average_color(self, image: QImage, bbox: juggler_pb2.BoundingBox2D) -> QColor:
             """Calculates the average color within a bounding box."""

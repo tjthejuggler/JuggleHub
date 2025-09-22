@@ -45,6 +45,7 @@ public:
 
     void update_setting(const std::string& key, const std::string& value);
     const std::map<int, int>& get_held_ball_states() const { return held_ball_states_; };
+    static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
 
 private:
     void reinitialize_tracker();

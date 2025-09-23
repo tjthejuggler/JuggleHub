@@ -604,6 +604,12 @@ This is the critical conversion step. We will use the `yolo` command-line tool, 
     ```bash
     yolo export model=~/Downloads/best.pt format=openvino imgsz=640
     ```
+    or
+
+    ```bash
+    yolo export model=/home/twain/Projects/JuggleHub/engine/models/zipped/V2_3_lonely_hands/best.pt format=openvino imgsz=640
+    ```
+
     *   `model=~/Downloads/best.pt`: The path to the model you just downloaded.
     *   `format=openvino`: The target format for conversion.
     *   `imgsz=640`: It's crucial to specify the same image size you trained with (640x640).

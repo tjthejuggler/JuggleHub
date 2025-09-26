@@ -234,8 +234,11 @@ Once you have several completed annotation sessions and their corresponding `via
     **Example Command:**
     ```bash
     python scripts/convert_via_to_yolo.py \
-      /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V3rs455_normal_balls_daylight_sessions_auto_realsense/V3_via_project_17Sep2025_10h0m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V3rs455_normal_balls_mixedlight_sessions_intentional_realsense/V3_via_project_18Sep2025_14h31m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V3rs455_just_hands_low_light_intentional_and_auto_realsense/V3_via_project_20Sep2025_18h36m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V3_2_rs455_lonely_hands_low_light_intentional_realsense/V3_via_project_21Sep2025_10h30m.json
+      /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V4V2rs455_normal_balls_mixedlight_sessions_intentional_realsense/V4via_project_18Sep2025_14h31m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V4V2rs455_normal_balls_daylight_sessions_auto_realsense/V4via_project_17Sep2025_10h0m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V4V2rs455_just_hands_low_light_intentional_and_auto_realsense/V4via_project_20Sep2025_18h36m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V4V2_2_rs455_lonely_hands_low_light_intentional_realsense/V4via_project_21Sep2025_10h30m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V4rs455_led_balls_mixedlight_sessions_intentional_realsense/V4via_project_23Sep2025_12h19m.json
     ```
+    NOTE: you can use --classes ball
+        to override the default list of classes.
+
     *   **Result:** The script will run and create a `.txt` file next to every single image you annotated inside the `images` subfolders of your session directories. Your data is now in the correct YOLO format.
 
 #### **Step A2: Assemble the Dataset**
@@ -243,10 +246,10 @@ Once you have several completed annotation sessions and their corresponding `via
     *   **Example Command:**
     ```bash
     python scripts/prepare_dataset.py \
-        --dataset-name V3_no_hands \
+        --dataset-name V4_balls_only \
         --source-dir /home/twain/Projects/JuggleHub/engine/data/annotation_sessions \
         --output-dir /home/twain/Projects/JuggleHub/engine/data/3_training_datasets \
-        --tags V3rs455_normal_balls_mixedlight_sessions_intentional_realsense V3rs455_normal_balls_daylight_sessions_auto_realsense V3rs455_just_hands_low_light_intentional_and_auto_realsense V3_2_rs455_lonely_hands_low_light_intentional_realsense
+        --tags V4V2rs455_normal_balls_mixedlight_sessions_intentional_realsense V4V2rs455_normal_balls_daylight_sessions_auto_realsense V4V2rs455_just_hands_low_light_intentional_and_auto_realsense V4V2_2_rs455_lonely_hands_low_light_intentional_realsense V4rs455_led_balls_mixedlight_sessions_intentional_realsense
     ```
     *   **Result:** A new folder like `data/3_training_datasets/V2_with_hands/` is created.
 
@@ -255,7 +258,7 @@ This is where we prevent the label mismatch error at its source. We will create 
 
 3.  **Run the create_yaml.py Script:** From your terminal, run this script, providing the path to your newly assembled dataset and your full list of class names in the correct order.
     ```bash
-    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V2_2_lonely_hands led_on led_off dropped_ball hand
+    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V4_balls_only ball
     ```
     *   **Result:** A perfect `dataset.yaml` file is now inside your `V2_with_hands` folder. The dataset is now self-contained and correct.
 
@@ -583,6 +586,50 @@ Your non-augmented training run is almost done. Once it finishes, a `best.pt` fi
     *   Save this file somewhere convenient on your local computer, for example, your `~/Downloads` folder.
 
 ### **Phase 2: Convert the Model to OpenVINO Format**
+
+***UPDATE***
+The proceeding steps to deploy the model have been packaged into the following script
+
+-----------
+
+I've created a comprehensive deploy_model.sh script that automates your model deployment process. The script is now executable and ready for testing.
+
+Features:
+Required argument:
+
+Model name (e.g., V2_3_lonely_hands)
+Optional arguments:
+
+-p, --pt-path: Path to best.pt file (default: ~/Downloads/best.pt)
+-s, --size: Model size nano or small (default: nano)
+-d, --deploy: Deploy to root models directory (replaces current models)
+-h, --help: Show help message
+Usage Examples:
+# Basic usage with default settings (nano model from ~/Downloads/best.pt)
+./scripts/deploy_model.sh V2_3_lonely_hands
+
+# Specify custom PT file location and small model size
+./scripts/deploy_model.sh V2_3_lonely_hands -p /path/to/model.pt -s small
+
+# Deploy and replace current root models
+./scripts/deploy_model.sh V2_3_lonely_hands --deploy
+
+# Full example with all options
+./scripts/deploy_model.sh V4n_balls_only -p ~/Downloads/best.pt -s nano --deploy
+
+What the script does:
+Validates inputs and checks if the PT file exists
+Creates zipped directory at /home/twain/Projects/JuggleHub/engine/models/zipped/{model_name}/
+Copies PT file to the zipped directory as best.pt
+Runs YOLO export command to convert to OpenVINO format
+Creates model directory at /home/twain/Projects/JuggleHub/engine/models/{model_name}/
+Renames and copies the exported files:
+best.xml → yolo11n.xml (nano) or yolo11s.xml (small)
+best.bin → yolo11n.bin (nano) or yolo11s.bin (small)
+Optionally deploys to root models directory (with --deploy flag), backing up existing files
+The script includes comprehensive error handling, logging, input validation, and creates backups when replacing existing models. It's ready for you to test with your workflow.
+
+---------
 
 This is the critical conversion step. We will use the `yolo` command-line tool, which has a built-in exporter for OpenVINO.
 

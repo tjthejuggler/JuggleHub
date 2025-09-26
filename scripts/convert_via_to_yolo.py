@@ -3,7 +3,7 @@ import os
 import argparse
 from PIL import Image
 
-def convert_via_to_yolo(via_json_paths, class_list_path):
+def convert_via_to_yolo(via_json_paths, class_list_path, custom_classes=None):
     """
     Converts VIA (VGG Image Annotator) JSON project files to YOLOv5 format.
 
@@ -16,15 +16,21 @@ def convert_via_to_yolo(via_json_paths, class_list_path):
         class_list_path (str): Path to a text file containing the list of class
                                names, one per line. The line number corresponds
                                to the class ID (line 1 = ID 0).
+        custom_classes (list, optional): List of custom class names to use instead
+                                        of loading from file.
     """
     # --- 1. Load the Class List ---
-    try:
-        with open(class_list_path, 'r') as f:
-            class_list = [line.strip() for line in f.readlines()]
-        print(f"Successfully loaded {len(class_list)} classes: {class_list}")
-    except FileNotFoundError:
-        print(f"FATAL: Class list file not found at '{class_list_path}'")
-        return
+    if custom_classes:
+        class_list = custom_classes
+        print(f"Using custom classes: {class_list}")
+    else:
+        try:
+            with open(class_list_path, 'r') as f:
+                class_list = [line.strip() for line in f.readlines()]
+            print(f"Successfully loaded {len(class_list)} classes from file: {class_list}")
+        except FileNotFoundError:
+            print(f"FATAL: Class list file not found at '{class_list_path}'")
+            return
 
     # --- 2. Process Each VIA Project File ---
     for via_json_path in via_json_paths:
@@ -137,6 +143,12 @@ if __name__ == "__main__":
         default='/home/twain/Projects/JuggleHub/engine/data/classes.txt',
         help="Path to the file containing class names, one per line. \n(default: data/classes.txt)"
     )
+    parser.add_argument(
+        '--classes',
+        type=str,
+        nargs='*',
+        help="Optional list of class names to use instead of loading from file. \nExample: --classes led_on led_off ball"
+    )
 
     args = parser.parse_args()
-    convert_via_to_yolo(args.via_json_paths, args.class_list)
+    convert_via_to_yolo(args.via_json_paths, args.class_list, args.classes)

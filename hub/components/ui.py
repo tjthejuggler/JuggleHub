@@ -949,7 +949,13 @@ if PYQT_AVAILABLE:
 
         def record_clip(self):
             self.log_message("Sending record command to engine...")
-            command = juggler_pb2.CommandRequest(type=juggler_pb2.CommandRequest.CommandType.RECORD_START)
+            
+            command = juggler_pb2.CommandRequest(
+                type=juggler_pb2.CommandRequest.CommandType.RECORD_START,
+                record_with_yolo_boxes=self.show_raw_detections_toggle.isChecked(),
+                record_with_bytetrack_boxes=self.show_tracked_boxes_toggle.isChecked()
+            )
+            
             try:
                 response = self.zmq_client.send_command(command)
                 self.log_message(f"✅ Record command acknowledged: {response.message}" if response.success else f"❌ Record command failed: {response.message}")
@@ -960,7 +966,13 @@ if PYQT_AVAILABLE:
             is_starting = not self.is_continuous_recording
             self.log_message(f"{'Starting' if is_starting else 'Stopping'} continuous recording...")
             command_type = juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_START if is_starting else juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_STOP
-            command = juggler_pb2.CommandRequest(type=command_type)
+            
+            command = juggler_pb2.CommandRequest(
+                type=command_type,
+                record_with_yolo_boxes=self.show_raw_detections_toggle.isChecked(),
+                record_with_bytetrack_boxes=self.show_tracked_boxes_toggle.isChecked()
+            )
+            
             try:
                 response = self.zmq_client.send_command(command)
                 if response.success:

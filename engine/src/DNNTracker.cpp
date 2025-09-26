@@ -66,7 +66,7 @@ void DNNTracker::initialize_logical_trackers() {
     }
 }
 
-std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
+std::pair<std::vector<TrackedObject>, std::vector<Detection>> DNNTracker::update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
     auto current_time = std::chrono::steady_clock::now();
     float dt = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - last_update_time_).count();
     last_update_time_ = current_time;
@@ -113,7 +113,7 @@ std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::upd
     for (const auto& b_track : byte_tracks) {
         int b_track_id = (int)b_track->getTrackId();
         
-        const RawDetection* best_det = nullptr;
+        const Detection* best_det = nullptr;
         float best_iou = 0.0f;
         for(const auto& det : last_raw_detections_){
             byte_track::Rect<float> det_rect(det.box.x, det.box.y, det.box.width, det.box.height);
@@ -174,7 +174,7 @@ std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::upd
     }
 
     // --- 5. MANAGE HEURISTICS ---
-    std::vector<RawDetection> hand_detections;
+    std::vector<Detection> hand_detections;
     for(const auto& det : last_raw_detections_) if(det.class_id == 3) hand_detections.push_back(det);
     manage_hand_tracks(hand_detections);
     manage_ball_occlusion();
@@ -203,7 +203,7 @@ std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> DNNTracker::upd
 }
 
 
-void DNNTracker::manage_hand_tracks(const std::vector<RawDetection>& hand_detections) {
+void DNNTracker::manage_hand_tracks(const std::vector<Detection>& hand_detections) {
     // This logic is now stateful. It tries to maintain left/right assignment.
     PersistentTracker* left_hand = nullptr;
     PersistentTracker* right_hand = nullptr;
@@ -298,7 +298,7 @@ void DNNTracker::manage_ball_occlusion() {
 
 void DNNTracker::calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
     float min_dist = 20.0f; // 20 pixel search radius
-    const RawDetection* closest_det = nullptr;
+    const Detection* closest_det = nullptr;
 
     for(const auto& det : last_raw_detections_) {
         cv::Point2f center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
@@ -355,7 +355,7 @@ cv::Mat DNNTracker::preprocess(const cv::Mat& frame, float& scale_x, float& scal
     return cv::dnn::blobFromImage(float_frame);
 }
 
-std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<RawDetection>& raw_detections) {
+std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<Detection>& raw_detections) {
     raw_detections.clear();
     const float* output_data = output_tensor.data<const float>();
     const int num_channels = 4 + num_classes_;

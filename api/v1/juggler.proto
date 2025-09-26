@@ -149,6 +149,8 @@ message CommandRequest {
   // For CALIBRATE_OBJECT
   int32 logical_id_to_calibrate = 10;
   Vector2 calibration_pixel_pos = 11;
+  bool record_with_yolo_boxes = 12;
+  bool record_with_bytetrack_boxes = 13;
 }
 
 message ColorCommand {

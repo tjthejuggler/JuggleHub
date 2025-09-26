@@ -33,7 +33,7 @@ struct TrackedObject {
     bool is_left;         // For hands, true if it's the left hand
 };
 
-struct RawDetection {
+struct Detection {
     cv::Rect_<float> box;
     cv::Point3f world_pos; // The raw, measured 3D position
     float confidence;
@@ -45,7 +45,7 @@ public:
     DNNTracker(const std::string& model_path, const std::string& device_name);
     ~DNNTracker();
 
-    std::pair<std::vector<TrackedObject>, std::vector<RawDetection>> update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
+    std::pair<std::vector<TrackedObject>, std::vector<Detection>> update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
 
     void update_setting(const std::string& key, const std::string& value);
     void calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
@@ -75,7 +75,7 @@ private:
     const int NUM_HANDS = 2; // Configurable number of hands
 
     // --- State Caching ---
-    std::vector<RawDetection> last_raw_detections_;
+    std::vector<Detection> last_raw_detections_;
 
     // Model & Preprocessing Parameters
     int input_width_ = 640;
@@ -94,8 +94,8 @@ private:
     const std::vector<std::string> class_names_ = {"led_on", "led_off", "dropped_ball", "hand"};
 
     // --- Private Methods ---
-    void manage_hand_tracks(const std::vector<RawDetection>& hand_detections);
+    void manage_hand_tracks(const std::vector<Detection>& hand_detections);
     void manage_ball_occlusion();
     cv::Mat preprocess(const cv::Mat& frame, float& scale_x, float& scale_y);
-    std::vector<byte_track::Object> postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<RawDetection>& raw_detections);
+    std::vector<byte_track::Object> postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<Detection>& raw_detections);
 };

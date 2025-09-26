@@ -34,7 +34,9 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       ir_projector_active_(false),
       camera_width_(640),
       camera_height_(480),
-      camera_fps_(30) {
+      camera_fps_(30),
+      record_with_yolo_boxes_(false),
+      record_with_bytetrack_boxes_(false) {
    if (verbose_) {
        std::cout << "[LOG] Engine constructor called." << std::endl;
        std::cout << "[LOG] Initial camera settings: " << camera_width_ << "x" << camera_height_ << " @ " << camera_fps_ << " FPS" << std::endl;
@@ -115,20 +117,7 @@ void Engine::run() {
         cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
         last_depth_frame_ = depth_image.clone();
         
-        // Add to frame buffer
-        {
-            std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
-            frame_buffer_.push_back(color_image.clone());
-            if (frame_buffer_.size() > 150) {
-                frame_buffer_.pop_front();
-            }
-        }
-        
-        // Add to continuous recording buffer if recording
-        if (continuous_recording_) {
-            std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
-            continuous_frame_buffer_.push_back(color_image.clone());
-        }
+        // This block will be updated later to include detections
         
         juggler::v1::FrameData frame_data;
         frame_data.set_timestamp_us(std::chrono::duration_cast<std::chrono::microseconds>(
@@ -159,9 +148,26 @@ void Engine::run() {
                 raw_det_pb->set_class_id(det.class_id);
             }
 
-            if (verbose_) {
-                std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects and " << raw_detections.size() << " raw detections." << std::endl;
+            last_raw_detections_ = raw_detections;
+            last_tracked_objects_ = tracked_objects;
+
+            // Add to frame buffers
+            RecordingFrame rec_frame = {color_image.clone(), raw_detections, tracked_objects};
+            {
+                std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
+                frame_buffer_.push_back(rec_frame);
+                if (frame_buffer_.size() > 150) {
+                    frame_buffer_.pop_front();
+                }
             }
+            if (continuous_recording_) {
+                std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
+                continuous_frame_buffer_.push_back(rec_frame);
+            }
+ 
+             if (verbose_) {
+                 std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects and " << raw_detections.size() << " raw detections." << std::endl;
+             }
         } else {
              auto rs_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
              auto detections = ball_tracker_->detectBalls(color_image, depth_frame, rs_intrinsics);
@@ -295,10 +301,14 @@ void Engine::processCommands() {
                     }
                     break;
                 case juggler::v1::CommandRequest::RECORD_START:
+                    record_with_yolo_boxes_ = command.record_with_yolo_boxes();
+                    record_with_bytetrack_boxes_ = command.record_with_bytetrack_boxes();
                     saveRecording();
                     response.set_message("Recording saved");
                     break;
                 case juggler::v1::CommandRequest::RECORD_CONTINUOUS_START:
+                    record_with_yolo_boxes_ = command.record_with_yolo_boxes();
+                    record_with_bytetrack_boxes_ = command.record_with_bytetrack_boxes();
                     startContinuousRecording();
                     response.set_message("Continuous recording started");
                     break;
@@ -415,7 +425,6 @@ void Engine::saveRecording() {
         return;
     }
 
-    // Create a timestamped directory
     auto now = std::chrono::system_clock::now();
     auto in_time_t = std::chrono::system_clock::to_time_t(now);
     std::tm buf;
@@ -425,26 +434,46 @@ void Engine::saveRecording() {
     fs::path data_dir = "engine/data/1_raw_recordings";
     fs::path recording_dir = data_dir / ss.str();
     
-    std::cout << "DEBUG: Attempting to create directory: " << recording_dir << std::endl;
+    fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
+
+    std::cout << "DEBUG: Attempting to create directory: " << recording_dir_no_boxes << std::endl;
 
     try {
-        if (fs::create_directories(recording_dir)) {
-            std::cout << "DEBUG: Successfully created directory." << std::endl;
-        } else {
-            std::cout << "DEBUG: Directory already existed or failed to create." << std::endl;
-        }
+        fs::create_directories(recording_dir_no_boxes);
         
         int frame_num = 0;
-        for (const auto& frame : frame_buffer_) {
+        for (const auto& rec_frame : frame_buffer_) {
             std::string filename = ss.str() + "_frame_" + std::to_string(frame_num++) + ".jpg";
-            fs::path filepath = recording_dir / filename;
-            bool success = cv::imwrite(filepath.string(), frame);
-            if (!success) {
-                std::cerr << "Error: Failed to save frame to " << filepath << std::endl;
-            }
+            fs::path filepath = recording_dir_no_boxes / filename;
+            cv::imwrite(filepath.string(), rec_frame.frame);
         }
         
-        std::cout << "Saved " << frame_buffer_.size() << " frames to " << recording_dir << std::endl;
+        std::cout << "Saved " << frame_buffer_.size() << " frames to " << recording_dir_no_boxes << std::endl;
+
+        if (record_with_yolo_boxes_ || record_with_bytetrack_boxes_) {
+            fs::path recording_dir_with_boxes = recording_dir / "with_boxes";
+            fs::create_directories(recording_dir_with_boxes);
+
+            int frame_num_boxes = 0;
+            for (const auto& rec_frame : frame_buffer_) {
+                cv::Mat frame_with_boxes = rec_frame.frame.clone();
+                if (record_with_yolo_boxes_) {
+                    for (const auto& det : rec_frame.raw_detections) {
+                        cv::rectangle(frame_with_boxes, det.box, cv::Scalar(0, 0, 255), 2); // Red for YOLO
+                    }
+                }
+                if (record_with_bytetrack_boxes_) {
+                    for (const auto& obj : rec_frame.tracked_objects) {
+                        cv::rectangle(frame_with_boxes, obj.box, cv::Scalar(0, 165, 255), 2); // Orange for ByteTrack
+                    }
+                }
+                std::string filename = ss.str() + "_frame_" + std::to_string(frame_num_boxes++) + "_boxes.jpg";
+                fs::path filepath = recording_dir_with_boxes / filename;
+                cv::imwrite(filepath.string(), frame_with_boxes);
+            }
+            std::cout << "Saved " << frame_buffer_.size() << " frames with bounding boxes to " << recording_dir_with_boxes << std::endl;
+        }
+
     } catch (const fs::filesystem_error& e) {
         std::cerr << "Error creating directory or saving frames: " << e.what() << std::endl;
     }
@@ -494,30 +523,48 @@ void Engine::stopContinuousRecording() {
         return;
     }
     
-    // Create directory for continuous recording
     fs::path data_dir = "engine/data/1_raw_recordings";
     fs::path recording_dir = data_dir / continuous_recording_session_;
-    
-    std::cout << "DEBUG: Attempting to create directory: " << recording_dir << std::endl;
+    fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
+
+    std::cout << "DEBUG: Attempting to create directory: " << recording_dir_no_boxes << std::endl;
     
     try {
-        if (fs::create_directories(recording_dir)) {
-            std::cout << "DEBUG: Successfully created directory." << std::endl;
-        } else {
-            std::cout << "DEBUG: Directory already existed or failed to create." << std::endl;
-        }
+        fs::create_directories(recording_dir_no_boxes);
         
         int frame_num = 0;
-        for (const auto& frame : continuous_frame_buffer_) {
+        for (const auto& rec_frame : continuous_frame_buffer_) {
             std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num++) + ".jpg";
-            fs::path filepath = recording_dir / filename;
-            bool success = cv::imwrite(filepath.string(), frame);
-            if (!success) {
-                std::cerr << "Error: Failed to save frame to " << filepath << std::endl;
-            }
+            fs::path filepath = recording_dir_no_boxes / filename;
+            cv::imwrite(filepath.string(), rec_frame.frame);
         }
         
-        std::cout << "Saved " << continuous_frame_buffer_.size() << " frames to " << recording_dir << std::endl;
+        std::cout << "Saved " << continuous_frame_buffer_.size() << " frames to " << recording_dir_no_boxes << std::endl;
+
+        if (record_with_yolo_boxes_ || record_with_bytetrack_boxes_) {
+            fs::path recording_dir_with_boxes = recording_dir / "with_boxes";
+            fs::create_directories(recording_dir_with_boxes);
+
+            int frame_num_boxes = 0;
+            for (const auto& rec_frame : continuous_frame_buffer_) {
+                cv::Mat frame_with_boxes = rec_frame.frame.clone();
+                if (record_with_yolo_boxes_) {
+                    for (const auto& det : rec_frame.raw_detections) {
+                        cv::rectangle(frame_with_boxes, det.box, cv::Scalar(0, 0, 255), 2); // Red for YOLO
+                    }
+                }
+                if (record_with_bytetrack_boxes_) {
+                    for (const auto& obj : rec_frame.tracked_objects) {
+                        cv::rectangle(frame_with_boxes, obj.box, cv::Scalar(0, 165, 255), 2); // Orange for ByteTrack
+                    }
+                }
+                std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num_boxes++) + "_boxes.jpg";
+                fs::path filepath = recording_dir_with_boxes / filename;
+                cv::imwrite(filepath.string(), frame_with_boxes);
+            }
+            std::cout << "Saved " << continuous_frame_buffer_.size() << " frames with bounding boxes to " << recording_dir_with_boxes << std::endl;
+        }
+
         continuous_frame_buffer_.clear();
         
     } catch (const fs::filesystem_error& e) {

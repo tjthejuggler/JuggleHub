@@ -81,13 +81,24 @@ private:
     uint32_t camera_fps_;
 
     // Frame buffer for recording
-    std::deque<cv::Mat> frame_buffer_;
+    struct RecordingFrame {
+        cv::Mat frame;
+        std::vector<Detection> raw_detections;
+        std::vector<TrackedObject> tracked_objects;
+    };
+    std::deque<RecordingFrame> frame_buffer_;
     std::mutex frame_buffer_mutex_;
     uint32_t frame_counter_;
     
     // Continuous recording state
     std::atomic<bool> continuous_recording_;
-    std::deque<cv::Mat> continuous_frame_buffer_;
+    std::deque<RecordingFrame> continuous_frame_buffer_;
     std::mutex continuous_frame_buffer_mutex_;
     std::string continuous_recording_session_;
+
+    // Recording with bounding boxes state
+    std::atomic<bool> record_with_yolo_boxes_;
+    std::atomic<bool> record_with_bytetrack_boxes_;
+    std::vector<Detection> last_raw_detections_; // Keep for calibration
+    std::vector<TrackedObject> last_tracked_objects_; // Keep for calibration
 };

@@ -8,3 +8,7 @@ V2_cleaned_more_blur - i fixed the mislabeled hands from V1 and i labelled some 
 V2_1_empty_hands - an extra 200ish images of empty hands, no juggling balls
 V2_2_lonely_hands - about 600 more images of empty hands, fake juggling, holding balls in weird angles and throws and catches
 V2_3_lonely_hands - same as V2.2 but with slight changes to the augmented data code
+V5 - specifically targeted edgecases images added, about 400 of them
+V6 - all boxes made one pixel smaller on all sides compared to V5
+V6.1 - all boxes made 2 pixels smaller on all sides compared to V5
+V6.2 - all boxes made 1 pixel larger on all sides compared to V5

@@ -234,7 +234,7 @@ Once you have several completed annotation sessions and their corresponding `via
     **Example Command:**
     ```bash
     python scripts/convert_via_to_yolo.py \
-      /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5_2_rs455_lonely_hands_low_light_intentional_realsense/V4via_project_21Sep2025_10h30m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5rs455_just_hands_low_light_intentional_and_auto_realsense/V4via_project_20Sep2025_18h36m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5rs455_led_balls_mixedlight_sessions_intentional_realsense/V4via_project_23Sep2025_12h19m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5rs455_normal_balls_daylight_sessions_auto_realsense/V4via_project_17Sep2025_10h0m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5rs455_normal_balls_mixedlight_sessions_intentional_realsense/V4via_project_18Sep2025_14h31m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes/via_project_27Sep2025_16h17m.json --classes ball
+      /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6_2_rs455_lonely_hands_low_light_intentional_realsense/V4via_project_21Sep2025_10h30m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6rs455_just_hands_low_light_intentional_and_auto_realsense/V4via_project_20Sep2025_18h36m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6rs455_led_balls_mixedlight_sessions_intentional_realsense/V4via_project_23Sep2025_12h19m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6rs455_normal_balls_daylight_sessions_auto_realsense/V4via_project_17Sep2025_10h0m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6rs455_normal_balls_mixedlight_sessions_intentional_realsense/V4via_project_18Sep2025_14h31m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes/via_project_27Sep2025_16h17m.json --classes ball
     ```
     NOTE: you can use --classes ball
         to override the default list of classes.
@@ -246,10 +246,10 @@ Once you have several completed annotation sessions and their corresponding `via
     *   **Example Command:**
     ```bash
     python scripts/prepare_dataset.py \
-        --dataset-name V5_edgecases \
+        --dataset-name V6_6_grown \
         --source-dir /home/twain/Projects/JuggleHub/engine/data/annotation_sessions \
         --output-dir /home/twain/Projects/JuggleHub/engine/data/3_training_datasets \
-        --tags V5_2_rs455_lonely_hands_low_light_intentional_realsense V5rs455_just_hands_low_light_intentional_and_auto_realsense V5rs455_led_balls_mixedlight_sessions_intentional_realsense V5rs455_normal_balls_daylight_sessions_auto_realsense V5rs455_normal_balls_mixedlight_sessions_intentional_realsense V5_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes
+        --tags V6.6_2_rs455_lonely_hands_low_light_intentional_realsense V6.6rs455_just_hands_low_light_intentional_and_auto_realsense V6.6rs455_led_balls_mixedlight_sessions_intentional_realsense V6.6rs455_normal_balls_daylight_sessions_auto_realsense V6.6rs455_normal_balls_mixedlight_sessions_intentional_realsense V6.6_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes
     ```
     *   **Result:** A new folder like `data/3_training_datasets/V2_with_hands/` is created.
 
@@ -258,7 +258,7 @@ This is where we prevent the label mismatch error at its source. We will create 
 
 3.  **Run the create_yaml.py Script:** From your terminal, run this script, providing the path to your newly assembled dataset and your full list of class names in the correct order.
     ```bash
-    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V5_edgecases ball
+    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V6_6_grown ball
     ```
     *   **Result:** A perfect `dataset.yaml` file is now inside your `V2_with_hands` folder. The dataset is now self-contained and correct.
 
@@ -266,7 +266,7 @@ This is where we prevent the label mismatch error at its source. We will create 
 1.  **Compress the Dataset:** Navigate to the `3_training_datasets` directory and zip your final dataset folder.
     ```bash
     cd engine/data/3_training_datasets/
-    zip -r V2_with_hands.zip V2_with_hands/
+    zip -r V6_6_grown.zip V6_6_grown/
     ```
 2.  **Locate Your Custom Model:** Find your `yolo11n.pt` file. You will need to upload this alongside your dataset.
 

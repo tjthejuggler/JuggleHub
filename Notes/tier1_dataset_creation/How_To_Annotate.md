@@ -246,10 +246,10 @@ Once you have several completed annotation sessions and their corresponding `via
     *   **Example Command:**
     ```bash
     python scripts/prepare_dataset.py \
-        --dataset-name V7_ball_col_aug \
+        --dataset-name V7_1_ball_col_aug \
         --source-dir /home/twain/Projects/JuggleHub/engine/data/annotation_sessions \
         --output-dir /home/twain/Projects/JuggleHub/engine/data/3_training_datasets \
-        --tags V6.6_2_rs455_lonely_hands_low_light_intentional_realsense V6.6rs455_just_hands_low_light_intentional_and_auto_realsense V6.6rs455_led_balls_mixedlight_sessions_intentional_realsense V6.6rs455_normal_balls_daylight_sessions_auto_realsense V6.6rs455_normal_balls_mixedlight_sessions_intentional_realsense V6.6_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes V7_ball_col_aug
+        --tags V6.6_2_rs455_lonely_hands_low_light_intentional_realsense V6.6rs455_just_hands_low_light_intentional_and_auto_realsense V6.6rs455_led_balls_mixedlight_sessions_intentional_realsense V6.6rs455_normal_balls_daylight_sessions_auto_realsense V6.6rs455_normal_balls_mixedlight_sessions_intentional_realsense V6.6_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes V7_ball_col_aug V7_1_hard_negatives
     ```
     *   **Result:** A new folder like `data/3_training_datasets/V2_with_hands/` is created.
 
@@ -615,7 +615,7 @@ Usage Examples:
 ./scripts/deploy_model.sh V2_3_lonely_hands --deploy
 
 # Full example with all options
-./scripts/deploy_model.sh V4n_balls_only -p ~/Downloads/best.pt -s nano --deploy
+./scripts/deploy_model.sh V7_1_balls_col_aug -p ~/Downloads/best.pt -s nano --deploy
 
 What the script does:
 Validates inputs and checks if the PT file exists

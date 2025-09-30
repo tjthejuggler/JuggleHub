@@ -929,22 +929,6 @@ if PYQT_AVAILABLE:
                     painter.drawText(center_x + 15, center_y, label)
                     painter.drawText(center_x + 15, center_y + 15, pos_label)
 
-            # --- Draw Hand Trackers ---
-            painter.setPen(QPen(QColor(3, 169, 244), 4)) # Bright blue, thick line
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            for hand in frame_data.hands:
-                # Draw a large circle for high visibility
-                center_x, center_y = int(hand.position_2d.x), int(hand.position_2d.y)
-                radius = 20 # Large radius for visibility
-                painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
-                
-                # Draw hand side label
-                painter.setPen(QPen(QColor(255, 255, 255)))
-                painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-                side_label = "L" if hand.side == "left" else "R"
-                painter.drawText(center_x - 5, center_y + 5, side_label)
-
-
             # --- Draw Tracker Tails ---
             if self.show_tails_toggle.isChecked():
                 for ball_id, history in self.tracker_history.items():
@@ -963,9 +947,29 @@ if PYQT_AVAILABLE:
                                     painter.setPen(pen)
                                     painter.drawLine(int(p1[0]), int(p1[1]), int(p2[0]), int(p2[1]))
 
-            # --- Draw Skeleton ---
+            # --- Draw Skeleton and Hand Trackers ---
             if self.show_skeleton_toggle.isChecked():
                 self.log_message(f"UI: Drawing skeleton for {len(frame_data.hands)} hands")
+                
+                # Draw hand wrist markers
+                painter.setPen(QPen(QColor(3, 169, 244), 4)) # Bright blue, thick line
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                for hand in frame_data.hands:
+                    # Draw a large circle for high visibility
+                    center_x, center_y = int(hand.position_2d.x), int(hand.position_2d.y)
+                    radius = 20 # Large radius for visibility
+                    painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
+                    
+                    # Draw hand side label
+                    painter.setPen(QPen(QColor(255, 255, 255)))
+                    painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+                    side_label = "L" if hand.side == "left" else "R"
+                    painter.drawText(center_x - 5, center_y + 5, side_label)
+                    
+                    # Reset pen for keypoints
+                    painter.setPen(QPen(QColor(3, 169, 244), 4))
+                
+                # Draw all body keypoints
                 painter.setPen(QPen(QColor(0, 255, 0, 150), 2)) # Green for skeleton
                 for hand in frame_data.hands:
                     self.log_message(f"UI: Hand has {len(hand.keypoints)} keypoints")

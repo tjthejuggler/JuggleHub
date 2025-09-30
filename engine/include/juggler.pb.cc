@@ -136,8 +136,10 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORIT
 PROTOBUF_CONSTEXPR Hand::Hand(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.keypoints_)*/{}
+  , /*decltype(_impl_.side_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.position_2d_)*/nullptr
   , /*decltype(_impl_.wrist_pos_3d_)*/nullptr
+  , /*decltype(_impl_.position_3d_)*/nullptr
   , /*decltype(_impl_.id_)*/0
   , /*decltype(_impl_.is_visible_)*/false
   , /*decltype(_impl_.confidence_)*/0
@@ -387,6 +389,8 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.confidence_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.is_visible_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.keypoints_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.side_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.position_3d_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::IMUData, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -502,14 +506,14 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 47, -1, -1, sizeof(::juggler::v1::Ball)},
   { 60, -1, -1, sizeof(::juggler::v1::KeyPoint)},
   { 69, -1, -1, sizeof(::juggler::v1::Hand)},
-  { 81, -1, -1, sizeof(::juggler::v1::IMUData)},
-  { 96, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
-  { 107, -1, -1, sizeof(::juggler::v1::SystemStatus)},
-  { 120, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 139, 147, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 149, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 169, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 177, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 83, -1, -1, sizeof(::juggler::v1::IMUData)},
+  { 98, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
+  { 109, -1, -1, sizeof(::juggler::v1::SystemStatus)},
+  { 122, -1, -1, sizeof(::juggler::v1::FrameData)},
+  { 141, 149, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 151, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 171, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 179, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -551,64 +555,66 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "\022\014\n\010OCCLUDED\020\002\"h\n\010KeyPoint\022#\n\006pos_2d\030\001 \001"
   "(\0132\023.juggler.v1.Vector2\022#\n\006pos_3d\030\002 \001(\0132"
   "\023.juggler.v1.Vector3\022\022\n\nconfidence\030\003 \001(\002"
-  "\"\270\001\n\004Hand\022\n\n\002id\030\001 \001(\005\022(\n\013position_2d\030\002 \001"
+  "\"\360\001\n\004Hand\022\n\n\002id\030\001 \001(\005\022(\n\013position_2d\030\002 \001"
   "(\0132\023.juggler.v1.Vector2\022)\n\014wrist_pos_3d\030"
   "\003 \001(\0132\023.juggler.v1.Vector3\022\022\n\nconfidence"
   "\030\004 \001(\001\022\022\n\nis_visible\030\005 \001(\010\022\'\n\tkeypoints\030"
-  "\006 \003(\0132\024.juggler.v1.KeyPoint\"\211\002\n\007IMUData\022"
-  "\022\n\nwatch_name\030\001 \001(\t\022\020\n\010watch_ip\030\002 \001(\t\022)\n"
-  "\014acceleration\030\003 \001(\0132\023.juggler.v1.Vector3"
-  "\022&\n\tgyroscope\030\004 \001(\0132\023.juggler.v1.Vector3"
-  "\022)\n\014magnetometer\030\005 \001(\0132\023.juggler.v1.Vect"
-  "or3\022\027\n\017accel_magnitude\030\006 \001(\001\022\026\n\016gyro_mag"
-  "nitude\030\007 \001(\001\022\024\n\014timestamp_us\030\010 \001(\004\022\023\n\013da"
-  "ta_age_ms\030\t \001(\001\"Y\n\020CameraIntrinsics\022\n\n\002f"
-  "x\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003ppx\030\003 \001(\001\022\013\n\003ppy\030"
-  "\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001\"\235\001\n\014SystemSta"
-  "tus\022\030\n\020camera_connected\030\001 \001(\010\022\026\n\016engine_"
-  "running\030\002 \001(\010\022\013\n\003fps\030\003 \001(\001\022\023\n\013frame_coun"
-  "t\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\rerror_message\030\006"
-  " \001(\t\022\024\n\014timestamp_us\030\007 \001(\004\"\251\003\n\tFrameData"
-  "\022\024\n\014timestamp_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020."
-  "juggler.v1.Ball\022\037\n\005hands\030\003 \003(\0132\020.juggler"
-  ".v1.Hand\022%\n\010imu_data\030\004 \003(\0132\023.juggler.v1."
-  "IMUData\0220\n\nintrinsics\030\005 \001(\0132\034.juggler.v1"
-  ".CameraIntrinsics\022(\n\006status\030\006 \001(\0132\030.jugg"
-  "ler.v1.SystemStatus\022\023\n\013frame_width\030\007 \001(\r"
-  "\022\024\n\014frame_height\030\010 \001(\r\022\024\n\014frame_number\030\t"
-  " \001(\r\0221\n\016raw_detections\030\n \003(\0132\031.juggler.v"
-  "1.BoundingBox2D\022\027\n\017color_image_b64\030\013 \001(\014"
-  "\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir_projecto"
-  "r_active\030\r \001(\010\"\334\006\n\016CommandRequest\0224\n\004typ"
-  "e\030\001 \001(\0162&.juggler.v1.CommandRequest.Comm"
-  "andType\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestam"
-  "p_us\030\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.jugg"
-  "ler.v1.ColorCommand\022\?\n\013module_args\030\005 \003(\013"
-  "2*.juggler.v1.CommandRequest.ModuleArgsE"
-  "ntry\022\034\n\024camera_settings_file\030\006 \001(\t\022\024\n\014ca"
-  "mera_width\030\007 \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022"
-  "\022\n\ncamera_fps\030\t \001(\r\022\037\n\027logical_id_to_cal"
-  "ibrate\030\n \001(\005\0222\n\025calibration_pixel_pos\030\013 "
-  "\001(\0132\023.juggler.v1.Vector2\022\036\n\026record_with_"
-  "yolo_boxes\030\014 \001(\010\022#\n\033record_with_bytetrac"
-  "k_boxes\030\r \001(\010\022\032\n\022pose_model_enabled\030\016 \001("
-  "\010\0321\n\017ModuleArgsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005val"
-  "ue\030\002 \001(\t:\0028\001\"\256\002\n\013CommandType\022\013\n\007UNKNOWN\020"
-  "\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n"
-  "\022SEND_COLOR_COMMAND\020\003\022\024\n\020CONFIGURE_MODUL"
-  "E\020\004\022\020\n\014RECORD_START\020\005\022\033\n\027RECORD_CONTINUO"
-  "US_START\020\006\022\032\n\026RECORD_CONTINUOUS_STOP\020\007\022 "
-  "\n\034RESTART_WITH_CAMERA_SETTINGS\020\010\022\017\n\013CAME"
-  "RA_STOP\020\t\022\020\n\014CAMERA_START\020\n\022\024\n\020CALIBRATE"
-  "_OBJECT\020\013\022\032\n\026SET_POSE_MODEL_ENABLED\020\014\"A\n"
-  "\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030"
-  "\002 \001(\0132\021.juggler.v1.Color\"I\n\017CommandRespo"
-  "nse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n"
-  "\014timestamp_us\030\003 \001(\004b\006proto3"
+  "\006 \003(\0132\024.juggler.v1.KeyPoint\022\014\n\004side\030\007 \001("
+  "\t\022(\n\013position_3d\030\010 \001(\0132\023.juggler.v1.Vect"
+  "or3\"\211\002\n\007IMUData\022\022\n\nwatch_name\030\001 \001(\t\022\020\n\010w"
+  "atch_ip\030\002 \001(\t\022)\n\014acceleration\030\003 \001(\0132\023.ju"
+  "ggler.v1.Vector3\022&\n\tgyroscope\030\004 \001(\0132\023.ju"
+  "ggler.v1.Vector3\022)\n\014magnetometer\030\005 \001(\0132\023"
+  ".juggler.v1.Vector3\022\027\n\017accel_magnitude\030\006"
+  " \001(\001\022\026\n\016gyro_magnitude\030\007 \001(\001\022\024\n\014timestam"
+  "p_us\030\010 \001(\004\022\023\n\013data_age_ms\030\t \001(\001\"Y\n\020Camer"
+  "aIntrinsics\022\n\n\002fx\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003p"
+  "px\030\003 \001(\001\022\013\n\003ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001"
+  "(\001\"\235\001\n\014SystemStatus\022\030\n\020camera_connected\030"
+  "\001 \001(\010\022\026\n\016engine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001"
+  "(\001\022\023\n\013frame_count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n"
+  "\rerror_message\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001"
+  "(\004\"\251\003\n\tFrameData\022\024\n\014timestamp_us\030\001 \001(\004\022\037"
+  "\n\005balls\030\002 \003(\0132\020.juggler.v1.Ball\022\037\n\005hands"
+  "\030\003 \003(\0132\020.juggler.v1.Hand\022%\n\010imu_data\030\004 \003"
+  "(\0132\023.juggler.v1.IMUData\0220\n\nintrinsics\030\005 "
+  "\001(\0132\034.juggler.v1.CameraIntrinsics\022(\n\006sta"
+  "tus\030\006 \001(\0132\030.juggler.v1.SystemStatus\022\023\n\013f"
+  "rame_width\030\007 \001(\r\022\024\n\014frame_height\030\010 \001(\r\022\024"
+  "\n\014frame_number\030\t \001(\r\0221\n\016raw_detections\030\n"
+  " \003(\0132\031.juggler.v1.BoundingBox2D\022\027\n\017color"
+  "_image_b64\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001("
+  "\014\022\033\n\023ir_projector_active\030\r \001(\010\"\334\006\n\016Comma"
+  "ndRequest\0224\n\004type\030\001 \001(\0162&.juggler.v1.Com"
+  "mandRequest.CommandType\022\023\n\013module_name\030\002"
+  " \001(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/\n\rcolor_comm"
+  "and\030\004 \001(\0132\030.juggler.v1.ColorCommand\022\?\n\013m"
+  "odule_args\030\005 \003(\0132*.juggler.v1.CommandReq"
+  "uest.ModuleArgsEntry\022\034\n\024camera_settings_"
+  "file\030\006 \001(\t\022\024\n\014camera_width\030\007 \001(\r\022\025\n\rcame"
+  "ra_height\030\010 \001(\r\022\022\n\ncamera_fps\030\t \001(\r\022\037\n\027l"
+  "ogical_id_to_calibrate\030\n \001(\005\0222\n\025calibrat"
+  "ion_pixel_pos\030\013 \001(\0132\023.juggler.v1.Vector2"
+  "\022\036\n\026record_with_yolo_boxes\030\014 \001(\010\022#\n\033reco"
+  "rd_with_bytetrack_boxes\030\r \001(\010\022\032\n\022pose_mo"
+  "del_enabled\030\016 \001(\010\0321\n\017ModuleArgsEntry\022\013\n\003"
+  "key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\256\002\n\013Command"
+  "Type\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rUN"
+  "LOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMMAND\020\003\022\024\n"
+  "\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_START\020\005\022\033\n"
+  "\027RECORD_CONTINUOUS_START\020\006\022\032\n\026RECORD_CON"
+  "TINUOUS_STOP\020\007\022 \n\034RESTART_WITH_CAMERA_SE"
+  "TTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CAMERA_STAR"
+  "T\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026SET_POSE_MO"
+  "DEL_ENABLED\020\014\"A\n\014ColorCommand\022\017\n\007ball_id"
+  "\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color"
+  "\"I\n\017CommandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007"
+  "message\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006pro"
+  "to3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 2907, descriptor_table_protodef_juggler_2eproto,
+    false, false, 2963, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 16,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -2785,6 +2791,7 @@ class Hand::_Internal {
  public:
   static const ::juggler::v1::Vector2& position_2d(const Hand* msg);
   static const ::juggler::v1::Vector3& wrist_pos_3d(const Hand* msg);
+  static const ::juggler::v1::Vector3& position_3d(const Hand* msg);
 };
 
 const ::juggler::v1::Vector2&
@@ -2794,6 +2801,10 @@ Hand::_Internal::position_2d(const Hand* msg) {
 const ::juggler::v1::Vector3&
 Hand::_Internal::wrist_pos_3d(const Hand* msg) {
   return *msg->_impl_.wrist_pos_3d_;
+}
+const ::juggler::v1::Vector3&
+Hand::_Internal::position_3d(const Hand* msg) {
+  return *msg->_impl_.position_3d_;
 }
 Hand::Hand(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                          bool is_message_owned)
@@ -2806,19 +2817,32 @@ Hand::Hand(const Hand& from)
   Hand* const _this = this; (void)_this;
   new (&_impl_) Impl_{
       decltype(_impl_.keypoints_){from._impl_.keypoints_}
+    , decltype(_impl_.side_){}
     , decltype(_impl_.position_2d_){nullptr}
     , decltype(_impl_.wrist_pos_3d_){nullptr}
+    , decltype(_impl_.position_3d_){nullptr}
     , decltype(_impl_.id_){}
     , decltype(_impl_.is_visible_){}
     , decltype(_impl_.confidence_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.side_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.side_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_side().empty()) {
+    _this->_impl_.side_.Set(from._internal_side(), 
+      _this->GetArenaForAllocation());
+  }
   if (from._internal_has_position_2d()) {
     _this->_impl_.position_2d_ = new ::juggler::v1::Vector2(*from._impl_.position_2d_);
   }
   if (from._internal_has_wrist_pos_3d()) {
     _this->_impl_.wrist_pos_3d_ = new ::juggler::v1::Vector3(*from._impl_.wrist_pos_3d_);
+  }
+  if (from._internal_has_position_3d()) {
+    _this->_impl_.position_3d_ = new ::juggler::v1::Vector3(*from._impl_.position_3d_);
   }
   ::memcpy(&_impl_.id_, &from._impl_.id_,
     static_cast<size_t>(reinterpret_cast<char*>(&_impl_.confidence_) -
@@ -2832,13 +2856,19 @@ inline void Hand::SharedCtor(
   (void)is_message_owned;
   new (&_impl_) Impl_{
       decltype(_impl_.keypoints_){arena}
+    , decltype(_impl_.side_){}
     , decltype(_impl_.position_2d_){nullptr}
     , decltype(_impl_.wrist_pos_3d_){nullptr}
+    , decltype(_impl_.position_3d_){nullptr}
     , decltype(_impl_.id_){0}
     , decltype(_impl_.is_visible_){false}
     , decltype(_impl_.confidence_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
+  _impl_.side_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.side_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 Hand::~Hand() {
@@ -2853,8 +2883,10 @@ Hand::~Hand() {
 inline void Hand::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
   _impl_.keypoints_.~RepeatedPtrField();
+  _impl_.side_.Destroy();
   if (this != internal_default_instance()) delete _impl_.position_2d_;
   if (this != internal_default_instance()) delete _impl_.wrist_pos_3d_;
+  if (this != internal_default_instance()) delete _impl_.position_3d_;
 }
 
 void Hand::SetCachedSize(int size) const {
@@ -2868,6 +2900,7 @@ void Hand::Clear() {
   (void) cached_has_bits;
 
   _impl_.keypoints_.Clear();
+  _impl_.side_.ClearToEmpty();
   if (GetArenaForAllocation() == nullptr && _impl_.position_2d_ != nullptr) {
     delete _impl_.position_2d_;
   }
@@ -2876,6 +2909,10 @@ void Hand::Clear() {
     delete _impl_.wrist_pos_3d_;
   }
   _impl_.wrist_pos_3d_ = nullptr;
+  if (GetArenaForAllocation() == nullptr && _impl_.position_3d_ != nullptr) {
+    delete _impl_.position_3d_;
+  }
+  _impl_.position_3d_ = nullptr;
   ::memset(&_impl_.id_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.confidence_) -
       reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.confidence_));
@@ -2938,6 +2975,24 @@ const char* Hand::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
             CHK_(ptr);
             if (!ctx->DataAvailable(ptr)) break;
           } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<50>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // string side = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 58)) {
+          auto str = _internal_mutable_side();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.Hand.side"));
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector3 position_3d = 8;
+      case 8:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 66)) {
+          ptr = ctx->ParseMessage(_internal_mutable_position_3d(), ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -3014,6 +3069,23 @@ uint8_t* Hand::_InternalSerialize(
         InternalWriteMessage(6, repfield, repfield.GetCachedSize(), target, stream);
   }
 
+  // string side = 7;
+  if (!this->_internal_side().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_side().data(), static_cast<int>(this->_internal_side().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "juggler.v1.Hand.side");
+    target = stream->WriteStringMaybeAliased(
+        7, this->_internal_side(), target);
+  }
+
+  // .juggler.v1.Vector3 position_3d = 8;
+  if (this->_internal_has_position_3d()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(8, _Internal::position_3d(this),
+        _Internal::position_3d(this).GetCachedSize(), target, stream);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -3037,6 +3109,13 @@ size_t Hand::ByteSizeLong() const {
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
   }
 
+  // string side = 7;
+  if (!this->_internal_side().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_side());
+  }
+
   // .juggler.v1.Vector2 position_2d = 2;
   if (this->_internal_has_position_2d()) {
     total_size += 1 +
@@ -3049,6 +3128,13 @@ size_t Hand::ByteSizeLong() const {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
         *_impl_.wrist_pos_3d_);
+  }
+
+  // .juggler.v1.Vector3 position_3d = 8;
+  if (this->_internal_has_position_3d()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.position_3d_);
   }
 
   // int32 id = 1;
@@ -3089,6 +3175,9 @@ void Hand::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_
   (void) cached_has_bits;
 
   _this->_impl_.keypoints_.MergeFrom(from._impl_.keypoints_);
+  if (!from._internal_side().empty()) {
+    _this->_internal_set_side(from._internal_side());
+  }
   if (from._internal_has_position_2d()) {
     _this->_internal_mutable_position_2d()->::juggler::v1::Vector2::MergeFrom(
         from._internal_position_2d());
@@ -3096,6 +3185,10 @@ void Hand::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_
   if (from._internal_has_wrist_pos_3d()) {
     _this->_internal_mutable_wrist_pos_3d()->::juggler::v1::Vector3::MergeFrom(
         from._internal_wrist_pos_3d());
+  }
+  if (from._internal_has_position_3d()) {
+    _this->_internal_mutable_position_3d()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_position_3d());
   }
   if (from._internal_id() != 0) {
     _this->_internal_set_id(from._internal_id());
@@ -3126,8 +3219,14 @@ bool Hand::IsInitialized() const {
 
 void Hand::InternalSwap(Hand* other) {
   using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   _impl_.keypoints_.InternalSwap(&other->_impl_.keypoints_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.side_, lhs_arena,
+      &other->_impl_.side_, rhs_arena
+  );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(Hand, _impl_.confidence_)
       + sizeof(Hand::_impl_.confidence_)

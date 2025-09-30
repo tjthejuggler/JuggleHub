@@ -27,7 +27,19 @@ class ZMQClient:
             
             logging.debug(f"Parsed FrameData: frame_number={frame_data.frame_number}, "
                           f"num_balls={len(frame_data.balls)}, "
+                          f"num_hands={len(frame_data.hands)}, "
                           f"num_raw_detections={len(frame_data.raw_detections)}")
+            
+            # Log hand details
+            if len(frame_data.hands) > 0:
+                for i, hand in enumerate(frame_data.hands):
+                    logging.info(f"Hand {i}: id={hand.id}, visible={hand.is_visible}, "
+                                f"num_keypoints={len(hand.keypoints)}, "
+                                f"wrist_3d=({hand.wrist_pos_3d.x:.2f}, {hand.wrist_pos_3d.y:.2f}, {hand.wrist_pos_3d.z:.2f})")
+                    if len(hand.keypoints) > 0:
+                        logging.info(f"  First keypoint 2D: ({hand.keypoints[0].pos_2d.x:.1f}, {hand.keypoints[0].pos_2d.y:.1f})")
+            else:
+                logging.debug("No hands detected in this frame")
             
             if len(frame_data.raw_detections) > 0 and len(frame_data.balls) == 0:
                 logging.warning("Received raw detections but no tracked balls.")
@@ -36,7 +48,7 @@ class ZMQClient:
         except zmq.Again:
             return None
         except Exception as e:
-            logging.error(f"Error receiving or parsing frame data: {e}")
+            logging.error(f"Error receiving or parsing frame data: {e}", exc_info=True)
             return None
 
     def send_command(self, command):

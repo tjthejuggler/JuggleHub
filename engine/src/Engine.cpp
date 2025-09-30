@@ -154,22 +154,54 @@ void Engine::run() {
             for (const auto& hand_obj : tracked_hands) {
                 auto* hand = frame_data.add_hands();
                 hand->set_id(hand_obj.id);
+                
+                // Set side field for Python compatibility
+                hand->set_side(hand_obj.id == 0 ? "left" : "right");
+                
+                // Set wrist_pos_3d
                 auto* pos = hand->mutable_wrist_pos_3d();
                 pos->set_x(hand_obj.wrist_pos_3d.x);
                 pos->set_y(hand_obj.wrist_pos_3d.y);
                 pos->set_z(hand_obj.wrist_pos_3d.z);
+                
+                // Set position_3d (alias for compatibility)
+                auto* pos_3d = hand->mutable_position_3d();
+                pos_3d->set_x(hand_obj.wrist_pos_3d.x);
+                pos_3d->set_y(hand_obj.wrist_pos_3d.y);
+                pos_3d->set_z(hand_obj.wrist_pos_3d.z);
+                
                 hand->set_confidence(hand_obj.confidence);
                 hand->set_is_visible(true);
 
+                // Project wrist position to 2D for hand circle rendering
+                cv::Point2f wrist_2d = DNNTracker::project_3d_to_2d(hand_obj.wrist_pos_3d, camera_intrinsics_);
+                auto* hand_pos_2d = hand->mutable_position_2d();
+                hand_pos_2d->set_x(wrist_2d.x);
+                hand_pos_2d->set_y(wrist_2d.y);
+
+                // Add keypoints with proper 2D projection
                 for (const auto& kp : hand_obj.keypoints) {
                     auto* keypoint = hand->add_keypoints();
+                    
+                    // Project 3D keypoint to 2D screen coordinates
+                    cv::Point2f kp_2d = DNNTracker::project_3d_to_2d(kp, camera_intrinsics_);
                     auto* pos_2d = keypoint->mutable_pos_2d();
-                    pos_2d->set_x(0); // Placeholder
-                    pos_2d->set_y(0); // Placeholder
+                    pos_2d->set_x(kp_2d.x);
+                    pos_2d->set_y(kp_2d.y);
+                    
+                    // Also store 3D position
                     auto* pos_3d = keypoint->mutable_pos_3d();
                     pos_3d->set_x(kp.x);
                     pos_3d->set_y(kp.y);
                     pos_3d->set_z(kp.z);
+                    
+                    // Set confidence (assuming all keypoints have same confidence as hand for now)
+                    keypoint->set_confidence(hand_obj.confidence);
+                }
+                
+                if (verbose_) {
+                    std::cout << "[LOG] Hand " << hand_obj.id << " with " << hand_obj.keypoints.size()
+                              << " keypoints added to frame_data" << std::endl;
                 }
             }
 

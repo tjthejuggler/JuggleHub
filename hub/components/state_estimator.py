@@ -27,7 +27,10 @@ class ProbabilisticStateEstimator:
             
             # 1. Physics Score (normalized innovation)
             # This is a placeholder; a proper normalization scheme is needed.
-            physics_score = min(1.0, ball.kf.y.norm() / self.config.get('max_innovation', 10.0))
+            if hasattr(ball.kf, 'y') and ball.kf.y is not None:
+                physics_score = min(1.0, np.linalg.norm(ball.kf.y) / self.config.get('max_innovation', 10.0))
+            else:
+                physics_score = 0.5  # Default score if innovation is not available
 
             # 2. Proximity Scores
             left_hand_pos = hand_positions.get('left')

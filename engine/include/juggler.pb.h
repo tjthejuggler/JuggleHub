@@ -1668,8 +1668,10 @@ class Hand final :
 
   enum : int {
     kKeypointsFieldNumber = 6,
+    kSideFieldNumber = 7,
     kPosition2DFieldNumber = 2,
     kWristPos3DFieldNumber = 3,
+    kPosition3DFieldNumber = 8,
     kIdFieldNumber = 1,
     kIsVisibleFieldNumber = 5,
     kConfidenceFieldNumber = 4,
@@ -1691,6 +1693,20 @@ class Hand final :
   ::juggler::v1::KeyPoint* add_keypoints();
   const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KeyPoint >&
       keypoints() const;
+
+  // string side = 7;
+  void clear_side();
+  const std::string& side() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_side(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_side();
+  PROTOBUF_NODISCARD std::string* release_side();
+  void set_allocated_side(std::string* side);
+  private:
+  const std::string& _internal_side() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_side(const std::string& value);
+  std::string* _internal_mutable_side();
+  public:
 
   // .juggler.v1.Vector2 position_2d = 2;
   bool has_position_2d() const;
@@ -1728,6 +1744,24 @@ class Hand final :
       ::juggler::v1::Vector3* wrist_pos_3d);
   ::juggler::v1::Vector3* unsafe_arena_release_wrist_pos_3d();
 
+  // .juggler.v1.Vector3 position_3d = 8;
+  bool has_position_3d() const;
+  private:
+  bool _internal_has_position_3d() const;
+  public:
+  void clear_position_3d();
+  const ::juggler::v1::Vector3& position_3d() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector3* release_position_3d();
+  ::juggler::v1::Vector3* mutable_position_3d();
+  void set_allocated_position_3d(::juggler::v1::Vector3* position_3d);
+  private:
+  const ::juggler::v1::Vector3& _internal_position_3d() const;
+  ::juggler::v1::Vector3* _internal_mutable_position_3d();
+  public:
+  void unsafe_arena_set_allocated_position_3d(
+      ::juggler::v1::Vector3* position_3d);
+  ::juggler::v1::Vector3* unsafe_arena_release_position_3d();
+
   // int32 id = 1;
   void clear_id();
   int32_t id() const;
@@ -1764,8 +1798,10 @@ class Hand final :
   typedef void DestructorSkippable_;
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KeyPoint > keypoints_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr side_;
     ::juggler::v1::Vector2* position_2d_;
     ::juggler::v1::Vector3* wrist_pos_3d_;
+    ::juggler::v1::Vector3* position_3d_;
     int32_t id_;
     bool is_visible_;
     double confidence_;
@@ -4976,6 +5012,146 @@ inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KeyPoint 
 Hand::keypoints() const {
   // @@protoc_insertion_point(field_list:juggler.v1.Hand.keypoints)
   return _impl_.keypoints_;
+}
+
+// string side = 7;
+inline void Hand::clear_side() {
+  _impl_.side_.ClearToEmpty();
+}
+inline const std::string& Hand::side() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.Hand.side)
+  return _internal_side();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void Hand::set_side(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.side_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.Hand.side)
+}
+inline std::string* Hand::mutable_side() {
+  std::string* _s = _internal_mutable_side();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.Hand.side)
+  return _s;
+}
+inline const std::string& Hand::_internal_side() const {
+  return _impl_.side_.Get();
+}
+inline void Hand::_internal_set_side(const std::string& value) {
+  
+  _impl_.side_.Set(value, GetArenaForAllocation());
+}
+inline std::string* Hand::_internal_mutable_side() {
+  
+  return _impl_.side_.Mutable(GetArenaForAllocation());
+}
+inline std::string* Hand::release_side() {
+  // @@protoc_insertion_point(field_release:juggler.v1.Hand.side)
+  return _impl_.side_.Release();
+}
+inline void Hand::set_allocated_side(std::string* side) {
+  if (side != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.side_.SetAllocated(side, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.side_.IsDefault()) {
+    _impl_.side_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.Hand.side)
+}
+
+// .juggler.v1.Vector3 position_3d = 8;
+inline bool Hand::_internal_has_position_3d() const {
+  return this != internal_default_instance() && _impl_.position_3d_ != nullptr;
+}
+inline bool Hand::has_position_3d() const {
+  return _internal_has_position_3d();
+}
+inline void Hand::clear_position_3d() {
+  if (GetArenaForAllocation() == nullptr && _impl_.position_3d_ != nullptr) {
+    delete _impl_.position_3d_;
+  }
+  _impl_.position_3d_ = nullptr;
+}
+inline const ::juggler::v1::Vector3& Hand::_internal_position_3d() const {
+  const ::juggler::v1::Vector3* p = _impl_.position_3d_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
+      ::juggler::v1::_Vector3_default_instance_);
+}
+inline const ::juggler::v1::Vector3& Hand::position_3d() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.Hand.position_3d)
+  return _internal_position_3d();
+}
+inline void Hand::unsafe_arena_set_allocated_position_3d(
+    ::juggler::v1::Vector3* position_3d) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.position_3d_);
+  }
+  _impl_.position_3d_ = position_3d;
+  if (position_3d) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.Hand.position_3d)
+}
+inline ::juggler::v1::Vector3* Hand::release_position_3d() {
+  
+  ::juggler::v1::Vector3* temp = _impl_.position_3d_;
+  _impl_.position_3d_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector3* Hand::unsafe_arena_release_position_3d() {
+  // @@protoc_insertion_point(field_release:juggler.v1.Hand.position_3d)
+  
+  ::juggler::v1::Vector3* temp = _impl_.position_3d_;
+  _impl_.position_3d_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector3* Hand::_internal_mutable_position_3d() {
+  
+  if (_impl_.position_3d_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
+    _impl_.position_3d_ = p;
+  }
+  return _impl_.position_3d_;
+}
+inline ::juggler::v1::Vector3* Hand::mutable_position_3d() {
+  ::juggler::v1::Vector3* _msg = _internal_mutable_position_3d();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.Hand.position_3d)
+  return _msg;
+}
+inline void Hand::set_allocated_position_3d(::juggler::v1::Vector3* position_3d) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.position_3d_;
+  }
+  if (position_3d) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(position_3d);
+    if (message_arena != submessage_arena) {
+      position_3d = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, position_3d, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.position_3d_ = position_3d;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.Hand.position_3d)
 }
 
 // -------------------------------------------------------------------

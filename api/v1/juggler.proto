@@ -70,6 +70,8 @@ message Hand {
   double confidence = 4;            // Detection confidence (0.0-1.0)
   bool is_visible = 5;              // Whether hand is visible
   repeated KeyPoint keypoints = 6;  // All keypoints for the hand
+  string side = 7;                  // "left" or "right" for compatibility
+  Vector3 position_3d = 8;          // Alias for wrist_pos_3d for compatibility
 }
 
 // IMU data from smartwatches

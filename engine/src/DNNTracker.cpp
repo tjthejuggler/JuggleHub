@@ -436,7 +436,126 @@ std::vector<byte_track::Object> DNNTracker::postprocess_ball_detection(const cv:
 }
 
 std::vector<TrackedHand> DNNTracker::run_pose_estimation(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
-    // This is a placeholder implementation.
-    // The actual implementation will depend on the specifics of the YOLO-Pose model.
-    return {};
+    std::vector<TrackedHand> tracked_hands;
+    
+    // --- 1. PREPROCESS ---
+    float scale_x, scale_y;
+    cv::Mat preprocessed_image = preprocess(color_frame, scale_x, scale_y);
+    
+    // --- 2. RUN INFERENCE ---
+    ov::Tensor input_tensor(pose_compiled_model.input().get_element_type(),
+                           pose_compiled_model.input().get_shape(),
+                           preprocessed_image.data);
+    pose_infer_request.set_input_tensor(input_tensor);
+    pose_infer_request.infer();
+    const ov::Tensor& output_tensor = pose_infer_request.get_output_tensor();
+    
+    // --- 3. PARSE YOLO-POSE OUTPUT ---
+    // YOLO-Pose output format: [1, 56, N] where 56 = 4 (bbox) + 1 (conf) + 17*3 (keypoints x,y,conf)
+    const float* output_data = output_tensor.data<const float>();
+    const auto& shape = output_tensor.get_shape();
+    
+    if (shape.size() < 3) {
+        std::cerr << "Unexpected pose output tensor shape" << std::endl;
+        return tracked_hands;
+    }
+    
+    const int num_channels = shape[1]; // Should be 56
+    const int num_detections = shape[2];
+    
+    // Transpose to [N, 56] for easier processing
+    cv::Mat output_buffer(num_channels, num_detections, CV_32F, (void*)output_data);
+    cv::transpose(output_buffer, output_buffer);
+    
+    const float pose_confidence_threshold = 0.3f; // Threshold for person detection
+    const float keypoint_confidence_threshold = 0.5f; // Threshold for individual keypoints
+    
+    // --- 4. PROCESS EACH PERSON DETECTION ---
+    for (int i = 0; i < output_buffer.rows; ++i) {
+        // Extract bounding box and confidence
+        float cx = output_buffer.at<float>(i, 0);
+        float cy = output_buffer.at<float>(i, 1);
+        float w = output_buffer.at<float>(i, 2);
+        float h = output_buffer.at<float>(i, 3);
+        float person_confidence = output_buffer.at<float>(i, 4);
+        
+        if (person_confidence < pose_confidence_threshold) continue;
+        
+        // Scale back to original image coordinates
+        int left = static_cast<int>((cx - 0.5 * w) * scale_x);
+        int top = static_cast<int>((cy - 0.5 * h) * scale_y);
+        int width = static_cast<int>(w * scale_x);
+        int height = static_cast<int>(h * scale_y);
+        
+        // --- 5. EXTRACT ALL 17 KEYPOINTS ---
+        // COCO keypoint order: 0-nose, 1-left_eye, 2-right_eye, 3-left_ear, 4-right_ear,
+        // 5-left_shoulder, 6-right_shoulder, 7-left_elbow, 8-right_elbow,
+        // 9-left_wrist, 10-right_wrist, 11-left_hip, 12-right_hip,
+        // 13-left_knee, 14-right_knee, 15-left_ankle, 16-right_ankle
+        
+        std::vector<cv::Point3f> keypoints_3d(17, cv::Point3f(0, 0, 0));
+        std::vector<float> keypoint_confidences(17, 0.0f);
+        
+        for (int kp_idx = 0; kp_idx < 17; ++kp_idx) {
+            int base_idx = 5 + kp_idx * 3; // Start after bbox(4) + conf(1)
+            
+            float kp_x = output_buffer.at<float>(i, base_idx + 0) * scale_x;
+            float kp_y = output_buffer.at<float>(i, base_idx + 1) * scale_y;
+            float kp_conf = output_buffer.at<float>(i, base_idx + 2);
+            
+            keypoint_confidences[kp_idx] = kp_conf;
+            
+            // Only deproject keypoints with sufficient confidence
+            if (kp_conf > keypoint_confidence_threshold) {
+                cv::Point2f pixel(kp_x, kp_y);
+                
+                // Ensure pixel is within frame bounds
+                if (pixel.x >= 0 && pixel.x < depth_frame.cols &&
+                    pixel.y >= 0 && pixel.y < depth_frame.rows) {
+                    
+                    uint16_t depth_value_mm = depth_frame.at<uint16_t>(static_cast<int>(pixel.y),
+                                                                        static_cast<int>(pixel.x));
+                    float depth_value_m = depth_value_mm / 1000.0f;
+                    
+                    // Deproject to 3D
+                    if (depth_value_m > 0.2f && depth_value_m < 3.0f) {
+                        keypoints_3d[kp_idx] = deproject_2d_to_3d(pixel, depth_value_m, intrinsics);
+                    }
+                }
+            }
+        }
+        
+        // --- 6. CREATE TRACKED HANDS FROM WRIST KEYPOINTS ---
+        // Left wrist is keypoint 9, right wrist is keypoint 10
+        
+        // Left hand
+        if (keypoint_confidences[9] > keypoint_confidence_threshold &&
+            keypoints_3d[9].z > 0.2f && keypoints_3d[9].z < 3.0f) {
+            
+            TrackedHand left_hand;
+            left_hand.wrist_pos_3d = keypoints_3d[9];
+            left_hand.confidence = keypoint_confidences[9];
+            left_hand.id = 0; // Left hand ID
+            left_hand.keypoints = keypoints_3d; // Store all keypoints
+            tracked_hands.push_back(left_hand);
+        }
+        
+        // Right hand
+        if (keypoint_confidences[10] > keypoint_confidence_threshold &&
+            keypoints_3d[10].z > 0.2f && keypoints_3d[10].z < 3.0f) {
+            
+            TrackedHand right_hand;
+            right_hand.wrist_pos_3d = keypoints_3d[10];
+            right_hand.confidence = keypoint_confidences[10];
+            right_hand.id = 1; // Right hand ID
+            right_hand.keypoints = keypoints_3d; // Store all keypoints
+            tracked_hands.push_back(right_hand);
+        }
+        
+        // Note: We only process the first person detected for now
+        // In a multi-person scenario, you would need to track multiple people
+        break;
+    }
+    
+    return tracked_hands;
 }

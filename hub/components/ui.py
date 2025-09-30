@@ -858,6 +858,7 @@ if PYQT_AVAILABLE:
 
         def update_video_feed(self, frame_data: juggler_pb2.FrameData):
             self.log_message(f"UI: update_video_feed called for frame {frame_data.frame_number}.")
+            self.log_message(f"UI: Frame has {len(frame_data.hands)} hands, {len(frame_data.balls)} balls")
             if not frame_data.color_image_b64:
                 self.log_message(f"UI ERROR: Frame {frame_data.frame_number} has no color_image_b64 data.")
                 return
@@ -964,11 +965,16 @@ if PYQT_AVAILABLE:
 
             # --- Draw Skeleton ---
             if self.show_skeleton_toggle.isChecked():
+                self.log_message(f"UI: Drawing skeleton for {len(frame_data.hands)} hands")
                 painter.setPen(QPen(QColor(0, 255, 0, 150), 2)) # Green for skeleton
                 for hand in frame_data.hands:
-                    for kp in hand.keypoints:
+                    self.log_message(f"UI: Hand has {len(hand.keypoints)} keypoints")
+                    for i, kp in enumerate(hand.keypoints):
                         if kp.confidence > 0.5:
+                            self.log_message(f"UI: Drawing keypoint {i} at ({kp.pos_2d.x:.1f}, {kp.pos_2d.y:.1f})")
                             painter.drawEllipse(int(kp.pos_2d.x) - 3, int(kp.pos_2d.y) - 3, 6, 6)
+                        else:
+                            self.log_message(f"UI: Skipping keypoint {i} (confidence {kp.confidence:.2f} < 0.5)")
 
             painter.end()
             self.video_pixmap_item.setPixmap(pixmap)

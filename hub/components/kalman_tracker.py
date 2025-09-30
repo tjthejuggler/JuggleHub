@@ -50,14 +50,17 @@ class KalmanBallTracker:
         Updates the tracker with new ball detections.
 
         Args:
-            raw_ball_detections (list): A list of 3D positions for detected balls.
+            raw_ball_detections (list): A list of Ball protobuf objects.
 
         Returns:
             list: A list of objects with tracking information.
         """
+        # Extract 3D positions from protobuf objects
+        detected_positions = [np.array([b.position.x, b.position.y, b.position.z]) for b in raw_ball_detections]
+
         if not self.tracks:
             # Create new tracks for all initial detections
-            for pos in raw_ball_detections:
+            for pos in detected_positions:
                 self.tracks[self.next_track_id] = self._create_kalman_filter(pos)
                 self.next_track_id += 1
             return []
@@ -69,11 +72,11 @@ class KalmanBallTracker:
             kf.x[5] += self.gravity * self.dt
 
         # Data association
-        cost_matrix = np.zeros((len(self.tracks), len(raw_ball_detections)))
+        cost_matrix = np.zeros((len(self.tracks), len(detected_positions)))
         track_ids = list(self.tracks.keys())
         
         for i, track_id in enumerate(track_ids):
-            for j, pos in enumerate(raw_ball_detections):
+            for j, pos in enumerate(detected_positions):
                 predicted_pos = self.tracks[track_id].x[:3]
                 cost_matrix[i, j] = np.linalg.norm(predicted_pos - pos)
 
@@ -82,7 +85,7 @@ class KalmanBallTracker:
         # Update matched tracks
         for r, c in zip(row_ind, col_ind):
             track_id = track_ids[r]
-            self.tracks[track_id].update(raw_ball_detections[c])
+            self.tracks[track_id].update(detected_positions[c])
 
         # TODO: Handle new and lost tracks
 

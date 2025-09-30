@@ -111,8 +111,11 @@ void Engine::run() {
         auto depth_frame = aligned_frames.get_depth_frame();
 
         if (!color_frame || !depth_frame) {
+            if (verbose_) std::cout << "[LOG] Dropping frame: missing color or depth." << std::endl;
             continue;
         }
+
+        if (verbose_) std::cout << "[LOG] Frame " << frame_counter_ << ": Received color and depth frames." << std::endl;
 
         cv::Mat color_image(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
         cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
@@ -127,6 +130,7 @@ void Engine::run() {
 
         std::vector<uchar> buf;
         cv::imencode(".jpg", color_image, buf);
+        if (verbose_) std::cout << "[LOG] Frame " << frame_data.frame_number() << ": Encoded color image to JPG, size: " << buf.size() << " bytes." << std::endl;
         frame_data.set_color_image_b64(buf.data(), buf.size());
         frame_data.set_ir_projector_active(ir_projector_active_);
 

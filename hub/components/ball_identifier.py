@@ -25,7 +25,8 @@ class BallIdentifier:
         identified_balls = {}
 
         for i, detection in enumerate(raw_ball_detections):
-            x, y, w, h = [int(c) for c in detection['box']]
+            bbox = detection.bounding_box_2d
+            x, y, w, h = int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height)
             
             # Ensure the bounding box is within the image bounds
             x = max(0, x)

@@ -241,7 +241,7 @@ fi
 
 # Start the C++ engine in the background
 echo -e "${BLUE}🧠 Starting C++ engine with device: $ENGINE_DEVICE${NC}"
-ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=$ENGINE_DEVICE" "--model=$ENGINE_MODEL")
+ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=$ENGINE_DEVICE" "--model=$ENGINE_MODEL" "--pose-model=yolo11n-pose")
 
 # Determine which camera settings to use
 if [ -n "$CAMERA_SETTINGS" ]; then

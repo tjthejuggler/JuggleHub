@@ -13,6 +13,8 @@ import base64
 import socket
 import qrcode
 import io
+import cv2
+import numpy as np
 
 
 try:
@@ -800,8 +802,11 @@ if PYQT_AVAILABLE:
 
             self.ball_list.setPlainText(ball_text)
 
-            if self.calibration_mode and frame_data.color_image_b64:
+            # Always try to update the video feed if the widget is visible
+            if self.video_group.isVisible() and frame_data.color_image_b64:
                 self.update_video_feed(frame_data)
+            elif self.video_group.isVisible():
+                self.log_message(f"UI: Video feed is visible but frame {frame_data.frame_number} has no image data.")
             
             if self.settings_widget:
                 is_camera_running = "Running" in self.settings_widget.camera_status_label.text()
@@ -852,8 +857,23 @@ if PYQT_AVAILABLE:
             if self.last_frame_data: self.update_video_feed(self.last_frame_data)
 
         def update_video_feed(self, frame_data: juggler_pb2.FrameData):
+            self.log_message(f"UI: update_video_feed called for frame {frame_data.frame_number}.")
+            if not frame_data.color_image_b64:
+                self.log_message(f"UI ERROR: Frame {frame_data.frame_number} has no color_image_b64 data.")
+                return
+
             image = QImage()
-            image.loadFromData(frame_data.color_image_b64, "JPEG")
+            load_success = image.loadFromData(frame_data.color_image_b64, "JPEG")
+
+            if not load_success:
+                self.log_message(f"UI ERROR: QImage.loadFromData failed for frame {frame_data.frame_number}. Image data size: {len(frame_data.color_image_b64)} bytes.")
+                # Optionally, save the bad frame for debugging
+                # with open(f"bad_frame_{frame_data.frame_number}.jpg", "wb") as f:
+                #     f.write(frame_data.color_image_b64)
+                return
+            
+            self.log_message(f"UI: Frame {frame_data.frame_number} loaded into QImage successfully. Size: {image.width()}x{image.height()}.")
+
             pixmap = QPixmap.fromImage(image)
             painter = QPainter(pixmap)
             
@@ -1038,9 +1058,13 @@ if PYQT_AVAILABLE:
         def get_latest_frame(self):
             """Returns the latest video frame as a numpy array."""
             if self.last_frame_data and self.last_frame_data.color_image_b64:
-                return cv2.imdecode(np.frombuffer(self.last_frame_data.color_image_b64, np.uint8), cv2.IMREAD_COLOR)
+                # Use np.frombuffer which is more direct for bytes
+                nparr = np.frombuffer(self.last_frame_data.color_image_b64, np.uint8)
+                # Decode the image
+                img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                return img_np
             return None
-        
+
         def toggle_web_ui(self):
             if not self.hub_instance.web_ui.is_running:
                 self.hub_instance.web_ui.start()
@@ -1113,6 +1137,12 @@ class JuggleHubUI:
         else:
             self.console_ui = ConsoleUI(config)
             self.ui_type = "console"
+
+    def get_latest_frame(self):
+        """Returns the latest video frame as a numpy array."""
+        if self.ui_type == "pyqt6" and hasattr(self.main_window, 'get_latest_frame'):
+            return self.main_window.get_latest_frame()
+        return None
     
     def update_frame_data(self, frame_data: juggler_pb2.FrameData):
         getattr(self.main_window if self.ui_type == "pyqt6" else self.console_ui, 'update_frame_data')(frame_data)

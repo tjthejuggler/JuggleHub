@@ -95,7 +95,10 @@ class JuggleHub:
                 # 1. Receive ball tracking data from the C++ engine
                 frame_data = self.zmq_client.receive_frame_data()
                 if frame_data:
-                    print(f"DEBUG: Received frame_data with {len(frame_data.balls)} balls.")
+                    image_size = len(frame_data.color_image_b64)
+                    print(f"PYTHON HUB: Received frame {frame_data.frame_number} with {len(frame_data.balls)} balls and image size {image_size} bytes.")
+                else:
+                    print("PYTHON HUB: No frame_data received from ZMQ client.")
 
                 # 2. Get the latest IMU data from the listener
                 if self.imu_listener:

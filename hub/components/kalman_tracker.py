@@ -56,7 +56,7 @@ class KalmanBallTracker:
             raw_ball_detections (list): A list of Ball protobuf objects.
 
         Returns:
-            list: A list of objects with tracking information.
+            list: A list of objects with tracking information including detection state.
         """
         logger.debug(f"Kalman tracker update called with {len(raw_ball_detections)} raw detections")
         
@@ -83,6 +83,7 @@ class KalmanBallTracker:
         # Data association
         cost_matrix = np.zeros((len(self.tracks), len(detected_positions)))
         track_ids = list(self.tracks.keys())
+        matched_tracks = set()
         
         for i, track_id in enumerate(track_ids):
             for j, pos in enumerate(detected_positions):
@@ -97,6 +98,7 @@ class KalmanBallTracker:
             for r, c in zip(row_ind, col_ind):
                 track_id = track_ids[r]
                 self.tracks[track_id].update(detected_positions[c])
+                matched_tracks.add(track_id)
                 logger.debug(f"Updated track {track_id} with detection at position {detected_positions[c]}")
         else:
             logger.debug("No detections to match, all tracks are predictions only")
@@ -111,12 +113,15 @@ class KalmanBallTracker:
             # A simple innovation score
             innovation_score = np.linalg.norm(kf.y) if hasattr(kf, 'y') and kf.y is not None else 0.0
             
+            # Determine detection state based on whether this track was matched
+            detection_state = 'DETECTED' if track_id in matched_tracks else 'PREDICTED'
+            
             results.append({
                 'track_id': track_id,
                 'smoothed_position_3d': pos,
                 'smoothed_velocity_3d': vel,
                 'innovation_score': innovation_score,
-                'detection_state': 'DETECTED' # This will be improved later
+                'detection_state': detection_state
             })
         
         logger.debug(f"Returning {len(results)} tracked balls")

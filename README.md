@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-09-30 13:38:00 UTC
+**Last Updated:** 2025-10-01 01:16:00 UTC
 
 ## 🎯 Overview
 
@@ -213,6 +213,33 @@ JuggleHub/
 - **Console mode** for headless operation
 - **Performance monitoring** and statistics
 - **Extensible architecture** for custom analysis
+### Enhanced Color Tracking System
+
+**Last Updated:** 2025-10-01 01:16:00 UTC
+
+JuggleHub features an advanced color tracking system with persistent color profiles and intelligent tracking behavior:
+
+#### Named Color Profiles
+- **Interactive Calibration**: Click on a ball during calibration mode to create a named color profile
+- **Persistent Database**: Color profiles are saved to `hub/ball_color_profiles.json` and persist across sessions
+- **Manual Naming**: Each profile gets a custom name (e.g., "Red Ball", "Blue Ball") for easy identification
+- **Profile Matching**: Only balls matching saved color profiles are tracked - false positives are automatically filtered out
+
+#### Zero-Lag Tracking
+- **Direct YOLO Positioning**: When YOLO detects a ball, the color tracker uses the raw detection position directly (no smoothing lag)
+- **Kalman Prediction Fallback**: When YOLO loses sight of a ball, Kalman filtering predicts its position
+- **Instant Hand Association**: When a ball disappears near a wrist (within 15cm), it's instantly associated with that hand
+- **Smart Occlusion Handling**: Balls held in hands are automatically positioned at the wrist location
+
+#### How to Use
+1. **Enter Calibration Mode** in the hub UI
+2. **Click "Calibrate Ball 0"** (or 1, 2, etc.)
+3. **Click on the ball** in the video feed
+4. **Enter a name** for the color profile (e.g., "Red Ball")
+5. **Repeat** for each ball you want to track
+
+The system will now only track balls that match your saved color profiles, eliminating false positives from hands or other objects.
+
 
 ### Heuristic Intelligence Layer
 - **Robust Hand Tracking**: Enforces a two-hand limit and maintains persistent left/right identity.

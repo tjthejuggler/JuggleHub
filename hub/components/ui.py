@@ -261,11 +261,11 @@ if PYQT_AVAILABLE:
                 row=0,
                 label_text="Track Buffer (Frames)",
                 tooltip_text="How long (in frames) ByteTrack remembers a lost object.\n"
-                             "Range: 1 to 300. Default: 150.\n"
-                             "Increase this for objects that get occluded for longer periods.",
+                             "Range: 1 to 600. Default: 300.\n"
+                             "Higher values keep tracks alive longer during occlusions.",
                 range_min=1,
-                range_max=300,
-                initial_value=150,
+                range_max=600,
+                initial_value=300,
                 update_func=lambda v: self.update_setting('track_buffer', v)
             )
 
@@ -274,11 +274,11 @@ if PYQT_AVAILABLE:
                 row=1,
                 label_text="Track Threshold",
                 tooltip_text="Confidence score needed to start a new track.\n"
-                             "Range: 0.00 to 1.00. Default: 0.25.\n"
-                             "This is the threshold for low-confidence detections.",
+                             "Range: 0.00 to 1.00. Default: 0.10.\n"
+                             "Lower values allow tracking of less confident detections.",
                 range_min=0,
                 range_max=100,
-                initial_value=25,
+                initial_value=10,
                 update_func=lambda v: self.update_setting('track_thresh', v / 100.0),
                 is_float=True
             )
@@ -288,11 +288,11 @@ if PYQT_AVAILABLE:
                 row=2,
                 label_text="High Confidence Threshold",
                 tooltip_text="Confidence score for a detection to be considered 'high confidence'.\n"
-                             "Range: 0.00 to 1.00. Default: 0.50.\n"
-                             "These detections are matched first.",
+                             "Range: 0.00 to 1.00. Default: 0.40.\n"
+                             "Lower values treat more detections as high confidence.",
                 range_min=0,
                 range_max=100,
-                initial_value=50,
+                initial_value=40,
                 update_func=lambda v: self.update_setting('high_thresh', v / 100.0),
                 is_float=True
             )
@@ -302,11 +302,11 @@ if PYQT_AVAILABLE:
                 row=3,
                 label_text="Match Threshold (IoU)",
                 tooltip_text="The minimum Intersection over Union (IoU) to match a detection to a track.\n"
-                             "Range: 0.00 to 1.00. Default: 0.70.\n"
-                             "Lower values make it easier to maintain a track ID, even with jittery detections.",
+                             "Range: 0.00 to 1.00. Default: 0.50.\n"
+                             "Lower values make it easier to maintain tracks with fast-moving objects.",
                 range_min=0,
                 range_max=100,
-                initial_value=70,
+                initial_value=50,
                 update_func=lambda v: self.update_setting('match_thresh', v / 100.0),
                 is_float=True
             )
@@ -1117,18 +1117,63 @@ if PYQT_AVAILABLE:
                     # Transform scene coordinates to pixmap (image) coordinates
                     img_pos = pixmap_item.mapFromScene(scene_pos)
                     
-                    self.log_message(f"Calibrating Ball {self.calibrating_id} at pixel ({img_pos.x():.1f}, {img_pos.y():.1f})")
-
-                    command = juggler_pb2.CommandRequest(
-                        type=juggler_pb2.CommandRequest.CommandType.CALIBRATE_OBJECT,
-                        logical_id_to_calibrate=self.calibrating_id,
-                        calibration_pixel_pos=juggler_pb2.Vector2(x=img_pos.x(), y=img_pos.y())
+                    logical_ball_id = self.calibrating_id
+                    self.log_message(f"Clicked at pixel ({img_pos.x():.1f}, {img_pos.y():.1f}) for Ball {logical_ball_id}")
+                    
+                    # Show dialog to name the color profile
+                    from PyQt6.QtWidgets import QInputDialog
+                    profile_name, ok = QInputDialog.getText(
+                        self,
+                        "Name Color Profile",
+                        f"Enter a name for Ball {logical_ball_id}'s color profile:",
+                        text=f"Ball_{logical_ball_id}"
                     )
-                    try:
-                        response = self.zmq_client.send_command(command)
-                        self.log_message(f"✅ Calibration command sent: {response.message}")
-                    except Exception as e:
-                        self.log_message(f"❌ Error sending calibration command: {e}")
+                    
+                    if ok and profile_name:
+                        self.log_message(f"Creating color profile '{profile_name}' for Ball {logical_ball_id}")
+                        
+                        # Get the current frame image
+                        frame_image = self.get_latest_frame()
+                        if frame_image is not None:
+                            # Extract color at the clicked position
+                            x, y = int(img_pos.x()), int(img_pos.y())
+                            # Ensure coordinates are within bounds
+                            x = max(0, min(x, frame_image.shape[1] - 1))
+                            y = max(0, min(y, frame_image.shape[0] - 1))
+                            
+                            # Sample a small region around the click for better color accuracy
+                            sample_size = 10
+                            x1 = max(0, x - sample_size)
+                            y1 = max(0, y - sample_size)
+                            x2 = min(frame_image.shape[1], x + sample_size)
+                            y2 = min(frame_image.shape[0], y + sample_size)
+                            
+                            roi = frame_image[y1:y2, x1:x2]
+                            hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                            avg_hsv = np.mean(hsv_roi, axis=(0, 1))
+                            
+                            self.log_message(f"Sampled HSV color: {avg_hsv}")
+                            
+                            # Create the color profile through the hub's juggling system manager
+                            if self.hub_instance and self.hub_instance.juggling_system_manager:
+                                jsm = self.hub_instance.juggling_system_manager
+                                color_manager = jsm.color_profile_manager
+                                
+                                # Create the color profile
+                                unique_id = color_manager.create_new_profile(avg_hsv, profile_name)
+                                color_manager.save_profiles()
+                                
+                                # CRITICAL: Associate this color profile with the logical ball ID
+                                jsm.assign_profile_to_logical_id(logical_ball_id, unique_id)
+                                
+                                self.log_message(f"✅ Created color profile '{profile_name}' with ID {unique_id}")
+                                self.log_message(f"✅ Assigned Ball {logical_ball_id} to color profile '{profile_name}'")
+                            else:
+                                self.log_message(f"❌ Error: Could not access color profile manager")
+                        else:
+                            self.log_message(f"❌ Error: No frame image available for color sampling")
+                    else:
+                        self.log_message(f"Calibration cancelled by user")
 
                     self.calibrating_id = -1
                     self.calib_status_label.setText("Click a button to start calibration.")

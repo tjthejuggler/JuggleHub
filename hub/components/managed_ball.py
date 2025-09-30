@@ -14,6 +14,7 @@ class ManagedBall:
         # --- Identity ---
         self.track_id = track_id   # The temporary ID from the current tracking session (e.g., from ByteTrack)
         self.unique_id = unique_id # The persistent, color-based ID from ColorProfileManager
+        self.logical_id = None     # The user-assigned logical ID (0, 1, 2, etc.) - set after calibration
 
         # --- State ---
         self.detection_state = DetectionState.DETECTED
@@ -25,6 +26,8 @@ class ManagedBall:
         self.position_history = [] # List of 3D points
         self.smoothed_position_3d = None
         self.smoothed_velocity_3d = None
+        self.projected_pos_2d = None  # 2D position for display (from detection bounding box center)
+        self.bounding_box_2d = None   # Bounding box for color sampling
 
         # --- Hysteresis Logic ---
         self.potential_next_state = self.physical_state

@@ -137,15 +137,15 @@ class JuggleHub:
                                     logger.warning("UI returned None for latest frame")
                             
                             logger.debug(f"Processing frame through JugglingSystemManager (frame_image: {frame_image is not None})")
-                            updated_balls = self.juggling_system_manager.process_frame(frame_data, frame_image)
-                            logger.debug(f"JugglingSystemManager returned {len(updated_balls)} managed balls")
-                            # TODO: Use the updated_balls for UI and logging
+                            managed_balls = self.juggling_system_manager.process_frame(frame_data, frame_image)
+                            logger.debug(f"JugglingSystemManager returned {len(managed_balls)} managed balls")
+                            # TODO: Use managed_balls to enhance the display
                         except Exception as e:
                             logger.error(f"Error in JugglingSystemManager.process_frame: {e}", exc_info=True)
                     
-                    # Pass the combined frame_data to other components
+                    # Pass the frame_data (with original balls from engine) to UI
                     if self.ui:
-                        logger.debug(f"Updating UI with frame_data containing {len(frame_data.balls)} balls")
+                        logger.debug(f"Updating UI with frame_data containing {len(frame_data.balls)} balls from engine")
                         self.ui.update_frame_data(frame_data)
                     
                     if self.database_logger:

@@ -148,19 +148,23 @@ class ColorProfileManager:
         diff = np.abs(hsv_color_sample - profile.hsv_mean)
         profile.hsv_range = np.maximum(profile.hsv_range, diff * 1.2) # Add a small buffer
 
-    def create_new_profile(self, hsv_color_sample, profile_name_prefix="Ball"):
+    def create_new_profile(self, hsv_color_sample, profile_name=None):
         """
         Creates a new color profile from a color sample.
 
         Args:
             hsv_color_sample (np.ndarray): The first color sample for the new profile.
-            profile_name_prefix (str): A prefix for the human-readable name.
+            profile_name (str): The human-readable name for the profile. If None, generates a default name.
 
         Returns:
             str: The unique_id of the newly created profile.
         """
         new_id = str(uuid.uuid4())
-        profile_name = f"{profile_name_prefix} {len(self.profiles) + 1}"
+        
+        # Use provided name or generate a default one
+        if profile_name is None:
+            profile_name = f"Ball_{len(self.profiles) + 1}"
+        
         initial_range = np.array([10, 50, 50], dtype=float) # Initial forgiving range
 
         new_profile = ColorProfile(
@@ -171,4 +175,20 @@ class ColorProfileManager:
             sample_count=1
         )
         self.profiles[new_id] = new_profile
+        print(f"Created new color profile '{profile_name}' with ID {new_id}")
         return new_id
+    
+    def get_profile_by_name(self, profile_name):
+        """
+        Gets a profile by its human-readable name.
+        
+        Args:
+            profile_name (str): The name of the profile to find.
+            
+        Returns:
+            ColorProfile or None: The profile if found, None otherwise.
+        """
+        for profile in self.profiles.values():
+            if profile.profile_name == profile_name:
+                return profile
+        return None

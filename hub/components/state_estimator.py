@@ -20,8 +20,11 @@ class ProbabilisticStateEstimator:
 
         Args:
             managed_balls (dict): A dictionary of ManagedBall objects.
-            hand_positions (dict): A dictionary of hand positions.
+            hand_positions (dict): A dictionary of hand positions (as numpy arrays).
         """
+        # Proximity threshold for instant hand association (in meters)
+        instant_catch_distance = self.config.get('instant_catch_distance', 0.15)
+        
         for ball in managed_balls.values():
             # --- Calculate Evidence Scores ---
             
@@ -37,19 +40,45 @@ class ProbabilisticStateEstimator:
             right_hand_pos = hand_positions.get('right')
             
             proximity_score_left = 0.0
+            dist_to_left = float('inf')
             if left_hand_pos is not None:
-                dist = np.linalg.norm(ball.smoothed_position_3d - left_hand_pos)
-                proximity_score_left = self._normalize_distance(dist, self.config.get('max_proximity_distance', 0.5))
+                dist_to_left = np.linalg.norm(ball.smoothed_position_3d - left_hand_pos)
+                proximity_score_left = self._normalize_distance(dist_to_left, self.config.get('max_proximity_distance', 0.5))
 
             proximity_score_right = 0.0
+            dist_to_right = float('inf')
             if right_hand_pos is not None:
-                dist = np.linalg.norm(ball.smoothed_position_3d - right_hand_pos)
-                proximity_score_right = self._normalize_distance(dist, self.config.get('max_proximity_distance', 0.5))
+                dist_to_right = np.linalg.norm(ball.smoothed_position_3d - right_hand_pos)
+                proximity_score_right = self._normalize_distance(dist_to_right, self.config.get('max_proximity_distance', 0.5))
 
             # 3. Visibility Score
             visibility_score = 1.0 if ball.detection_state == DetectionState.DETECTED else 0.0
 
-            # --- Fuse Evidence ---
+            # --- CRITICAL: Instant Catch Logic ---
+            # If ball was recently detected near a hand and now becomes undetected,
+            # instantly associate it with that hand (it's been caught/occluded)
+            if ball.detection_state == DetectionState.UNDETECTED:
+                # Check if ball is very close to either hand
+                if dist_to_left < instant_catch_distance:
+                    # Ball is very close to left hand and not detected - it must be held
+                    ball.physical_state = PhysicalState.HELD_LEFT
+                    ball.confidences = {
+                        'held_left': 1.0,
+                        'held_right': 0.0,
+                        'unheld': 0.0
+                    }
+                    continue  # Skip normal state estimation
+                elif dist_to_right < instant_catch_distance:
+                    # Ball is very close to right hand and not detected - it must be held
+                    ball.physical_state = PhysicalState.HELD_RIGHT
+                    ball.confidences = {
+                        'held_left': 0.0,
+                        'held_right': 1.0,
+                        'unheld': 0.0
+                    }
+                    continue  # Skip normal state estimation
+
+            # --- Fuse Evidence (Normal Case) ---
             w_physics = self.config.get('w_physics', 0.5)
             w_proximity = self.config.get('w_proximity', 0.4)
             
@@ -58,7 +87,7 @@ class ProbabilisticStateEstimator:
             confidence_unheld = (w_physics * (1.0 - physics_score)) + \
                                 (w_proximity * (1.0 - max(proximity_score_left, proximity_score_right)))
 
-            # Apply visibility bonus
+            # Apply visibility bonus for occlusion near hands
             if visibility_score == 0.0:
                 if proximity_score_left > 0.8:
                     confidence_held_left += 0.5
@@ -81,7 +110,13 @@ class ProbabilisticStateEstimator:
                 ball.potential_next_state = max_confidence_state
                 ball.frames_in_potential_state = 1
             
-            if ball.frames_in_potential_state >= self.config.get('hysteresis_frames', 3):
+            # Reduce hysteresis for instant catches (when ball is undetected near hand)
+            hysteresis_threshold = self.config.get('hysteresis_frames', 3)
+            if ball.detection_state == DetectionState.UNDETECTED and \
+               (proximity_score_left > 0.8 or proximity_score_right > 0.8):
+                hysteresis_threshold = 1  # Instant transition
+            
+            if ball.frames_in_potential_state >= hysteresis_threshold:
                 if max_confidence_state == 'held_left':
                     ball.physical_state = PhysicalState.HELD_LEFT
                 elif max_confidence_state == 'held_right':

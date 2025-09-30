@@ -57,6 +57,7 @@ public:
     void update_setting(const std::string& key, const std::string& value);
     void calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
     const std::vector<PersistentTracker>& get_ball_trackers() const { return logical_ball_trackers_; }
+    const std::vector<Detection>& get_last_raw_detections() const { return last_raw_detections_; }
     static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
 
 private:

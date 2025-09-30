@@ -12,7 +12,15 @@ import time
 import argparse
 import signal
 import threading
+import logging
 from typing import Optional, List
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 from components.zmq_client import ZMQClient
@@ -90,15 +98,16 @@ class JuggleHub:
 
     def _data_processing_loop(self):
         """The main loop for processing data from all sources."""
+        logger.info("Data processing loop started")
         while self.running:
             try:
                 # 1. Receive ball tracking data from the C++ engine
                 frame_data = self.zmq_client.receive_frame_data()
                 if frame_data:
                     image_size = len(frame_data.color_image_b64)
-                    print(f"PYTHON HUB: Received frame {frame_data.frame_number} with {len(frame_data.balls)} balls and image size {image_size} bytes.")
+                    logger.debug(f"Received frame {frame_data.frame_number} with {len(frame_data.balls)} balls and image size {image_size} bytes")
                 else:
-                    print("PYTHON HUB: No frame_data received from ZMQ client.")
+                    logger.debug("No frame_data received from ZMQ client")
 
                 # 2. Get the latest IMU data from the listener
                 if self.imu_listener:
@@ -119,12 +128,24 @@ class JuggleHub:
                     
                     # Process the frame data through the JugglingSystemManager
                     if self.juggling_system_manager:
-                        updated_balls = self.juggling_system_manager.process_frame(frame_data, self.ui.get_latest_frame())
-                        # TODO: Use the updated_balls for UI and logging
+                        try:
+                            # Get the latest frame image from UI
+                            frame_image = None
+                            if self.ui:
+                                frame_image = self.ui.get_latest_frame()
+                                if frame_image is None:
+                                    logger.warning("UI returned None for latest frame")
+                            
+                            logger.debug(f"Processing frame through JugglingSystemManager (frame_image: {frame_image is not None})")
+                            updated_balls = self.juggling_system_manager.process_frame(frame_data, frame_image)
+                            logger.debug(f"JugglingSystemManager returned {len(updated_balls)} managed balls")
+                            # TODO: Use the updated_balls for UI and logging
+                        except Exception as e:
+                            logger.error(f"Error in JugglingSystemManager.process_frame: {e}", exc_info=True)
                     
                     # Pass the combined frame_data to other components
                     if self.ui:
-                        print(f"DEBUG: Updating UI with frame_data containing {len(frame_data.balls)} balls.")
+                        logger.debug(f"Updating UI with frame_data containing {len(frame_data.balls)} balls")
                         self.ui.update_frame_data(frame_data)
                     
                     if self.database_logger:
@@ -133,7 +154,7 @@ class JuggleHub:
                 # Prevent busy-waiting
                 time.sleep(0.001)
             except Exception as e:
-                print(f"❌ Error in data processing loop: {e}")
+                logger.error(f"Error in data processing loop: {e}", exc_info=True)
                 time.sleep(1) # Avoid spamming errors if in a tight loop
 
     def run(self):

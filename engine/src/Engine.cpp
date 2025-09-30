@@ -134,13 +134,22 @@ void Engine::run() {
         frame_data.set_color_image_b64(buf.data(), buf.size());
         frame_data.set_ir_projector_active(ir_projector_active_);
 
-        // --- BAll TRACKING CODE ---
+        // --- BALL TRACKING CODE ---
         std::vector<TrackedObject> tracked_objects;
         if (use_dnn_tracker_) {
             if (!dnn_tracker_) return; // Safety check
 
             auto [tracker_results, tracked_hands] = dnn_tracker_->update(color_image, depth_image, camera_intrinsics_);
             tracked_objects = tracker_results;
+            
+            // Get the raw detections from DNNTracker
+            last_raw_detections_ = dnn_tracker_->get_last_raw_detections();
+            
+            if (verbose_) {
+                std::cout << "[LOG] Frame " << frame_data.frame_number() << ": DNNTracker returned "
+                          << tracked_objects.size() << " tracked objects and "
+                          << last_raw_detections_.size() << " raw detections." << std::endl;
+            }
 
             for (const auto& hand_obj : tracked_hands) {
                 auto* hand = frame_data.add_hands();

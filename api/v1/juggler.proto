@@ -57,12 +57,19 @@ message Ball {
 }
 
 // Hand position and tracking
+message KeyPoint {
+  Vector2 pos_2d = 1;
+  Vector3 pos_3d = 2;
+  float confidence = 3;
+}
+
 message Hand {
-  string side = 1;                  // "left" or "right"
-  Vector2 position_2d = 2;          // 2D pixel position
-  Vector3 position_3d = 3;          // 3D position if available
+  int32 id = 1;                     // 0 for left, 1 for right
+  Vector2 position_2d = 2;          // 2D pixel position of the wrist
+  Vector3 wrist_pos_3d = 3;         // 3D position of the wrist
   double confidence = 4;            // Detection confidence (0.0-1.0)
   bool is_visible = 5;              // Whether hand is visible
+  repeated KeyPoint keypoints = 6;  // All keypoints for the hand
 }
 
 // IMU data from smartwatches
@@ -134,6 +141,7 @@ message CommandRequest {
     CAMERA_STOP = 9; // Stop camera feed
     CAMERA_START = 10; // Start camera feed with settings
     CALIBRATE_OBJECT = 11; // Force-set the position of a logical tracker
+    SET_POSE_MODEL_ENABLED = 12; // Enable or disable the pose model
   }
   
   CommandType type = 1;
@@ -151,6 +159,7 @@ message CommandRequest {
   Vector2 calibration_pixel_pos = 11;
   bool record_with_yolo_boxes = 12;
   bool record_with_bytetrack_boxes = 13;
+  bool pose_model_enabled = 14;
 }
 
 message ColorCommand {

@@ -27,3 +27,4 @@ psutil>=5.9.0
 # Configuration
 pyyaml>=6.0
 websockets
+filterpy

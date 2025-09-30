@@ -17,7 +17,7 @@
 
 namespace fs = std::filesystem;
 
-Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, const std::string& model_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
+Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, const std::string& model_name, const std::string& pose_model_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
     : camera_settings_path_(camera_settings_path),
       running_(false),
       output_format_(format),
@@ -49,8 +49,9 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
     // In your Engine's setup/initialization function
     try {
         // This assumes your models are in JuggleHub/engine/models/
-        const std::string model_path = "engine/models/" + model_name + ".xml";
-        dnn_tracker_ = std::make_shared<DNNTracker>(model_path, device_name);
+        const std::string ball_model_path = "engine/models/" + model_name + ".xml";
+        const std::string pose_model_path = "engine/models/" + pose_model_name + ".xml";
+        dnn_tracker_ = std::make_shared<DNNTracker>(ball_model_path, pose_model_path, device_name);
     } catch (const std::exception& e) {
         std::cerr << "FATAL ERROR: Failed to initialize DNNTracker: " << e.what() << std::endl;
         // Exit or handle the critical failure appropriately
@@ -134,11 +135,33 @@ void Engine::run() {
         if (use_dnn_tracker_) {
             if (!dnn_tracker_) return; // Safety check
 
-            auto [tracker_results, raw_detections] = dnn_tracker_->update(color_image, depth_image, camera_intrinsics_);
+            auto [tracker_results, tracked_hands] = dnn_tracker_->update(color_image, depth_image, camera_intrinsics_);
             tracked_objects = tracker_results;
 
+            for (const auto& hand_obj : tracked_hands) {
+                auto* hand = frame_data.add_hands();
+                hand->set_id(hand_obj.id);
+                auto* pos = hand->mutable_wrist_pos_3d();
+                pos->set_x(hand_obj.wrist_pos_3d.x);
+                pos->set_y(hand_obj.wrist_pos_3d.y);
+                pos->set_z(hand_obj.wrist_pos_3d.z);
+                hand->set_confidence(hand_obj.confidence);
+                hand->set_is_visible(true);
+
+                for (const auto& kp : hand_obj.keypoints) {
+                    auto* keypoint = hand->add_keypoints();
+                    auto* pos_2d = keypoint->mutable_pos_2d();
+                    pos_2d->set_x(0); // Placeholder
+                    pos_2d->set_y(0); // Placeholder
+                    auto* pos_3d = keypoint->mutable_pos_3d();
+                    pos_3d->set_x(kp.x);
+                    pos_3d->set_y(kp.y);
+                    pos_3d->set_z(kp.z);
+                }
+            }
+
             // Populate raw detections in protobuf
-            for (const auto& det : raw_detections) {
+            for (const auto& det : last_raw_detections_) {
                 auto* raw_det_pb = frame_data.add_raw_detections();
                 raw_det_pb->set_x(det.box.x);
                 raw_det_pb->set_y(det.box.y);
@@ -148,11 +171,10 @@ void Engine::run() {
                 raw_det_pb->set_class_id(det.class_id);
             }
 
-            last_raw_detections_ = raw_detections;
             last_tracked_objects_ = tracked_objects;
 
             // Add to frame buffers
-            RecordingFrame rec_frame = {color_image.clone(), raw_detections, tracked_objects};
+            RecordingFrame rec_frame = {color_image.clone(), last_raw_detections_, tracked_objects, tracked_hands};
             {
                 std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
                 frame_buffer_.push_back(rec_frame);
@@ -166,7 +188,7 @@ void Engine::run() {
             }
  
              if (verbose_) {
-                 std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects and " << raw_detections.size() << " raw detections." << std::endl;
+                 std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects and " << last_raw_detections_.size() << " raw detections." << std::endl;
              }
         } else {
              auto rs_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
@@ -214,14 +236,16 @@ void Engine::run() {
             } else if (obj.class_name == "hand") {
                 auto* hand = frame_data.add_hands();
                 // For now, just sending position and side.
-                auto* pos = hand->mutable_position_3d();
+                auto* pos = hand->mutable_wrist_pos_3d();
                 pos->set_x(obj.world_pos.x);
                 pos->set_y(obj.world_pos.y);
                 pos->set_z(obj.world_pos.z);
                 hand->set_is_visible(obj.status == TrackerStatus::TRACKED);
-                hand->set_side(obj.is_left ? "left" : "right");
+                hand->set_id(obj.is_left ? 0 : 1);
             }
         }
+
+
 
         if (active_module_) {
             active_module_->update(frame_data, [this](const juggler::v1::CommandRequest& command) {
@@ -351,6 +375,15 @@ void Engine::processCommands() {
                     } else {
                         response.set_success(false);
                         response.set_message("Tracker not ready for calibration.");
+                    }
+                    break;
+                case juggler::v1::CommandRequest::SET_POSE_MODEL_ENABLED:
+                    if (dnn_tracker_) {
+                        dnn_tracker_->update_setting("pose_model_enabled", command.pose_model_enabled() ? "true" : "false");
+                        response.set_message("Pose model enabled set to " + std::string(command.pose_model_enabled() ? "true" : "false"));
+                    } else {
+                        response.set_success(false);
+                        response.set_message("DNNTracker not initialized.");
                     }
                     break;
                 default:

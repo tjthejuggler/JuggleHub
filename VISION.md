@@ -1,6 +1,6 @@
 # JuggleHub Project Vision
 
-**Last Updated:** 2025-09-07 13:30:00 UTC
+**Last Updated:** 2025-09-30 13:41:00 UTC
 
 This document outlines the core mission, technical architecture, and long-term goals for the JuggleHub project. It serves as a guiding star for development, community contributions, and strategic decisions, blending a high-level creative vision with a detailed technical foundation verified against the core source code.
 
@@ -37,11 +37,11 @@ JuggleHub is built on a high-performance, hybrid architecture that separates low
 |       C++ Real-Time Engine      |      |          Python Hub            |
 |---------------------------------|      |--------------------------------|
 | - Intel RealSense Camera I/O    |      | - ZMQClient (Data Receiver)    |
-| - DNN Ball & Hand Tracking      |      | - Pattern Recognition Pipeline |
-| - Real-Time Module Execution    |      | - IMUListener (WebSocket)      |
-| - ZMQ PUB (Data) & REP (Control)|      | - JuggleHubUI (PyQt6)          |
-| - UDP Control for Smart Props   |      | - DatabaseLogger (SQLite)      |
-|                                 |      | - Headless Operation Capable   |
+| - DNN Ball & Hand Tracking      |      | - JugglingSystemManager        |
+| - Real-Time Module Execution    |      | - ProbabilisticStateEstimator  |
+| - ZMQ PUB (Data) & REP (Control)|      | - IMUListener (WebSocket)      |
+| - UDP Control for Smart Props   |      | - JuggleHubUI (PyQt6)          |
+|                                 |      | - DatabaseLogger (SQLite)      |
 +---------------------------------+      +--------------------------------+
            ^                |                      ^                |
            |                | Protobuf via ZeroMQ  |                |
@@ -62,14 +62,14 @@ The C++ engine is the heart of the system, responsible for all tasks where per-f
 
 *   **Responsibilities**:
     *   Directly managing the Intel RealSense camera, including sophisticated control over settings, resolution, and frame rates via JSON configuration files.
-    *   Performing ball and hand tracking using a fine-tuned, high-performance YOLOv8n model.
+    *   Performing ball and hand tracking using a fine-tuned, high-performance YOLOv11 model and a YOLO-Pose model.
     *   Executing sandboxed, real-time "Modules" (e.g., `PositionToRgbModule`) for interactive applications like smart ball control.
     *   Streaming serialized `FrameData` Protobuf messages via a ZeroMQ `PUB` socket.
     *   Receiving and responding to `CommandRequest` Protobuf messages on a separate ZeroMQ `REP` socket in a dedicated command processing thread.
 
 *   **Tracking Subsystems**:
     1.  **DNN-Powered Tracking (Primary):** The state-of-the-art pipeline for object detection.
-        *   **Model:** A fine-tuned YOLOv8n model, specifically optimized for the consistent conditions of the RealSense camera setup to provide the highest quality coordinate data for the downstream analysis pipeline.
+        *   **Model:** A fine-tuned YOLOv11 model, specifically optimized for the consistent conditions of the RealSense camera setup to provide the highest quality coordinate data for the downstream analysis pipeline.
         *   **Inference Backend:** Intel's OpenVINO toolkit for high-performance inference, intelligently utilizing available hardware like iGPUs or NPUs.
         *   **Tracker:** ByteTrack for maintaining consistent object IDs across frames.
     2.  **Color-Based Tracking (Legacy):** A highly efficient system for controlled lighting conditions, maintained for specific use cases or as a fallback.
@@ -81,6 +81,10 @@ The Python hub is the flexible, user-facing brain of the operation. It is built 
     Core Components:
 
         ZMQClient: Connects to the C++ engine's PUB socket to receive the stream of FrameData.
+
+        JugglingSystemManager: Orchestrates all the components of the juggling tracking system.
+
+        ProbabilisticStateEstimator: Fuses evidence from physics, proximity, and visibility to estimate the physical state of each juggling ball.
 
         IMUListener: Runs in a separate thread, managing WebSocket connections to wearable sensors and parsing incoming IMU data.
 
@@ -131,6 +135,8 @@ The API definition is the rigid contract that ensures seamless communication. It
         FrameData: The main message type, a container for all data related to a single moment in time. It includes lists of Ball, Hand, and IMUData messages, as well as system status, camera intrinsics, and the new PatternData message.
 
         Ball: Contains the 3D position, 2D bounding box, and smoothed Kalman filter state of a tracked ball.
+
+        Hand: Contains the 3D position of the wrist, a list of all keypoints for the hand, and other tracking data.
 
         JugglingEvent: Represents a discrete event detected in the time-series. This message is crucial for the event-based analysis pipeline.
         code Protobuf
@@ -187,7 +193,7 @@ CommandRequest: A versatile message for controlling the engine, with an enum for
 
 ### 4.5. Core AI Strategy: Dual-Model Specialization for Object Tracking
 
-To achieve the highest performance in both real-time analysis and offline data processing, JuggleHub adopts a dual-model strategy for its core object tracking. A single, generalist model cannot optimally serve the distinct domains of clean, consistent lab footage and varied, "in-the-wild" video. Therefore, we develop and maintain two specialized, fine-tuned YOLOv8 models:
+To achieve the highest performance in both real-time analysis and offline data processing, JuggleHub adopts a dual-model strategy for its core object tracking. A single, generalist model cannot optimally serve the distinct domains of clean, consistent lab footage and varied, "in-the-wild" video. Therefore, we develop and maintain two specialized, fine-tuned YOLOv11 models:
 
 *   **Model A: The "Live Engine" Model**
     *   **Purpose:** Real-time, low-latency tracking.
@@ -200,8 +206,6 @@ To achieve the highest performance in both real-time analysis and offline data p
     *   **Training Data:** Fine-tuned on a diverse and challenging dataset composed of thousands of juggling videos from varied sources (e.g., YouTube).
     *   **Characteristics:** Optimized for robustness over raw speed. It is designed to handle a wide range of lighting conditions, compression artifacts, camera angles, and juggler styles.
     *   **Deployment:** This model is a critical development tool used in our data preparation scripts. It is not part of the real-time engine.
-
-This separation of concerns is fundamental, allowing us to build a hyper-accurate real-time system without sacrificing the ability to learn from the vast amount of juggling knowledge available publicly.
 
 ### 4.6. Development Workflow for the Pattern Recognition Engine
 

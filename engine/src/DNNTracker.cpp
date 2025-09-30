@@ -41,12 +41,19 @@ static float calculate_iou(const byte_track::Rect<float>& box1, const byte_track
     return (union_area > 0) ? intersection_area / union_area : 0.0f;
 }
 
-DNNTracker::DNNTracker(const std::string& model_path, const std::string& device_name) {
-    std::cout << "Loading OpenVINO model: " << model_path << std::endl;
-    std::cout << "Compiling model for device: " << device_name << std::endl;
-    compiled_model = core.compile_model(model_path, device_name);
-    infer_request = compiled_model.create_infer_request();
-    std::cout << "Model loaded successfully." << std::endl;
+DNNTracker::DNNTracker(const std::string& ball_model_path, const std::string& pose_model_path, const std::string& device_name) {
+    std::cout << "Loading OpenVINO ball model: " << ball_model_path << std::endl;
+    std::cout << "Compiling ball model for device: " << device_name << std::endl;
+    ball_compiled_model = core.compile_model(ball_model_path, device_name);
+    ball_infer_request = ball_compiled_model.create_infer_request();
+    std::cout << "Ball model loaded successfully." << std::endl;
+    
+    std::cout << "Loading OpenVINO pose model: " << pose_model_path << std::endl;
+    std::cout << "Compiling pose model for device: " << device_name << std::endl;
+    pose_compiled_model = core.compile_model(pose_model_path, device_name);
+    pose_infer_request = pose_compiled_model.create_infer_request();
+    std::cout << "Pose model loaded successfully." << std::endl;
+
     reinitialize_tracker();
     initialize_logical_trackers();
     last_update_time_ = std::chrono::steady_clock::now();
@@ -66,7 +73,7 @@ void DNNTracker::initialize_logical_trackers() {
     }
 }
 
-std::pair<std::vector<TrackedObject>, std::vector<Detection>> DNNTracker::update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
+std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
     auto current_time = std::chrono::steady_clock::now();
     float dt = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - last_update_time_).count();
     last_update_time_ = current_time;
@@ -85,15 +92,15 @@ std::pair<std::vector<TrackedObject>, std::vector<Detection>> DNNTracker::update
         if (hand.status != TrackerStatus::LOST) hand.kf.predict(dt);
     }
 
-    // --- 2. DETECT ---
+    // --- 2. DETECT BALLS ---
     float scale_x, scale_y;
     cv::Mat preprocessed_image = preprocess(color_frame, scale_x, scale_y);
-    ov::Tensor input_tensor(compiled_model.input().get_element_type(), compiled_model.input().get_shape(), preprocessed_image.data);
-    infer_request.set_input_tensor(input_tensor);
-    infer_request.infer();
-    const ov::Tensor& output_tensor = infer_request.get_output_tensor();
+    ov::Tensor input_tensor(ball_compiled_model.input().get_element_type(), ball_compiled_model.input().get_shape(), preprocessed_image.data);
+    ball_infer_request.set_input_tensor(input_tensor);
+    ball_infer_request.infer();
+    const ov::Tensor& output_tensor = ball_infer_request.get_output_tensor();
     last_raw_detections_.clear();
-    std::vector<byte_track::Object> detections_for_bytetrack = postprocess(color_frame, depth_frame, intrinsics, output_tensor, scale_x, scale_y, last_raw_detections_);
+    std::vector<byte_track::Object> detections_for_bytetrack = postprocess_ball_detection(color_frame, depth_frame, intrinsics, output_tensor, scale_x, scale_y, last_raw_detections_);
 
     // --- 3. TRACK (ByteTrack) ---
     std::vector<std::shared_ptr<byte_track::STrack>> byte_tracks = tracker->update(detections_for_bytetrack);
@@ -199,7 +206,13 @@ std::pair<std::vector<TrackedObject>, std::vector<Detection>> DNNTracker::update
         });
     }
 
-    return {final_tracked_objects, last_raw_detections_};
+    // --- 7. RUN POSE ESTIMATION ---
+    std::vector<TrackedHand> tracked_hands;
+    if (pose_model_enabled_) {
+        tracked_hands = run_pose_estimation(color_frame, depth_frame, intrinsics);
+    }
+
+    return {final_tracked_objects, tracked_hands};
 }
 
 
@@ -331,6 +344,7 @@ void DNNTracker::update_setting(const std::string& key, const std::string& value
         if (key == "confidence_threshold") confidence_threshold_ = std::stof(value);
         else if (key == "nms_threshold") nms_threshold_ = std::stof(value);
         else if (key == "track_buffer") { track_buffer_ = std::stoi(value); reinitialize_tracker(); }
+        else if (key == "pose_model_enabled") { pose_model_enabled_ = (value == "true"); }
         else if (key == "track_thresh") { track_thresh_ = std::stof(value); reinitialize_tracker(); }
         else if (key == "high_thresh") { high_thresh_ = std::stof(value); reinitialize_tracker(); }
         else if (key == "match_thresh") { match_thresh_ = std::stof(value); reinitialize_tracker(); }
@@ -355,7 +369,7 @@ cv::Mat DNNTracker::preprocess(const cv::Mat& frame, float& scale_x, float& scal
     return cv::dnn::blobFromImage(float_frame);
 }
 
-std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<Detection>& raw_detections) {
+std::vector<byte_track::Object> DNNTracker::postprocess_ball_detection(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<Detection>& raw_detections) {
     raw_detections.clear();
     const float* output_data = output_tensor.data<const float>();
     const int num_channels = 4 + num_classes_;
@@ -419,4 +433,10 @@ std::vector<byte_track::Object> DNNTracker::postprocess(const cv::Mat& color_fra
     }
     
     return objects;
+}
+
+std::vector<TrackedHand> DNNTracker::run_pose_estimation(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
+    // This is a placeholder implementation.
+    // The actual implementation will depend on the specifics of the YOLO-Pose model.
+    return {};
 }

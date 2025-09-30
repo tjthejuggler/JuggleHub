@@ -22,6 +22,7 @@ from components.imu_listener import IMUListener
 from components.web_ui import WebUI
 from components.screen_controller import ScreenController
 import juggler_pb2
+from components.juggling_system_manager import JugglingSystemManager
 
 class JuggleHub:
     """Main JuggleHub application class."""
@@ -38,6 +39,7 @@ class JuggleHub:
         self.imu_listener: Optional[IMUListener] = None
         self.web_ui: Optional[WebUI] = None
         self.screen_controller: Optional[ScreenController] = None
+        self.juggling_system_manager: Optional[JugglingSystemManager] = None
         
         self._data_thread: Optional[threading.Thread] = None
         
@@ -77,6 +79,8 @@ class JuggleHub:
                 )
                 self.imu_listener.start()
             
+            self.juggling_system_manager = JugglingSystemManager(self.config)
+            
             print("✅ JuggleHub initialized successfully")
             return True
             
@@ -109,6 +113,11 @@ class JuggleHub:
                     # Augment with the latest IMU data
                     del frame_data.imu_data[:]
                     frame_data.imu_data.extend(list(imu_datas.values()))
+                    
+                    # Process the frame data through the JugglingSystemManager
+                    if self.juggling_system_manager:
+                        updated_balls = self.juggling_system_manager.process_frame(frame_data, self.ui.get_latest_frame())
+                        # TODO: Use the updated_balls for UI and logging
                     
                     # Pass the combined frame_data to other components
                     if self.ui:
@@ -172,6 +181,9 @@ class JuggleHub:
         # UI cleanup is handled by its own exit
         if self.ui:
             self.ui.cleanup()
+        
+        if self.juggling_system_manager:
+            self.juggling_system_manager.shutdown()
         
         print("✅ JuggleHub cleanup completed")
     

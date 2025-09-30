@@ -23,7 +23,7 @@ public:
         LEGACY
     };
 
-    Engine(const std::string& camera_settings_path, const std::string& device_name = "CPU", const std::string& model_name = "yolo11n", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
+    Engine(const std::string& camera_settings_path, const std::string& device_name = "CPU", const std::string& model_name = "yolo11n", const std::string& pose_model_name = "yolo-pose", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
     ~Engine();
 
     void run();
@@ -85,6 +85,7 @@ private:
         cv::Mat frame;
         std::vector<Detection> raw_detections;
         std::vector<TrackedObject> tracked_objects;
+        std::vector<TrackedHand> tracked_hands;
     };
     std::deque<RecordingFrame> frame_buffer_;
     std::mutex frame_buffer_mutex_;

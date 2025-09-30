@@ -310,7 +310,34 @@ if PYQT_AVAILABLE:
             )
 
             layout.addWidget(bytetrack_group)
+
+            # -- Pose Model Settings --
+            pose_group = QGroupBox("Pose Model Settings")
+            pose_layout = QGridLayout(pose_group)
+
+            self.pose_model_toggle = QPushButton("Enable Pose Model")
+            self.pose_model_toggle.setCheckable(True)
+            self.pose_model_toggle.setChecked(True)
+            self.pose_model_toggle.clicked.connect(self.toggle_pose_model)
+            pose_layout.addWidget(self.pose_model_toggle, 0, 0, 1, 2)
+
+            layout.addWidget(pose_group)
             layout.addStretch()
+
+        def toggle_pose_model(self):
+            is_enabled = self.pose_model_toggle.isChecked()
+            command = juggler_pb2.CommandRequest(
+                type=juggler_pb2.CommandRequest.CommandType.SET_POSE_MODEL_ENABLED,
+                pose_model_enabled=is_enabled
+            )
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Pose model {'enabled' if is_enabled else 'disabled'}")
+                else:
+                    print(f"❌ Failed to toggle pose model: {response.message}")
+            except Exception as e:
+                print(f"❌ Error toggling pose model: {e}")
 
         def _create_slider_widget(self, parent_layout, row, label_text, tooltip_text,
                                   range_min, range_max, initial_value,
@@ -613,17 +640,23 @@ if PYQT_AVAILABLE:
             self.show_tracked_boxes_toggle.clicked.connect(self.toggle_overlays)
             toggles_layout.addWidget(self.show_tracked_boxes_toggle)
 
-            self.show_3d_trackers_toggle = QPushButton("Logical Trackers")
-            self.show_3d_trackers_toggle.setCheckable(True)
-            self.show_3d_trackers_toggle.setChecked(True) # Default to on
-            self.show_3d_trackers_toggle.clicked.connect(self.toggle_overlays)
-            toggles_layout.addWidget(self.show_3d_trackers_toggle)
+            self.show_color_tracker_toggle = QPushButton("Color Tracking")
+            self.show_color_tracker_toggle.setCheckable(True)
+            self.show_color_tracker_toggle.setChecked(True) # Default to on
+            self.show_color_tracker_toggle.clicked.connect(self.toggle_overlays)
+            toggles_layout.addWidget(self.show_color_tracker_toggle)
 
             self.show_tails_toggle = QPushButton("Show Tails")
             self.show_tails_toggle.setCheckable(True)
             self.show_tails_toggle.setChecked(False)
             self.show_tails_toggle.clicked.connect(self.toggle_overlays)
             toggles_layout.addWidget(self.show_tails_toggle)
+            
+            self.show_skeleton_toggle = QPushButton("Show Skeleton")
+            self.show_skeleton_toggle.setCheckable(True)
+            self.show_skeleton_toggle.setChecked(False)
+            self.show_skeleton_toggle.clicked.connect(self.toggle_overlays)
+            toggles_layout.addWidget(self.show_skeleton_toggle)
             
             self.video_layout.addLayout(toggles_layout)
 
@@ -838,8 +871,8 @@ if PYQT_AVAILABLE:
                         bbox = obj.bounding_box_2d
                         painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
 
-            # --- Draw Logical Trackers (Kalman Filtered) ---
-            if self.show_3d_trackers_toggle.isChecked():
+            # --- Draw Color Trackers (Kalman Filtered) ---
+            if self.show_color_tracker_toggle.isChecked():
                 colors = [QColor(255, 87, 34), QColor(255, 193, 7), QColor(139, 195, 74),
                           QColor(0, 188, 212), QColor(3, 169, 244), QColor(63, 81, 181)]
                 for obj in frame_data.balls:
@@ -908,6 +941,14 @@ if PYQT_AVAILABLE:
                                 if p1[0] > 0 and p1[1] > 0 and p2[0] > 0 and p2[1] > 0: # Check for valid points
                                     painter.setPen(pen)
                                     painter.drawLine(int(p1[0]), int(p1[1]), int(p2[0]), int(p2[1]))
+
+            # --- Draw Skeleton ---
+            if self.show_skeleton_toggle.isChecked():
+                painter.setPen(QPen(QColor(0, 255, 0, 150), 2)) # Green for skeleton
+                for hand in frame_data.hands:
+                    for kp in hand.keypoints:
+                        if kp.confidence > 0.5:
+                            painter.drawEllipse(int(kp.pos_2d.x) - 3, int(kp.pos_2d.y) - 3, 6, 6)
 
             painter.end()
             self.video_pixmap_item.setPixmap(pixmap)
@@ -993,6 +1034,12 @@ if PYQT_AVAILABLE:
                 self.record_clip()
             else:
                 super().keyPressEvent(event)
+        
+        def get_latest_frame(self):
+            """Returns the latest video frame as a numpy array."""
+            if self.last_frame_data and self.last_frame_data.color_image_b64:
+                return cv2.imdecode(np.frombuffer(self.last_frame_data.color_image_b64, np.uint8), cv2.IMREAD_COLOR)
+            return None
         
         def toggle_web_ui(self):
             if not self.hub_instance.web_ui.is_running:

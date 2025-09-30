@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-09-22 12:56:00 UTC
+**Last Updated:** 2025-09-30 13:38:00 UTC
 
 ## 🎯 Overview
 
@@ -190,6 +190,7 @@ JuggleHub/
   - **DNN-based tracking** using YOLOv11 + ByteTrack for robust object detection and tracking
 - **Advanced AI Tracking**:
   - **YOLOv11 object detection** optimized with Intel OpenVINO for real-time inference
+  - **YOLO-Pose estimation** for hand and body tracking
   - **ByteTrack multi-object tracking** for consistent ball ID assignment across frames
   - **Automatic model loading** from OpenVINO IR format (.xml/.bin files)
 - **Camera Settings Management**: Load custom camera settings from JSON files for optimal performance
@@ -197,11 +198,13 @@ JuggleHub/
 - **Smart occlusion handling** - merges nearby detections
 - **High-performance streaming** at up to 90 FPS
 - **Protocol Buffers output** for type-safe data exchange
-- **Optional hand tracking** with MediaPipe integration
 - **Pluggable Real-Time Modules**: Run different interactive applications (games, controllers, etc.) as sandboxed C++ modules for maximum performance, controlled by the Python hub
 
 ### Python Hub Features
 - **Real-time visualization** with PyQt6 GUI
+- **Probabilistic State Estimator**: Fuses data from multiple sources to determine the physical state of juggling balls (held vs. unheld).
+- **Color Profile Persistence**: Saves and loads color profiles for juggling balls, allowing for consistent identification across sessions.
+- **Kalman Filter Ball Tracker**: Manages ball tracks and applies a Kalman Filter to each one for smoothed physics data.
 - **Enhanced Visualization**: Large, solid, color-matched ball trackers and thick, highly visible hand trackers for clear and intuitive visual feedback.
 - **Camera settings selection** with dropdown interface for easy configuration switching
 - **Live camera control** with stop/start functionality for seamless settings switching
@@ -235,21 +238,23 @@ The hub UI provides real-time control over the DNN-based tracking system. These 
 - **Track Threshold**: The confidence threshold required to initiate a new track.
 - **High Confidence Threshold**: The confidence threshold for the first association step, where high-confidence detections are matched to existing tracks.
 - **Match Threshold**: The IoU (Intersection over Union) threshold for associating detections with existing tracks. A lower value makes it easier to associate a detection with a track, even if they don't perfectly overlap.
+
 ## 🤖 DNN-Based Tracking System
 
 JuggleHub now features a state-of-the-art deep neural network tracking system that provides robust, AI-powered ball detection and tracking capabilities alongside the traditional color-based tracking.
 
 ### Architecture Overview
 
-The DNN tracking system consists of two main components:
+The DNN tracking system consists of three main components:
 
 1. **YOLOv11 Object Detection**: Uses a pre-trained YOLOv11 model optimized with Intel OpenVINO for real-time inference
-2. **ByteTrack Multi-Object Tracking**: Maintains consistent object IDs across frames, handling occlusions and temporary disappearances
+2. **YOLO-Pose Estimation**: Uses a pre-trained pose estimation model to track hand and body keypoints.
+3. **ByteTrack Multi-Object Tracking**: Maintains consistent object IDs across frames, handling occlusions and temporary disappearances
 
 ### Key Components
 
 #### DNNTracker Class ([`engine/include/DNNTracker.hpp`](engine/include/DNNTracker.hpp))
-- **OpenVINO Integration**: Loads and runs YOLOv11 models in OpenVINO IR format
+- **OpenVINO Integration**: Loads and runs YOLOv11 and YOLO-Pose models in OpenVINO IR format
 - **Preprocessing Pipeline**: Handles image resizing, normalization, and format conversion
 - **Postprocessing**: Converts model outputs to detection boxes with confidence scores
 - **ByteTrack Integration**: Maintains object tracking across frames
@@ -365,7 +370,6 @@ The DNN tracking system provides a foundation for advanced features:
 
 - **Custom Model Training**: Train YOLOv11 models on specific juggling ball datasets
 - **Multi-Class Detection**: Detect different types of juggling objects (balls, clubs, rings)
-- **Pose Integration**: Combine object detection with human pose estimation
 - **Hardware Acceleration**: Utilize Intel GPU or VPU for faster inference
 - **Model Optimization**: Quantization and pruning for embedded deployment
 
@@ -989,22 +993,22 @@ To build the engine with debug symbols and verbose output:
 
 Here is the step-by-step process for adding a new interactive feature (e.g., a new game that colors the balls based on their height).
 
-1.  **(API) Define Data Structures:** If your new module needs to send or receive unique data, add the new message types to [`api/v1/juggler.proto`](api/v1/juggler.proto:1).
+1.  **(API) Define Data Structures:** If your new module needs to send or receive unique data, add the new message types to [`api/v1/juggler.proto`](api/v1/juggler.proto).
 
 2.  **(C++) Create the Module:**
-    -   Create a new file in [`engine/src/modules/`](engine/src/modules/:1), for example, `HeightColorModule.cpp`.
+    -   Create a new file in [`engine/src/modules/`](engine/src/modules/), for example, `HeightColorModule.cpp`.
     -   In this file, create a class that inherits from the `ModuleBase` interface.
     -   Implement the `setup()`, `update()`, and `cleanup()` methods. The `update()` function will contain your real-time logic that runs every frame.
 
 3.  **(C++) Register the Module:**
-    -   Open [`engine/src/Engine.cpp`](engine/src/Engine.cpp:1) (or a dedicated module factory file).
+    -   Open [`engine/src/Engine.cpp`](engine/src/Engine.cpp) (or a dedicated module factory file).
     -   Include the header for your new module.
     -   Add your new module to the list of available modules so the engine knows it exists and can be loaded.
 
 4.  **(Build) Recompile the Engine:** Run `./scripts/build_engine.sh`. This will compile your new module and also regenerate the Protobuf files for both C++ and Python, ensuring everything is in sync.
 
 5.  **(Python) Add Control Logic:**
-    -   In the Python [`hub/`](hub/:1), modify the UI or application logic to send a command to the C++ engine to load your new module.
+    -   In the Python [`hub/`](hub/), modify the UI or application logic to send a command to the C++ engine to load your new module.
 
 6.  **Run and Test!**
 
@@ -1024,10 +1028,10 @@ python3 -m pytest
 
 ### Adding New Features
 
-1. **Modify the API**: Update [`api/v1/juggler.proto`](api/v1/juggler.proto:1)
+1. **Modify the API**: Update [`api/v1/juggler.proto`](api/v1/juggler.proto)
 2. **Rebuild**: Run build scripts to regenerate Protocol Buffer files
-3. **Update Engine**: Modify C++ code in [`engine/src/`](engine/src/:1)
-4. **Update Hub**: Modify Python code in [`hub/components/`](hub/components/:1)
+3. **Update Engine**: Modify C++ code in [`engine/src/`](engine/src/)
+4. **Update Hub**: Modify Python code in [`hub/components/`](hub/components/)
 
 ## 🗺️ Roadmap & Future Vision
 

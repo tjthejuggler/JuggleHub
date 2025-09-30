@@ -40,12 +40,19 @@ struct Detection {
     int class_id;
 };
 
+struct TrackedHand {
+    cv::Point3f wrist_pos_3d;
+    float confidence;
+    int id; // 0 for left, 1 for right
+    std::vector<cv::Point3f> keypoints;
+};
+
 class DNNTracker {
 public:
-    DNNTracker(const std::string& model_path, const std::string& device_name);
+    DNNTracker(const std::string& ball_model_path, const std::string& pose_model_path, const std::string& device_name);
     ~DNNTracker();
 
-    std::pair<std::vector<TrackedObject>, std::vector<Detection>> update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
+    std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
 
     void update_setting(const std::string& key, const std::string& value);
     void calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
@@ -62,8 +69,10 @@ private:
 
     // OpenVINO
     ov::Core core;
-    ov::CompiledModel compiled_model;
-    ov::InferRequest infer_request;
+    ov::CompiledModel ball_compiled_model;
+    ov::InferRequest ball_infer_request;
+    ov::CompiledModel pose_compiled_model;
+    ov::InferRequest pose_infer_request;
 
     // Bytetrack
     std::unique_ptr<byte_track::BYTETracker> tracker;
@@ -89,6 +98,8 @@ private:
     float high_thresh_ = 0.5f;
     float match_thresh_ = 0.7f;
 
+    bool pose_model_enabled_ = true;
+
     // --- NEW MODEL CONFIGURATION MEMBERS ---
     const int num_classes_ = 4;
     const std::vector<std::string> class_names_ = {"led_on", "led_off", "dropped_ball", "hand"};
@@ -97,5 +108,6 @@ private:
     void manage_hand_tracks(const std::vector<Detection>& hand_detections);
     void manage_ball_occlusion();
     cv::Mat preprocess(const cv::Mat& frame, float& scale_x, float& scale_y);
-    std::vector<byte_track::Object> postprocess(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<Detection>& raw_detections);
+    std::vector<byte_track::Object> postprocess_ball_detection(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics, const ov::Tensor& output_tensor, float scale_x, float scale_y, std::vector<Detection>& raw_detections);
+    std::vector<TrackedHand> run_pose_estimation(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
 };

@@ -118,13 +118,29 @@ struct BallDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 BallDefaultTypeInternal _Ball_default_instance_;
+PROTOBUF_CONSTEXPR KeyPoint::KeyPoint(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.pos_2d_)*/nullptr
+  , /*decltype(_impl_.pos_3d_)*/nullptr
+  , /*decltype(_impl_.confidence_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct KeyPointDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR KeyPointDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~KeyPointDefaultTypeInternal() {}
+  union {
+    KeyPoint _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 KeyPointDefaultTypeInternal _KeyPoint_default_instance_;
 PROTOBUF_CONSTEXPR Hand::Hand(
     ::_pbi::ConstantInitialized): _impl_{
-    /*decltype(_impl_.side_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+    /*decltype(_impl_.keypoints_)*/{}
   , /*decltype(_impl_.position_2d_)*/nullptr
-  , /*decltype(_impl_.position_3d_)*/nullptr
-  , /*decltype(_impl_.confidence_)*/0
+  , /*decltype(_impl_.wrist_pos_3d_)*/nullptr
+  , /*decltype(_impl_.id_)*/0
   , /*decltype(_impl_.is_visible_)*/false
+  , /*decltype(_impl_.confidence_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct HandDefaultTypeInternal {
   PROTOBUF_CONSTEXPR HandDefaultTypeInternal()
@@ -243,6 +259,7 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.logical_id_to_calibrate_)*/0
   , /*decltype(_impl_.record_with_yolo_boxes_)*/false
   , /*decltype(_impl_.record_with_bytetrack_boxes_)*/false
+  , /*decltype(_impl_.pose_model_enabled_)*/false
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct CommandRequestDefaultTypeInternal {
   PROTOBUF_CONSTEXPR CommandRequestDefaultTypeInternal()
@@ -284,7 +301,7 @@ struct CommandResponseDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 CommandResponseDefaultTypeInternal _CommandResponse_default_instance_;
 }  // namespace v1
 }  // namespace juggler
-static ::_pb::Metadata file_level_metadata_juggler_2eproto[15];
+static ::_pb::Metadata file_level_metadata_juggler_2eproto[16];
 static const ::_pb::EnumDescriptor* file_level_enum_descriptors_juggler_2eproto[2];
 static constexpr ::_pb::ServiceDescriptor const** file_level_service_descriptors_juggler_2eproto = nullptr;
 
@@ -350,16 +367,26 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Ball, _impl_.projected_pos_2d_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Ball, _impl_.logical_id_),
   ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KeyPoint, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KeyPoint, _impl_.pos_2d_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KeyPoint, _impl_.pos_3d_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KeyPoint, _impl_.confidence_),
+  ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _internal_metadata_),
   ~0u,  // no _extensions_
   ~0u,  // no _oneof_case_
   ~0u,  // no _weak_field_map_
   ~0u,  // no _inlined_string_donated_
-  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.side_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.id_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.position_2d_),
-  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.position_3d_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.wrist_pos_3d_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.confidence_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.is_visible_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.keypoints_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::IMUData, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -447,6 +474,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.calibration_pixel_pos_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.record_with_yolo_boxes_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.record_with_bytetrack_boxes_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.pose_model_enabled_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorCommand, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -472,15 +500,16 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 26, -1, -1, sizeof(::juggler::v1::HSVRange)},
   { 34, -1, -1, sizeof(::juggler::v1::BoundingBox2D)},
   { 47, -1, -1, sizeof(::juggler::v1::Ball)},
-  { 60, -1, -1, sizeof(::juggler::v1::Hand)},
-  { 71, -1, -1, sizeof(::juggler::v1::IMUData)},
-  { 86, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
-  { 97, -1, -1, sizeof(::juggler::v1::SystemStatus)},
-  { 110, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 129, 137, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 139, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 158, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 166, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 60, -1, -1, sizeof(::juggler::v1::KeyPoint)},
+  { 69, -1, -1, sizeof(::juggler::v1::Hand)},
+  { 81, -1, -1, sizeof(::juggler::v1::IMUData)},
+  { 96, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
+  { 107, -1, -1, sizeof(::juggler::v1::SystemStatus)},
+  { 120, -1, -1, sizeof(::juggler::v1::FrameData)},
+  { 139, 147, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 149, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 169, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 177, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -490,6 +519,7 @@ static const ::_pb::Message* const file_default_instances[] = {
   &::juggler::v1::_HSVRange_default_instance_._instance,
   &::juggler::v1::_BoundingBox2D_default_instance_._instance,
   &::juggler::v1::_Ball_default_instance_._instance,
+  &::juggler::v1::_KeyPoint_default_instance_._instance,
   &::juggler::v1::_Hand_default_instance_._instance,
   &::juggler::v1::_IMUData_default_instance_._instance,
   &::juggler::v1::_CameraIntrinsics_default_instance_._instance,
@@ -518,64 +548,69 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   ".v1.Ball.Status\022-\n\020projected_pos_2d\030\006 \001("
   "\0132\023.juggler.v1.Vector2\022\022\n\nlogical_id\030\007 \001"
   "(\005\"2\n\006Status\022\013\n\007TRACKED\020\000\022\r\n\tPREDICTED\020\001"
-  "\022\014\n\010OCCLUDED\020\002\"\220\001\n\004Hand\022\014\n\004side\030\001 \001(\t\022(\n"
-  "\013position_2d\030\002 \001(\0132\023.juggler.v1.Vector2\022"
-  "(\n\013position_3d\030\003 \001(\0132\023.juggler.v1.Vector"
-  "3\022\022\n\nconfidence\030\004 \001(\001\022\022\n\nis_visible\030\005 \001("
-  "\010\"\211\002\n\007IMUData\022\022\n\nwatch_name\030\001 \001(\t\022\020\n\010wat"
-  "ch_ip\030\002 \001(\t\022)\n\014acceleration\030\003 \001(\0132\023.jugg"
-  "ler.v1.Vector3\022&\n\tgyroscope\030\004 \001(\0132\023.jugg"
-  "ler.v1.Vector3\022)\n\014magnetometer\030\005 \001(\0132\023.j"
-  "uggler.v1.Vector3\022\027\n\017accel_magnitude\030\006 \001"
-  "(\001\022\026\n\016gyro_magnitude\030\007 \001(\001\022\024\n\014timestamp_"
-  "us\030\010 \001(\004\022\023\n\013data_age_ms\030\t \001(\001\"Y\n\020CameraI"
-  "ntrinsics\022\n\n\002fx\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003ppx"
-  "\030\003 \001(\001\022\013\n\003ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001"
-  "\"\235\001\n\014SystemStatus\022\030\n\020camera_connected\030\001 "
-  "\001(\010\022\026\n\016engine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001(\001"
-  "\022\023\n\013frame_count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\re"
-  "rror_message\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001(\004"
-  "\"\251\003\n\tFrameData\022\024\n\014timestamp_us\030\001 \001(\004\022\037\n\005"
-  "balls\030\002 \003(\0132\020.juggler.v1.Ball\022\037\n\005hands\030\003"
-  " \003(\0132\020.juggler.v1.Hand\022%\n\010imu_data\030\004 \003(\013"
-  "2\023.juggler.v1.IMUData\0220\n\nintrinsics\030\005 \001("
-  "\0132\034.juggler.v1.CameraIntrinsics\022(\n\006statu"
-  "s\030\006 \001(\0132\030.juggler.v1.SystemStatus\022\023\n\013fra"
-  "me_width\030\007 \001(\r\022\024\n\014frame_height\030\010 \001(\r\022\024\n\014"
-  "frame_number\030\t \001(\r\0221\n\016raw_detections\030\n \003"
-  "(\0132\031.juggler.v1.BoundingBox2D\022\027\n\017color_i"
-  "mage_b64\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014\022"
-  "\033\n\023ir_projector_active\030\r \001(\010\"\244\006\n\016Command"
-  "Request\0224\n\004type\030\001 \001(\0162&.juggler.v1.Comma"
-  "ndRequest.CommandType\022\023\n\013module_name\030\002 \001"
-  "(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/\n\rcolor_comman"
-  "d\030\004 \001(\0132\030.juggler.v1.ColorCommand\022\?\n\013mod"
-  "ule_args\030\005 \003(\0132*.juggler.v1.CommandReque"
-  "st.ModuleArgsEntry\022\034\n\024camera_settings_fi"
-  "le\030\006 \001(\t\022\024\n\014camera_width\030\007 \001(\r\022\025\n\rcamera"
-  "_height\030\010 \001(\r\022\022\n\ncamera_fps\030\t \001(\r\022\037\n\027log"
-  "ical_id_to_calibrate\030\n \001(\005\0222\n\025calibratio"
-  "n_pixel_pos\030\013 \001(\0132\023.juggler.v1.Vector2\022\036"
-  "\n\026record_with_yolo_boxes\030\014 \001(\010\022#\n\033record"
-  "_with_bytetrack_boxes\030\r \001(\010\0321\n\017ModuleArg"
-  "sEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\222"
-  "\002\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODU"
-  "LE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_CO"
-  "MMAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_"
-  "START\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026"
-  "RECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WITH"
-  "_CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014C"
-  "AMERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\"A\n\014C"
-  "olorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030\002 "
-  "\001(\0132\021.juggler.v1.Color\"I\n\017CommandRespons"
-  "e\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014t"
-  "imestamp_us\030\003 \001(\004b\006proto3"
+  "\022\014\n\010OCCLUDED\020\002\"h\n\010KeyPoint\022#\n\006pos_2d\030\001 \001"
+  "(\0132\023.juggler.v1.Vector2\022#\n\006pos_3d\030\002 \001(\0132"
+  "\023.juggler.v1.Vector3\022\022\n\nconfidence\030\003 \001(\002"
+  "\"\270\001\n\004Hand\022\n\n\002id\030\001 \001(\005\022(\n\013position_2d\030\002 \001"
+  "(\0132\023.juggler.v1.Vector2\022)\n\014wrist_pos_3d\030"
+  "\003 \001(\0132\023.juggler.v1.Vector3\022\022\n\nconfidence"
+  "\030\004 \001(\001\022\022\n\nis_visible\030\005 \001(\010\022\'\n\tkeypoints\030"
+  "\006 \003(\0132\024.juggler.v1.KeyPoint\"\211\002\n\007IMUData\022"
+  "\022\n\nwatch_name\030\001 \001(\t\022\020\n\010watch_ip\030\002 \001(\t\022)\n"
+  "\014acceleration\030\003 \001(\0132\023.juggler.v1.Vector3"
+  "\022&\n\tgyroscope\030\004 \001(\0132\023.juggler.v1.Vector3"
+  "\022)\n\014magnetometer\030\005 \001(\0132\023.juggler.v1.Vect"
+  "or3\022\027\n\017accel_magnitude\030\006 \001(\001\022\026\n\016gyro_mag"
+  "nitude\030\007 \001(\001\022\024\n\014timestamp_us\030\010 \001(\004\022\023\n\013da"
+  "ta_age_ms\030\t \001(\001\"Y\n\020CameraIntrinsics\022\n\n\002f"
+  "x\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003ppx\030\003 \001(\001\022\013\n\003ppy\030"
+  "\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001\"\235\001\n\014SystemSta"
+  "tus\022\030\n\020camera_connected\030\001 \001(\010\022\026\n\016engine_"
+  "running\030\002 \001(\010\022\013\n\003fps\030\003 \001(\001\022\023\n\013frame_coun"
+  "t\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\rerror_message\030\006"
+  " \001(\t\022\024\n\014timestamp_us\030\007 \001(\004\"\251\003\n\tFrameData"
+  "\022\024\n\014timestamp_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020."
+  "juggler.v1.Ball\022\037\n\005hands\030\003 \003(\0132\020.juggler"
+  ".v1.Hand\022%\n\010imu_data\030\004 \003(\0132\023.juggler.v1."
+  "IMUData\0220\n\nintrinsics\030\005 \001(\0132\034.juggler.v1"
+  ".CameraIntrinsics\022(\n\006status\030\006 \001(\0132\030.jugg"
+  "ler.v1.SystemStatus\022\023\n\013frame_width\030\007 \001(\r"
+  "\022\024\n\014frame_height\030\010 \001(\r\022\024\n\014frame_number\030\t"
+  " \001(\r\0221\n\016raw_detections\030\n \003(\0132\031.juggler.v"
+  "1.BoundingBox2D\022\027\n\017color_image_b64\030\013 \001(\014"
+  "\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir_projecto"
+  "r_active\030\r \001(\010\"\334\006\n\016CommandRequest\0224\n\004typ"
+  "e\030\001 \001(\0162&.juggler.v1.CommandRequest.Comm"
+  "andType\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestam"
+  "p_us\030\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.jugg"
+  "ler.v1.ColorCommand\022\?\n\013module_args\030\005 \003(\013"
+  "2*.juggler.v1.CommandRequest.ModuleArgsE"
+  "ntry\022\034\n\024camera_settings_file\030\006 \001(\t\022\024\n\014ca"
+  "mera_width\030\007 \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022"
+  "\022\n\ncamera_fps\030\t \001(\r\022\037\n\027logical_id_to_cal"
+  "ibrate\030\n \001(\005\0222\n\025calibration_pixel_pos\030\013 "
+  "\001(\0132\023.juggler.v1.Vector2\022\036\n\026record_with_"
+  "yolo_boxes\030\014 \001(\010\022#\n\033record_with_bytetrac"
+  "k_boxes\030\r \001(\010\022\032\n\022pose_model_enabled\030\016 \001("
+  "\010\0321\n\017ModuleArgsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005val"
+  "ue\030\002 \001(\t:\0028\001\"\256\002\n\013CommandType\022\013\n\007UNKNOWN\020"
+  "\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n"
+  "\022SEND_COLOR_COMMAND\020\003\022\024\n\020CONFIGURE_MODUL"
+  "E\020\004\022\020\n\014RECORD_START\020\005\022\033\n\027RECORD_CONTINUO"
+  "US_START\020\006\022\032\n\026RECORD_CONTINUOUS_STOP\020\007\022 "
+  "\n\034RESTART_WITH_CAMERA_SETTINGS\020\010\022\017\n\013CAME"
+  "RA_STOP\020\t\022\020\n\014CAMERA_START\020\n\022\024\n\020CALIBRATE"
+  "_OBJECT\020\013\022\032\n\026SET_POSE_MODEL_ENABLED\020\014\"A\n"
+  "\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030"
+  "\002 \001(\0132\021.juggler.v1.Color\"I\n\017CommandRespo"
+  "nse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n"
+  "\014timestamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 2705, descriptor_table_protodef_juggler_2eproto,
+    false, false, 2907, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
-    &descriptor_table_juggler_2eproto_once, nullptr, 0, 15,
+    &descriptor_table_juggler_2eproto_once, nullptr, 0, 16,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
     file_level_metadata_juggler_2eproto, file_level_enum_descriptors_juggler_2eproto,
     file_level_service_descriptors_juggler_2eproto,
@@ -629,6 +664,7 @@ bool CommandRequest_CommandType_IsValid(int value) {
     case 9:
     case 10:
     case 11:
+    case 12:
       return true;
     default:
       return false;
@@ -648,6 +684,7 @@ constexpr CommandRequest_CommandType CommandRequest::RESTART_WITH_CAMERA_SETTING
 constexpr CommandRequest_CommandType CommandRequest::CAMERA_STOP;
 constexpr CommandRequest_CommandType CommandRequest::CAMERA_START;
 constexpr CommandRequest_CommandType CommandRequest::CALIBRATE_OBJECT;
+constexpr CommandRequest_CommandType CommandRequest::SET_POSE_MODEL_ENABLED;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MIN;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MAX;
 constexpr int CommandRequest::CommandType_ARRAYSIZE;
@@ -2467,10 +2504,287 @@ void Ball::InternalSwap(Ball* other) {
 
 // ===================================================================
 
+class KeyPoint::_Internal {
+ public:
+  static const ::juggler::v1::Vector2& pos_2d(const KeyPoint* msg);
+  static const ::juggler::v1::Vector3& pos_3d(const KeyPoint* msg);
+};
+
+const ::juggler::v1::Vector2&
+KeyPoint::_Internal::pos_2d(const KeyPoint* msg) {
+  return *msg->_impl_.pos_2d_;
+}
+const ::juggler::v1::Vector3&
+KeyPoint::_Internal::pos_3d(const KeyPoint* msg) {
+  return *msg->_impl_.pos_3d_;
+}
+KeyPoint::KeyPoint(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.KeyPoint)
+}
+KeyPoint::KeyPoint(const KeyPoint& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  KeyPoint* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.pos_2d_){nullptr}
+    , decltype(_impl_.pos_3d_){nullptr}
+    , decltype(_impl_.confidence_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  if (from._internal_has_pos_2d()) {
+    _this->_impl_.pos_2d_ = new ::juggler::v1::Vector2(*from._impl_.pos_2d_);
+  }
+  if (from._internal_has_pos_3d()) {
+    _this->_impl_.pos_3d_ = new ::juggler::v1::Vector3(*from._impl_.pos_3d_);
+  }
+  _this->_impl_.confidence_ = from._impl_.confidence_;
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.KeyPoint)
+}
+
+inline void KeyPoint::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.pos_2d_){nullptr}
+    , decltype(_impl_.pos_3d_){nullptr}
+    , decltype(_impl_.confidence_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+KeyPoint::~KeyPoint() {
+  // @@protoc_insertion_point(destructor:juggler.v1.KeyPoint)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void KeyPoint::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  if (this != internal_default_instance()) delete _impl_.pos_2d_;
+  if (this != internal_default_instance()) delete _impl_.pos_3d_;
+}
+
+void KeyPoint::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void KeyPoint::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.KeyPoint)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  if (GetArenaForAllocation() == nullptr && _impl_.pos_2d_ != nullptr) {
+    delete _impl_.pos_2d_;
+  }
+  _impl_.pos_2d_ = nullptr;
+  if (GetArenaForAllocation() == nullptr && _impl_.pos_3d_ != nullptr) {
+    delete _impl_.pos_3d_;
+  }
+  _impl_.pos_3d_ = nullptr;
+  _impl_.confidence_ = 0;
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* KeyPoint::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // .juggler.v1.Vector2 pos_2d = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+          ptr = ctx->ParseMessage(_internal_mutable_pos_2d(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector3 pos_3d = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          ptr = ctx->ParseMessage(_internal_mutable_pos_3d(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float confidence = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 29)) {
+          _impl_.confidence_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* KeyPoint::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.KeyPoint)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // .juggler.v1.Vector2 pos_2d = 1;
+  if (this->_internal_has_pos_2d()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(1, _Internal::pos_2d(this),
+        _Internal::pos_2d(this).GetCachedSize(), target, stream);
+  }
+
+  // .juggler.v1.Vector3 pos_3d = 2;
+  if (this->_internal_has_pos_3d()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(2, _Internal::pos_3d(this),
+        _Internal::pos_3d(this).GetCachedSize(), target, stream);
+  }
+
+  // float confidence = 3;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = this->_internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(3, this->_internal_confidence(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.KeyPoint)
+  return target;
+}
+
+size_t KeyPoint::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.KeyPoint)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // .juggler.v1.Vector2 pos_2d = 1;
+  if (this->_internal_has_pos_2d()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.pos_2d_);
+  }
+
+  // .juggler.v1.Vector3 pos_3d = 2;
+  if (this->_internal_has_pos_3d()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.pos_3d_);
+  }
+
+  // float confidence = 3;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = this->_internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    total_size += 1 + 4;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData KeyPoint::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    KeyPoint::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*KeyPoint::GetClassData() const { return &_class_data_; }
+
+
+void KeyPoint::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<KeyPoint*>(&to_msg);
+  auto& from = static_cast<const KeyPoint&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.KeyPoint)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_has_pos_2d()) {
+    _this->_internal_mutable_pos_2d()->::juggler::v1::Vector2::MergeFrom(
+        from._internal_pos_2d());
+  }
+  if (from._internal_has_pos_3d()) {
+    _this->_internal_mutable_pos_3d()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_pos_3d());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = from._internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    _this->_internal_set_confidence(from._internal_confidence());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void KeyPoint::CopyFrom(const KeyPoint& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.KeyPoint)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool KeyPoint::IsInitialized() const {
+  return true;
+}
+
+void KeyPoint::InternalSwap(KeyPoint* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(KeyPoint, _impl_.confidence_)
+      + sizeof(KeyPoint::_impl_.confidence_)
+      - PROTOBUF_FIELD_OFFSET(KeyPoint, _impl_.pos_2d_)>(
+          reinterpret_cast<char*>(&_impl_.pos_2d_),
+          reinterpret_cast<char*>(&other->_impl_.pos_2d_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata KeyPoint::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[6]);
+}
+
+// ===================================================================
+
 class Hand::_Internal {
  public:
   static const ::juggler::v1::Vector2& position_2d(const Hand* msg);
-  static const ::juggler::v1::Vector3& position_3d(const Hand* msg);
+  static const ::juggler::v1::Vector3& wrist_pos_3d(const Hand* msg);
 };
 
 const ::juggler::v1::Vector2&
@@ -2478,8 +2792,8 @@ Hand::_Internal::position_2d(const Hand* msg) {
   return *msg->_impl_.position_2d_;
 }
 const ::juggler::v1::Vector3&
-Hand::_Internal::position_3d(const Hand* msg) {
-  return *msg->_impl_.position_3d_;
+Hand::_Internal::wrist_pos_3d(const Hand* msg) {
+  return *msg->_impl_.wrist_pos_3d_;
 }
 Hand::Hand(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                          bool is_message_owned)
@@ -2491,31 +2805,24 @@ Hand::Hand(const Hand& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   Hand* const _this = this; (void)_this;
   new (&_impl_) Impl_{
-      decltype(_impl_.side_){}
+      decltype(_impl_.keypoints_){from._impl_.keypoints_}
     , decltype(_impl_.position_2d_){nullptr}
-    , decltype(_impl_.position_3d_){nullptr}
-    , decltype(_impl_.confidence_){}
+    , decltype(_impl_.wrist_pos_3d_){nullptr}
+    , decltype(_impl_.id_){}
     , decltype(_impl_.is_visible_){}
+    , decltype(_impl_.confidence_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  _impl_.side_.InitDefault();
-  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    _impl_.side_.Set("", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (!from._internal_side().empty()) {
-    _this->_impl_.side_.Set(from._internal_side(), 
-      _this->GetArenaForAllocation());
-  }
   if (from._internal_has_position_2d()) {
     _this->_impl_.position_2d_ = new ::juggler::v1::Vector2(*from._impl_.position_2d_);
   }
-  if (from._internal_has_position_3d()) {
-    _this->_impl_.position_3d_ = new ::juggler::v1::Vector3(*from._impl_.position_3d_);
+  if (from._internal_has_wrist_pos_3d()) {
+    _this->_impl_.wrist_pos_3d_ = new ::juggler::v1::Vector3(*from._impl_.wrist_pos_3d_);
   }
-  ::memcpy(&_impl_.confidence_, &from._impl_.confidence_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.is_visible_) -
-    reinterpret_cast<char*>(&_impl_.confidence_)) + sizeof(_impl_.is_visible_));
+  ::memcpy(&_impl_.id_, &from._impl_.id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.confidence_) -
+    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.confidence_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.Hand)
 }
 
@@ -2524,17 +2831,14 @@ inline void Hand::SharedCtor(
   (void)arena;
   (void)is_message_owned;
   new (&_impl_) Impl_{
-      decltype(_impl_.side_){}
+      decltype(_impl_.keypoints_){arena}
     , decltype(_impl_.position_2d_){nullptr}
-    , decltype(_impl_.position_3d_){nullptr}
-    , decltype(_impl_.confidence_){0}
+    , decltype(_impl_.wrist_pos_3d_){nullptr}
+    , decltype(_impl_.id_){0}
     , decltype(_impl_.is_visible_){false}
+    , decltype(_impl_.confidence_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
-  _impl_.side_.InitDefault();
-  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    _impl_.side_.Set("", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 Hand::~Hand() {
@@ -2548,9 +2852,9 @@ Hand::~Hand() {
 
 inline void Hand::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
-  _impl_.side_.Destroy();
+  _impl_.keypoints_.~RepeatedPtrField();
   if (this != internal_default_instance()) delete _impl_.position_2d_;
-  if (this != internal_default_instance()) delete _impl_.position_3d_;
+  if (this != internal_default_instance()) delete _impl_.wrist_pos_3d_;
 }
 
 void Hand::SetCachedSize(int size) const {
@@ -2563,18 +2867,18 @@ void Hand::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.side_.ClearToEmpty();
+  _impl_.keypoints_.Clear();
   if (GetArenaForAllocation() == nullptr && _impl_.position_2d_ != nullptr) {
     delete _impl_.position_2d_;
   }
   _impl_.position_2d_ = nullptr;
-  if (GetArenaForAllocation() == nullptr && _impl_.position_3d_ != nullptr) {
-    delete _impl_.position_3d_;
+  if (GetArenaForAllocation() == nullptr && _impl_.wrist_pos_3d_ != nullptr) {
+    delete _impl_.wrist_pos_3d_;
   }
-  _impl_.position_3d_ = nullptr;
-  ::memset(&_impl_.confidence_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.is_visible_) -
-      reinterpret_cast<char*>(&_impl_.confidence_)) + sizeof(_impl_.is_visible_));
+  _impl_.wrist_pos_3d_ = nullptr;
+  ::memset(&_impl_.id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.confidence_) -
+      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.confidence_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2584,13 +2888,11 @@ const char* Hand::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
     uint32_t tag;
     ptr = ::_pbi::ReadTag(ptr, &tag);
     switch (tag >> 3) {
-      // string side = 1;
+      // int32 id = 1;
       case 1:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
-          auto str = _internal_mutable_side();
-          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
-          CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.Hand.side"));
         } else
           goto handle_unusual;
         continue;
@@ -2602,10 +2904,10 @@ const char* Hand::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
         } else
           goto handle_unusual;
         continue;
-      // .juggler.v1.Vector3 position_3d = 3;
+      // .juggler.v1.Vector3 wrist_pos_3d = 3;
       case 3:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
-          ptr = ctx->ParseMessage(_internal_mutable_position_3d(), ptr);
+          ptr = ctx->ParseMessage(_internal_mutable_wrist_pos_3d(), ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -2623,6 +2925,19 @@ const char* Hand::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
           _impl_.is_visible_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.KeyPoint keypoints = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 50)) {
+          ptr -= 1;
+          do {
+            ptr += 1;
+            ptr = ctx->ParseMessage(_internal_add_keypoints(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<50>(ptr));
         } else
           goto handle_unusual;
         continue;
@@ -2655,14 +2970,10 @@ uint8_t* Hand::_InternalSerialize(
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  // string side = 1;
-  if (!this->_internal_side().empty()) {
-    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
-      this->_internal_side().data(), static_cast<int>(this->_internal_side().length()),
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
-      "juggler.v1.Hand.side");
-    target = stream->WriteStringMaybeAliased(
-        1, this->_internal_side(), target);
+  // int32 id = 1;
+  if (this->_internal_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(1, this->_internal_id(), target);
   }
 
   // .juggler.v1.Vector2 position_2d = 2;
@@ -2672,11 +2983,11 @@ uint8_t* Hand::_InternalSerialize(
         _Internal::position_2d(this).GetCachedSize(), target, stream);
   }
 
-  // .juggler.v1.Vector3 position_3d = 3;
-  if (this->_internal_has_position_3d()) {
+  // .juggler.v1.Vector3 wrist_pos_3d = 3;
+  if (this->_internal_has_wrist_pos_3d()) {
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
-      InternalWriteMessage(3, _Internal::position_3d(this),
-        _Internal::position_3d(this).GetCachedSize(), target, stream);
+      InternalWriteMessage(3, _Internal::wrist_pos_3d(this),
+        _Internal::wrist_pos_3d(this).GetCachedSize(), target, stream);
   }
 
   // double confidence = 4;
@@ -2695,6 +3006,14 @@ uint8_t* Hand::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(5, this->_internal_is_visible(), target);
   }
 
+  // repeated .juggler.v1.KeyPoint keypoints = 6;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_keypoints_size()); i < n; i++) {
+    const auto& repfield = this->_internal_keypoints(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(6, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -2711,11 +3030,11 @@ size_t Hand::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  // string side = 1;
-  if (!this->_internal_side().empty()) {
-    total_size += 1 +
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
-        this->_internal_side());
+  // repeated .juggler.v1.KeyPoint keypoints = 6;
+  total_size += 1UL * this->_internal_keypoints_size();
+  for (const auto& msg : this->_impl_.keypoints_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
   }
 
   // .juggler.v1.Vector2 position_2d = 2;
@@ -2725,11 +3044,21 @@ size_t Hand::ByteSizeLong() const {
         *_impl_.position_2d_);
   }
 
-  // .juggler.v1.Vector3 position_3d = 3;
-  if (this->_internal_has_position_3d()) {
+  // .juggler.v1.Vector3 wrist_pos_3d = 3;
+  if (this->_internal_has_wrist_pos_3d()) {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
-        *_impl_.position_3d_);
+        *_impl_.wrist_pos_3d_);
+  }
+
+  // int32 id = 1;
+  if (this->_internal_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_id());
+  }
+
+  // bool is_visible = 5;
+  if (this->_internal_is_visible() != 0) {
+    total_size += 1 + 1;
   }
 
   // double confidence = 4;
@@ -2739,11 +3068,6 @@ size_t Hand::ByteSizeLong() const {
   memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
   if (raw_confidence != 0) {
     total_size += 1 + 8;
-  }
-
-  // bool is_visible = 5;
-  if (this->_internal_is_visible() != 0) {
-    total_size += 1 + 1;
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -2764,16 +3088,20 @@ void Hand::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (!from._internal_side().empty()) {
-    _this->_internal_set_side(from._internal_side());
-  }
+  _this->_impl_.keypoints_.MergeFrom(from._impl_.keypoints_);
   if (from._internal_has_position_2d()) {
     _this->_internal_mutable_position_2d()->::juggler::v1::Vector2::MergeFrom(
         from._internal_position_2d());
   }
-  if (from._internal_has_position_3d()) {
-    _this->_internal_mutable_position_3d()->::juggler::v1::Vector3::MergeFrom(
-        from._internal_position_3d());
+  if (from._internal_has_wrist_pos_3d()) {
+    _this->_internal_mutable_wrist_pos_3d()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_wrist_pos_3d());
+  }
+  if (from._internal_id() != 0) {
+    _this->_internal_set_id(from._internal_id());
+  }
+  if (from._internal_is_visible() != 0) {
+    _this->_internal_set_is_visible(from._internal_is_visible());
   }
   static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
   double tmp_confidence = from._internal_confidence();
@@ -2781,9 +3109,6 @@ void Hand::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_
   memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
   if (raw_confidence != 0) {
     _this->_internal_set_confidence(from._internal_confidence());
-  }
-  if (from._internal_is_visible() != 0) {
-    _this->_internal_set_is_visible(from._internal_is_visible());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -2801,16 +3126,11 @@ bool Hand::IsInitialized() const {
 
 void Hand::InternalSwap(Hand* other) {
   using std::swap;
-  auto* lhs_arena = GetArenaForAllocation();
-  auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
-      &_impl_.side_, lhs_arena,
-      &other->_impl_.side_, rhs_arena
-  );
+  _impl_.keypoints_.InternalSwap(&other->_impl_.keypoints_);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(Hand, _impl_.is_visible_)
-      + sizeof(Hand::_impl_.is_visible_)
+      PROTOBUF_FIELD_OFFSET(Hand, _impl_.confidence_)
+      + sizeof(Hand::_impl_.confidence_)
       - PROTOBUF_FIELD_OFFSET(Hand, _impl_.position_2d_)>(
           reinterpret_cast<char*>(&_impl_.position_2d_),
           reinterpret_cast<char*>(&other->_impl_.position_2d_));
@@ -2819,7 +3139,7 @@ void Hand::InternalSwap(Hand* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata Hand::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[6]);
+      file_level_metadata_juggler_2eproto[7]);
 }
 
 // ===================================================================
@@ -3339,7 +3659,7 @@ void IMUData::InternalSwap(IMUData* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata IMUData::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[7]);
+      file_level_metadata_juggler_2eproto[8]);
 }
 
 // ===================================================================
@@ -3682,7 +4002,7 @@ void CameraIntrinsics::InternalSwap(CameraIntrinsics* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CameraIntrinsics::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[8]);
+      file_level_metadata_juggler_2eproto[9]);
 }
 
 // ===================================================================
@@ -4079,7 +4399,7 @@ void SystemStatus::InternalSwap(SystemStatus* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata SystemStatus::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[9]);
+      file_level_metadata_juggler_2eproto[10]);
 }
 
 // ===================================================================
@@ -4672,7 +4992,7 @@ void FrameData::InternalSwap(FrameData* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata FrameData::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[10]);
+      file_level_metadata_juggler_2eproto[11]);
 }
 
 // ===================================================================
@@ -4686,7 +5006,7 @@ void CommandRequest_ModuleArgsEntry_DoNotUse::MergeFrom(const CommandRequest_Mod
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandRequest_ModuleArgsEntry_DoNotUse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[11]);
+      file_level_metadata_juggler_2eproto[12]);
 }
 
 // ===================================================================
@@ -4731,6 +5051,7 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.logical_id_to_calibrate_){}
     , decltype(_impl_.record_with_yolo_boxes_){}
     , decltype(_impl_.record_with_bytetrack_boxes_){}
+    , decltype(_impl_.pose_model_enabled_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -4758,8 +5079,8 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     _this->_impl_.calibration_pixel_pos_ = new ::juggler::v1::Vector2(*from._impl_.calibration_pixel_pos_);
   }
   ::memcpy(&_impl_.timestamp_us_, &from._impl_.timestamp_us_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.record_with_bytetrack_boxes_) -
-    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.record_with_bytetrack_boxes_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.pose_model_enabled_) -
+    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.pose_model_enabled_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.CommandRequest)
 }
 
@@ -4781,6 +5102,7 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.logical_id_to_calibrate_){0}
     , decltype(_impl_.record_with_yolo_boxes_){false}
     , decltype(_impl_.record_with_bytetrack_boxes_){false}
+    , decltype(_impl_.pose_model_enabled_){false}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.module_name_.InitDefault();
@@ -4839,8 +5161,8 @@ void CommandRequest::Clear() {
   }
   _impl_.calibration_pixel_pos_ = nullptr;
   ::memset(&_impl_.timestamp_us_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.record_with_bytetrack_boxes_) -
-      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.record_with_bytetrack_boxes_));
+      reinterpret_cast<char*>(&_impl_.pose_model_enabled_) -
+      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.pose_model_enabled_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -4960,6 +5282,14 @@ const char* CommandRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext
       case 13:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 104)) {
           _impl_.record_with_bytetrack_boxes_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool pose_model_enabled = 14;
+      case 14:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 112)) {
+          _impl_.pose_model_enabled_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -5106,6 +5436,12 @@ uint8_t* CommandRequest::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(13, this->_internal_record_with_bytetrack_boxes(), target);
   }
 
+  // bool pose_model_enabled = 14;
+  if (this->_internal_pose_model_enabled() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(14, this->_internal_pose_model_enabled(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -5200,6 +5536,11 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // bool pose_model_enabled = 14;
+  if (this->_internal_pose_model_enabled() != 0) {
+    total_size += 1 + 1;
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -5257,6 +5598,9 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (from._internal_record_with_bytetrack_boxes() != 0) {
     _this->_internal_set_record_with_bytetrack_boxes(from._internal_record_with_bytetrack_boxes());
   }
+  if (from._internal_pose_model_enabled() != 0) {
+    _this->_internal_set_pose_model_enabled(from._internal_pose_model_enabled());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -5286,8 +5630,8 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
       &other->_impl_.camera_settings_file_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.record_with_bytetrack_boxes_)
-      + sizeof(CommandRequest::_impl_.record_with_bytetrack_boxes_)
+      PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.pose_model_enabled_)
+      + sizeof(CommandRequest::_impl_.pose_model_enabled_)
       - PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.color_command_)>(
           reinterpret_cast<char*>(&_impl_.color_command_),
           reinterpret_cast<char*>(&other->_impl_.color_command_));
@@ -5296,7 +5640,7 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandRequest::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[12]);
+      file_level_metadata_juggler_2eproto[13]);
 }
 
 // ===================================================================
@@ -5541,7 +5885,7 @@ void ColorCommand::InternalSwap(ColorCommand* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata ColorCommand::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[13]);
+      file_level_metadata_juggler_2eproto[14]);
 }
 
 // ===================================================================
@@ -5804,7 +6148,7 @@ void CommandResponse::InternalSwap(CommandResponse* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandResponse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[14]);
+      file_level_metadata_juggler_2eproto[15]);
 }
 
 // @@protoc_insertion_point(namespace_scope)
@@ -5834,6 +6178,10 @@ Arena::CreateMaybeMessage< ::juggler::v1::BoundingBox2D >(Arena* arena) {
 template<> PROTOBUF_NOINLINE ::juggler::v1::Ball*
 Arena::CreateMaybeMessage< ::juggler::v1::Ball >(Arena* arena) {
   return Arena::CreateMessageInternal< ::juggler::v1::Ball >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::KeyPoint*
+Arena::CreateMaybeMessage< ::juggler::v1::KeyPoint >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::KeyPoint >(arena);
 }
 template<> PROTOBUF_NOINLINE ::juggler::v1::Hand*
 Arena::CreateMaybeMessage< ::juggler::v1::Hand >(Arena* arena) {

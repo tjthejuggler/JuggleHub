@@ -2,7 +2,7 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-01 01:16:00 UTC
+**Last Updated:** 2025-10-01 12:27:00 UTC
 
 ## 🎯 Overview
 
@@ -195,6 +195,7 @@ JuggleHub/
   - **Automatic model loading** from OpenVINO IR format (.xml/.bin files)
 - **Camera Settings Management**: Load custom camera settings from JSON files for optimal performance
 - **Interactive calibration** with click-to-calibrate functionality
+- **Persistent calibration settings** - automatically saves and loads settings between sessions
 - **Smart occlusion handling** - merges nearby detections
 - **High-performance streaming** at up to 90 FPS
 - **Protocol Buffers output** for type-safe data exchange
@@ -202,6 +203,10 @@ JuggleHub/
 
 ### Python Hub Features
 - **Real-time visualization** with PyQt6 GUI
+- **Menu bar interface** with File and Help menus for easy access to settings and information
+- **Persistent calibration settings** - automatically saves settings on exit and loads on startup
+- **Save/Load settings** - export and import calibration settings via file dialogs (Ctrl+S / Ctrl+O)
+- **About dialog** - comprehensive application information and feature overview
 - **Probabilistic State Estimator**: Fuses data from multiple sources to determine the physical state of juggling balls (held vs. unheld).
 - **Color Profile Persistence**: Saves and loads color profiles for juggling balls, allowing for consistent identification across sessions.
 - **Kalman Filter Ball Tracker**: Manages ball tracks and applies a Kalman Filter to each one for smoothed physics data.

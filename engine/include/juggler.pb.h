@@ -165,12 +165,13 @@ enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_CAMERA_START = 10,
   CommandRequest_CommandType_CALIBRATE_OBJECT = 11,
   CommandRequest_CommandType_SET_POSE_MODEL_ENABLED = 12,
+  CommandRequest_CommandType_CALIBRATE_COLOR = 13,
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool CommandRequest_CommandType_IsValid(int value);
 constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MIN = CommandRequest_CommandType_UNKNOWN;
-constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_SET_POSE_MODEL_ENABLED;
+constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_CALIBRATE_COLOR;
 constexpr int CommandRequest_CommandType_CommandType_ARRAYSIZE = CommandRequest_CommandType_CommandType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor();
@@ -3282,6 +3283,8 @@ class CommandRequest final :
     CommandRequest_CommandType_CALIBRATE_OBJECT;
   static constexpr CommandType SET_POSE_MODEL_ENABLED =
     CommandRequest_CommandType_SET_POSE_MODEL_ENABLED;
+  static constexpr CommandType CALIBRATE_COLOR =
+    CommandRequest_CommandType_CALIBRATE_COLOR;
   static inline bool CommandType_IsValid(int value) {
     return CommandRequest_CommandType_IsValid(value);
   }
@@ -3313,6 +3316,7 @@ class CommandRequest final :
     kModuleArgsFieldNumber = 5,
     kModuleNameFieldNumber = 2,
     kCameraSettingsFileFieldNumber = 6,
+    kColorNameFieldNumber = 15,
     kColorCommandFieldNumber = 4,
     kCalibrationPixelPosFieldNumber = 11,
     kTimestampUsFieldNumber = 3,
@@ -3324,6 +3328,8 @@ class CommandRequest final :
     kRecordWithYoloBoxesFieldNumber = 12,
     kRecordWithBytetrackBoxesFieldNumber = 13,
     kPoseModelEnabledFieldNumber = 14,
+    kClickXFieldNumber = 16,
+    kClickYFieldNumber = 17,
   };
   // map<string, string> module_args = 5;
   int module_args_size() const;
@@ -3368,6 +3374,20 @@ class CommandRequest final :
   const std::string& _internal_camera_settings_file() const;
   inline PROTOBUF_ALWAYS_INLINE void _internal_set_camera_settings_file(const std::string& value);
   std::string* _internal_mutable_camera_settings_file();
+  public:
+
+  // string color_name = 15;
+  void clear_color_name();
+  const std::string& color_name() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_color_name(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_color_name();
+  PROTOBUF_NODISCARD std::string* release_color_name();
+  void set_allocated_color_name(std::string* color_name);
+  private:
+  const std::string& _internal_color_name() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_color_name(const std::string& value);
+  std::string* _internal_mutable_color_name();
   public:
 
   // .juggler.v1.ColorCommand color_command = 4;
@@ -3487,6 +3507,24 @@ class CommandRequest final :
   void _internal_set_pose_model_enabled(bool value);
   public:
 
+  // int32 click_x = 16;
+  void clear_click_x();
+  int32_t click_x() const;
+  void set_click_x(int32_t value);
+  private:
+  int32_t _internal_click_x() const;
+  void _internal_set_click_x(int32_t value);
+  public:
+
+  // int32 click_y = 17;
+  void clear_click_y();
+  int32_t click_y() const;
+  void set_click_y(int32_t value);
+  private:
+  int32_t _internal_click_y() const;
+  void _internal_set_click_y(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.CommandRequest)
  private:
   class _Internal;
@@ -3502,6 +3540,7 @@ class CommandRequest final :
         ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_STRING> module_args_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr module_name_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr camera_settings_file_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_name_;
     ::juggler::v1::ColorCommand* color_command_;
     ::juggler::v1::Vector2* calibration_pixel_pos_;
     uint64_t timestamp_us_;
@@ -3513,6 +3552,8 @@ class CommandRequest final :
     bool record_with_yolo_boxes_;
     bool record_with_bytetrack_boxes_;
     bool pose_model_enabled_;
+    int32_t click_x_;
+    int32_t click_y_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -7568,6 +7609,96 @@ inline void CommandRequest::_internal_set_pose_model_enabled(bool value) {
 inline void CommandRequest::set_pose_model_enabled(bool value) {
   _internal_set_pose_model_enabled(value);
   // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.pose_model_enabled)
+}
+
+// string color_name = 15;
+inline void CommandRequest::clear_color_name() {
+  _impl_.color_name_.ClearToEmpty();
+}
+inline const std::string& CommandRequest::color_name() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.color_name)
+  return _internal_color_name();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void CommandRequest::set_color_name(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.color_name_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.color_name)
+}
+inline std::string* CommandRequest::mutable_color_name() {
+  std::string* _s = _internal_mutable_color_name();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.CommandRequest.color_name)
+  return _s;
+}
+inline const std::string& CommandRequest::_internal_color_name() const {
+  return _impl_.color_name_.Get();
+}
+inline void CommandRequest::_internal_set_color_name(const std::string& value) {
+  
+  _impl_.color_name_.Set(value, GetArenaForAllocation());
+}
+inline std::string* CommandRequest::_internal_mutable_color_name() {
+  
+  return _impl_.color_name_.Mutable(GetArenaForAllocation());
+}
+inline std::string* CommandRequest::release_color_name() {
+  // @@protoc_insertion_point(field_release:juggler.v1.CommandRequest.color_name)
+  return _impl_.color_name_.Release();
+}
+inline void CommandRequest::set_allocated_color_name(std::string* color_name) {
+  if (color_name != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.color_name_.SetAllocated(color_name, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.color_name_.IsDefault()) {
+    _impl_.color_name_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.color_name)
+}
+
+// int32 click_x = 16;
+inline void CommandRequest::clear_click_x() {
+  _impl_.click_x_ = 0;
+}
+inline int32_t CommandRequest::_internal_click_x() const {
+  return _impl_.click_x_;
+}
+inline int32_t CommandRequest::click_x() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.click_x)
+  return _internal_click_x();
+}
+inline void CommandRequest::_internal_set_click_x(int32_t value) {
+  
+  _impl_.click_x_ = value;
+}
+inline void CommandRequest::set_click_x(int32_t value) {
+  _internal_set_click_x(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.click_x)
+}
+
+// int32 click_y = 17;
+inline void CommandRequest::clear_click_y() {
+  _impl_.click_y_ = 0;
+}
+inline int32_t CommandRequest::_internal_click_y() const {
+  return _impl_.click_y_;
+}
+inline int32_t CommandRequest::click_y() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.click_y)
+  return _internal_click_y();
+}
+inline void CommandRequest::_internal_set_click_y(int32_t value) {
+  
+  _impl_.click_y_ = value;
+}
+inline void CommandRequest::set_click_y(int32_t value) {
+  _internal_set_click_y(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.click_y)
 }
 
 // -------------------------------------------------------------------

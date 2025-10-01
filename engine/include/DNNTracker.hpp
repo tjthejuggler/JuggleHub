@@ -57,6 +57,7 @@ public:
 
     void update_setting(const std::string& key, const std::string& value);
     void calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
+    void calibrate_color(const std::string& color_name, const cv::Point& click_point);
     const std::vector<PersistentTracker>& get_ball_trackers() const { return logical_ball_trackers_; }
     const std::vector<Detection>& get_last_raw_detections() const { return last_raw_detections_; }
     const std::vector<juggler::ColorTrackedBall>& get_color_tracked_balls() const { return color_tracked_balls_; }
@@ -92,6 +93,7 @@ private:
 
     // --- State Caching ---
     std::vector<Detection> last_raw_detections_;
+    cv::Mat last_color_frame_; // For color calibration
 
     // Model & Preprocessing Parameters
     int input_width_ = 640;

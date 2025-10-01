@@ -156,6 +156,7 @@ message CommandRequest {
     CAMERA_START = 10; // Start camera feed with settings
     CALIBRATE_OBJECT = 11; // Force-set the position of a logical tracker
     SET_POSE_MODEL_ENABLED = 12; // Enable or disable the pose model
+    CALIBRATE_COLOR = 13; // Calibrate a color profile by clicking on a ball
   }
   
   CommandType type = 1;
@@ -174,6 +175,11 @@ message CommandRequest {
   bool record_with_yolo_boxes = 12;
   bool record_with_bytetrack_boxes = 13;
   bool pose_model_enabled = 14;
+  
+  // For CALIBRATE_COLOR
+  string color_name = 15;           // Name of the color profile to calibrate
+  int32 click_x = 16;               // X coordinate of the click
+  int32 click_y = 17;               // Y coordinate of the click
 }
 
 message ColorCommand {

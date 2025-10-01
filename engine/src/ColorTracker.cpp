@@ -44,6 +44,16 @@ std::vector<ColorTrackedBall> ColorTracker::update(
     // Track which ByteTrack detections have been assigned to avoid double-assignment
     std::set<int> assigned_bytetrack_ids;
     
+    // Debug: Log inactive trackers and available detections
+    int inactive_count = 0;
+    for (const auto& ball : tracked_balls_) {
+        if (!ball.is_active) inactive_count++;
+    }
+    if (inactive_count > 0 && bytetrack_objects.size() > 0) {
+        std::cout << "ColorTracker: " << inactive_count << " inactive trackers, "
+                  << bytetrack_objects.size() << " ByteTrack detections available" << std::endl;
+    }
+    
     for (auto& ball : tracked_balls_) {
         if (!ball.is_active) {
             // Look for ByteTrack objects that match this ball's color profile (if it has one)
@@ -59,7 +69,12 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 
                 // Check each color profile to see if this detection matches
                 for (const auto& profile : color_profiles_) {
-                    if (matchesColorProfile(hsv_frame, center, profile)) {
+                    bool matches = matchesColorProfile(hsv_frame, center, profile);
+                    if (inactive_count > 0 && bytetrack_objects.size() > 0) {
+                        std::cout << "ColorTracker: Testing detection at (" << center.x << "," << center.y
+                                  << ") against " << profile.name << ": " << (matches ? "MATCH" : "no match") << std::endl;
+                    }
+                    if (matches) {
                         // Check if another ball is already using this color
                         bool color_already_used = false;
                         for (const auto& other_ball : tracked_balls_) {
@@ -429,7 +444,14 @@ bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
     int total_pixels = sample_area.rows * sample_area.cols;
     float match_ratio = static_cast<float>(matching_pixels) / total_pixels;
     
-    return match_ratio > 0.3f; // At least 30% of pixels should match
+    // Debug output
+    static int debug_counter = 0;
+    if (debug_counter++ % 30 == 0) {  // Print every 30th check to avoid spam
+        std::cout << "ColorTracker: Color match ratio: " << match_ratio
+                  << " (threshold: 0.15)" << std::endl;
+    }
+    
+    return match_ratio > 0.15f; // At least 15% of pixels should match (lowered from 30%)
 }
 
 cv::Point3f ColorTracker::deprojectToWorld(const cv::Point2f& pixel, float depth,

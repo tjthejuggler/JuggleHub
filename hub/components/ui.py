@@ -15,6 +15,8 @@ import qrcode
 import io
 import cv2
 import numpy as np
+import json
+from datetime import datetime
 
 
 try:
@@ -29,9 +31,10 @@ try:
                                  QHBoxLayout, QLabel, QTextEdit, QPushButton,
                                  QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
                                  QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit,
-                                 QComboBox, QMessageBox, QDialog, QVBoxLayout as QVBoxLayout_Dialog)
+                                 QComboBox, QMessageBox, QDialog, QVBoxLayout as QVBoxLayout_Dialog,
+                                 QMenuBar, QFileDialog)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
-    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence, QBrush
+    from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence, QBrush, QAction
     PYQT_AVAILABLE = True
 except ImportError:
     print("⚠️ PyQt6 not available. Using console UI.")
@@ -113,7 +116,16 @@ if PYQT_AVAILABLE:
             self.udp_client = udp_client
             self.zmq_client = zmq_client
             self.hub_instance = hub_instance
+            self.settings_file = os.path.join("hub", "config", "calibration_settings.json")
+            self.calibration_saves_dir = os.path.join("hub", "calibration_saves")
+            self._loading_settings = True  # Flag to prevent auto-save during initialization and load
+            # Ensure calibration_saves directory exists
+            os.makedirs(self.calibration_saves_dir, exist_ok=True)
             self.init_ui()
+            # Load settings after UI is initialized
+            self.load_settings()
+            # Now allow auto-save
+            self._loading_settings = False
 
         def init_ui(self):
             layout = QVBoxLayout(self)
@@ -336,6 +348,8 @@ if PYQT_AVAILABLE:
                 response = self.zmq_client.send_command(command)
                 if response.success:
                     print(f"✅ Pose model {'enabled' if is_enabled else 'disabled'}")
+                    # Auto-save settings after pose model toggle
+                    self.save_settings()
                 else:
                     print(f"❌ Failed to toggle pose model: {response.message}")
             except Exception as e:
@@ -493,6 +507,8 @@ if PYQT_AVAILABLE:
                     self.camera_status_label.setText(f"● Camera Running ({selected_resolution} @ {selected_fps} FPS)")
                     self.camera_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
                     print(f"✅ Camera started with {settings_name} at {selected_resolution} @ {selected_fps} FPS: {response.message}")
+                    # Auto-save settings after camera starts successfully
+                    self.save_settings()
                 else:
                     QMessageBox.critical(self, "Error", f"Failed to start camera: {response.message}")
                     print(f"❌ Failed to start camera: {response.message}")
@@ -502,6 +518,127 @@ if PYQT_AVAILABLE:
 
         def update_setting(self, key: str, value: Any):
             self.udp_client.send_setting(key, value)
+            # Auto-save settings whenever they change (but not during initial load)
+            if not self._loading_settings:
+                self.save_settings()
+            # Auto-save settings whenever they change
+            self.save_settings()
+
+        def get_current_settings(self) -> dict:
+            """Get current calibration settings as a dictionary."""
+            # Check if ALL UI elements exist before accessing them
+            required_attrs = [
+                'confidence_slider', 'nms_slider', 'track_buffer_slider',
+                'track_thresh_slider', 'high_thresh_slider', 'match_thresh_slider',
+                'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo'
+            ]
+            
+            for attr in required_attrs:
+                if not hasattr(self, attr):
+                    return {}
+            
+            return {
+                'camera_settings_profile': self.camera_settings_combo.currentData(),
+                'resolution': self.resolution_combo.currentText(),
+                'fps': self.fps_combo.currentData(),
+                'confidence_threshold': self.confidence_slider.value() / 100.0,
+                'nms_threshold': self.nms_slider.value() / 100.0,
+                'track_buffer': self.track_buffer_slider.value(),
+                'track_thresh': self.track_thresh_slider.value() / 100.0,
+                'high_thresh': self.high_thresh_slider.value() / 100.0,
+                'match_thresh': self.match_thresh_slider.value() / 100.0,
+                'pose_model_enabled': self.pose_model_toggle.isChecked()
+            }
+
+        def apply_settings(self, settings: dict):
+            """Apply settings from a dictionary to the UI controls."""
+            # Camera settings
+            if 'camera_settings_profile' in settings:
+                index = self.camera_settings_combo.findData(settings['camera_settings_profile'])
+                if index >= 0:
+                    self.camera_settings_combo.setCurrentIndex(index)
+            
+            if 'resolution' in settings:
+                index = self.resolution_combo.findText(settings['resolution'])
+                if index >= 0:
+                    self.resolution_combo.setCurrentIndex(index)
+            
+            if 'fps' in settings:
+                index = self.fps_combo.findData(settings['fps'])
+                if index >= 0:
+                    self.fps_combo.setCurrentIndex(index)
+            
+            # DNN Tracker settings
+            if 'confidence_threshold' in settings:
+                self.confidence_slider.setValue(int(settings['confidence_threshold'] * 100))
+            
+            if 'nms_threshold' in settings:
+                self.nms_slider.setValue(int(settings['nms_threshold'] * 100))
+            
+            # ByteTrack settings
+            if 'track_buffer' in settings:
+                self.track_buffer_slider.setValue(settings['track_buffer'])
+            
+            if 'track_thresh' in settings:
+                self.track_thresh_slider.setValue(int(settings['track_thresh'] * 100))
+            
+            if 'high_thresh' in settings:
+                self.high_thresh_slider.setValue(int(settings['high_thresh'] * 100))
+            
+            if 'match_thresh' in settings:
+                self.match_thresh_slider.setValue(int(settings['match_thresh'] * 100))
+            
+            # Pose model
+            if 'pose_model_enabled' in settings:
+                self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
+
+        def save_settings(self, filepath: str = None):
+            """Save current calibration settings to a JSON file."""
+            if filepath is None:
+                filepath = self.settings_file
+            
+            settings = self.get_current_settings()
+            settings['saved_at'] = datetime.now().isoformat()
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            
+            try:
+                with open(filepath, 'w') as f:
+                    json.dump(settings, f, indent=2)
+                print(f"✅ Settings saved to {filepath}")
+                return True
+            except Exception as e:
+                print(f"❌ Error saving settings: {e}")
+                return False
+
+        def load_settings(self, filepath: str = None):
+            """Load calibration settings from a JSON file."""
+            if filepath is None:
+                filepath = self.settings_file
+            
+            if not os.path.exists(filepath):
+                print(f"ℹ️ No saved settings found at {filepath}")
+                return False
+            
+            try:
+                # Set flag to prevent auto-save during load
+                self._loading_settings = True
+                
+                with open(filepath, 'r') as f:
+                    settings = json.load(f)
+                
+                self.apply_settings(settings)
+                print(f"✅ Settings loaded from {filepath}")
+                if 'saved_at' in settings:
+                    print(f"   Saved at: {settings['saved_at']}")
+                return True
+            except Exception as e:
+                print(f"❌ Error loading settings: {e}")
+                return False
+            finally:
+                # Always reset the flag
+                self._loading_settings = False
 
     class JuggleHubMainWindow(QMainWindow):
         """Main window for JuggleHub UI."""
@@ -535,6 +672,9 @@ if PYQT_AVAILABLE:
             """Initialize the user interface."""
             self.setWindowTitle("JuggleHub - Juggling Analysis")
             self.setGeometry(100, 100, 1000, 700)
+            
+            # Create menu bar
+            self.create_menu_bar()
             
             # Central widget
             central_widget = QWidget()
@@ -623,15 +763,43 @@ if PYQT_AVAILABLE:
             self.video_view.mousePressEvent = self.video_view_clicked
             self.video_layout.addWidget(self.video_view)
 
-            # --- Calibration Controls ---
-            calib_layout = QHBoxLayout()
-            self.calib_status_label = QLabel("Click a button to start calibration.")
-            calib_layout.addWidget(self.calib_status_label)
-            for i in range(3): # Assuming 3 balls
-                btn = QPushButton(f"Calibrate Ball {i}")
-                btn.clicked.connect(lambda checked, b_id=i: self.start_calibration(b_id))
-                calib_layout.addWidget(btn)
-            self.video_layout.addLayout(calib_layout)
+            # --- Color Profile Controls ---
+            color_profile_layout = QVBoxLayout()
+            
+            # Top row: dropdown and button
+            profile_control_layout = QHBoxLayout()
+            profile_control_layout.addWidget(QLabel("Color Profile:"))
+            
+            self.color_profile_combo = QComboBox()
+            self.color_profile_combo.addItems(["pink", "orange", "yellow", "green", "red", "blue", "purple"])
+            profile_control_layout.addWidget(self.color_profile_combo)
+            
+            self.set_color_profile_button = QPushButton("Set Color Profile")
+            self.set_color_profile_button.setCheckable(True)
+            self.set_color_profile_button.clicked.connect(self.start_color_profile_calibration)
+            self.set_color_profile_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #555;
+                    color: white;
+                    border: 1px solid #777;
+                    padding: 5px;
+                    border-radius: 3px;
+                }
+                QPushButton:checked {
+                    background-color: #007ACC;
+                    border-color: #005A9E;
+                }
+            """)
+            profile_control_layout.addWidget(self.set_color_profile_button)
+            
+            color_profile_layout.addLayout(profile_control_layout)
+            
+            # Status label
+            self.color_profile_status_label = QLabel("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
+            self.color_profile_status_label.setWordWrap(True)
+            color_profile_layout.addWidget(self.color_profile_status_label)
+            
+            self.video_layout.addLayout(color_profile_layout)
 
             # --- NEW: Visualization Toggles ---
             toggles_layout = QHBoxLayout()
@@ -749,6 +917,103 @@ if PYQT_AVAILABLE:
             
             self.apply_dark_theme()
             self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
+        def create_menu_bar(self):
+            """Create the menu bar with File and Help menus."""
+            menubar = self.menuBar()
+            
+            # File menu
+            file_menu = menubar.addMenu("&File")
+            
+            # Save Settings action
+            save_action = QAction("&Save Settings", self)
+            save_action.setShortcut("Ctrl+S")
+            save_action.triggered.connect(self.save_settings_dialog)
+            file_menu.addAction(save_action)
+            
+            # Load Settings action
+            load_action = QAction("&Load Settings", self)
+            load_action.setShortcut("Ctrl+O")
+            load_action.triggered.connect(self.load_settings_dialog)
+            file_menu.addAction(load_action)
+            
+            # Help menu
+            help_menu = menubar.addMenu("&Help")
+            
+            # About action
+            about_action = QAction("&About", self)
+            about_action.triggered.connect(self.show_about_dialog)
+            help_menu.addAction(about_action)
+        
+        def save_settings_dialog(self):
+            """Show file dialog to save calibration settings."""
+            if not self.calibration_mode:
+                QMessageBox.information(self, "Info", "Please enter Calibration Mode first to save settings.")
+                return
+            
+            filepath, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Calibration Settings",
+                os.path.join(self.settings_widget.calibration_saves_dir, "calibration_settings.json"),
+                "JSON Files (*.json);;All Files (*)"
+            )
+            
+            if filepath:
+                if self.settings_widget.save_settings(filepath):
+                    QMessageBox.information(self, "Success", f"Settings saved to:\n{filepath}")
+                    self.log_message(f"✅ Settings saved to {filepath}")
+                else:
+                    QMessageBox.critical(self, "Error", "Failed to save settings. Check console for details.")
+        
+        def load_settings_dialog(self):
+            """Show file dialog to load calibration settings."""
+            if not self.calibration_mode:
+                QMessageBox.information(self, "Info", "Please enter Calibration Mode first to load settings.")
+                return
+            
+            filepath, _ = QFileDialog.getOpenFileName(
+                self,
+                "Load Calibration Settings",
+                self.settings_widget.calibration_saves_dir,
+                "JSON Files (*.json);;All Files (*)"
+            )
+            
+            if filepath:
+                if self.settings_widget.load_settings(filepath):
+                    QMessageBox.information(self, "Success", f"Settings loaded from:\n{filepath}")
+                    self.log_message(f"✅ Settings loaded from {filepath}")
+                else:
+                    QMessageBox.critical(self, "Error", "Failed to load settings. Check console for details.")
+        
+        def show_about_dialog(self):
+            """Show the About dialog."""
+            about_text = """
+            <h2>JuggleHub</h2>
+            <p><b>Version:</b> 1.0.0</p>
+            <p><b>Description:</b> A comprehensive juggling analysis system that tracks balls in real-time using computer vision and deep learning.</p>
+            <br>
+            <p><b>Features:</b></p>
+            <ul>
+                <li>Real-time ball tracking with YOLO object detection</li>
+                <li>ByteTrack multi-object tracking</li>
+                <li>Color-based ball identification</li>
+                <li>3D position estimation</li>
+                <li>Camera calibration tools</li>
+                <li>Video recording capabilities</li>
+            </ul>
+            <br>
+            <p><b>Technologies:</b></p>
+            <ul>
+                <li>Python & PyQt6</li>
+                <li>C++ & OpenVINO</li>
+                <li>Intel RealSense D455</li>
+                <li>ZeroMQ & Protocol Buffers</li>
+            </ul>
+            <br>
+            <p>© 2025 JuggleHub Project</p>
+            """
+            
+            QMessageBox.about(self, "About JuggleHub", about_text)
         
         def apply_dark_theme(self):
             """Apply a dark theme to the UI."""
@@ -1119,13 +1384,18 @@ if PYQT_AVAILABLE:
         def disable_top_screen(self): self.hub_instance.screen_controller.disable_top_screen()
         def disable_bottom_screen(self): self.hub_instance.screen_controller.disable_bottom_screen()
 
-        def start_calibration(self, ball_id: int):
-            self.calibrating_id = ball_id
-            self.calib_status_label.setText(f"Click on Ball {ball_id} in the video feed...")
-            self.log_message(f"Waiting for user to click on Ball {ball_id} to calibrate.")
+        def start_color_profile_calibration(self):
+            """Start color profile calibration mode."""
+            if self.set_color_profile_button.isChecked():
+                selected_color = self.color_profile_combo.currentText()
+                self.color_profile_status_label.setText(f"Click on a {selected_color} ball in the video feed...")
+                self.log_message(f"Waiting for user to click on a {selected_color} ball to set color profile.")
+            else:
+                self.color_profile_status_label.setText("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
+                self.log_message("Color profile calibration cancelled.")
 
         def video_view_clicked(self, event):
-            if self.calibrating_id != -1:
+            if self.set_color_profile_button.isChecked():
                 scene_pos = self.video_view.mapToScene(event.pos())
                 pixmap_item = self.video_pixmap_item
                 
@@ -1134,66 +1404,56 @@ if PYQT_AVAILABLE:
                     # Transform scene coordinates to pixmap (image) coordinates
                     img_pos = pixmap_item.mapFromScene(scene_pos)
                     
-                    logical_ball_id = self.calibrating_id
-                    self.log_message(f"Clicked at pixel ({img_pos.x():.1f}, {img_pos.y():.1f}) for Ball {logical_ball_id}")
+                    color_name = self.color_profile_combo.currentText()
+                    self.log_message(f"Clicked at pixel ({img_pos.x():.1f}, {img_pos.y():.1f}) to set '{color_name}' color profile")
                     
-                    # Show dialog to name the color profile
-                    from PyQt6.QtWidgets import QInputDialog
-                    profile_name, ok = QInputDialog.getText(
-                        self,
-                        "Name Color Profile",
-                        f"Enter a name for Ball {logical_ball_id}'s color profile:",
-                        text=f"Ball_{logical_ball_id}"
-                    )
-                    
-                    if ok and profile_name:
-                        self.log_message(f"Creating color profile '{profile_name}' for Ball {logical_ball_id}")
+                    # Get the current frame image
+                    frame_image = self.get_latest_frame()
+                    if frame_image is not None:
+                        # Extract color at the clicked position
+                        x, y = int(img_pos.x()), int(img_pos.y())
+                        # Ensure coordinates are within bounds
+                        x = max(0, min(x, frame_image.shape[1] - 1))
+                        y = max(0, min(y, frame_image.shape[0] - 1))
                         
-                        # Get the current frame image
-                        frame_image = self.get_latest_frame()
-                        if frame_image is not None:
-                            # Extract color at the clicked position
-                            x, y = int(img_pos.x()), int(img_pos.y())
-                            # Ensure coordinates are within bounds
-                            x = max(0, min(x, frame_image.shape[1] - 1))
-                            y = max(0, min(y, frame_image.shape[0] - 1))
-                            
-                            # Sample a small region around the click for better color accuracy
-                            sample_size = 10
-                            x1 = max(0, x - sample_size)
-                            y1 = max(0, y - sample_size)
-                            x2 = min(frame_image.shape[1], x + sample_size)
-                            y2 = min(frame_image.shape[0], y + sample_size)
-                            
-                            roi = frame_image[y1:y2, x1:x2]
-                            hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-                            avg_hsv = np.mean(hsv_roi, axis=(0, 1))
-                            
-                            self.log_message(f"Sampled HSV color: {avg_hsv}")
-                            
-                            # Create the color profile through the hub's juggling system manager
-                            if self.hub_instance and self.hub_instance.juggling_system_manager:
-                                jsm = self.hub_instance.juggling_system_manager
-                                color_manager = jsm.color_profile_manager
-                                
-                                # Create the color profile
-                                unique_id = color_manager.create_new_profile(avg_hsv, profile_name)
-                                color_manager.save_profiles()
-                                
-                                # CRITICAL: Associate this color profile with the logical ball ID
-                                jsm.assign_profile_to_logical_id(logical_ball_id, unique_id)
-                                
-                                self.log_message(f"✅ Created color profile '{profile_name}' with ID {unique_id}")
-                                self.log_message(f"✅ Assigned Ball {logical_ball_id} to color profile '{profile_name}'")
+                        # Sample a small region around the click for better color accuracy
+                        sample_size = 10
+                        x1 = max(0, x - sample_size)
+                        y1 = max(0, y - sample_size)
+                        x2 = min(frame_image.shape[1], x + sample_size)
+                        y2 = min(frame_image.shape[0], y + sample_size)
+                        
+                        roi = frame_image[y1:y2, x1:x2]
+                        hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                        avg_hsv = np.mean(hsv_roi, axis=(0, 1))
+                        
+                        self.log_message(f"Sampled HSV color: H={avg_hsv[0]:.1f}, S={avg_hsv[1]:.1f}, V={avg_hsv[2]:.1f}")
+                        
+                        # Send calibration command to engine via ZMQ
+                        command = juggler_pb2.CommandRequest()
+                        command.type = juggler_pb2.CommandRequest.CommandType.CALIBRATE_COLOR
+                        command.color_name = color_name
+                        command.click_x = x
+                        command.click_y = y
+                        
+                        try:
+                            response = self.zmq_client.send_command(command)
+                            if response.success:
+                                self.log_message(f"✅ Color profile '{color_name}' updated successfully")
+                                self.color_profile_status_label.setText(f"✅ '{color_name}' profile set! Click 'Set Color Profile' again to calibrate another color.")
                             else:
-                                self.log_message(f"❌ Error: Could not access color profile manager")
-                        else:
-                            self.log_message(f"❌ Error: No frame image available for color sampling")
+                                self.log_message(f"❌ Failed to update color profile: {response.message}")
+                                self.color_profile_status_label.setText(f"❌ Failed to set '{color_name}' profile")
+                        except Exception as e:
+                            self.log_message(f"❌ Error sending calibration command: {e}")
+                            self.color_profile_status_label.setText(f"❌ Error: {e}")
                     else:
-                        self.log_message(f"Calibration cancelled by user")
-
-                    self.calibrating_id = -1
-                    self.calib_status_label.setText("Click a button to start calibration.")
+                        self.log_message(f"❌ Error: No frame image available for color sampling")
+                        self.color_profile_status_label.setText("❌ No frame available")
+                    
+                    # Uncheck the button after calibration
+                    self.set_color_profile_button.setChecked(False)
+                    self.color_profile_status_label.setText("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
             # Call original event handler
             QGraphicsView.mousePressEvent(self.video_view, event)
 

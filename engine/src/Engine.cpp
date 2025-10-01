@@ -120,6 +120,7 @@ void Engine::run() {
         cv::Mat color_image(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
         cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
         last_depth_frame_ = depth_image.clone();
+        last_color_frame_ = color_image.clone();
         
         // This block will be updated later to include detections
         
@@ -452,6 +453,16 @@ void Engine::processCommands() {
                     } else {
                         response.set_success(false);
                         response.set_message("DNNTracker not initialized.");
+                    }
+                    break;
+                case juggler::v1::CommandRequest::CALIBRATE_COLOR:
+                    if (dnn_tracker_ && !last_color_frame_.empty()) {
+                        cv::Point click_point(command.click_x(), command.click_y());
+                        dnn_tracker_->calibrate_color(command.color_name(), click_point);
+                        response.set_message("Color profile '" + command.color_name() + "' calibrated successfully");
+                    } else {
+                        response.set_success(false);
+                        response.set_message("Tracker not ready for color calibration");
                     }
                     break;
                 default:

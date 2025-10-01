@@ -78,6 +78,9 @@ void DNNTracker::initialize_logical_trackers() {
 }
 
 std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::update(const cv::Mat& color_frame, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics) {
+    // Store color frame for calibration
+    last_color_frame_ = color_frame.clone();
+    
     auto current_time = std::chrono::steady_clock::now();
     float dt = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - last_update_time_).count();
     last_update_time_ = current_time;
@@ -355,6 +358,25 @@ void DNNTracker::calibrate_object(int logical_id, const cv::Point2f& pixel_coord
                 return;
             }
         }
+    }
+}
+
+void DNNTracker::calibrate_color(const std::string& color_name, const cv::Point& click_point) {
+    if (!color_tracker_) {
+        std::cerr << "DNNTracker: Color tracker not initialized" << std::endl;
+        return;
+    }
+    
+    // Convert current frame to HSV
+    cv::Mat hsv_frame;
+    if (!last_color_frame_.empty()) {
+        cv::cvtColor(last_color_frame_, hsv_frame, cv::COLOR_BGR2HSV);
+        color_tracker_->calibrateColor(color_name, hsv_frame, click_point);
+        color_tracker_->saveSettings();
+        std::cout << "DNNTracker: Calibrated color profile '" << color_name << "' at ("
+                  << click_point.x << "," << click_point.y << ")" << std::endl;
+    } else {
+        std::cerr << "DNNTracker: No color frame available for calibration" << std::endl;
     }
 }
 

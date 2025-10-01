@@ -66,7 +66,7 @@ class KalmanBallTracker:
 
         if not self.tracks:
             # Create new tracks for all initial detections
-            logger.info(f"No existing tracks, creating {len(detected_positions)} new tracks")
+            logger.debug(f"No existing tracks, creating {len(detected_positions)} new tracks")
             for pos in detected_positions:
                 self.tracks[self.next_track_id] = self._create_kalman_filter(pos)
                 logger.debug(f"Created track {self.next_track_id} at position {pos}")

@@ -1,9 +1,14 @@
 import zmq
 import juggler_pb2
 import logging
+import os
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging based on JUGGLEHUB_DEBUG environment variable
+debug_enabled = os.environ.get('JUGGLEHUB_DEBUG', '0') == '1'
+logging.basicConfig(
+    level=logging.DEBUG if debug_enabled else logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 class ZMQClient:
     def __init__(self, sub_port="5555", req_port="5565"):
@@ -33,11 +38,11 @@ class ZMQClient:
             # Log hand details
             if len(frame_data.hands) > 0:
                 for i, hand in enumerate(frame_data.hands):
-                    logging.info(f"Hand {i}: id={hand.id}, visible={hand.is_visible}, "
+                    logging.debug(f"Hand {i}: id={hand.id}, visible={hand.is_visible}, "
                                 f"num_keypoints={len(hand.keypoints)}, "
                                 f"wrist_3d=({hand.wrist_pos_3d.x:.2f}, {hand.wrist_pos_3d.y:.2f}, {hand.wrist_pos_3d.z:.2f})")
                     if len(hand.keypoints) > 0:
-                        logging.info(f"  First keypoint 2D: ({hand.keypoints[0].pos_2d.x:.1f}, {hand.keypoints[0].pos_2d.y:.1f})")
+                        logging.debug(f"  First keypoint 2D: ({hand.keypoints[0].pos_2d.x:.1f}, {hand.keypoints[0].pos_2d.y:.1f})")
             else:
                 logging.debug("No hands detected in this frame")
             

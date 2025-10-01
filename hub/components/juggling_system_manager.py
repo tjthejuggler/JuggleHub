@@ -41,14 +41,14 @@ class JugglingSystemManager:
             profile_unique_id (str): The unique ID of the color profile
         """
         self.logical_id_to_profile[logical_id] = profile_unique_id
-        logger.info(f"Assigned logical ball {logical_id} to color profile {profile_unique_id}")
+        logger.debug(f"Assigned logical ball {logical_id} to color profile {profile_unique_id}")
         
         # Create managed ball immediately if it doesn't exist
         if profile_unique_id not in self.managed_balls:
             self.managed_balls[profile_unique_id] = ManagedBall(profile_unique_id, profile_unique_id)
             self.managed_balls[profile_unique_id].logical_id = logical_id
             self.frames_missing[profile_unique_id] = 0
-            logger.info(f"Created managed ball for profile {profile_unique_id} with logical_id {logical_id}")
+            logger.debug(f"Created managed ball for profile {profile_unique_id} with logical_id {logical_id}")
 
     def process_frame(self, frame_data, frame_image):
         """
@@ -98,7 +98,7 @@ class JugglingSystemManager:
                 self.managed_balls[profile_unique_id] = ManagedBall(profile_unique_id, profile_unique_id)
                 self.managed_balls[profile_unique_id].logical_id = logical_id
                 self.frames_missing[profile_unique_id] = 0
-                logger.info(f"Created managed ball for profile {profile_unique_id} with logical_id {logical_id}")
+                logger.debug(f"Created managed ball for profile {profile_unique_id} with logical_id {logical_id}")
             
             # INSTANT POSITION UPDATE - No smoothing, no lag!
             managed_ball = self.managed_balls[profile_unique_id]
@@ -149,7 +149,7 @@ class JugglingSystemManager:
                 
                 # Remove ball if missing too long
                 if self.frames_missing[profile_unique_id] > self.max_missing_frames:
-                    logger.info(f"Removing ball {profile_unique_id} - missing for {self.frames_missing[profile_unique_id]} frames")
+                    logger.debug(f"Removing ball {profile_unique_id} - missing for {self.frames_missing[profile_unique_id]} frames")
                     del self.managed_balls[profile_unique_id]
                     del self.frames_missing[profile_unique_id]
 

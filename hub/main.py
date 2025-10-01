@@ -15,12 +15,16 @@ import threading
 import logging
 from typing import Optional, List
 
-# Configure logging
+# Configure logging based on JUGGLEHUB_DEBUG environment variable
+debug_enabled = os.environ.get('JUGGLEHUB_DEBUG', '0') == '1'
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.DEBUG if debug_enabled else logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+if debug_enabled:
+    logger.info("🐛 Python debug logging enabled (JUGGLEHUB_DEBUG=1)")
 
 
 from components.zmq_client import ZMQClient

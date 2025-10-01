@@ -1337,6 +1337,12 @@ This architecture provides a foundation for many advanced features:
 - Check USB bandwidth limitations
 - For DNN tracking: Reduce model input resolution or use GPU acceleration
 
+**"Excessive debug output / console spam"**
+- Debug logging is now controlled by the `JUGGLEHUB_DEBUG` environment variable
+- By default, only important messages (INFO, WARN, ERROR) are shown
+- Enable detailed debug logging: `JUGGLEHUB_DEBUG=1 ./scripts/run_hub.sh`
+- See [`DEBUG_LOGGING_GUIDE.md`](DEBUG_LOGGING_GUIDE.md) for complete documentation
+
 ### Debug Mode
 
 Enable debug output for detailed information:

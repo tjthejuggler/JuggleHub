@@ -1,5 +1,6 @@
 #include "ColorTracker.hpp"
 #include "DNNTracker.hpp"
+#include "DebugLog.hpp"
 #include <fstream>
 #include <iostream>
 #include <algorithm>
@@ -49,10 +50,8 @@ std::vector<ColorTrackedBall> ColorTracker::update(
     for (const auto& ball : tracked_balls_) {
         if (!ball.is_active) inactive_count++;
     }
-    if (inactive_count > 0 && bytetrack_objects.size() > 0) {
-        std::cout << "ColorTracker: " << inactive_count << " inactive trackers, "
-                  << bytetrack_objects.size() << " ByteTrack detections available" << std::endl;
-    }
+    DEBUG_LOG("ColorTracker: ", inactive_count, " inactive trackers, ",
+              bytetrack_objects.size(), " ByteTrack detections available");
     
     for (auto& ball : tracked_balls_) {
         if (!ball.is_active) {
@@ -70,10 +69,8 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 // Check each color profile to see if this detection matches
                 for (const auto& profile : color_profiles_) {
                     bool matches = matchesColorProfile(hsv_frame, center, profile);
-                    if (inactive_count > 0 && bytetrack_objects.size() > 0) {
-                        std::cout << "ColorTracker: Testing detection at (" << center.x << "," << center.y
-                                  << ") against " << profile.name << ": " << (matches ? "MATCH" : "no match") << std::endl;
-                    }
+                    DEBUG_LOG("ColorTracker: Testing detection at (", center.x, ",", center.y,
+                              ") against ", profile.name, ": ", (matches ? "MATCH" : "no match"));
                     if (matches) {
                         // Check if another ball is already using this color
                         bool color_already_used = false;
@@ -106,8 +103,8 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                                 }
                             }
                             
-                            std::cout << "ColorTracker: Activated ball " << ball.logical_id
-                                      << " with color " << profile.name << std::endl;
+                            INFO_LOG("ColorTracker: Activated ball ", ball.logical_id,
+                                     " with color ", profile.name);
                             break; // Break out of color profiles loop
                         }
                     }
@@ -259,7 +256,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             if (ball.frames_since_seen > MAX_FRAMES_LOST) {
                 ball.is_active = false;
                 ball.associated_wrist_id = -1;
-                std::cout << "ColorTracker: Lost ball " << ball.logical_id << std::endl;
+                INFO_LOG("ColorTracker: Lost ball ", ball.logical_id);
             }
         } else {
             // Reset wrist association if ball moved away
@@ -444,12 +441,8 @@ bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
     int total_pixels = sample_area.rows * sample_area.cols;
     float match_ratio = static_cast<float>(matching_pixels) / total_pixels;
     
-    // Debug output
-    static int debug_counter = 0;
-    if (debug_counter++ % 30 == 0) {  // Print every 30th check to avoid spam
-        std::cout << "ColorTracker: Color match ratio: " << match_ratio
-                  << " (threshold: 0.15)" << std::endl;
-    }
+    // Debug output (only when debug is enabled)
+    DEBUG_LOG("ColorTracker: Color match ratio: ", match_ratio, " (threshold: 0.15)");
     
     return match_ratio > 0.15f; // At least 15% of pixels should match (lowered from 30%)
 }
@@ -467,7 +460,7 @@ cv::Point3f ColorTracker::deprojectToWorld(const cv::Point2f& pixel, float depth
 bool ColorTracker::loadSettings() {
     std::ifstream file(settings_file_);
     if (!file.is_open()) {
-        std::cerr << "ColorTracker: Settings file not found. Using default values." << std::endl;
+        WARN_LOG("ColorTracker: Settings file not found. Using default values.");
         return false;
     }
     
@@ -504,11 +497,11 @@ bool ColorTracker::loadSettings() {
             }
         }
         
-        std::cout << "ColorTracker: Settings loaded from " << settings_file_ << std::endl;
+        INFO_LOG("ColorTracker: Settings loaded from ", settings_file_);
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "ColorTracker: Error loading settings: " << e.what() 
-                  << ". Using default values." << std::endl;
+        ERROR_LOG("ColorTracker: Error loading settings: ", e.what(),
+                  ". Using default values.");
         return false;
     }
 }
@@ -543,7 +536,7 @@ void ColorTracker::saveSettings() {
     
     std::ofstream file(settings_file_);
     file << j.dump(4);
-    std::cout << "ColorTracker: Settings saved to " << settings_file_ << std::endl;
+    INFO_LOG("ColorTracker: Settings saved to ", settings_file_);
 }
 
 void ColorTracker::resetToDefaults() {
@@ -553,7 +546,7 @@ void ColorTracker::resetToDefaults() {
         ColorProfile("green", cv::Scalar(45, 120, 70), cv::Scalar(75, 255, 255)),
         ColorProfile("yellow", cv::Scalar(25, 120, 100), cv::Scalar(35, 255, 255))
     };
-    std::cout << "ColorTracker: Reset to default color values" << std::endl;
+    INFO_LOG("ColorTracker: Reset to default color values");
 }
 
 void ColorTracker::calibrateColor(const std::string& color_name, 
@@ -566,7 +559,7 @@ void ColorTracker::calibrateColor(const std::string& color_name,
                           });
     
     if (it == color_profiles_.end()) {
-        std::cerr << "ColorTracker: Color '" << color_name << "' not found" << std::endl;
+        ERROR_LOG("ColorTracker: Color '", color_name, "' not found");
         return;
     }
     
@@ -653,11 +646,11 @@ void ColorTracker::calibrateColor(const std::string& color_name,
         it->max_hsv2 = cv::Scalar(-1, -1, -1);
     }
     
-    std::cout << "ColorTracker: Calibrated " << color_name << " at (" 
-              << click_point.x << "," << click_point.y << ")" << std::endl;
-    std::cout << "HSV values - H:" << static_cast<int>(mean[0]) 
-              << " S:" << static_cast<int>(mean[1]) 
-              << " V:" << static_cast<int>(mean[2]) << std::endl;
+    INFO_LOG("ColorTracker: Calibrated ", color_name, " at (",
+             click_point.x, ",", click_point.y, ")");
+    INFO_LOG("HSV values - H:", static_cast<int>(mean[0]),
+             " S:", static_cast<int>(mean[1]),
+             " V:", static_cast<int>(mean[2]));
 }
 
 bool ColorTracker::updateSetting(const std::string& key, const std::string& value) {
@@ -667,7 +660,7 @@ bool ColorTracker::updateSetting(const std::string& key, const std::string& valu
         size_t pos2 = key.find('_', pos1 + 1);
         
         if (pos1 == std::string::npos || pos2 == std::string::npos) {
-            std::cerr << "ColorTracker: Unknown setting key '" << key << "'" << std::endl;
+            ERROR_LOG("ColorTracker: Unknown setting key '", key, "'");
             return false;
         }
         
@@ -679,7 +672,7 @@ bool ColorTracker::updateSetting(const std::string& key, const std::string& valu
                               [&](const ColorProfile& p) { return p.name == color_name; });
         
         if (it == color_profiles_.end()) {
-            std::cerr << "ColorTracker: Color '" << color_name << "' not found" << std::endl;
+            ERROR_LOG("ColorTracker: Color '", color_name, "' not found");
             return false;
         }
         
@@ -691,14 +684,14 @@ bool ColorTracker::updateSetting(const std::string& key, const std::string& valu
         } else if (range_type == "max") {
             it->max_hsv[comp_idx] = val;
         } else {
-            std::cerr << "ColorTracker: Unknown range type '" << range_type << "'" << std::endl;
+            ERROR_LOG("ColorTracker: Unknown range type '", range_type, "'");
             return false;
         }
         
-        std::cout << "ColorTracker: Updated " << key << " to " << value << std::endl;
+        INFO_LOG("ColorTracker: Updated ", key, " to ", value);
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "ColorTracker: Error updating setting: " << e.what() << std::endl;
+        ERROR_LOG("ColorTracker: Error updating setting: ", e.what());
         return false;
     }
 }

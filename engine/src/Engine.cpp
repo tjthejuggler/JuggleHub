@@ -1,4 +1,5 @@
 #include "Engine.hpp"
+#include "DebugLog.hpp"
 #include "BallTracker.hpp"
 #include "modules/UdpBallColorModule.hpp"
 #include "modules/PositionToRgbModule.hpp"
@@ -37,10 +38,8 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       camera_fps_(60),
       record_with_yolo_boxes_(false),
       record_with_bytetrack_boxes_(false) {
-   if (verbose_) {
-       std::cout << "[LOG] Engine constructor called." << std::endl;
-       std::cout << "[LOG] Initial camera settings: " << camera_width_ << "x" << camera_height_ << " @ " << camera_fps_ << " FPS" << std::endl;
-   }
+   DEBUG_LOG("[LOG] Engine constructor called.");
+   DEBUG_LOG("[LOG] Initial camera settings: ", camera_width_, "x", camera_height_, " @ ", camera_fps_, " FPS");
    // Bind ZMQ sockets
    zmq_publisher_.bind("tcp://127.0.0.1:5555");
     zmq_commander_.bind("tcp://127.0.0.1:5565");
@@ -53,7 +52,7 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
         const std::string pose_model_path = "engine/models/" + pose_model_name + ".xml";
         dnn_tracker_ = std::make_shared<DNNTracker>(ball_model_path, pose_model_path, device_name);
     } catch (const std::exception& e) {
-        std::cerr << "FATAL ERROR: Failed to initialize DNNTracker: " << e.what() << std::endl;
+        ERROR_LOG("FATAL ERROR: Failed to initialize DNNTracker: ", e.what());
         // Exit or handle the critical failure appropriately
         return; // or exit(1);
     }
@@ -68,15 +67,15 @@ Engine::~Engine() {
 
 void Engine::run() {
     running_ = true;
-    if (verbose_) std::cout << "[LOG] Engine::run() called. Starting main loop." << std::endl;
+    DEBUG_LOG("[LOG] Engine::run() called. Starting main loop.");
 
     // Start command processing thread
     std::thread command_thread(&Engine::processCommands, this);
     
     // Initialize and start the camera with default settings.
-    if (verbose_) std::cout << "[LOG] Calling initializeCamera() from run()." << std::endl;
+    DEBUG_LOG("[LOG] Calling initializeCamera() from run().");
     initializeCamera();
-    if (verbose_) std::cout << "[LOG] Performing initial camera start from run()." << std::endl;
+    DEBUG_LOG("[LOG] Performing initial camera start from run().");
     startCamera();
 
     // Initialize the old BallTracker only if DNN tracking is not enabled
@@ -99,9 +98,7 @@ void Engine::run() {
         try {
             frames = pipe_.wait_for_frames(1000); // 1 second timeout
         } catch (const rs2::error& e) {
-            if (verbose_) {
-                std::cout << "Camera frame timeout or error: " << e.what() << std::endl;
-            }
+            DEBUG_LOG("Camera frame timeout or error: ", e.what());
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
@@ -111,11 +108,11 @@ void Engine::run() {
         auto depth_frame = aligned_frames.get_depth_frame();
 
         if (!color_frame || !depth_frame) {
-            if (verbose_) std::cout << "[LOG] Dropping frame: missing color or depth." << std::endl;
+            DEBUG_LOG("[LOG] Dropping frame: missing color or depth.");
             continue;
         }
 
-        if (verbose_) std::cout << "[LOG] Frame " << frame_counter_ << ": Received color and depth frames." << std::endl;
+        DEBUG_LOG("[LOG] Frame ", frame_counter_, ": Received color and depth frames.");
 
         cv::Mat color_image(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
         cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
@@ -131,7 +128,7 @@ void Engine::run() {
 
         std::vector<uchar> buf;
         cv::imencode(".jpg", color_image, buf);
-        if (verbose_) std::cout << "[LOG] Frame " << frame_data.frame_number() << ": Encoded color image to JPG, size: " << buf.size() << " bytes." << std::endl;
+        DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": Encoded color image to JPG, size: ", buf.size(), " bytes.");
         frame_data.set_color_image_b64(buf.data(), buf.size());
         frame_data.set_ir_projector_active(ir_projector_active_);
 
@@ -149,11 +146,9 @@ void Engine::run() {
             last_raw_detections_ = dnn_tracker_->get_last_raw_detections();
             color_tracked_balls = dnn_tracker_->get_color_tracked_balls();
             
-            if (verbose_) {
-                std::cout << "[LOG] Frame " << frame_data.frame_number() << ": DNNTracker returned "
-                          << tracked_objects.size() << " tracked objects and "
-                          << last_raw_detections_.size() << " raw detections." << std::endl;
-            }
+            DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": DNNTracker returned ",
+                      tracked_objects.size(), " tracked objects and ",
+                      last_raw_detections_.size(), " raw detections.");
 
             for (const auto& hand_obj : tracked_hands) {
                 auto* hand = frame_data.add_hands();
@@ -203,10 +198,8 @@ void Engine::run() {
                     keypoint->set_confidence(hand_obj.confidence);
                 }
                 
-                if (verbose_) {
-                    std::cout << "[LOG] Hand " << hand_obj.id << " with " << hand_obj.keypoints.size()
-                              << " keypoints added to frame_data" << std::endl;
-                }
+                DEBUG_LOG("[LOG] Hand ", hand_obj.id, " with ", hand_obj.keypoints.size(),
+                          " keypoints added to frame_data");
             }
 
             // Populate raw detections in protobuf
@@ -236,9 +229,7 @@ void Engine::run() {
                 continuous_frame_buffer_.push_back(rec_frame);
             }
  
-             if (verbose_) {
-                 std::cout << "DNNTracker update returned " << tracked_objects.size() << " objects and " << last_raw_detections_.size() << " raw detections." << std::endl;
-             }
+             DEBUG_LOG("DNNTracker update returned ", tracked_objects.size(), " objects and ", last_raw_detections_.size(), " raw detections.");
         } else {
              auto rs_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
              auto detections = ball_tracker_->detectBalls(color_image, depth_frame, rs_intrinsics);
@@ -324,14 +315,10 @@ void Engine::run() {
 
         // Publish FrameData
         std::string serialized_data;
-        if (verbose_) {
-            std::cout << "DEBUG: C++ sending " << frame_data.balls_size() << " balls." << std::endl;
-        }
+        DEBUG_LOG("DEBUG: C++ sending ", frame_data.balls_size(), " balls.");
         frame_data.SerializeToString(&serialized_data);
 
-        if (verbose_) {
-            std::cout << "Serialized FrameData size: " << serialized_data.size() << " bytes" << std::endl;
-        }
+        DEBUG_LOG("Serialized FrameData size: ", serialized_data.size(), " bytes");
 
         zmq::message_t message(serialized_data.size());
         memcpy(message.data(), serialized_data.c_str(), serialized_data.size());
@@ -358,7 +345,7 @@ void Engine::processCommands() {
             juggler::v1::CommandRequest command;
             command.ParseFromArray(request.data(), request.size());
             
-            std::cout << "Received external command: " << command.type() << std::endl;
+            DEBUG_LOG("Received external command: ", command.type());
 
             juggler::v1::CommandResponse response;
             response.set_success(true);
@@ -414,24 +401,24 @@ void Engine::processCommands() {
                     response.set_message("Camera feed stopped");
                     break;
                 case juggler::v1::CommandRequest::CAMERA_START:
-                    if (verbose_) std::cout << "[LOG] CAMERA_START command received." << std::endl;
+                    DEBUG_LOG("[LOG] CAMERA_START command received.");
                     if (!command.camera_settings_file().empty()) {
                         // Check if camera parameters are provided from UI
                         if (command.camera_width() > 0 && command.camera_height() > 0 && command.camera_fps() > 0) {
-                            if (verbose_) std::cout << "[LOG] Calling startCameraWithSettings with new resolution." << std::endl;
+                            DEBUG_LOG("[LOG] Calling startCameraWithSettings with new resolution.");
                             // Use UI-provided parameters
                             startCameraWithSettings(command.camera_settings_file(), command.camera_width(), command.camera_height(), command.camera_fps());
                             response.set_message("Camera started with settings: " + command.camera_settings_file() +
                                                " at " + std::to_string(command.camera_width()) + "x" + std::to_string(command.camera_height()) +
                                                " @ " + std::to_string(command.camera_fps()) + " FPS");
                         } else {
-                            if (verbose_) std::cout << "[LOG] Calling startCameraWithSettings with settings file only." << std::endl;
+                            DEBUG_LOG("[LOG] Calling startCameraWithSettings with settings file only.");
                             // Use original method without parameters (backward compatibility)
                             startCameraWithSettings(command.camera_settings_file());
                             response.set_message("Camera started with settings: " + command.camera_settings_file());
                         }
                     } else {
-                        if (verbose_) std::cout << "[LOG] Calling startCamera() with current settings." << std::endl;
+                        DEBUG_LOG("[LOG] Calling startCamera() with current settings.");
                         startCamera();
                         response.set_message("Camera started with current settings");
                     }
@@ -492,7 +479,7 @@ void Engine::processCommands() {
         }
 
         if (command_found) {
-            std::cout << "Processing internal command: " << internal_command.type() << std::endl;
+            DEBUG_LOG("Processing internal command: ", internal_command.type());
 
             switch (internal_command.type()) {
                 case juggler::v1::CommandRequest::SEND_COLOR_COMMAND:
@@ -529,11 +516,11 @@ std::unique_ptr<ModuleBase> Engine::create_module(const juggler::v1::CommandRequ
 }
 
 void Engine::saveRecording() {
-    std::cout << "DEBUG: saveRecording() called." << std::endl;
+    DEBUG_LOG("DEBUG: saveRecording() called.");
     std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
     
     if (frame_buffer_.empty()) {
-        std::cout << "DEBUG: Frame buffer is empty. Nothing to save." << std::endl;
+        DEBUG_LOG("DEBUG: Frame buffer is empty. Nothing to save.");
         return;
     }
 
@@ -548,7 +535,7 @@ void Engine::saveRecording() {
     
     fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
 
-    std::cout << "DEBUG: Attempting to create directory: " << recording_dir_no_boxes << std::endl;
+    DEBUG_LOG("DEBUG: Attempting to create directory: ", recording_dir_no_boxes.string());
 
     try {
         fs::create_directories(recording_dir_no_boxes);
@@ -560,7 +547,7 @@ void Engine::saveRecording() {
             cv::imwrite(filepath.string(), rec_frame.frame);
         }
         
-        std::cout << "Saved " << frame_buffer_.size() << " frames to " << recording_dir_no_boxes << std::endl;
+        INFO_LOG("Saved ", frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
 
         if (record_with_yolo_boxes_ || record_with_bytetrack_boxes_) {
             fs::path recording_dir_with_boxes = recording_dir / "with_boxes";
@@ -583,19 +570,19 @@ void Engine::saveRecording() {
                 fs::path filepath = recording_dir_with_boxes / filename;
                 cv::imwrite(filepath.string(), frame_with_boxes);
             }
-            std::cout << "Saved " << frame_buffer_.size() << " frames with bounding boxes to " << recording_dir_with_boxes << std::endl;
+            INFO_LOG("Saved ", frame_buffer_.size(), " frames with bounding boxes to ", recording_dir_with_boxes.string());
         }
 
     } catch (const fs::filesystem_error& e) {
-        std::cerr << "Error creating directory or saving frames: " << e.what() << std::endl;
+        ERROR_LOG("Error creating directory or saving frames: ", e.what());
     }
 }
 
 void Engine::startContinuousRecording() {
-    std::cout << "DEBUG: startContinuousRecording() called." << std::endl;
-    
+    DEBUG_LOG("DEBUG: startContinuousRecording() called.");
+
     if (continuous_recording_) {
-        std::cout << "DEBUG: Continuous recording already active." << std::endl;
+        DEBUG_LOG("DEBUG: Continuous recording already active.");
         return;
     }
     
@@ -615,14 +602,14 @@ void Engine::startContinuousRecording() {
     continuous_recording_session_ = ss.str();
     
     continuous_recording_ = true;
-    std::cout << "Continuous recording started: " << continuous_recording_session_ << std::endl;
+    INFO_LOG("Continuous recording started: ", continuous_recording_session_);
 }
 
 void Engine::stopContinuousRecording() {
-    std::cout << "DEBUG: stopContinuousRecording() called." << std::endl;
-    
+    DEBUG_LOG("DEBUG: stopContinuousRecording() called.");
+
     if (!continuous_recording_) {
-        std::cout << "DEBUG: No continuous recording active." << std::endl;
+        DEBUG_LOG("DEBUG: No continuous recording active.");
         return;
     }
     
@@ -631,7 +618,7 @@ void Engine::stopContinuousRecording() {
     std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
     
     if (continuous_frame_buffer_.empty()) {
-        std::cout << "DEBUG: Continuous frame buffer is empty. Nothing to save." << std::endl;
+        DEBUG_LOG("DEBUG: Continuous frame buffer is empty. Nothing to save.");
         return;
     }
     
@@ -639,7 +626,7 @@ void Engine::stopContinuousRecording() {
     fs::path recording_dir = data_dir / continuous_recording_session_;
     fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
 
-    std::cout << "DEBUG: Attempting to create directory: " << recording_dir_no_boxes << std::endl;
+    DEBUG_LOG("DEBUG: Attempting to create directory: ", recording_dir_no_boxes.string());
     
     try {
         fs::create_directories(recording_dir_no_boxes);
@@ -651,7 +638,7 @@ void Engine::stopContinuousRecording() {
             cv::imwrite(filepath.string(), rec_frame.frame);
         }
         
-        std::cout << "Saved " << continuous_frame_buffer_.size() << " frames to " << recording_dir_no_boxes << std::endl;
+        INFO_LOG("Saved ", continuous_frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
 
         if (record_with_yolo_boxes_ || record_with_bytetrack_boxes_) {
             fs::path recording_dir_with_boxes = recording_dir / "with_boxes";
@@ -674,41 +661,33 @@ void Engine::stopContinuousRecording() {
                 fs::path filepath = recording_dir_with_boxes / filename;
                 cv::imwrite(filepath.string(), frame_with_boxes);
             }
-            std::cout << "Saved " << continuous_frame_buffer_.size() << " frames with bounding boxes to " << recording_dir_with_boxes << std::endl;
+            INFO_LOG("Saved ", continuous_frame_buffer_.size(), " frames with bounding boxes to ", recording_dir_with_boxes.string());
         }
 
         continuous_frame_buffer_.clear();
         
     } catch (const fs::filesystem_error& e) {
-        std::cerr << "Error creating directory or saving frames: " << e.what() << std::endl;
+        ERROR_LOG("Error creating directory or saving frames: ", e.what());
     }
 }
 
 void Engine::initializeCamera() {
-    if (verbose_) std::cout << "[LOG] Engine::initializeCamera() called." << std::endl;
+    DEBUG_LOG("[LOG] Engine::initializeCamera() called.");
     // Load camera settings from JSON file first
     if (!camera_settings_path_.empty()) {
-        if (verbose_) {
-            std::cout << "[LOG] Loading camera settings from: " << camera_settings_path_ << std::endl;
-        }
+        DEBUG_LOG("[LOG] Loading camera settings from: ", camera_settings_path_);
         loadCameraSettingsFromJson(camera_settings_path_);
     } else {
-        if (verbose_) {
-            std::cout << "[LOG] No camera settings path provided." << std::endl;
-        }
+        DEBUG_LOG("[LOG] No camera settings path provided.");
     }
 
     // Configure camera streams but do not start them
-     if (verbose_) {
-        std::cout << "[LOG] Configuring camera streams: "
-                  << camera_width_ << "x" << camera_height_ << " @ " << camera_fps_ << " FPS" << std::endl;
-    }
+     DEBUG_LOG("[LOG] Configuring camera streams: ",
+               camera_width_, "x", camera_height_, " @ ", camera_fps_, " FPS");
     rs_config_.enable_stream(RS2_STREAM_COLOR, camera_width_, camera_height_, RS2_FORMAT_BGR8, camera_fps_);
     rs_config_.enable_stream(RS2_STREAM_DEPTH, camera_width_, camera_height_, RS2_FORMAT_Z16, camera_fps_);
     
-    if (verbose_) {
-        std::cout << "[LOG] Camera configured." << std::endl;
-    }
+    DEBUG_LOG("[LOG] Camera configured.");
 }
 
 void Engine::loadCameraSettingsFromJson(const std::string& json_path) {
@@ -723,29 +702,27 @@ void Engine::loadCameraSettingsFromJson(const std::string& json_path) {
         buffer << file.rdbuf();
         json_content_ = buffer.str();
         
-        if (verbose_) {
-            std::cout << "Loaded camera settings from: " << json_path << std::endl;
-        }
+        INFO_LOG("Loaded camera settings from: ", json_path);
     } catch (const std::exception& e) {
-        std::cerr << "Error loading camera settings: " << e.what() << std::endl;
+        ERROR_LOG("Error loading camera settings: ", e.what());
         throw;
     }
 }
 
 void Engine::applyCameraSettings() {
-    if (verbose_) std::cout << "[LOG] Engine::applyCameraSettings() called." << std::endl;
+    DEBUG_LOG("[LOG] Engine::applyCameraSettings() called.");
     if (json_content_.empty()) {
-        if (verbose_) std::cout << "[LOG] No JSON content, skipping settings application." << std::endl;
+        DEBUG_LOG("[LOG] No JSON content, skipping settings application.");
         return;
     }
 
     try {
         if (!camera_running_) {
-            if (verbose_) std::cout << "[LOG] Camera not running, settings will be applied on start." << std::endl;
+            DEBUG_LOG("[LOG] Camera not running, settings will be applied on start.");
             return;
         }
 
-        if (verbose_) std::cout << "[LOG] Applying camera settings from JSON..." << std::endl;
+        DEBUG_LOG("[LOG] Applying camera settings from JSON...");
         
         auto profile = pipe_.get_active_profile();
         rs2::device dev = profile.get_device();
@@ -753,53 +730,49 @@ void Engine::applyCameraSettings() {
         if (dev.is<rs2::serializable_device>()) {
             rs2::serializable_device serializable_dev = dev.as<rs2::serializable_device>();
             serializable_dev.load_json(json_content_);
-            if (verbose_) std::cout << "[LOG] Camera settings applied successfully." << std::endl;
+            DEBUG_LOG("[LOG] Camera settings applied successfully.");
         } else {
-            if (verbose_) std::cout << "[LOG] Device does not support advanced settings." << std::endl;
+            DEBUG_LOG("[LOG] Device does not support advanced settings.");
         }
     } catch (const rs2::error& e) {
-        std::cerr << "[ERROR] RealSense error in applyCameraSettings: " << e.what() << std::endl;
+        ERROR_LOG("[ERROR] RealSense error in applyCameraSettings: ", e.what());
     } catch (const std::exception& e) {
-        std::cerr << "[ERROR] General error in applyCameraSettings: " << e.what() << std::endl;
+        ERROR_LOG("[ERROR] General error in applyCameraSettings: ", e.what());
     }
 }
 
 void Engine::stopCamera() {
-    if (verbose_) std::cout << "[LOG] Engine::stopCamera() called." << std::endl;
+    DEBUG_LOG("[LOG] Engine::stopCamera() called.");
     if (!camera_running_) {
-        if (verbose_) std::cout << "[LOG] Camera already stopped." << std::endl;
+        DEBUG_LOG("[LOG] Camera already stopped.");
         return;
     }
 
-    if (verbose_) {
-        std::cout << "[LOG] Attempting to stop camera..." << std::endl;
-    }
+    DEBUG_LOG("[LOG] Attempting to stop camera...");
 
     try {
         pipe_.stop();
-        if (verbose_) {
-            std::cout << "[LOG] Camera stopped successfully." << std::endl;
-        }
+        INFO_LOG("[LOG] Camera stopped successfully.");
         camera_running_ = false;
         ir_projector_active_ = false;
     } catch (const rs2::error& e) {
-        std::cerr << "[ERROR] Error stopping camera: " << e.what() << std::endl;
+        ERROR_LOG("[ERROR] Error stopping camera: ", e.what());
     }
 }
 
 void Engine::startCamera() {
-    if (verbose_) std::cout << "[LOG] Engine::startCamera() called." << std::endl;
+    DEBUG_LOG("[LOG] Engine::startCamera() called.");
     if (camera_running_) {
-        if (verbose_) std::cout << "[LOG] Camera is already running." << std::endl;
+        DEBUG_LOG("[LOG] Camera is already running.");
         return;
     }
 
-    if (verbose_) std::cout << "[LOG] Attempting to start camera pipeline..." << std::endl;
+    DEBUG_LOG("[LOG] Attempting to start camera pipeline...");
 
     try {
         rs2::pipeline_profile profile = pipe_.start(rs_config_);
         camera_running_ = true;
-        if (verbose_) std::cout << "[LOG] Camera pipeline started successfully." << std::endl;
+        INFO_LOG("[LOG] Camera pipeline started successfully.");
 
         // --- Store Camera Intrinsics ---
         auto stream = profile.get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
@@ -808,11 +781,9 @@ void Engine::startCamera() {
         camera_intrinsics_.fy = intrinsics.fy;
         camera_intrinsics_.ppx = intrinsics.ppx;
         camera_intrinsics_.ppy = intrinsics.ppy;
-        if (verbose_) {
-            std::cout << "[LOG] Stored camera intrinsics: fx=" << camera_intrinsics_.fx
-                      << ", fy=" << camera_intrinsics_.fy << ", ppx=" << camera_intrinsics_.ppx
-                      << ", ppy=" << camera_intrinsics_.ppy << std::endl;
-        }
+        DEBUG_LOG("[LOG] Stored camera intrinsics: fx=", camera_intrinsics_.fx,
+                  ", fy=", camera_intrinsics_.fy, ", ppx=", camera_intrinsics_.ppx,
+                  ", ppy=", camera_intrinsics_.ppy);
 
         // Wait for a moment to ensure the device is ready.
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -826,29 +797,27 @@ void Engine::startCamera() {
             if (sensor.supports(RS2_OPTION_EMITTER_ENABLED)) {
                 sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 1.f); // 1.f is for ON
                 ir_projector_active_ = true;
-                if (verbose_) std::cout << "[LOG] IR Emitter enabled programmatically." << std::endl;
+                DEBUG_LOG("[LOG] IR Emitter enabled programmatically.");
             }
         } catch (const rs2::error& e) {
-            std::cerr << "[WARNING] Could not set IR emitter option: " << e.what() << std::endl;
+            WARN_LOG("[WARNING] Could not set IR emitter option: ", e.what());
             ir_projector_active_ = false;
         }
 
     } catch (const rs2::error& e) {
-        std::cerr << "[ERROR] Error starting camera: " << e.what() << std::endl;
+        ERROR_LOG("[ERROR] Error starting camera: ", e.what());
         camera_running_ = false;
     }
 }
 
 void Engine::startCameraWithSettings(const std::string& settings_file) {
-    if (verbose_) std::cout << "[LOG] startCameraWithSettings(settings_file) called." << std::endl;
+    DEBUG_LOG("[LOG] startCameraWithSettings(settings_file) called.");
     startCameraWithSettings(settings_file, camera_width_, camera_height_, camera_fps_);
 }
 
 void Engine::startCameraWithSettings(const std::string& settings_file, uint32_t width, uint32_t height, uint32_t fps) {
-    if (verbose_) {
-        std::cout << "Reconfiguring camera with settings: " << settings_file
-                  << " at " << width << "x" << height << " @ " << fps << " FPS" << std::endl;
-    }
+    INFO_LOG("Reconfiguring camera with settings: ", settings_file,
+             " at ", width, "x", height, " @ ", fps, " FPS");
 
     // Stop the pipeline completely.
     if (camera_running_) {

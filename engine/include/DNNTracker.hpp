@@ -14,6 +14,7 @@
 #include "ByteTrack/BYTETracker.h"
 #include "KalmanFilter3D.hpp"
 #include "PersistentTracker.hpp" // New persistent tracker data structure
+#include "ColorTracker.hpp" // Color-based ball tracking
 
 // Simple struct to hold camera intrinsics needed for deprojection
 struct CameraIntrinsics {
@@ -58,6 +59,7 @@ public:
     void calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
     const std::vector<PersistentTracker>& get_ball_trackers() const { return logical_ball_trackers_; }
     const std::vector<Detection>& get_last_raw_detections() const { return last_raw_detections_; }
+    const std::vector<juggler::ColorTrackedBall>& get_color_tracked_balls() const { return color_tracked_balls_; }
     static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
 
 private:
@@ -77,6 +79,10 @@ private:
 
     // Bytetrack
     std::unique_ptr<byte_track::BYTETracker> tracker;
+
+    // --- Color Tracker ---
+    std::unique_ptr<juggler::ColorTracker> color_tracker_;
+    std::vector<juggler::ColorTrackedBall> color_tracked_balls_;
 
     // --- Persistent Logical Trackers ---
     std::vector<PersistentTracker> logical_ball_trackers_;

@@ -65,6 +65,9 @@ extern ColorDefaultTypeInternal _Color_default_instance_;
 class ColorCommand;
 struct ColorCommandDefaultTypeInternal;
 extern ColorCommandDefaultTypeInternal _ColorCommand_default_instance_;
+class ColorTrackedBall;
+struct ColorTrackedBallDefaultTypeInternal;
+extern ColorTrackedBallDefaultTypeInternal _ColorTrackedBall_default_instance_;
 class CommandRequest;
 struct CommandRequestDefaultTypeInternal;
 extern CommandRequestDefaultTypeInternal _CommandRequest_default_instance_;
@@ -106,6 +109,7 @@ template<> ::juggler::v1::BoundingBox2D* Arena::CreateMaybeMessage<::juggler::v1
 template<> ::juggler::v1::CameraIntrinsics* Arena::CreateMaybeMessage<::juggler::v1::CameraIntrinsics>(Arena*);
 template<> ::juggler::v1::Color* Arena::CreateMaybeMessage<::juggler::v1::Color>(Arena*);
 template<> ::juggler::v1::ColorCommand* Arena::CreateMaybeMessage<::juggler::v1::ColorCommand>(Arena*);
+template<> ::juggler::v1::ColorTrackedBall* Arena::CreateMaybeMessage<::juggler::v1::ColorTrackedBall>(Arena*);
 template<> ::juggler::v1::CommandRequest* Arena::CreateMaybeMessage<::juggler::v1::CommandRequest>(Arena*);
 template<> ::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse* Arena::CreateMaybeMessage<::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse>(Arena*);
 template<> ::juggler::v1::CommandResponse* Arena::CreateMaybeMessage<::juggler::v1::CommandResponse>(Arena*);
@@ -1358,6 +1362,243 @@ class Ball final :
 };
 // -------------------------------------------------------------------
 
+class ColorTrackedBall final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.ColorTrackedBall) */ {
+ public:
+  inline ColorTrackedBall() : ColorTrackedBall(nullptr) {}
+  ~ColorTrackedBall() override;
+  explicit PROTOBUF_CONSTEXPR ColorTrackedBall(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  ColorTrackedBall(const ColorTrackedBall& from);
+  ColorTrackedBall(ColorTrackedBall&& from) noexcept
+    : ColorTrackedBall() {
+    *this = ::std::move(from);
+  }
+
+  inline ColorTrackedBall& operator=(const ColorTrackedBall& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ColorTrackedBall& operator=(ColorTrackedBall&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const ColorTrackedBall& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const ColorTrackedBall* internal_default_instance() {
+    return reinterpret_cast<const ColorTrackedBall*>(
+               &_ColorTrackedBall_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    6;
+
+  friend void swap(ColorTrackedBall& a, ColorTrackedBall& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(ColorTrackedBall* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ColorTrackedBall* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  ColorTrackedBall* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<ColorTrackedBall>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const ColorTrackedBall& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const ColorTrackedBall& from) {
+    ColorTrackedBall::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(ColorTrackedBall* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.ColorTrackedBall";
+  }
+  protected:
+  explicit ColorTrackedBall(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kColorNameFieldNumber = 2,
+    kPixelPosFieldNumber = 3,
+    kWorldPosFieldNumber = 4,
+    kLogicalIdFieldNumber = 1,
+    kIsActiveFieldNumber = 5,
+    kAssociatedWristIdFieldNumber = 6,
+    kFramesSinceSeenFieldNumber = 7,
+  };
+  // string color_name = 2;
+  void clear_color_name();
+  const std::string& color_name() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_color_name(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_color_name();
+  PROTOBUF_NODISCARD std::string* release_color_name();
+  void set_allocated_color_name(std::string* color_name);
+  private:
+  const std::string& _internal_color_name() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_color_name(const std::string& value);
+  std::string* _internal_mutable_color_name();
+  public:
+
+  // .juggler.v1.Vector2 pixel_pos = 3;
+  bool has_pixel_pos() const;
+  private:
+  bool _internal_has_pixel_pos() const;
+  public:
+  void clear_pixel_pos();
+  const ::juggler::v1::Vector2& pixel_pos() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector2* release_pixel_pos();
+  ::juggler::v1::Vector2* mutable_pixel_pos();
+  void set_allocated_pixel_pos(::juggler::v1::Vector2* pixel_pos);
+  private:
+  const ::juggler::v1::Vector2& _internal_pixel_pos() const;
+  ::juggler::v1::Vector2* _internal_mutable_pixel_pos();
+  public:
+  void unsafe_arena_set_allocated_pixel_pos(
+      ::juggler::v1::Vector2* pixel_pos);
+  ::juggler::v1::Vector2* unsafe_arena_release_pixel_pos();
+
+  // .juggler.v1.Vector3 world_pos = 4;
+  bool has_world_pos() const;
+  private:
+  bool _internal_has_world_pos() const;
+  public:
+  void clear_world_pos();
+  const ::juggler::v1::Vector3& world_pos() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector3* release_world_pos();
+  ::juggler::v1::Vector3* mutable_world_pos();
+  void set_allocated_world_pos(::juggler::v1::Vector3* world_pos);
+  private:
+  const ::juggler::v1::Vector3& _internal_world_pos() const;
+  ::juggler::v1::Vector3* _internal_mutable_world_pos();
+  public:
+  void unsafe_arena_set_allocated_world_pos(
+      ::juggler::v1::Vector3* world_pos);
+  ::juggler::v1::Vector3* unsafe_arena_release_world_pos();
+
+  // int32 logical_id = 1;
+  void clear_logical_id();
+  int32_t logical_id() const;
+  void set_logical_id(int32_t value);
+  private:
+  int32_t _internal_logical_id() const;
+  void _internal_set_logical_id(int32_t value);
+  public:
+
+  // bool is_active = 5;
+  void clear_is_active();
+  bool is_active() const;
+  void set_is_active(bool value);
+  private:
+  bool _internal_is_active() const;
+  void _internal_set_is_active(bool value);
+  public:
+
+  // int32 associated_wrist_id = 6;
+  void clear_associated_wrist_id();
+  int32_t associated_wrist_id() const;
+  void set_associated_wrist_id(int32_t value);
+  private:
+  int32_t _internal_associated_wrist_id() const;
+  void _internal_set_associated_wrist_id(int32_t value);
+  public:
+
+  // int32 frames_since_seen = 7;
+  void clear_frames_since_seen();
+  int32_t frames_since_seen() const;
+  void set_frames_since_seen(int32_t value);
+  private:
+  int32_t _internal_frames_since_seen() const;
+  void _internal_set_frames_since_seen(int32_t value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.ColorTrackedBall)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_name_;
+    ::juggler::v1::Vector2* pixel_pos_;
+    ::juggler::v1::Vector3* world_pos_;
+    int32_t logical_id_;
+    bool is_active_;
+    int32_t associated_wrist_id_;
+    int32_t frames_since_seen_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
 class KeyPoint final :
     public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.KeyPoint) */ {
  public:
@@ -1406,7 +1647,7 @@ class KeyPoint final :
                &_KeyPoint_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    6;
+    7;
 
   friend void swap(KeyPoint& a, KeyPoint& b) {
     a.Swap(&b);
@@ -1594,7 +1835,7 @@ class Hand final :
                &_Hand_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    7;
+    8;
 
   friend void swap(Hand& a, Hand& b) {
     a.Swap(&b);
@@ -1860,7 +2101,7 @@ class IMUData final :
                &_IMUData_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    8;
+    9;
 
   friend void swap(IMUData& a, IMUData& b) {
     a.Swap(&b);
@@ -2133,7 +2374,7 @@ class CameraIntrinsics final :
                &_CameraIntrinsics_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    9;
+    10;
 
   friend void swap(CameraIntrinsics& a, CameraIntrinsics& b) {
     a.Swap(&b);
@@ -2325,7 +2566,7 @@ class SystemStatus final :
                &_SystemStatus_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    10;
+    11;
 
   friend void swap(SystemStatus& a, SystemStatus& b) {
     a.Swap(&b);
@@ -2549,7 +2790,7 @@ class FrameData final :
                &_FrameData_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    11;
+    12;
 
   friend void swap(FrameData& a, FrameData& b) {
     a.Swap(&b);
@@ -2626,6 +2867,7 @@ class FrameData final :
     kHandsFieldNumber = 3,
     kImuDataFieldNumber = 4,
     kRawDetectionsFieldNumber = 10,
+    kColorTrackedBallsFieldNumber = 14,
     kColorImageB64FieldNumber = 11,
     kDepthImageB64FieldNumber = 12,
     kIntrinsicsFieldNumber = 5,
@@ -2707,6 +2949,24 @@ class FrameData final :
   ::juggler::v1::BoundingBox2D* add_raw_detections();
   const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D >&
       raw_detections() const;
+
+  // repeated .juggler.v1.ColorTrackedBall color_tracked_balls = 14;
+  int color_tracked_balls_size() const;
+  private:
+  int _internal_color_tracked_balls_size() const;
+  public:
+  void clear_color_tracked_balls();
+  ::juggler::v1::ColorTrackedBall* mutable_color_tracked_balls(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall >*
+      mutable_color_tracked_balls();
+  private:
+  const ::juggler::v1::ColorTrackedBall& _internal_color_tracked_balls(int index) const;
+  ::juggler::v1::ColorTrackedBall* _internal_add_color_tracked_balls();
+  public:
+  const ::juggler::v1::ColorTrackedBall& color_tracked_balls(int index) const;
+  ::juggler::v1::ColorTrackedBall* add_color_tracked_balls();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall >&
+      color_tracked_balls() const;
 
   // bytes color_image_b64 = 11;
   void clear_color_image_b64();
@@ -2829,6 +3089,7 @@ class FrameData final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::Hand > hands_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::IMUData > imu_data_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D > raw_detections_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall > color_tracked_balls_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_image_b64_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr depth_image_b64_;
     ::juggler::v1::CameraIntrinsics* intrinsics_;
@@ -2921,7 +3182,7 @@ class CommandRequest final :
                &_CommandRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    13;
+    14;
 
   friend void swap(CommandRequest& a, CommandRequest& b) {
     a.Swap(&b);
@@ -3307,7 +3568,7 @@ class ColorCommand final :
                &_ColorCommand_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    14;
+    15;
 
   friend void swap(ColorCommand& a, ColorCommand& b) {
     a.Swap(&b);
@@ -3480,7 +3741,7 @@ class CommandResponse final :
                &_CommandResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    15;
+    16;
 
   friend void swap(CommandResponse& a, CommandResponse& b) {
     a.Swap(&b);
@@ -4524,6 +4785,320 @@ inline void Ball::_internal_set_logical_id(int32_t value) {
 inline void Ball::set_logical_id(int32_t value) {
   _internal_set_logical_id(value);
   // @@protoc_insertion_point(field_set:juggler.v1.Ball.logical_id)
+}
+
+// -------------------------------------------------------------------
+
+// ColorTrackedBall
+
+// int32 logical_id = 1;
+inline void ColorTrackedBall::clear_logical_id() {
+  _impl_.logical_id_ = 0;
+}
+inline int32_t ColorTrackedBall::_internal_logical_id() const {
+  return _impl_.logical_id_;
+}
+inline int32_t ColorTrackedBall::logical_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorTrackedBall.logical_id)
+  return _internal_logical_id();
+}
+inline void ColorTrackedBall::_internal_set_logical_id(int32_t value) {
+  
+  _impl_.logical_id_ = value;
+}
+inline void ColorTrackedBall::set_logical_id(int32_t value) {
+  _internal_set_logical_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorTrackedBall.logical_id)
+}
+
+// string color_name = 2;
+inline void ColorTrackedBall::clear_color_name() {
+  _impl_.color_name_.ClearToEmpty();
+}
+inline const std::string& ColorTrackedBall::color_name() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorTrackedBall.color_name)
+  return _internal_color_name();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ColorTrackedBall::set_color_name(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.color_name_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorTrackedBall.color_name)
+}
+inline std::string* ColorTrackedBall::mutable_color_name() {
+  std::string* _s = _internal_mutable_color_name();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.ColorTrackedBall.color_name)
+  return _s;
+}
+inline const std::string& ColorTrackedBall::_internal_color_name() const {
+  return _impl_.color_name_.Get();
+}
+inline void ColorTrackedBall::_internal_set_color_name(const std::string& value) {
+  
+  _impl_.color_name_.Set(value, GetArenaForAllocation());
+}
+inline std::string* ColorTrackedBall::_internal_mutable_color_name() {
+  
+  return _impl_.color_name_.Mutable(GetArenaForAllocation());
+}
+inline std::string* ColorTrackedBall::release_color_name() {
+  // @@protoc_insertion_point(field_release:juggler.v1.ColorTrackedBall.color_name)
+  return _impl_.color_name_.Release();
+}
+inline void ColorTrackedBall::set_allocated_color_name(std::string* color_name) {
+  if (color_name != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.color_name_.SetAllocated(color_name, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.color_name_.IsDefault()) {
+    _impl_.color_name_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.ColorTrackedBall.color_name)
+}
+
+// .juggler.v1.Vector2 pixel_pos = 3;
+inline bool ColorTrackedBall::_internal_has_pixel_pos() const {
+  return this != internal_default_instance() && _impl_.pixel_pos_ != nullptr;
+}
+inline bool ColorTrackedBall::has_pixel_pos() const {
+  return _internal_has_pixel_pos();
+}
+inline void ColorTrackedBall::clear_pixel_pos() {
+  if (GetArenaForAllocation() == nullptr && _impl_.pixel_pos_ != nullptr) {
+    delete _impl_.pixel_pos_;
+  }
+  _impl_.pixel_pos_ = nullptr;
+}
+inline const ::juggler::v1::Vector2& ColorTrackedBall::_internal_pixel_pos() const {
+  const ::juggler::v1::Vector2* p = _impl_.pixel_pos_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector2&>(
+      ::juggler::v1::_Vector2_default_instance_);
+}
+inline const ::juggler::v1::Vector2& ColorTrackedBall::pixel_pos() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorTrackedBall.pixel_pos)
+  return _internal_pixel_pos();
+}
+inline void ColorTrackedBall::unsafe_arena_set_allocated_pixel_pos(
+    ::juggler::v1::Vector2* pixel_pos) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.pixel_pos_);
+  }
+  _impl_.pixel_pos_ = pixel_pos;
+  if (pixel_pos) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.ColorTrackedBall.pixel_pos)
+}
+inline ::juggler::v1::Vector2* ColorTrackedBall::release_pixel_pos() {
+  
+  ::juggler::v1::Vector2* temp = _impl_.pixel_pos_;
+  _impl_.pixel_pos_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector2* ColorTrackedBall::unsafe_arena_release_pixel_pos() {
+  // @@protoc_insertion_point(field_release:juggler.v1.ColorTrackedBall.pixel_pos)
+  
+  ::juggler::v1::Vector2* temp = _impl_.pixel_pos_;
+  _impl_.pixel_pos_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector2* ColorTrackedBall::_internal_mutable_pixel_pos() {
+  
+  if (_impl_.pixel_pos_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector2>(GetArenaForAllocation());
+    _impl_.pixel_pos_ = p;
+  }
+  return _impl_.pixel_pos_;
+}
+inline ::juggler::v1::Vector2* ColorTrackedBall::mutable_pixel_pos() {
+  ::juggler::v1::Vector2* _msg = _internal_mutable_pixel_pos();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.ColorTrackedBall.pixel_pos)
+  return _msg;
+}
+inline void ColorTrackedBall::set_allocated_pixel_pos(::juggler::v1::Vector2* pixel_pos) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.pixel_pos_;
+  }
+  if (pixel_pos) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(pixel_pos);
+    if (message_arena != submessage_arena) {
+      pixel_pos = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, pixel_pos, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.pixel_pos_ = pixel_pos;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.ColorTrackedBall.pixel_pos)
+}
+
+// .juggler.v1.Vector3 world_pos = 4;
+inline bool ColorTrackedBall::_internal_has_world_pos() const {
+  return this != internal_default_instance() && _impl_.world_pos_ != nullptr;
+}
+inline bool ColorTrackedBall::has_world_pos() const {
+  return _internal_has_world_pos();
+}
+inline void ColorTrackedBall::clear_world_pos() {
+  if (GetArenaForAllocation() == nullptr && _impl_.world_pos_ != nullptr) {
+    delete _impl_.world_pos_;
+  }
+  _impl_.world_pos_ = nullptr;
+}
+inline const ::juggler::v1::Vector3& ColorTrackedBall::_internal_world_pos() const {
+  const ::juggler::v1::Vector3* p = _impl_.world_pos_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
+      ::juggler::v1::_Vector3_default_instance_);
+}
+inline const ::juggler::v1::Vector3& ColorTrackedBall::world_pos() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorTrackedBall.world_pos)
+  return _internal_world_pos();
+}
+inline void ColorTrackedBall::unsafe_arena_set_allocated_world_pos(
+    ::juggler::v1::Vector3* world_pos) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.world_pos_);
+  }
+  _impl_.world_pos_ = world_pos;
+  if (world_pos) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.ColorTrackedBall.world_pos)
+}
+inline ::juggler::v1::Vector3* ColorTrackedBall::release_world_pos() {
+  
+  ::juggler::v1::Vector3* temp = _impl_.world_pos_;
+  _impl_.world_pos_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector3* ColorTrackedBall::unsafe_arena_release_world_pos() {
+  // @@protoc_insertion_point(field_release:juggler.v1.ColorTrackedBall.world_pos)
+  
+  ::juggler::v1::Vector3* temp = _impl_.world_pos_;
+  _impl_.world_pos_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector3* ColorTrackedBall::_internal_mutable_world_pos() {
+  
+  if (_impl_.world_pos_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
+    _impl_.world_pos_ = p;
+  }
+  return _impl_.world_pos_;
+}
+inline ::juggler::v1::Vector3* ColorTrackedBall::mutable_world_pos() {
+  ::juggler::v1::Vector3* _msg = _internal_mutable_world_pos();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.ColorTrackedBall.world_pos)
+  return _msg;
+}
+inline void ColorTrackedBall::set_allocated_world_pos(::juggler::v1::Vector3* world_pos) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.world_pos_;
+  }
+  if (world_pos) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(world_pos);
+    if (message_arena != submessage_arena) {
+      world_pos = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, world_pos, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.world_pos_ = world_pos;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.ColorTrackedBall.world_pos)
+}
+
+// bool is_active = 5;
+inline void ColorTrackedBall::clear_is_active() {
+  _impl_.is_active_ = false;
+}
+inline bool ColorTrackedBall::_internal_is_active() const {
+  return _impl_.is_active_;
+}
+inline bool ColorTrackedBall::is_active() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorTrackedBall.is_active)
+  return _internal_is_active();
+}
+inline void ColorTrackedBall::_internal_set_is_active(bool value) {
+  
+  _impl_.is_active_ = value;
+}
+inline void ColorTrackedBall::set_is_active(bool value) {
+  _internal_set_is_active(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorTrackedBall.is_active)
+}
+
+// int32 associated_wrist_id = 6;
+inline void ColorTrackedBall::clear_associated_wrist_id() {
+  _impl_.associated_wrist_id_ = 0;
+}
+inline int32_t ColorTrackedBall::_internal_associated_wrist_id() const {
+  return _impl_.associated_wrist_id_;
+}
+inline int32_t ColorTrackedBall::associated_wrist_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorTrackedBall.associated_wrist_id)
+  return _internal_associated_wrist_id();
+}
+inline void ColorTrackedBall::_internal_set_associated_wrist_id(int32_t value) {
+  
+  _impl_.associated_wrist_id_ = value;
+}
+inline void ColorTrackedBall::set_associated_wrist_id(int32_t value) {
+  _internal_set_associated_wrist_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorTrackedBall.associated_wrist_id)
+}
+
+// int32 frames_since_seen = 7;
+inline void ColorTrackedBall::clear_frames_since_seen() {
+  _impl_.frames_since_seen_ = 0;
+}
+inline int32_t ColorTrackedBall::_internal_frames_since_seen() const {
+  return _impl_.frames_since_seen_;
+}
+inline int32_t ColorTrackedBall::frames_since_seen() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorTrackedBall.frames_since_seen)
+  return _internal_frames_since_seen();
+}
+inline void ColorTrackedBall::_internal_set_frames_since_seen(int32_t value) {
+  
+  _impl_.frames_since_seen_ = value;
+}
+inline void ColorTrackedBall::set_frames_since_seen(int32_t value) {
+  _internal_set_frames_since_seen(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorTrackedBall.frames_since_seen)
 }
 
 // -------------------------------------------------------------------
@@ -6460,6 +7035,46 @@ inline void FrameData::set_ir_projector_active(bool value) {
   // @@protoc_insertion_point(field_set:juggler.v1.FrameData.ir_projector_active)
 }
 
+// repeated .juggler.v1.ColorTrackedBall color_tracked_balls = 14;
+inline int FrameData::_internal_color_tracked_balls_size() const {
+  return _impl_.color_tracked_balls_.size();
+}
+inline int FrameData::color_tracked_balls_size() const {
+  return _internal_color_tracked_balls_size();
+}
+inline void FrameData::clear_color_tracked_balls() {
+  _impl_.color_tracked_balls_.Clear();
+}
+inline ::juggler::v1::ColorTrackedBall* FrameData::mutable_color_tracked_balls(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.color_tracked_balls)
+  return _impl_.color_tracked_balls_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall >*
+FrameData::mutable_color_tracked_balls() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.color_tracked_balls)
+  return &_impl_.color_tracked_balls_;
+}
+inline const ::juggler::v1::ColorTrackedBall& FrameData::_internal_color_tracked_balls(int index) const {
+  return _impl_.color_tracked_balls_.Get(index);
+}
+inline const ::juggler::v1::ColorTrackedBall& FrameData::color_tracked_balls(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.color_tracked_balls)
+  return _internal_color_tracked_balls(index);
+}
+inline ::juggler::v1::ColorTrackedBall* FrameData::_internal_add_color_tracked_balls() {
+  return _impl_.color_tracked_balls_.Add();
+}
+inline ::juggler::v1::ColorTrackedBall* FrameData::add_color_tracked_balls() {
+  ::juggler::v1::ColorTrackedBall* _add = _internal_add_color_tracked_balls();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.color_tracked_balls)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall >&
+FrameData::color_tracked_balls() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.color_tracked_balls)
+  return _impl_.color_tracked_balls_;
+}
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
@@ -7196,6 +7811,8 @@ inline void CommandResponse::set_timestamp_us(uint64_t value) {
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------

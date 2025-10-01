@@ -56,6 +56,10 @@ DNNTracker::DNNTracker(const std::string& ball_model_path, const std::string& po
 
     reinitialize_tracker();
     initialize_logical_trackers();
+    
+    // Initialize color tracker
+    color_tracker_ = std::make_unique<juggler::ColorTracker>("ball_settings.json");
+    
     last_update_time_ = std::chrono::steady_clock::now();
 }
 
@@ -211,6 +215,21 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     if (pose_model_enabled_) {
         tracked_hands = run_pose_estimation(color_frame, depth_frame, intrinsics);
     }
+
+    // --- 8. RUN COLOR TRACKING ---
+    // Convert depth_frame cv::Mat to rs2_intrinsics for ColorTracker
+    rs2_intrinsics rs_intrinsics;
+    rs_intrinsics.fx = intrinsics.fx;
+    rs_intrinsics.fy = intrinsics.fy;
+    rs_intrinsics.ppx = intrinsics.ppx;
+    rs_intrinsics.ppy = intrinsics.ppy;
+    rs_intrinsics.width = color_frame.cols;
+    rs_intrinsics.height = color_frame.rows;
+    rs_intrinsics.model = RS2_DISTORTION_BROWN_CONRADY;
+    for (int i = 0; i < 5; i++) rs_intrinsics.coeffs[i] = 0.0f;
+    
+    color_tracked_balls_ = color_tracker_->update(color_frame, depth_frame, rs_intrinsics,
+                                                   final_tracked_objects, tracked_hands);
 
     return {final_tracked_objects, tracked_hands};
 }

@@ -56,6 +56,17 @@ message Ball {
   int32 logical_id = 7; // The persistent, logical ID of the ball (e.g., 0, 1, 2)
 }
 
+// Color-tracked ball (new simplified tracking system)
+message ColorTrackedBall {
+  int32 logical_id = 1;           // Persistent ID (0, 1, 2)
+  string color_name = 2;          // Associated color profile name
+  Vector2 pixel_pos = 3;          // Current 2D position
+  Vector3 world_pos = 4;          // Current 3D position
+  bool is_active = 5;             // Whether this tracker is currently tracking
+  int32 associated_wrist_id = 6;  // -1 if not associated, 0=left, 1=right if associated
+  int32 frames_since_seen = 7;    // Frames without detection
+}
+
 // Hand position and tracking
 message KeyPoint {
   Vector2 pos_2d = 1;
@@ -126,6 +137,7 @@ message FrameData {
   bytes color_image_b64 = 11;      // Base64 encoded color image
   bytes depth_image_b64 = 12;      // Base64 encoded depth image
   bool ir_projector_active = 13;   // Status of the IR projector
+  repeated ColorTrackedBall color_tracked_balls = 14; // New simplified color tracking
 }
 
 // Command and control API for managing engine modules

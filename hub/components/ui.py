@@ -892,42 +892,49 @@ if PYQT_AVAILABLE:
                         bbox = obj.bounding_box_2d
                         painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
 
-            # --- Draw Color Trackers (Kalman Filtered) ---
+            # --- Draw Color Trackers (NEW SIMPLIFIED SYSTEM) ---
             if self.show_color_tracker_toggle.isChecked():
-                colors = [QColor(255, 87, 34), QColor(255, 193, 7), QColor(139, 195, 74),
-                          QColor(0, 188, 212), QColor(3, 169, 244), QColor(63, 81, 181)]
-                for obj in frame_data.balls:
-                    # Use the projected 3D point for the center, which is more stable
-                    center_x, center_y = int(obj.projected_pos_2d.x), int(obj.projected_pos_2d.y)
+                # Define colors for each ball ID
+                ball_colors = {
+                    0: QColor(255, 87, 34),   # Orange
+                    1: QColor(255, 193, 7),   # Yellow
+                    2: QColor(139, 195, 74),  # Green
+                }
+                
+                for color_ball in frame_data.color_tracked_balls:
+                    if not color_ball.is_active:
+                        continue
                     
-                    # Get the average color from the bounding box for color matching.
-                    color = self.get_average_color(image, obj.bounding_box_2d)
-                    
+                    center_x, center_y = int(color_ball.pixel_pos.x), int(color_ball.pixel_pos.y)
+                    color = ball_colors.get(color_ball.logical_id, QColor(255, 255, 255))
                     radius = 12
                     
-                    # Render based on the new status field
-                    if obj.status == juggler_pb2.Ball.TRACKED:
-                        painter.setBrush(QBrush(color))
-                        painter.setPen(QPen(QColor(0,0,0,100), 1))
-                    elif obj.status == juggler_pb2.Ball.OCCLUDED:
+                    # Render based on wrist association
+                    if color_ball.associated_wrist_id >= 0:
+                        # Ball is near a wrist - draw with dashed outline
                         painter.setBrush(Qt.BrushStyle.NoBrush)
                         pen = QPen(color, 3)
                         pen.setStyle(Qt.PenStyle.DashLine)
                         painter.setPen(pen)
-                    elif obj.status == juggler_pb2.Ball.PREDICTED:
-                        transparent_color = QColor(color)
-                        transparent_color.setAlpha(100) # Semi-transparent
-                        painter.setBrush(QBrush(transparent_color))
-                        painter.setPen(QPen(QColor(0,0,0,50), 1))
-
+                    else:
+                        # Ball is being tracked normally - solid fill
+                        painter.setBrush(QBrush(color))
+                        painter.setPen(QPen(QColor(0, 0, 0, 100), 1))
+                    
                     painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
                     
+                    # Draw label
                     painter.setPen(QPen(QColor(255, 255, 255)))
                     painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                    label = f"Ball {obj.logical_id}"
-                    pos_label = f"({obj.position.z:.2f}m)" # Show depth for simplicity
+                    label = f"{color_ball.color_name} ({color_ball.logical_id})"
+                    pos_label = f"({color_ball.world_pos.z:.2f}m)"
                     painter.drawText(center_x + 15, center_y, label)
                     painter.drawText(center_x + 15, center_y + 15, pos_label)
+                    
+                    # Show wrist association if present
+                    if color_ball.associated_wrist_id >= 0:
+                        wrist_label = "L" if color_ball.associated_wrist_id == 0 else "R"
+                        painter.drawText(center_x + 15, center_y + 30, f"[{wrist_label}]")
 
             # --- Draw Tracker Tails ---
             if self.show_tails_toggle.isChecked():

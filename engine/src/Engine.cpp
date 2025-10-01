@@ -136,14 +136,17 @@ void Engine::run() {
 
         // --- BALL TRACKING CODE ---
         std::vector<TrackedObject> tracked_objects;
+        std::vector<juggler::ColorTrackedBall> color_tracked_balls;
+        
         if (use_dnn_tracker_) {
             if (!dnn_tracker_) return; // Safety check
 
             auto [tracker_results, tracked_hands] = dnn_tracker_->update(color_image, depth_image, camera_intrinsics_);
             tracked_objects = tracker_results;
             
-            // Get the raw detections from DNNTracker
+            // Get the raw detections and color-tracked balls from DNNTracker
             last_raw_detections_ = dnn_tracker_->get_last_raw_detections();
+            color_tracked_balls = dnn_tracker_->get_color_tracked_balls();
             
             if (verbose_) {
                 std::cout << "[LOG] Frame " << frame_data.frame_number() << ": DNNTracker returned "
@@ -290,7 +293,27 @@ void Engine::run() {
             }
         }
 
-
+        // Add color-tracked balls to frame data
+        for (const auto& color_ball : color_tracked_balls) {
+            if (!color_ball.is_active) continue;
+            
+            auto* ct_ball = frame_data.add_color_tracked_balls();
+            ct_ball->set_logical_id(color_ball.logical_id);
+            ct_ball->set_color_name(color_ball.color_name);
+            
+            auto* pixel_pos = ct_ball->mutable_pixel_pos();
+            pixel_pos->set_x(color_ball.pixel_pos.x);
+            pixel_pos->set_y(color_ball.pixel_pos.y);
+            
+            auto* world_pos = ct_ball->mutable_world_pos();
+            world_pos->set_x(color_ball.world_pos.x);
+            world_pos->set_y(color_ball.world_pos.y);
+            world_pos->set_z(color_ball.world_pos.z);
+            
+            ct_ball->set_is_active(color_ball.is_active);
+            ct_ball->set_associated_wrist_id(color_ball.associated_wrist_id);
+            ct_ball->set_frames_since_seen(color_ball.frames_since_seen);
+        }
 
         if (active_module_) {
             active_module_->update(frame_data, [this](const juggler::v1::CommandRequest& command) {

@@ -78,6 +78,8 @@ private:
     // Helper methods
     cv::Point2f findLargestColorBlob(const cv::Mat& hsv_frame, const ColorProfile& profile,
                                      const cv::Point2f& search_center, int search_radius);
+    cv::Point2f findClosestColorBlob(const cv::Mat& hsv_frame, const ColorProfile& profile,
+                                     const cv::Point2f& search_center, int search_radius);
     bool matchesColorProfile(const cv::Mat& hsv_frame, const cv::Point2f& center,
                             const ColorProfile& profile, int sample_radius = 5);
     float getDepthAtPoint(const rs2::depth_frame& depth_frame, const cv::Point2f& point,

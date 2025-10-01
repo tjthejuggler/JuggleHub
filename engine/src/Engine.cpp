@@ -34,7 +34,7 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       ir_projector_active_(false),
       camera_width_(640),
       camera_height_(480),
-      camera_fps_(30),
+      camera_fps_(60),
       record_with_yolo_boxes_(false),
       record_with_bytetrack_boxes_(false) {
    if (verbose_) {

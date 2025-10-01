@@ -134,26 +134,34 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             if (dist_3d < WRIST_ASSOCIATION_DISTANCE) {
                 ball.associated_wrist_id = hand.id;
                 
-                // Search for color blob around wrist
-                cv::Point2f new_pos = findLargestColorBlob(hsv_frame, *profile, 
-                                                          wrist_2d, WRIST_SEARCH_RADIUS);
+                // When associated with wrist, ALWAYS try color blob detection first
+                // Try to find the closest color blob in a reasonable radius around wrist
+                cv::Point2f close_blob = findClosestColorBlob(hsv_frame, *profile,
+                                                              wrist_2d, WRIST_SEARCH_RADIUS);
                 
-                if (new_pos.x >= 0 && new_pos.y >= 0) {
-                    ball.pixel_pos = new_pos;
+                if (close_blob.x >= 0 && close_blob.y >= 0) {
+                    // Found a color blob near wrist - track that
+                    ball.pixel_pos = close_blob;
                     ball.frames_since_seen = 0;
                     found_this_frame = true;
                     
                     // Update world position
-                    if (new_pos.x >= 0 && new_pos.x < depth_frame.cols &&
-                        new_pos.y >= 0 && new_pos.y < depth_frame.rows) {
+                    if (close_blob.x >= 0 && close_blob.x < depth_frame.cols &&
+                        close_blob.y >= 0 && close_blob.y < depth_frame.rows) {
                         uint16_t depth_mm = depth_frame.at<uint16_t>(
-                            static_cast<int>(new_pos.y), static_cast<int>(new_pos.x));
+                            static_cast<int>(close_blob.y), static_cast<int>(close_blob.x));
                         float depth_m = depth_mm / 1000.0f;
                         
                         if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                            ball.world_pos = deprojectToWorld(new_pos, depth_m, intrinsics);
+                            ball.world_pos = deprojectToWorld(close_blob, depth_m, intrinsics);
                         }
                     }
+                } else {
+                    // No color visible at all - fall back to wrist position as last resort
+                    ball.pixel_pos = wrist_2d;
+                    ball.world_pos = hand.wrist_pos_3d;
+                    ball.frames_since_seen = 0;  // Reset counter since we're tracking via wrist
+                    found_this_frame = true;
                 }
                 break;
             }
@@ -322,7 +330,74 @@ cv::Point2f ColorTracker::findLargestColorBlob(const cv::Mat& hsv_frame,
     return best_center;
 }
 
-bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame, 
+cv::Point2f ColorTracker::findClosestColorBlob(const cv::Mat& hsv_frame,
+                                               const ColorProfile& profile,
+                                               const cv::Point2f& search_center,
+                                               int search_radius) {
+    // Create ROI around search center
+    int x_min = std::max(0, static_cast<int>(search_center.x - search_radius));
+    int y_min = std::max(0, static_cast<int>(search_center.y - search_radius));
+    int x_max = std::min(hsv_frame.cols, static_cast<int>(search_center.x + search_radius));
+    int y_max = std::min(hsv_frame.rows, static_cast<int>(search_center.y + search_radius));
+    
+    if (x_max <= x_min || y_max <= y_min) {
+        return cv::Point2f(-1, -1);
+    }
+    
+    cv::Rect roi(x_min, y_min, x_max - x_min, y_max - y_min);
+    cv::Mat hsv_roi = hsv_frame(roi);
+    
+    // Create mask for color
+    cv::Mat mask;
+    cv::inRange(hsv_roi, profile.min_hsv, profile.max_hsv, mask);
+    
+    // Handle wrap-around colors (like red)
+    if (profile.min_hsv2[0] >= 0) {
+        cv::Mat mask2;
+        cv::inRange(hsv_roi, profile.min_hsv2, profile.max_hsv2, mask2);
+        cv::bitwise_or(mask, mask2, mask);
+    }
+    
+    // Apply morphological operations to clean up
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
+    cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+    
+    // Find contours
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    
+    // Find closest contour to search center (with minimum area threshold)
+    double min_area = 10.0; // Lower threshold for partial visibility
+    float min_distance = std::numeric_limits<float>::max();
+    cv::Point2f closest_center(-1, -1);
+    
+    for (const auto& contour : contours) {
+        double area = cv::contourArea(contour);
+        if (area > min_area) {
+            cv::Moments m = cv::moments(contour);
+            if (m.m00 > 0) {
+                // Get center in full frame coordinates
+                cv::Point2f center(x_min + m.m10 / m.m00, y_min + m.m01 / m.m00);
+                
+                // Calculate distance to search center
+                float dist = std::sqrt(
+                    std::pow(center.x - search_center.x, 2) +
+                    std::pow(center.y - search_center.y, 2)
+                );
+                
+                if (dist < min_distance) {
+                    min_distance = dist;
+                    closest_center = center;
+                }
+            }
+        }
+    }
+    
+    return closest_center;
+}
+
+bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
                                        const cv::Point2f& center,
                                        const ColorProfile& profile, 
                                        int sample_radius) {

@@ -402,6 +402,11 @@ if PYQT_AVAILABLE:
             if self.camera_settings_combo.count() == 0:
                 self.camera_settings_combo.addItem("Default", "default")
                 self.camera_settings_combo.addItem("No Blur", "no_blur")
+            
+            # Set default to "default" profile
+            default_index = self.camera_settings_combo.findData("default")
+            if default_index >= 0:
+                self.camera_settings_combo.setCurrentIndex(default_index)
 
         def populate_resolution_options(self):
             """Populate the resolution dropdown with D455 supported resolutions."""
@@ -424,8 +429,8 @@ if PYQT_AVAILABLE:
                 for fps in fps_options:
                     self.fps_combo.addItem(f"{fps} FPS", fps)
                 
-                # Set default to 30 FPS if available, otherwise first option
-                default_index = self.fps_combo.findText("30 FPS")
+                # Set default to 60 FPS if available, otherwise first option
+                default_index = self.fps_combo.findText("60 FPS")
                 if default_index >= 0:
                     self.fps_combo.setCurrentIndex(default_index)
                 elif self.fps_combo.count() > 0:
@@ -894,11 +899,15 @@ if PYQT_AVAILABLE:
 
             # --- Draw Color Trackers (NEW SIMPLIFIED SYSTEM) ---
             if self.show_color_tracker_toggle.isChecked():
-                # Define colors for each ball ID
-                ball_colors = {
-                    0: QColor(255, 87, 34),   # Orange
-                    1: QColor(255, 193, 7),   # Yellow
-                    2: QColor(139, 195, 74),  # Green
+                # Map color names to actual colors
+                color_name_map = {
+                    "orange": QColor(255, 87, 34),    # Orange
+                    "yellow": QColor(255, 235, 59),   # Yellow
+                    "green": QColor(76, 175, 80),     # Green
+                    "pink": QColor(233, 30, 99),      # Pink
+                    "red": QColor(244, 67, 54),       # Red
+                    "blue": QColor(33, 150, 243),     # Blue
+                    "purple": QColor(156, 39, 176),   # Purple
                 }
                 
                 for color_ball in frame_data.color_tracked_balls:
@@ -906,7 +915,8 @@ if PYQT_AVAILABLE:
                         continue
                     
                     center_x, center_y = int(color_ball.pixel_pos.x), int(color_ball.pixel_pos.y)
-                    color = ball_colors.get(color_ball.logical_id, QColor(255, 255, 255))
+                    # Use the actual color name from the tracker, fallback to white if unknown
+                    color = color_name_map.get(color_ball.color_name.lower(), QColor(255, 255, 255))
                     radius = 12
                     
                     # Render based on wrist association

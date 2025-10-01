@@ -234,7 +234,7 @@ Once you have several completed annotation sessions and their corresponding `via
     **Example Command:**
     ```bash
     python scripts/convert_via_to_yolo.py \
-      /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6_2_rs455_lonely_hands_low_light_intentional_realsense/V4via_project_21Sep2025_10h30m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6rs455_just_hands_low_light_intentional_and_auto_realsense/V4via_project_20Sep2025_18h36m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6rs455_led_balls_mixedlight_sessions_intentional_realsense/V4via_project_23Sep2025_12h19m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6rs455_normal_balls_daylight_sessions_auto_realsense/V4via_project_17Sep2025_10h0m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6rs455_normal_balls_mixedlight_sessions_intentional_realsense/V4via_project_18Sep2025_14h31m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V6.6_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes/via_project_27Sep2025_16h17m.json --classes ball
+      /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V8rs455_lonely_hands_low_light_intentional_realsense/V4via_project_21Sep2025_10h30m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V8rs455_just_hands_low_light_intentional_and_auto_realsense/V4via_project_20Sep2025_18h36m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V8rs455_led_balls_mixedlight_sessions_intentional_realsense/V4via_project_23Sep2025_12h19m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V8rs455_normal_balls_daylight_sessions_auto_realsense/V4via_project_17Sep2025_10h0m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V8rs455_normal_balls_mixedlight_sessions_intentional_realsense/V4via_project_18Sep2025_14h31m.json /home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V8_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes/via_project_27Sep2025_16h17m.json --classes ball ball_held
     ```
     NOTE: you can use --classes ball
         to override the default list of classes.
@@ -246,10 +246,10 @@ Once you have several completed annotation sessions and their corresponding `via
     *   **Example Command:**
     ```bash
     python scripts/prepare_dataset.py \
-        --dataset-name V7_1_ball_col_aug \
+        --dataset-name V8_held_balls \
         --source-dir /home/twain/Projects/JuggleHub/engine/data/annotation_sessions \
         --output-dir /home/twain/Projects/JuggleHub/engine/data/3_training_datasets \
-        --tags V6.6_2_rs455_lonely_hands_low_light_intentional_realsense V6.6rs455_just_hands_low_light_intentional_and_auto_realsense V6.6rs455_led_balls_mixedlight_sessions_intentional_realsense V6.6rs455_normal_balls_daylight_sessions_auto_realsense V6.6rs455_normal_balls_mixedlight_sessions_intentional_realsense V6.6_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes V7_ball_col_aug V7_1_hard_negatives
+        --tags V8rs455_lonely_hands_low_light_intentional_realsense V8rs455_just_hands_low_light_intentional_and_auto_realsense V8rs455_led_balls_mixedlight_sessions_intentional_realsense V8rs455_normal_balls_daylight_sessions_auto_realsense V8rs455_normal_balls_mixedlight_sessions_intentional_realsense V8_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes V8_ball_col_aug V8_hard_negatives
     ```
     *   **Result:** A new folder like `data/3_training_datasets/V2_with_hands/` is created.
 
@@ -258,7 +258,7 @@ This is where we prevent the label mismatch error at its source. We will create 
 
 3.  **Run the create_yaml.py Script:** From your terminal, run this script, providing the path to your newly assembled dataset and your full list of class names in the correct order.
     ```bash
-    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V7_ball_col_aug ball
+    python scripts/create_yaml.py /home/twain/Projects/JuggleHub/engine/data/3_training_datasets/V8_held_balls ball ball_held
     ```
     *   **Result:** A perfect `dataset.yaml` file is now inside your `V2_with_hands` folder. The dataset is now self-contained and correct.
 
@@ -615,7 +615,7 @@ Usage Examples:
 ./scripts/deploy_model.sh V2_3_lonely_hands --deploy
 
 # Full example with all options
-./scripts/deploy_model.sh V7_1_balls_col_aug -p ~/Downloads/best.pt -s nano --deploy
+./scripts/deploy_model.sh V8_balls_held -p ~/Downloads/best.pt -s nano --deploy
 
 What the script does:
 Validates inputs and checks if the PT file exists

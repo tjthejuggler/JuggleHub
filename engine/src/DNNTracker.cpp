@@ -60,6 +60,9 @@ DNNTracker::DNNTracker(const std::string& ball_model_path, const std::string& po
     // Initialize color tracker
     color_tracker_ = std::make_unique<juggler::ColorTracker>("ball_settings.json");
     
+    // Initialize throw/catch detector
+    throw_catch_detector_ = std::make_unique<juggler::ThrowCatchDetector>();
+    
     last_update_time_ = std::chrono::steady_clock::now();
 }
 
@@ -187,13 +190,19 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         }
     }
 
-    // --- 5. MANAGE HEURISTICS ---
+    // --- 5. RUN THROW/CATCH DETECTION ---
+    detected_events_ = throw_catch_detector_->detectEvents(
+        logical_ball_trackers_, logical_hand_trackers_, last_raw_detections_, dt);
+    
+    // --- 6. MANAGE HEURISTICS (Legacy occlusion handling) ---
     std::vector<Detection> hand_detections;
     for(const auto& det : last_raw_detections_) if(det.class_id == 3) hand_detections.push_back(det);
     manage_hand_tracks(hand_detections);
+    // Note: manage_ball_occlusion() is now largely replaced by ThrowCatchDetector
+    // but we keep it for backward compatibility and edge cases
     manage_ball_occlusion();
 
-    // --- 6. COMPILE FINAL RESULTS ---
+    // --- 7. COMPILE FINAL RESULTS ---
     std::vector<TrackedObject> final_tracked_objects;
     for(auto* tracker : all_logical_trackers) {
         if (tracker->status == TrackerStatus::LOST) continue;
@@ -213,13 +222,13 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         });
     }
 
-    // --- 7. RUN POSE ESTIMATION ---
+    // --- 8. RUN POSE ESTIMATION ---
     std::vector<TrackedHand> tracked_hands;
     if (pose_model_enabled_) {
         tracked_hands = run_pose_estimation(color_frame, depth_frame, intrinsics);
     }
 
-    // --- 8. RUN COLOR TRACKING ---
+    // --- 9. RUN COLOR TRACKING ---
     // Convert depth_frame cv::Mat to rs2_intrinsics for ColorTracker
     rs2_intrinsics rs_intrinsics;
     rs_intrinsics.fx = intrinsics.fx;
@@ -389,6 +398,52 @@ void DNNTracker::update_setting(const std::string& key, const std::string& value
         else if (key == "track_thresh") { track_thresh_ = std::stof(value); reinitialize_tracker(); }
         else if (key == "high_thresh") { high_thresh_ = std::stof(value); reinitialize_tracker(); }
         else if (key == "match_thresh") { match_thresh_ = std::stof(value); reinitialize_tracker(); }
+        // Throw/Catch Detection Settings
+        else if (key == "tc_ml_weight") {
+            auto config = throw_catch_detector_->getConfig();
+            config.ml_weight = std::stof(value);
+            throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "tc_proximity_weight") {
+            auto config = throw_catch_detector_->getConfig();
+            config.proximity_weight = std::stof(value);
+            throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "tc_kinematic_weight") {
+            auto config = throw_catch_detector_->getConfig();
+            config.kinematic_weight = std::stof(value);
+            throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "tc_relative_velocity_weight") {
+            auto config = throw_catch_detector_->getConfig();
+            config.relative_velocity_weight = std::stof(value);
+            throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "tc_catch_threshold") {
+            auto config = throw_catch_detector_->getConfig();
+            config.catch_threshold = std::stof(value);
+            throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "tc_throw_threshold") {
+            auto config = throw_catch_detector_->getConfig();
+            config.throw_threshold = std::stof(value);
+            throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "tc_catch_distance") {
+            auto config = throw_catch_detector_->getConfig();
+            config.catch_distance = std::stof(value);
+            throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "tc_throw_distance") {
+            auto config = throw_catch_detector_->getConfig();
+            config.throw_distance = std::stof(value);
+            throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "tc_min_frames") {
+            auto config = throw_catch_detector_->getConfig();
+            config.min_frames_for_event = std::stoi(value);
+            throw_catch_detector_->setConfig(config);
+        }
         else std::cerr << "Warning: Unknown DNNTracker setting key '" << key << "'" << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "Error updating setting " << key << " with value " << value << ": " << e.what() << std::endl;

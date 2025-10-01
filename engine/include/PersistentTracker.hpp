@@ -12,6 +12,14 @@ enum class TrackerStatus {
     LOST        // The object has been unseen for an extended period.
 };
 
+// Enum to represent the physical state of a ball
+enum class BallState {
+    IN_FLIGHT,      // Ball is in free flight (not in contact with hands)
+    HELD_LEFT,      // Ball is being held by the left hand
+    HELD_RIGHT,     // Ball is being held by the right hand
+    TRANSITIONING   // Ball is in the process of being caught or thrown (ambiguous state)
+};
+
 // A structure to hold the complete state of a single logical object (ball or hand)
 // that persists across frames, regardless of temporary occlusions.
 struct PersistentTracker {
@@ -36,6 +44,13 @@ struct PersistentTracker {
 
     // --- Physics State ---
     bool is_in_freefall = false;    // True if gravity should be applied.
+    
+    // --- Ball-Specific State (only used for ball trackers) ---
+    BallState ball_state = BallState::IN_FLIGHT;  // Current physical state of the ball
+    float ml_held_confidence = 0.0f;              // Confidence from ML model that ball is held
+    int frames_in_current_state = 0;              // How many frames ball has been in current state
+    std::vector<Eigen::Vector3d> velocity_history; // Recent velocity history for kinematic analysis
+    static constexpr int MAX_VELOCITY_HISTORY = 5; // Keep last 5 frames
 
     // Constructor
     PersistentTracker(int id, std::string name) : logical_id(id), class_name(std::move(name)) {}

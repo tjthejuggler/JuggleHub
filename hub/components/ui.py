@@ -33,7 +33,7 @@ try:
                                  QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
                                  QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit,
                                  QComboBox, QMessageBox, QDialog, QVBoxLayout as QVBoxLayout_Dialog,
-                                 QMenuBar, QFileDialog)
+                                 QMenuBar, QFileDialog, QScrollArea)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
     from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence, QBrush, QAction
     PYQT_AVAILABLE = True
@@ -111,6 +111,79 @@ if PYQT_AVAILABLE:
         """Signal emitter for thread-safe UI updates."""
         frame_received = pyqtSignal(object)
 
+    class CollapsibleGroupBox(QWidget):
+        """
+        A collapsible group box that mimics QGroupBox appearance.
+        
+        Features:
+        - Clickable header with expand/collapse icon
+        - Maintains QGroupBox styling
+        - Remembers collapsed state in settings
+        """
+        
+        def __init__(self, title: str, parent=None, collapsed: bool = False):
+            super().__init__(parent)
+            self.title = title
+            self.is_collapsed = collapsed
+            
+            # Main layout
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(0, 0, 0, 5)
+            main_layout.setSpacing(0)
+            
+            # Header button (clickable title)
+            self.header_button = QPushButton(f"▼ {title}")
+            self.header_button.setCheckable(True)
+            self.header_button.setChecked(not collapsed)
+            self.header_button.clicked.connect(self.toggle_collapsed)
+            self.header_button.setStyleSheet("""
+                QPushButton {
+                    text-align: left;
+                    padding: 8px;
+                    border: 2px solid #555555;
+                    border-radius: 5px 5px 0 0;
+                    background-color: #3a3a3a;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #4a4a4a;
+                }
+            """)
+            main_layout.addWidget(self.header_button)
+            
+            # Content container
+            self.content_widget = QWidget()
+            self.content_widget.setObjectName("CollapsibleContent")
+            self.content_layout = QVBoxLayout(self.content_widget)
+            self.content_layout.setContentsMargins(10, 10, 10, 10)
+            self.content_widget.setStyleSheet("""
+                QWidget#CollapsibleContent {
+                    border: 2px solid #555555;
+                    border-top: none;
+                    border-radius: 0 0 5px 5px;
+                    background-color: #2b2b2b;
+                }
+            """)
+            main_layout.addWidget(self.content_widget)
+            
+            # Set initial state
+            if collapsed:
+                self.content_widget.hide()
+                self.header_button.setText(f"▶ {title}")
+        
+        def toggle_collapsed(self):
+            self.is_collapsed = not self.is_collapsed
+            if self.is_collapsed:
+                self.content_widget.hide()
+                self.header_button.setText(f"▶ {self.title}")
+            else:
+                self.content_widget.show()
+                self.header_button.setText(f"▼ {self.title}")
+        
+        def get_content_layout(self):
+            """Returns the layout where child widgets should be added"""
+            return self.content_layout
+
     class CalibrationSettingsWidget(QWidget):
         def __init__(self, udp_client: UdpClient, zmq_client: 'ZMQClient', hub_instance=None, parent=None):
             super().__init__(parent)
@@ -129,7 +202,9 @@ if PYQT_AVAILABLE:
             self._loading_settings = False
 
         def init_ui(self):
-            layout = QVBoxLayout(self)
+            # Main layout for the widget
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(0, 0, 0, 0)
             
             # Initialize resolution-FPS mapping first
             self.resolution_fps_map = {
@@ -143,9 +218,68 @@ if PYQT_AVAILABLE:
                 "320 x 240": [60, 30, 15, 6]
             }
             
-            # -- Camera Settings --
-            camera_group = QGroupBox("📷 Camera Settings")
-            camera_layout = QGridLayout(camera_group)
+            # Create scroll area
+            scroll_area = QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll_area.setStyleSheet("""
+                QScrollArea {
+                    border: none;
+                    background-color: #2b2b2b;
+                }
+                QScrollBar:vertical {
+                    border: none;
+                    background: #1e1e1e;
+                    width: 12px;
+                    margin: 0px;
+                }
+                QScrollBar::handle:vertical {
+                    background: #555555;
+                    min-height: 20px;
+                    border-radius: 6px;
+                }
+                QScrollBar::handle:vertical:hover {
+                    background: #666666;
+                }
+            """)
+            
+            # Container widget for all collapsible sections
+            container_widget = QWidget()
+            container_layout = QVBoxLayout(container_widget)
+            container_layout.setSpacing(10)
+            container_layout.setContentsMargins(5, 5, 5, 5)
+            
+            # Add all collapsible sections
+            self.camera_section = self.create_camera_section()
+            container_layout.addWidget(self.camera_section)
+            
+            self.yolo_section = self.create_yolo_section()
+            container_layout.addWidget(self.yolo_section)
+            
+            self.bytetrack_section = self.create_bytetrack_section()
+            container_layout.addWidget(self.bytetrack_section)
+            
+            self.pose_section = self.create_pose_section()
+            container_layout.addWidget(self.pose_section)
+            
+            self.throw_catch_section = self.create_throw_catch_section()
+            container_layout.addWidget(self.throw_catch_section)
+            
+            # Add stretch to push sections to top
+            container_layout.addStretch()
+            
+            # Set container as scroll area widget
+            scroll_area.setWidget(container_widget)
+            
+            # Add scroll area to main layout
+            main_layout.addWidget(scroll_area)
+
+        def create_camera_section(self):
+            """Create the Camera Settings section"""
+            section = CollapsibleGroupBox("📷 Camera Settings", collapsed=False)
+            camera_layout = QGridLayout()
+            section.get_content_layout().addLayout(camera_layout)
             
             # Camera settings dropdown
             camera_layout.addWidget(QLabel("Settings Profile:"), 0, 0)
@@ -229,11 +363,13 @@ if PYQT_AVAILABLE:
             self.ir_status_label = QLabel("🔆 IR Projector: Unknown")
             camera_layout.addWidget(self.ir_status_label, 5, 0, 1, 2)
             
-            layout.addWidget(camera_group)
-            
-            # -- DNN Tracker Settings --
-            dnn_group = QGroupBox("YOLO Tracker Settings")
-            dnn_layout = QGridLayout(dnn_group)
+            return section
+
+        def create_yolo_section(self):
+            """Create the YOLO Tracker Settings section"""
+            section = CollapsibleGroupBox("🎯 YOLO Tracker Settings", collapsed=False)
+            dnn_layout = QGridLayout()
+            section.get_content_layout().addLayout(dnn_layout)
 
             self.confidence_slider, self.confidence_value_label = self._create_slider_widget(
                 parent_layout=dnn_layout,
@@ -263,11 +399,13 @@ if PYQT_AVAILABLE:
                 is_float=True
             )
             
-            layout.addWidget(dnn_group)
+            return section
 
-            # -- ByteTrack Settings --
-            bytetrack_group = QGroupBox("ByteTrack Settings")
-            bytetrack_layout = QGridLayout(bytetrack_group)
+        def create_bytetrack_section(self):
+            """Create the ByteTrack Settings section"""
+            section = CollapsibleGroupBox("🔍 ByteTrack Settings", collapsed=False)
+            bytetrack_layout = QGridLayout()
+            section.get_content_layout().addLayout(bytetrack_layout)
 
             self.track_buffer_slider, self.track_buffer_value_label = self._create_slider_widget(
                 parent_layout=bytetrack_layout,
@@ -324,11 +462,13 @@ if PYQT_AVAILABLE:
                 is_float=True
             )
 
-            layout.addWidget(bytetrack_group)
+            return section
 
-            # -- Pose Model Settings --
-            pose_group = QGroupBox("Pose Model Settings")
-            pose_layout = QGridLayout(pose_group)
+        def create_pose_section(self):
+            """Create the Pose Model Settings section"""
+            section = CollapsibleGroupBox("🧍 Pose Model Settings", collapsed=False)
+            pose_layout = QGridLayout()
+            section.get_content_layout().addLayout(pose_layout)
 
             self.pose_model_toggle = QPushButton("Enable Pose Model")
             self.pose_model_toggle.setCheckable(True)
@@ -336,8 +476,161 @@ if PYQT_AVAILABLE:
             self.pose_model_toggle.clicked.connect(self.toggle_pose_model)
             pose_layout.addWidget(self.pose_model_toggle, 0, 0, 1, 2)
 
-            layout.addWidget(pose_group)
-            layout.addStretch()
+            return section
+
+        def create_throw_catch_section(self):
+            """Create the Throw/Catch Detection settings section"""
+            section = CollapsibleGroupBox("🎯 Throw/Catch Detection", collapsed=False)
+            layout = QGridLayout()
+            section.get_content_layout().addLayout(layout)
+            
+            row = 0
+            
+            # Weight sliders (must sum to 100%)
+            layout.addWidget(QLabel("Evidence Weights:"), row, 0, 1, 3)
+            row += 1
+            
+            self.tc_ml_weight_slider, self.tc_ml_weight_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="ML Weight",
+                tooltip_text="Weight given to ML model classification (ball vs ball_held).\n"
+                             "Range: 0-100%. Default: 35%.\n"
+                             "All weights should sum to 100%.",
+                range_min=0,
+                range_max=100,
+                initial_value=35,
+                update_func=lambda v: self.update_setting('tc_ml_weight', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            self.tc_proximity_weight_slider, self.tc_proximity_weight_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Proximity Weight",
+                tooltip_text="Weight given to distance between ball and hand.\n"
+                             "Range: 0-100%. Default: 25%.",
+                range_min=0,
+                range_max=100,
+                initial_value=25,
+                update_func=lambda v: self.update_setting('tc_proximity_weight', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            self.tc_kinematic_weight_slider, self.tc_kinematic_weight_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Kinematic Weight",
+                tooltip_text="Weight given to velocity changes (acceleration/deceleration).\n"
+                             "Range: 0-100%. Default: 25%.",
+                range_min=0,
+                range_max=100,
+                initial_value=25,
+                update_func=lambda v: self.update_setting('tc_kinematic_weight', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            self.tc_rel_velocity_weight_slider, self.tc_rel_velocity_weight_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Relative Velocity Weight",
+                tooltip_text="Weight given to velocity difference between ball and hand.\n"
+                             "Range: 0-100%. Default: 15%.",
+                range_min=0,
+                range_max=100,
+                initial_value=15,
+                update_func=lambda v: self.update_setting('tc_relative_velocity_weight', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Separator
+            layout.addWidget(QLabel("Detection Thresholds:"), row, 0, 1, 3)
+            row += 1
+            
+            self.tc_catch_threshold_slider, self.tc_catch_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Catch Threshold",
+                tooltip_text="Minimum total score required to detect a catch event.\n"
+                             "Range: 0-100%. Default: 75%.\n"
+                             "Higher values = fewer false positives, may miss real catches.",
+                range_min=0,
+                range_max=100,
+                initial_value=75,
+                update_func=lambda v: self.update_setting('tc_catch_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            self.tc_throw_threshold_slider, self.tc_throw_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Throw Threshold",
+                tooltip_text="Minimum total score required to detect a throw event.\n"
+                             "Range: 0-100%. Default: 75%.",
+                range_min=0,
+                range_max=100,
+                initial_value=75,
+                update_func=lambda v: self.update_setting('tc_throw_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Separator
+            layout.addWidget(QLabel("Distance Thresholds:"), row, 0, 1, 3)
+            row += 1
+            
+            self.tc_catch_distance_slider, self.tc_catch_distance_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Catch Distance (cm)",
+                tooltip_text="Maximum distance between ball and hand for catch detection.\n"
+                             "Range: 0-50cm. Default: 15cm.",
+                range_min=0,
+                range_max=50,
+                initial_value=15,
+                update_func=lambda v: self.update_setting('tc_catch_distance', v / 100.0),  # Convert cm to m
+                is_float=True
+            )
+            row += 1
+            
+            self.tc_throw_distance_slider, self.tc_throw_distance_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Throw Distance (cm)",
+                tooltip_text="Minimum distance ball must travel from hand for throw detection.\n"
+                             "Range: 0-50cm. Default: 20cm.",
+                range_min=0,
+                range_max=50,
+                initial_value=20,
+                update_func=lambda v: self.update_setting('tc_throw_distance', v / 100.0),  # Convert cm to m
+                is_float=True
+            )
+            row += 1
+            
+            # Separator
+            layout.addWidget(QLabel("Temporal Filtering:"), row, 0, 1, 3)
+            row += 1
+            
+            self.tc_min_frames_slider, self.tc_min_frames_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Frames for Event",
+                tooltip_text="Number of consecutive frames an event must persist to be confirmed.\n"
+                             "Range: 1-10 frames. Default: 2.\n"
+                             "Higher values = more stable detection, slower response.",
+                range_min=1,
+                range_max=10,
+                initial_value=2,
+                update_func=lambda v: self.update_setting('tc_min_frames', v),
+                is_float=False
+            )
+            
+            return section
 
         def toggle_pose_model(self):
             is_enabled = self.pose_model_toggle.isChecked()
@@ -529,7 +822,13 @@ if PYQT_AVAILABLE:
             required_attrs = [
                 'confidence_slider', 'nms_slider', 'track_buffer_slider',
                 'track_thresh_slider', 'high_thresh_slider', 'match_thresh_slider',
-                'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo'
+                'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo',
+                # Throw/catch sliders
+                'tc_ml_weight_slider', 'tc_proximity_weight_slider',
+                'tc_kinematic_weight_slider', 'tc_rel_velocity_weight_slider',
+                'tc_catch_threshold_slider', 'tc_throw_threshold_slider',
+                'tc_catch_distance_slider', 'tc_throw_distance_slider',
+                'tc_min_frames_slider'
             ]
             
             for attr in required_attrs:
@@ -546,7 +845,25 @@ if PYQT_AVAILABLE:
                 'track_thresh': self.track_thresh_slider.value() / 100.0,
                 'high_thresh': self.high_thresh_slider.value() / 100.0,
                 'match_thresh': self.match_thresh_slider.value() / 100.0,
-                'pose_model_enabled': self.pose_model_toggle.isChecked()
+                'pose_model_enabled': self.pose_model_toggle.isChecked(),
+                
+                # Throw/Catch Detection settings
+                'tc_ml_weight': self.tc_ml_weight_slider.value() / 100.0,
+                'tc_proximity_weight': self.tc_proximity_weight_slider.value() / 100.0,
+                'tc_kinematic_weight': self.tc_kinematic_weight_slider.value() / 100.0,
+                'tc_relative_velocity_weight': self.tc_rel_velocity_weight_slider.value() / 100.0,
+                'tc_catch_threshold': self.tc_catch_threshold_slider.value() / 100.0,
+                'tc_throw_threshold': self.tc_throw_threshold_slider.value() / 100.0,
+                'tc_catch_distance': self.tc_catch_distance_slider.value() / 100.0,  # cm to m
+                'tc_throw_distance': self.tc_throw_distance_slider.value() / 100.0,  # cm to m
+                'tc_min_frames': self.tc_min_frames_slider.value(),
+                
+                # Collapsed states for UI persistence
+                'collapsed_camera': self.camera_section.is_collapsed,
+                'collapsed_yolo': self.yolo_section.is_collapsed,
+                'collapsed_bytetrack': self.bytetrack_section.is_collapsed,
+                'collapsed_pose': self.pose_section.is_collapsed,
+                'collapsed_throw_catch': self.throw_catch_section.is_collapsed
             }
 
         def apply_settings(self, settings: dict):
@@ -590,6 +907,55 @@ if PYQT_AVAILABLE:
             # Pose model
             if 'pose_model_enabled' in settings:
                 self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
+            
+            # Throw/Catch Detection settings
+            if 'tc_ml_weight' in settings:
+                self.tc_ml_weight_slider.setValue(int(settings['tc_ml_weight'] * 100))
+            
+            if 'tc_proximity_weight' in settings:
+                self.tc_proximity_weight_slider.setValue(int(settings['tc_proximity_weight'] * 100))
+            
+            if 'tc_kinematic_weight' in settings:
+                self.tc_kinematic_weight_slider.setValue(int(settings['tc_kinematic_weight'] * 100))
+            
+            if 'tc_relative_velocity_weight' in settings:
+                self.tc_rel_velocity_weight_slider.setValue(int(settings['tc_relative_velocity_weight'] * 100))
+            
+            if 'tc_catch_threshold' in settings:
+                self.tc_catch_threshold_slider.setValue(int(settings['tc_catch_threshold'] * 100))
+            
+            if 'tc_throw_threshold' in settings:
+                self.tc_throw_threshold_slider.setValue(int(settings['tc_throw_threshold'] * 100))
+            
+            if 'tc_catch_distance' in settings:
+                self.tc_catch_distance_slider.setValue(int(settings['tc_catch_distance'] * 100))  # m to cm
+            
+            if 'tc_throw_distance' in settings:
+                self.tc_throw_distance_slider.setValue(int(settings['tc_throw_distance'] * 100))  # m to cm
+            
+            if 'tc_min_frames' in settings:
+                self.tc_min_frames_slider.setValue(settings['tc_min_frames'])
+            
+            # Restore collapsed states
+            if 'collapsed_camera' in settings:
+                if settings['collapsed_camera'] != self.camera_section.is_collapsed:
+                    self.camera_section.toggle_collapsed()
+            
+            if 'collapsed_yolo' in settings:
+                if settings['collapsed_yolo'] != self.yolo_section.is_collapsed:
+                    self.yolo_section.toggle_collapsed()
+            
+            if 'collapsed_bytetrack' in settings:
+                if settings['collapsed_bytetrack'] != self.bytetrack_section.is_collapsed:
+                    self.bytetrack_section.toggle_collapsed()
+            
+            if 'collapsed_pose' in settings:
+                if settings['collapsed_pose'] != self.pose_section.is_collapsed:
+                    self.pose_section.toggle_collapsed()
+            
+            if 'collapsed_throw_catch' in settings:
+                if settings['collapsed_throw_catch'] != self.throw_catch_section.is_collapsed:
+                    self.throw_catch_section.toggle_collapsed()
 
         def save_settings(self, filepath: str = None):
             """Save current calibration settings to a JSON file."""
@@ -1151,7 +1517,7 @@ if PYQT_AVAILABLE:
         
         def toggle_calibration_mode(self):
             self.calibration_mode = not self.calibration_mode
-            self.video_group.setVisible(self.calibration_mode)
+            # Video feed is always visible, settings widget visibility toggles with calibration mode
             self.settings_widget.setVisible(self.calibration_mode)
             self.calibration_button.setText("Exit Calibration Mode" if self.calibration_mode else "Enter Calibration Mode")
             

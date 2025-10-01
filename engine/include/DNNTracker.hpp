@@ -15,6 +15,7 @@
 #include "KalmanFilter3D.hpp"
 #include "PersistentTracker.hpp" // New persistent tracker data structure
 #include "ColorTracker.hpp" // Color-based ball tracking
+#include "ThrowCatchDetector.hpp" // Throw and catch event detection
 
 // Simple struct to hold camera intrinsics needed for deprojection
 struct CameraIntrinsics {
@@ -84,6 +85,10 @@ private:
     // --- Color Tracker ---
     std::unique_ptr<juggler::ColorTracker> color_tracker_;
     std::vector<juggler::ColorTrackedBall> color_tracked_balls_;
+    
+    // --- Throw/Catch Detector ---
+    std::unique_ptr<juggler::ThrowCatchDetector> throw_catch_detector_;
+    std::vector<juggler::ThrowCatchDetector::DetectedEvent> detected_events_;
 
     // --- Persistent Logical Trackers ---
     std::vector<PersistentTracker> logical_ball_trackers_;
@@ -110,8 +115,9 @@ private:
     bool pose_model_enabled_ = true;
 
     // --- NEW MODEL CONFIGURATION MEMBERS ---
-    const int num_classes_ = 4;
-    const std::vector<std::string> class_names_ = {"led_on", "led_off", "dropped_ball", "hand"};
+    // Updated to support 2-class ball model: ball (in flight) and ball_held (in hand)
+    const int num_classes_ = 2;
+    const std::vector<std::string> class_names_ = {"ball", "ball_held"};
 
     // --- Private Methods ---
     void manage_hand_tracks(const std::vector<Detection>& hand_detections);

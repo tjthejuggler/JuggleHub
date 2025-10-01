@@ -243,6 +243,81 @@ JuggleHub features an advanced color tracking system with persistent color profi
 4. **Enter a name** for the color profile (e.g., "Red Ball")
 5. **Repeat** for each ball you want to track
 
+
+### Dynamic Color Profile Management
+
+**Last Updated:** 2025-10-01 13:34:00 CEST
+
+JuggleHub now features a dynamic color profile management system that allows you to add, edit, and remove color profiles directly from within the hub interface, without needing to modify code.
+
+#### Features
+
+- **White Color Profile**: Now includes a white color profile by default for tracking white juggling balls
+- **Dynamic Profile Management**: Add new color profiles on-the-fly through an intuitive dialog
+- **Visual Color Picker**: Choose colors using a standard color picker interface
+- **Enable/Disable Profiles**: Temporarily disable profiles without deleting them
+- **Persistent Storage**: All profiles are saved to [`hub/config/color_profiles.json`](hub/config/color_profiles.json)
+- **Real-time Updates**: Changes to profiles are immediately reflected in the UI and tracking system
+
+#### Default Color Profiles
+
+The system comes with 8 pre-configured color profiles:
+- Pink
+- Orange
+- Yellow
+- Green
+- Red
+- Blue
+- Purple
+- **White** (new!)
+
+#### Managing Color Profiles
+
+**Opening the Color Profile Manager:**
+1. Enter Calibration Mode in the hub UI
+2. Go to **File → Manage Color Profiles** (or press `Ctrl+P`)
+3. The Color Profile Manager dialog will open
+
+**Adding a New Profile:**
+1. Enter a name (e.g., "cyan", "magenta")
+2. Enter a display name (e.g., "Cyan", "Magenta")
+3. Click "Choose Color" to select the RGB color
+4. Click "Add Profile"
+
+**Editing a Profile:**
+- Click the color preview button to change the color
+- Check/uncheck the "Enabled" checkbox to enable/disable the profile
+
+**Deleting a Profile:**
+- Click the "Delete" button next to the profile you want to remove
+- Confirm the deletion
+
+**Saving Changes:**
+- Click "Save & Close" to apply all changes
+- The color profile dropdown will automatically update
+- The video feed will refresh to show the new colors
+
+#### Configuration File
+
+Color profiles are stored in [`hub/config/color_profiles.json`](hub/config/color_profiles.json):
+
+```json
+{
+  "profiles": [
+    {
+      "name": "white",
+      "display_name": "White",
+      "rgb": [255, 255, 255],
+      "enabled": true
+    },
+    ...
+  ],
+  "last_updated": "2025-10-01T13:34:00Z"
+}
+```
+
+You can also manually edit this file if needed, though the UI provides a more user-friendly interface.
+
 The system will now only track balls that match your saved color profiles, eliminating false positives from hands or other objects.
 
 

@@ -17,6 +17,7 @@ import cv2
 import numpy as np
 import json
 from datetime import datetime
+from .color_profile_manager import ColorProfileManager, ColorProfileDialog
 
 
 try:
@@ -654,6 +655,7 @@ if PYQT_AVAILABLE:
             self.is_continuous_recording = False
             self.tracker_history = {} # For drawing tails
             self.calibrating_id = -1 # ID of the ball we are currently calibrating
+            self.color_profile_manager = ColorProfileManager()
             
             # Signal for thread-safe updates
             self.signal_emitter = FrameDataSignal()
@@ -769,7 +771,7 @@ if PYQT_AVAILABLE:
             profile_control_layout.addWidget(QLabel("Color Profile:"))
             
             self.color_profile_combo = QComboBox()
-            self.color_profile_combo.addItems(["pink", "orange", "yellow", "green", "red", "blue", "purple"])
+            self.populate_color_profiles()
             profile_control_layout.addWidget(self.color_profile_combo)
             
             self.set_color_profile_button = QPushButton("Set Color Profile")
@@ -934,6 +936,38 @@ if PYQT_AVAILABLE:
             load_action.setShortcut("Ctrl+O")
             load_action.triggered.connect(self.load_settings_dialog)
             file_menu.addAction(load_action)
+            
+            file_menu.addSeparator()
+            
+            # Manage Color Profiles action
+            color_profiles_action = QAction("Manage &Color Profiles", self)
+            color_profiles_action.setShortcut("Ctrl+P")
+        
+        def populate_color_profiles(self):
+            """Populate the color profile dropdown from the manager."""
+            self.color_profile_combo.clear()
+            profile_names = self.color_profile_manager.get_profile_names()
+            self.color_profile_combo.addItems(profile_names)
+        
+        def open_color_profile_manager(self):
+            """Open the color profile manager dialog."""
+            dialog = ColorProfileDialog(self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                # Reload the color profile manager
+                self.color_profile_manager.load_profiles()
+                # Refresh the dropdown
+                current_selection = self.color_profile_combo.currentText()
+                self.populate_color_profiles()
+                # Try to restore previous selection
+                index = self.color_profile_combo.findText(current_selection)
+                if index >= 0:
+                    self.color_profile_combo.setCurrentIndex(index)
+                self.log_message("✅ Color profiles updated")
+                # Refresh the video feed to show updated colors
+                if self.last_frame_data:
+                    self.update_video_feed(self.last_frame_data)
+            color_profiles_action.triggered.connect(self.open_color_profile_manager)
+            file_menu.addAction(color_profiles_action)
             
             # Help menu
             help_menu = menubar.addMenu("&Help")
@@ -1167,16 +1201,8 @@ if PYQT_AVAILABLE:
 
             # --- Draw Color Trackers (NEW SIMPLIFIED SYSTEM) ---
             if self.show_color_tracker_toggle.isChecked():
-                # Map color names to actual colors
-                color_name_map = {
-                    "orange": QColor(255, 87, 34),    # Orange
-                    "yellow": QColor(255, 235, 59),   # Yellow
-                    "green": QColor(76, 175, 80),     # Green
-                    "pink": QColor(233, 30, 99),      # Pink
-                    "red": QColor(244, 67, 54),       # Red
-                    "blue": QColor(33, 150, 243),     # Blue
-                    "purple": QColor(156, 39, 176),   # Purple
-                }
+                # Get color map from profile manager
+                color_name_map = self.color_profile_manager.get_color_map()
                 
                 for color_ball in frame_data.color_tracked_balls:
                     if not color_ball.is_active:
@@ -1197,21 +1223,43 @@ if PYQT_AVAILABLE:
                     else:
                         # Ball is being tracked normally - solid fill
                         painter.setBrush(QBrush(color))
-                        painter.setPen(QPen(QColor(0, 0, 0, 100), 1))
+                        # Use thicker black border for white balls to make them visible
+                        if color_ball.color_name.lower() == 'white':
+                            painter.setPen(QPen(QColor(0, 0, 0), 3))
+                        else:
+                            painter.setPen(QPen(QColor(0, 0, 0, 100), 1))
                     
                     painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
                     
-                    # Draw label
-                    painter.setPen(QPen(QColor(255, 255, 255)))
+                    # Draw label with background for better visibility
                     painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
                     label = f"{color_ball.color_name} ({color_ball.logical_id})"
                     pos_label = f"({color_ball.world_pos.z:.2f}m)"
-                    painter.drawText(center_x + 15, center_y, label)
-                    painter.drawText(center_x + 15, center_y + 15, pos_label)
+                    
+                    # Use black text with white outline for white balls, white text with black outline for others
+                    if color_ball.color_name.lower() == 'white':
+                        # Draw text shadow for white balls
+                        painter.setPen(QPen(QColor(255, 255, 255)))
+                        painter.drawText(center_x + 14, center_y - 1, label)
+                        painter.drawText(center_x + 16, center_y + 1, label)
+                        painter.drawText(center_x + 14, center_y + 14, pos_label)
+                        painter.drawText(center_x + 16, center_y + 16, pos_label)
+                        # Draw actual text
+                        painter.setPen(QPen(QColor(0, 0, 0)))
+                        painter.drawText(center_x + 15, center_y, label)
+                        painter.drawText(center_x + 15, center_y + 15, pos_label)
+                    else:
+                        painter.setPen(QPen(QColor(255, 255, 255)))
+                        painter.drawText(center_x + 15, center_y, label)
+                        painter.drawText(center_x + 15, center_y + 15, pos_label)
                     
                     # Show wrist association if present
                     if color_ball.associated_wrist_id >= 0:
                         wrist_label = "L" if color_ball.associated_wrist_id == 0 else "R"
+                        if color_ball.color_name.lower() == 'white':
+                            painter.setPen(QPen(QColor(0, 0, 0)))
+                        else:
+                            painter.setPen(QPen(QColor(255, 255, 255)))
                         painter.drawText(center_x + 15, center_y + 30, f"[{wrist_label}]")
 
             # --- Draw Tracker Tails ---

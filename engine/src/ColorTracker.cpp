@@ -11,12 +11,16 @@ namespace juggler {
 
 ColorTracker::ColorTracker(const std::string& settings_file) 
     : settings_file_(settings_file) {
-    // Initialize default color profiles (same as old BallTracker)
+    // Initialize default color profiles (matching Python hub profiles)
     color_profiles_ = {
         ColorProfile("pink", cv::Scalar(150, 150, 90), cv::Scalar(170, 255, 255)),
         ColorProfile("orange", cv::Scalar(5, 150, 120), cv::Scalar(15, 255, 255)),
+        ColorProfile("yellow", cv::Scalar(25, 120, 100), cv::Scalar(35, 255, 255)),
         ColorProfile("green", cv::Scalar(45, 120, 70), cv::Scalar(75, 255, 255)),
-        ColorProfile("yellow", cv::Scalar(25, 120, 100), cv::Scalar(35, 255, 255))
+        ColorProfile("red", cv::Scalar(0, 150, 100), cv::Scalar(10, 255, 255)),
+        ColorProfile("blue", cv::Scalar(100, 150, 100), cv::Scalar(130, 255, 255)),
+        ColorProfile("purple", cv::Scalar(130, 150, 100), cv::Scalar(160, 255, 255)),
+        ColorProfile("white", cv::Scalar(0, 0, 200), cv::Scalar(180, 30, 255))
     };
     
     // Initialize tracked balls
@@ -543,8 +547,12 @@ void ColorTracker::resetToDefaults() {
     color_profiles_ = {
         ColorProfile("pink", cv::Scalar(150, 150, 90), cv::Scalar(170, 255, 255)),
         ColorProfile("orange", cv::Scalar(5, 150, 120), cv::Scalar(15, 255, 255)),
+        ColorProfile("yellow", cv::Scalar(25, 120, 100), cv::Scalar(35, 255, 255)),
         ColorProfile("green", cv::Scalar(45, 120, 70), cv::Scalar(75, 255, 255)),
-        ColorProfile("yellow", cv::Scalar(25, 120, 100), cv::Scalar(35, 255, 255))
+        ColorProfile("red", cv::Scalar(0, 150, 100), cv::Scalar(10, 255, 255)),
+        ColorProfile("blue", cv::Scalar(100, 150, 100), cv::Scalar(130, 255, 255)),
+        ColorProfile("purple", cv::Scalar(130, 150, 100), cv::Scalar(160, 255, 255)),
+        ColorProfile("white", cv::Scalar(0, 0, 200), cv::Scalar(180, 30, 255))
     };
     INFO_LOG("ColorTracker: Reset to default color values");
 }

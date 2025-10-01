@@ -49,17 +49,43 @@ std::vector<ColorTrackedBall> ColorTracker::update(
     // Track which ByteTrack detections have been assigned to avoid double-assignment
     std::set<int> assigned_bytetrack_ids;
     
-    // Debug: Log inactive trackers and available detections
+    // Log inactive trackers and available detections (INFO level for visibility)
     int inactive_count = 0;
     for (const auto& ball : tracked_balls_) {
         if (!ball.is_active) inactive_count++;
     }
-    DEBUG_LOG("ColorTracker: ", inactive_count, " inactive trackers, ",
-              bytetrack_objects.size(), " ByteTrack detections available");
+    if (inactive_count > 0 || bytetrack_objects.size() > 0) {
+        INFO_LOG("ColorTracker: ", inactive_count, " inactive trackers, ",
+                  bytetrack_objects.size(), " ByteTrack detections available");
+    }
     
     for (auto& ball : tracked_balls_) {
         if (!ball.is_active) {
-            // Look for ByteTrack objects that match this ball's color profile (if it has one)
+            INFO_LOG("ColorTracker: Attempting to reactivate ball ", ball.logical_id,
+                     " (previous color: ", (ball.color_name.empty() ? "none" : ball.color_name), ")");
+            
+            // Strategy: If ball had a previous color, try to find a detection matching that color first
+            // This preserves color identity across temporary occlusions
+            std::vector<const ColorProfile*> profiles_to_try;
+            
+            if (!ball.color_name.empty()) {
+                // Try previous color first
+                for (const auto& profile : color_profiles_) {
+                    if (profile.name == ball.color_name) {
+                        profiles_to_try.push_back(&profile);
+                        break;
+                    }
+                }
+            }
+            
+            // Then try all other colors
+            for (const auto& profile : color_profiles_) {
+                if (profile.name != ball.color_name) {
+                    profiles_to_try.push_back(&profile);
+                }
+            }
+            
+            // Look for ByteTrack objects that match this ball's color profile
             for (const auto& obj : bytetrack_objects) {
                 if (obj.class_name != "ball") continue;
                 
@@ -70,26 +96,30 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 cv::Point2f center(obj.box.x + obj.box.width / 2.0f,
                                   obj.box.y + obj.box.height / 2.0f);
                 
-                // Check each color profile to see if this detection matches
-                for (const auto& profile : color_profiles_) {
-                    bool matches = matchesColorProfile(hsv_frame, center, profile);
+                // Check color profiles in priority order
+                for (const auto* profile : profiles_to_try) {
+                    bool matches = matchesColorProfile(hsv_frame, center, *profile);
                     DEBUG_LOG("ColorTracker: Testing detection at (", center.x, ",", center.y,
-                              ") against ", profile.name, ": ", (matches ? "MATCH" : "no match"));
+                              ") against ", profile->name, ": ", (matches ? "MATCH" : "no match"));
                     if (matches) {
                         // Check if another ball is already using this color
                         bool color_already_used = false;
                         for (const auto& other_ball : tracked_balls_) {
-                            if (other_ball.is_active && other_ball.color_name == profile.name &&
+                            if (other_ball.is_active && other_ball.color_name == profile->name &&
                                 other_ball.logical_id != ball.logical_id) {
                                 color_already_used = true;
+                                DEBUG_LOG("ColorTracker: Color ", profile->name,
+                                         " already used by ball ", other_ball.logical_id);
                                 break;
                             }
                         }
                         
                         if (!color_already_used) {
+                            DEBUG_LOG("ColorTracker: Reactivating ball ", ball.logical_id,
+                                     " with color ", profile->name, " at (", center.x, ",", center.y, ")");
                             // Found a match! Activate this tracker
                             ball.is_active = true;
-                            ball.color_name = profile.name;
+                            ball.color_name = profile->name;
                             ball.pixel_pos = center;
                             ball.frames_since_seen = 0;
                             ball.associated_wrist_id = -1;
@@ -107,8 +137,6 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                                 }
                             }
                             
-                            INFO_LOG("ColorTracker: Activated ball ", ball.logical_id,
-                                     " with color ", profile.name);
                             break; // Break out of color profiles loop
                         }
                     }
@@ -258,9 +286,13 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             
             // If lost for too long, deactivate
             if (ball.frames_since_seen > MAX_FRAMES_LOST) {
+                INFO_LOG("ColorTracker: Deactivating ball ", ball.logical_id,
+                         " (color: ", ball.color_name, ") after ",
+                         ball.frames_since_seen, " frames lost");
                 ball.is_active = false;
                 ball.associated_wrist_id = -1;
-                INFO_LOG("ColorTracker: Lost ball ", ball.logical_id);
+                // CRITICAL: Preserve color_name so ball can reactivate with same color
+                // ball.color_name is intentionally NOT cleared here
             }
         } else {
             // Reset wrist association if ball moved away
@@ -446,9 +478,9 @@ bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
     float match_ratio = static_cast<float>(matching_pixels) / total_pixels;
     
     // Debug output (only when debug is enabled)
-    DEBUG_LOG("ColorTracker: Color match ratio: ", match_ratio, " (threshold: 0.15)");
+    DEBUG_LOG("ColorTracker: Color match ratio: ", match_ratio, " (threshold: 0.10)");
     
-    return match_ratio > 0.15f; // At least 15% of pixels should match (lowered from 30%)
+    return match_ratio > 0.10f; // At least 10% of pixels should match (lowered for better reactivation)
 }
 
 cv::Point3f ColorTracker::deprojectToWorld(const cv::Point2f& pixel, float depth,

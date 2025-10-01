@@ -521,8 +521,6 @@ if PYQT_AVAILABLE:
             # Auto-save settings whenever they change (but not during initial load)
             if not self._loading_settings:
                 self.save_settings()
-            # Auto-save settings whenever they change
-            self.save_settings()
 
         def get_current_settings(self) -> dict:
             """Get current calibration settings as a dictionary."""
@@ -1122,6 +1120,11 @@ if PYQT_AVAILABLE:
             self.video_group.setVisible(self.calibration_mode)
             self.settings_widget.setVisible(self.calibration_mode)
             self.calibration_button.setText("Exit Calibration Mode" if self.calibration_mode else "Enter Calibration Mode")
+            
+            # Auto-load settings when entering calibration mode
+            if self.calibration_mode:
+                self.settings_widget.load_settings()
+                self.log_message("💾 Auto-loaded calibration settings")
 
         def toggle_overlays(self):
             if self.last_frame_data: self.update_video_feed(self.last_frame_data)
@@ -1490,6 +1493,10 @@ class JuggleHubUI:
     def cleanup(self):
         print("🧹 Cleaning up UI...")
         if self.ui_type == "pyqt6":
+            # Auto-save settings before closing
+            if self.main_window and hasattr(self.main_window, 'settings_widget'):
+                self.main_window.settings_widget.save_settings()
+                print("💾 Auto-saved calibration settings on app close")
             if self.main_window: self.main_window.close()
             if self.app: self.app.quit()
         else:

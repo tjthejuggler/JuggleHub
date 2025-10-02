@@ -182,6 +182,299 @@ JuggleHub/
   
   This allows you to quickly switch between different camera configurations (like default auto-exposure vs. no-blur manual settings) during your juggling session without interrupting the application.
 
+## 🎮 App Layer System
+
+**Last Updated:** 2025-10-02 18:00:00 UTC
+
+JuggleHub features a powerful app layer system that allows independent applications to run on top of the tracking engine. Apps can access real-time tracking data, control engine features, and provide specialized functionality for different use cases.
+
+### Overview
+
+The app layer provides:
+- **Independent Windows**: Each app runs in its own movable window
+- **Real-time Data Access**: Apps receive tracking data via ZeroMQ pub/sub
+- **Engine Control**: Apps can enable/disable engine features dynamically
+- **Plugin Architecture**: Apps are discovered and managed automatically
+- **Easy Development**: Simple API for creating new apps
+
+### Quick Start
+
+#### Accessing Apps
+
+1. **Via App Menu**: Click `App` in the menu bar
+2. **Recent Apps**: Quick access to recently used apps
+3. **App Manager**: Click `App → App Manager` to browse all available apps
+
+#### Running the Catch Counter App
+
+The catch counter is a reference app that demonstrates the app system:
+
+```bash
+# Start the hub
+./scripts/run_hub.sh --use-venv
+
+# In the hub UI:
+# 1. Click "App" menu
+# 2. Click "App Manager"
+# 3. Click on "Catch Counter" card
+# 4. The app window will open
+```
+
+The catch counter will:
+- Display real-time catch count
+- Update automatically when catches are detected
+- Provide a restart button to reset the count
+
+### App Architecture
+
+#### Communication Flow
+
+```
+┌─────────────────┐
+│  Tracking Engine│
+│    (C++)        │
+└────────┬────────┘
+         │ ZMQ PUB (port 5555)
+         │ Frame data stream
+         ▼
+┌─────────────────┐
+│   Python Hub    │
+│  (Main Window)  │
+└────────┬────────┘
+         │
+         │ Launches
+         ▼
+┌─────────────────┐     ┌─────────────────┐
+│   App Window 1  │     │   App Window 2  │
+│  (Catch Counter)│     │  (Your App)     │
+└─────────────────┘     └─────────────────┘
+         │                       │
+         └───────┬───────────────┘
+                 │ ZMQ SUB (port 5555)
+                 │ ZMQ REQ (port 5565)
+                 ▼
+         ┌───────────────┐
+         │ Engine Control│
+         │  (Commands)   │
+         └───────────────┘
+```
+
+#### Key Components
+
+- **BaseApp**: Abstract base class for all apps
+- **AppAPI**: Handles ZMQ communication with engine
+- **AppManager**: Discovers, launches, and manages apps
+- **App Menu**: UI integration in main hub window
+
+### Creating Your Own App
+
+#### 1. Create App Directory
+
+```bash
+mkdir -p hub/apps/my_app
+touch hub/apps/my_app/__init__.py
+touch hub/apps/my_app/metadata.json
+touch hub/apps/my_app/app.py
+```
+
+#### 2. Define Metadata
+
+Create `hub/apps/my_app/metadata.json`:
+
+```json
+{
+  "id": "my_app",
+  "name": "My App",
+  "version": "1.0.0",
+  "description": "Description of what my app does",
+  "author": "Your Name",
+  "entry_point": "apps.my_app.app:MyApp",
+  "icon": "🎯"
+}
+```
+
+#### 3. Implement App Class
+
+Create `hub/apps/my_app/app.py`:
+
+```python
+from PyQt6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtCore import pyqtSignal, QObject
+from apps.base import BaseApp
+
+class MySignals(QObject):
+    update = pyqtSignal(object)
+
+class MyApp(BaseApp):
+    def get_metadata(self):
+        return {
+            "id": "my_app",
+            "name": "My App",
+            "version": "1.0.0"
+        }
+    
+    def initialize(self):
+        """Called once before window creation"""
+        self.signals = MySignals()
+        self.signals.update.connect(self._update_ui)
+        
+        # Enable engine features you need
+        self.api.enable_feature("throw_catch_detection")
+    
+    def create_window(self):
+        """Create and return the app window"""
+        window = QMainWindow()
+        window.setWindowTitle("My App")
+        window.setGeometry(100, 100, 400, 300)
+        
+        # Create UI
+        central = QWidget()
+        layout = QVBoxLayout(central)
+        self.label = QLabel("Waiting for data...")
+        layout.addWidget(self.label)
+        window.setCentralWidget(central)
+        
+        return window
+    
+    def on_frame_data(self, frame_data):
+        """Called for each frame (runs in background thread)"""
+        # Process frame data
+        ball_count = len(frame_data.balls)
+        
+        # Update UI via signal (thread-safe)
+        self.signals.update.emit(ball_count)
+    
+    def _update_ui(self, ball_count):
+        """Update UI on main thread"""
+        self.label.setText(f"Balls detected: {ball_count}")
+    
+    def cleanup(self):
+        """Called when app is closing"""
+        self.api.disable_feature("throw_catch_detection")
+```
+
+#### 4. Test Your App
+
+```bash
+# Restart the hub
+./scripts/run_hub.sh --use-venv
+
+# Your app will appear in the App Manager
+```
+
+### Available Engine Features
+
+Apps can enable/disable these engine features:
+
+- `throw_catch_detection`: Detect throw and catch events
+- `pose_estimation`: Full body pose tracking
+- `color_tracking`: Color-based ball tracking
+- `dnn_tracking`: AI-powered ball detection
+
+Example:
+```python
+# Enable a feature
+self.api.enable_feature("throw_catch_detection")
+
+# Disable when done
+self.api.disable_feature("throw_catch_detection")
+```
+
+### App API Reference
+
+#### BaseApp Methods
+
+- `get_metadata()`: Return app metadata dict
+- `initialize()`: Setup before window creation
+- `create_window()`: Create and return QMainWindow
+- `on_frame_data(frame_data)`: Process each frame (background thread)
+- `cleanup()`: Cleanup when closing
+
+#### AppAPI Methods
+
+- `subscribe_to_data()`: Start receiving frame data
+- `enable_feature(name)`: Enable engine feature
+- `disable_feature(name)`: Disable engine feature
+- `send_command(command)`: Send custom command to engine
+
+### Thread Safety
+
+**IMPORTANT**: The `on_frame_data()` method runs in a background thread. To update the UI:
+
+1. Create a `QObject` with `pyqtSignal`
+2. Connect signal to UI update method
+3. Emit signal from `on_frame_data()`
+4. Update UI in the connected method
+
+Example:
+```python
+class MySignals(QObject):
+    update = pyqtSignal(str)
+
+class MyApp(BaseApp):
+    def initialize(self):
+        self.signals = MySignals()
+        self.signals.update.connect(self._update_label)
+    
+    def on_frame_data(self, frame_data):
+        # Background thread - don't touch UI!
+        data = process_data(frame_data)
+        self.signals.update.emit(data)  # Thread-safe
+    
+    def _update_label(self, data):
+        # Main thread - safe to update UI
+        self.label.setText(data)
+```
+
+### App Discovery
+
+Apps are automatically discovered if they:
+1. Are in the `hub/apps/` directory
+2. Have a `metadata.json` file
+3. Have a valid entry point in the metadata
+
+The AppManager scans for apps on startup and when the App Manager dialog is opened.
+
+### Best Practices
+
+1. **Minimal UI**: Keep app windows simple and focused
+2. **Feature Control**: Only enable features you need
+3. **Cleanup**: Always disable features in `cleanup()`
+4. **Thread Safety**: Use signals for UI updates
+5. **Error Handling**: Handle missing data gracefully
+6. **Documentation**: Add clear descriptions in metadata
+
+### Example Apps
+
+#### Catch Counter (`hub/apps/catch_counter/`)
+- Counts catches detected by the engine
+- Demonstrates basic app structure
+- Shows throw/catch event handling
+
+### Troubleshooting
+
+**"App not appearing in App Manager"**
+- Check `metadata.json` is valid JSON
+- Verify entry point path is correct
+- Ensure `__init__.py` exists in app directory
+
+**"App window not updating"**
+- Verify you're using signals for UI updates
+- Check `on_frame_data()` is being called
+- Ensure ZMQ connection is active
+
+**"Feature not working"**
+- Confirm feature name is correct
+- Check engine supports the feature
+- Verify feature is enabled in `initialize()`
+
+### Documentation
+
+For detailed developer documentation, see:
+- [`APP_DEVELOPER_GUIDE.md`](APP_DEVELOPER_GUIDE.md) - Complete API reference and examples
+- [`APP_LAYER_ARCHITECTURE.md`](APP_LAYER_ARCHITECTURE.md) - System architecture
+- [`APP_IMPLEMENTATION_PLAN.md`](APP_IMPLEMENTATION_PLAN.md) - Implementation details
+
 ## 📊 Features
 
 ### C++ Engine Features

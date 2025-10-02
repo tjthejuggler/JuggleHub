@@ -1285,7 +1285,7 @@ if PYQT_AVAILABLE:
             self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
         def create_menu_bar(self):
-            """Create the menu bar with File and Help menus."""
+            """Create the menu bar with File, App, and Help menus."""
             menubar = self.menuBar()
             
             # File menu
@@ -1308,6 +1308,23 @@ if PYQT_AVAILABLE:
             # Manage Color Profiles action
             color_profiles_action = QAction("Manage &Color Profiles", self)
             color_profiles_action.setShortcut("Ctrl+P")
+            color_profiles_action.triggered.connect(self.open_color_profile_manager)
+            file_menu.addAction(color_profiles_action)
+            
+            # App menu
+            app_menu = menubar.addMenu("&App")
+            
+            # Recent Apps submenu
+            self.recent_apps_menu = app_menu.addMenu("&Recent Apps")
+            self.update_recent_apps_menu()
+            
+            app_menu.addSeparator()
+            
+            # App Manager action
+            app_manager_action = QAction("App &Manager...", self)
+            app_manager_action.setShortcut("Ctrl+M")
+            app_manager_action.triggered.connect(self.open_app_manager)
+            app_menu.addAction(app_manager_action)
         
         def populate_color_profiles(self):
             """Populate the color profile dropdown from the manager."""
@@ -1332,9 +1349,7 @@ if PYQT_AVAILABLE:
                 # Refresh the video feed to show updated colors
                 if self.last_frame_data:
                     self.update_video_feed(self.last_frame_data)
-            color_profiles_action.triggered.connect(self.open_color_profile_manager)
-            file_menu.addAction(color_profiles_action)
-            
+           
             # Help menu
             help_menu = menubar.addMenu("&Help")
             
@@ -1342,6 +1357,63 @@ if PYQT_AVAILABLE:
             about_action = QAction("&About", self)
             about_action.triggered.connect(self.show_about_dialog)
             help_menu.addAction(about_action)
+        
+        def update_recent_apps_menu(self):
+            """Update the Recent Apps submenu with recently used apps."""
+            self.recent_apps_menu.clear()
+            
+            if not hasattr(self.hub_instance, 'app_manager') or not self.hub_instance.app_manager:
+                no_apps_action = QAction("No recent apps", self)
+                no_apps_action.setEnabled(False)
+                self.recent_apps_menu.addAction(no_apps_action)
+                return
+            
+            recent_apps = self.hub_instance.app_manager.get_recent_apps(5)
+            
+            if not recent_apps:
+                no_apps_action = QAction("No recent apps", self)
+                no_apps_action.setEnabled(False)
+                self.recent_apps_menu.addAction(no_apps_action)
+            else:
+                for app_id in recent_apps:
+                    app_info = self.hub_instance.app_manager.get_app_info(app_id)
+                    if app_info:
+                        action = QAction(app_info['name'], self)
+                        action.triggered.connect(lambda checked, aid=app_id: self.launch_app(aid))
+                        self.recent_apps_menu.addAction(action)
+        
+        def open_app_manager(self):
+            """Open the App Manager dialog."""
+            if not hasattr(self.hub_instance, 'app_manager') or not self.hub_instance.app_manager:
+                QMessageBox.warning(self, "App Manager", "App Manager is not initialized.")
+                return
+            
+            from .app_manager_dialog import AppManagerDialog
+            dialog = AppManagerDialog(self.hub_instance.app_manager, self)
+            dialog.app_launched.connect(self.on_app_launched)
+            dialog.exec()
+            
+            # Update recent apps menu after dialog closes
+            self.update_recent_apps_menu()
+        
+        def launch_app(self, app_id: str):
+            """Launch an app by its ID."""
+            if not hasattr(self.hub_instance, 'app_manager') or not self.hub_instance.app_manager:
+                QMessageBox.warning(self, "Launch App", "App Manager is not initialized.")
+                return
+            
+            try:
+                self.hub_instance.app_manager.launch_app(app_id)
+                self.log_message(f"✅ Launched app: {app_id}")
+                self.update_recent_apps_menu()
+            except Exception as e:
+                QMessageBox.critical(self, "Launch Error", f"Failed to launch app '{app_id}':\n{str(e)}")
+                self.log_message(f"❌ Failed to launch app '{app_id}': {e}")
+        
+        def on_app_launched(self, app_id: str):
+            """Handle app launched signal from App Manager dialog."""
+            self.log_message(f"✅ App launched: {app_id}")
+            self.update_recent_apps_menu()
         
         def save_settings_dialog(self):
             """Show file dialog to save calibration settings."""

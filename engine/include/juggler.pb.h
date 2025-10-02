@@ -95,6 +95,9 @@ extern KeyPointDefaultTypeInternal _KeyPoint_default_instance_;
 class SystemStatus;
 struct SystemStatusDefaultTypeInternal;
 extern SystemStatusDefaultTypeInternal _SystemStatus_default_instance_;
+class ThrowCatchEvent;
+struct ThrowCatchEventDefaultTypeInternal;
+extern ThrowCatchEventDefaultTypeInternal _ThrowCatchEvent_default_instance_;
 class Vector2;
 struct Vector2DefaultTypeInternal;
 extern Vector2DefaultTypeInternal _Vector2_default_instance_;
@@ -119,6 +122,7 @@ template<> ::juggler::v1::Hand* Arena::CreateMaybeMessage<::juggler::v1::Hand>(A
 template<> ::juggler::v1::IMUData* Arena::CreateMaybeMessage<::juggler::v1::IMUData>(Arena*);
 template<> ::juggler::v1::KeyPoint* Arena::CreateMaybeMessage<::juggler::v1::KeyPoint>(Arena*);
 template<> ::juggler::v1::SystemStatus* Arena::CreateMaybeMessage<::juggler::v1::SystemStatus>(Arena*);
+template<> ::juggler::v1::ThrowCatchEvent* Arena::CreateMaybeMessage<::juggler::v1::ThrowCatchEvent>(Arena*);
 template<> ::juggler::v1::Vector2* Arena::CreateMaybeMessage<::juggler::v1::Vector2>(Arena*);
 template<> ::juggler::v1::Vector3* Arena::CreateMaybeMessage<::juggler::v1::Vector3>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
@@ -151,6 +155,31 @@ inline bool Ball_Status_Parse(
   return ::PROTOBUF_NAMESPACE_ID::internal::ParseNamedEnum<Ball_Status>(
     Ball_Status_descriptor(), name, value);
 }
+enum ThrowCatchEvent_EventType : int {
+  ThrowCatchEvent_EventType_THROW = 0,
+  ThrowCatchEvent_EventType_CATCH = 1,
+  ThrowCatchEvent_EventType_ThrowCatchEvent_EventType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
+  ThrowCatchEvent_EventType_ThrowCatchEvent_EventType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
+};
+bool ThrowCatchEvent_EventType_IsValid(int value);
+constexpr ThrowCatchEvent_EventType ThrowCatchEvent_EventType_EventType_MIN = ThrowCatchEvent_EventType_THROW;
+constexpr ThrowCatchEvent_EventType ThrowCatchEvent_EventType_EventType_MAX = ThrowCatchEvent_EventType_CATCH;
+constexpr int ThrowCatchEvent_EventType_EventType_ARRAYSIZE = ThrowCatchEvent_EventType_EventType_MAX + 1;
+
+const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* ThrowCatchEvent_EventType_descriptor();
+template<typename T>
+inline const std::string& ThrowCatchEvent_EventType_Name(T enum_t_value) {
+  static_assert(::std::is_same<T, ThrowCatchEvent_EventType>::value ||
+    ::std::is_integral<T>::value,
+    "Incorrect type passed to function ThrowCatchEvent_EventType_Name.");
+  return ::PROTOBUF_NAMESPACE_ID::internal::NameOfEnum(
+    ThrowCatchEvent_EventType_descriptor(), enum_t_value);
+}
+inline bool ThrowCatchEvent_EventType_Parse(
+    ::PROTOBUF_NAMESPACE_ID::ConstStringParam name, ThrowCatchEvent_EventType* value) {
+  return ::PROTOBUF_NAMESPACE_ID::internal::ParseNamedEnum<ThrowCatchEvent_EventType>(
+    ThrowCatchEvent_EventType_descriptor(), name, value);
+}
 enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_UNKNOWN = 0,
   CommandRequest_CommandType_LOAD_MODULE = 1,
@@ -166,12 +195,14 @@ enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_CALIBRATE_OBJECT = 11,
   CommandRequest_CommandType_SET_POSE_MODEL_ENABLED = 12,
   CommandRequest_CommandType_CALIBRATE_COLOR = 13,
+  CommandRequest_CommandType_ENABLE_FEATURE = 14,
+  CommandRequest_CommandType_DISABLE_FEATURE = 15,
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool CommandRequest_CommandType_IsValid(int value);
 constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MIN = CommandRequest_CommandType_UNKNOWN;
-constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_CALIBRATE_COLOR;
+constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_DISABLE_FEATURE;
 constexpr int CommandRequest_CommandType_CommandType_ARRAYSIZE = CommandRequest_CommandType_CommandType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor();
@@ -2327,6 +2358,248 @@ class IMUData final :
 };
 // -------------------------------------------------------------------
 
+class ThrowCatchEvent final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.ThrowCatchEvent) */ {
+ public:
+  inline ThrowCatchEvent() : ThrowCatchEvent(nullptr) {}
+  ~ThrowCatchEvent() override;
+  explicit PROTOBUF_CONSTEXPR ThrowCatchEvent(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  ThrowCatchEvent(const ThrowCatchEvent& from);
+  ThrowCatchEvent(ThrowCatchEvent&& from) noexcept
+    : ThrowCatchEvent() {
+    *this = ::std::move(from);
+  }
+
+  inline ThrowCatchEvent& operator=(const ThrowCatchEvent& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ThrowCatchEvent& operator=(ThrowCatchEvent&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const ThrowCatchEvent& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const ThrowCatchEvent* internal_default_instance() {
+    return reinterpret_cast<const ThrowCatchEvent*>(
+               &_ThrowCatchEvent_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    10;
+
+  friend void swap(ThrowCatchEvent& a, ThrowCatchEvent& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(ThrowCatchEvent* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ThrowCatchEvent* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  ThrowCatchEvent* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<ThrowCatchEvent>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const ThrowCatchEvent& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const ThrowCatchEvent& from) {
+    ThrowCatchEvent::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(ThrowCatchEvent* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.ThrowCatchEvent";
+  }
+  protected:
+  explicit ThrowCatchEvent(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  typedef ThrowCatchEvent_EventType EventType;
+  static constexpr EventType THROW =
+    ThrowCatchEvent_EventType_THROW;
+  static constexpr EventType CATCH =
+    ThrowCatchEvent_EventType_CATCH;
+  static inline bool EventType_IsValid(int value) {
+    return ThrowCatchEvent_EventType_IsValid(value);
+  }
+  static constexpr EventType EventType_MIN =
+    ThrowCatchEvent_EventType_EventType_MIN;
+  static constexpr EventType EventType_MAX =
+    ThrowCatchEvent_EventType_EventType_MAX;
+  static constexpr int EventType_ARRAYSIZE =
+    ThrowCatchEvent_EventType_EventType_ARRAYSIZE;
+  static inline const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor*
+  EventType_descriptor() {
+    return ThrowCatchEvent_EventType_descriptor();
+  }
+  template<typename T>
+  static inline const std::string& EventType_Name(T enum_t_value) {
+    static_assert(::std::is_same<T, EventType>::value ||
+      ::std::is_integral<T>::value,
+      "Incorrect type passed to function EventType_Name.");
+    return ThrowCatchEvent_EventType_Name(enum_t_value);
+  }
+  static inline bool EventType_Parse(::PROTOBUF_NAMESPACE_ID::ConstStringParam name,
+      EventType* value) {
+    return ThrowCatchEvent_EventType_Parse(name, value);
+  }
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kPositionFieldNumber = 5,
+    kTypeFieldNumber = 1,
+    kBallIdFieldNumber = 2,
+    kTimestampUsFieldNumber = 4,
+    kHandIdFieldNumber = 3,
+    kConfidenceFieldNumber = 6,
+  };
+  // .juggler.v1.Vector3 position = 5;
+  bool has_position() const;
+  private:
+  bool _internal_has_position() const;
+  public:
+  void clear_position();
+  const ::juggler::v1::Vector3& position() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector3* release_position();
+  ::juggler::v1::Vector3* mutable_position();
+  void set_allocated_position(::juggler::v1::Vector3* position);
+  private:
+  const ::juggler::v1::Vector3& _internal_position() const;
+  ::juggler::v1::Vector3* _internal_mutable_position();
+  public:
+  void unsafe_arena_set_allocated_position(
+      ::juggler::v1::Vector3* position);
+  ::juggler::v1::Vector3* unsafe_arena_release_position();
+
+  // .juggler.v1.ThrowCatchEvent.EventType type = 1;
+  void clear_type();
+  ::juggler::v1::ThrowCatchEvent_EventType type() const;
+  void set_type(::juggler::v1::ThrowCatchEvent_EventType value);
+  private:
+  ::juggler::v1::ThrowCatchEvent_EventType _internal_type() const;
+  void _internal_set_type(::juggler::v1::ThrowCatchEvent_EventType value);
+  public:
+
+  // int32 ball_id = 2;
+  void clear_ball_id();
+  int32_t ball_id() const;
+  void set_ball_id(int32_t value);
+  private:
+  int32_t _internal_ball_id() const;
+  void _internal_set_ball_id(int32_t value);
+  public:
+
+  // uint64 timestamp_us = 4;
+  void clear_timestamp_us();
+  uint64_t timestamp_us() const;
+  void set_timestamp_us(uint64_t value);
+  private:
+  uint64_t _internal_timestamp_us() const;
+  void _internal_set_timestamp_us(uint64_t value);
+  public:
+
+  // int32 hand_id = 3;
+  void clear_hand_id();
+  int32_t hand_id() const;
+  void set_hand_id(int32_t value);
+  private:
+  int32_t _internal_hand_id() const;
+  void _internal_set_hand_id(int32_t value);
+  public:
+
+  // float confidence = 6;
+  void clear_confidence();
+  float confidence() const;
+  void set_confidence(float value);
+  private:
+  float _internal_confidence() const;
+  void _internal_set_confidence(float value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.ThrowCatchEvent)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::juggler::v1::Vector3* position_;
+    int type_;
+    int32_t ball_id_;
+    uint64_t timestamp_us_;
+    int32_t hand_id_;
+    float confidence_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
 class CameraIntrinsics final :
     public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.CameraIntrinsics) */ {
  public:
@@ -2375,7 +2648,7 @@ class CameraIntrinsics final :
                &_CameraIntrinsics_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    10;
+    11;
 
   friend void swap(CameraIntrinsics& a, CameraIntrinsics& b) {
     a.Swap(&b);
@@ -2567,7 +2840,7 @@ class SystemStatus final :
                &_SystemStatus_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    11;
+    12;
 
   friend void swap(SystemStatus& a, SystemStatus& b) {
     a.Swap(&b);
@@ -2791,7 +3064,7 @@ class FrameData final :
                &_FrameData_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    12;
+    13;
 
   friend void swap(FrameData& a, FrameData& b) {
     a.Swap(&b);
@@ -2869,6 +3142,7 @@ class FrameData final :
     kImuDataFieldNumber = 4,
     kRawDetectionsFieldNumber = 10,
     kColorTrackedBallsFieldNumber = 14,
+    kThrowCatchEventsFieldNumber = 15,
     kColorImageB64FieldNumber = 11,
     kDepthImageB64FieldNumber = 12,
     kIntrinsicsFieldNumber = 5,
@@ -2968,6 +3242,24 @@ class FrameData final :
   ::juggler::v1::ColorTrackedBall* add_color_tracked_balls();
   const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall >&
       color_tracked_balls() const;
+
+  // repeated .juggler.v1.ThrowCatchEvent throw_catch_events = 15;
+  int throw_catch_events_size() const;
+  private:
+  int _internal_throw_catch_events_size() const;
+  public:
+  void clear_throw_catch_events();
+  ::juggler::v1::ThrowCatchEvent* mutable_throw_catch_events(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent >*
+      mutable_throw_catch_events();
+  private:
+  const ::juggler::v1::ThrowCatchEvent& _internal_throw_catch_events(int index) const;
+  ::juggler::v1::ThrowCatchEvent* _internal_add_throw_catch_events();
+  public:
+  const ::juggler::v1::ThrowCatchEvent& throw_catch_events(int index) const;
+  ::juggler::v1::ThrowCatchEvent* add_throw_catch_events();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent >&
+      throw_catch_events() const;
 
   // bytes color_image_b64 = 11;
   void clear_color_image_b64();
@@ -3091,6 +3383,7 @@ class FrameData final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::IMUData > imu_data_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D > raw_detections_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall > color_tracked_balls_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent > throw_catch_events_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_image_b64_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr depth_image_b64_;
     ::juggler::v1::CameraIntrinsics* intrinsics_;
@@ -3183,7 +3476,7 @@ class CommandRequest final :
                &_CommandRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    14;
+    15;
 
   friend void swap(CommandRequest& a, CommandRequest& b) {
     a.Swap(&b);
@@ -3285,6 +3578,10 @@ class CommandRequest final :
     CommandRequest_CommandType_SET_POSE_MODEL_ENABLED;
   static constexpr CommandType CALIBRATE_COLOR =
     CommandRequest_CommandType_CALIBRATE_COLOR;
+  static constexpr CommandType ENABLE_FEATURE =
+    CommandRequest_CommandType_ENABLE_FEATURE;
+  static constexpr CommandType DISABLE_FEATURE =
+    CommandRequest_CommandType_DISABLE_FEATURE;
   static inline bool CommandType_IsValid(int value) {
     return CommandRequest_CommandType_IsValid(value);
   }
@@ -3317,6 +3614,7 @@ class CommandRequest final :
     kModuleNameFieldNumber = 2,
     kCameraSettingsFileFieldNumber = 6,
     kColorNameFieldNumber = 15,
+    kFeatureNameFieldNumber = 18,
     kColorCommandFieldNumber = 4,
     kCalibrationPixelPosFieldNumber = 11,
     kTimestampUsFieldNumber = 3,
@@ -3388,6 +3686,20 @@ class CommandRequest final :
   const std::string& _internal_color_name() const;
   inline PROTOBUF_ALWAYS_INLINE void _internal_set_color_name(const std::string& value);
   std::string* _internal_mutable_color_name();
+  public:
+
+  // string feature_name = 18;
+  void clear_feature_name();
+  const std::string& feature_name() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_feature_name(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_feature_name();
+  PROTOBUF_NODISCARD std::string* release_feature_name();
+  void set_allocated_feature_name(std::string* feature_name);
+  private:
+  const std::string& _internal_feature_name() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_feature_name(const std::string& value);
+  std::string* _internal_mutable_feature_name();
   public:
 
   // .juggler.v1.ColorCommand color_command = 4;
@@ -3541,6 +3853,7 @@ class CommandRequest final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr module_name_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr camera_settings_file_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_name_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr feature_name_;
     ::juggler::v1::ColorCommand* color_command_;
     ::juggler::v1::Vector2* calibration_pixel_pos_;
     uint64_t timestamp_us_;
@@ -3609,7 +3922,7 @@ class ColorCommand final :
                &_ColorCommand_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    15;
+    16;
 
   friend void swap(ColorCommand& a, ColorCommand& b) {
     a.Swap(&b);
@@ -3782,7 +4095,7 @@ class CommandResponse final :
                &_CommandResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    16;
+    17;
 
   friend void swap(CommandResponse& a, CommandResponse& b) {
     a.Swap(&b);
@@ -6226,6 +6539,200 @@ inline void IMUData::set_data_age_ms(double value) {
 
 // -------------------------------------------------------------------
 
+// ThrowCatchEvent
+
+// .juggler.v1.ThrowCatchEvent.EventType type = 1;
+inline void ThrowCatchEvent::clear_type() {
+  _impl_.type_ = 0;
+}
+inline ::juggler::v1::ThrowCatchEvent_EventType ThrowCatchEvent::_internal_type() const {
+  return static_cast< ::juggler::v1::ThrowCatchEvent_EventType >(_impl_.type_);
+}
+inline ::juggler::v1::ThrowCatchEvent_EventType ThrowCatchEvent::type() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ThrowCatchEvent.type)
+  return _internal_type();
+}
+inline void ThrowCatchEvent::_internal_set_type(::juggler::v1::ThrowCatchEvent_EventType value) {
+  
+  _impl_.type_ = value;
+}
+inline void ThrowCatchEvent::set_type(::juggler::v1::ThrowCatchEvent_EventType value) {
+  _internal_set_type(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ThrowCatchEvent.type)
+}
+
+// int32 ball_id = 2;
+inline void ThrowCatchEvent::clear_ball_id() {
+  _impl_.ball_id_ = 0;
+}
+inline int32_t ThrowCatchEvent::_internal_ball_id() const {
+  return _impl_.ball_id_;
+}
+inline int32_t ThrowCatchEvent::ball_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ThrowCatchEvent.ball_id)
+  return _internal_ball_id();
+}
+inline void ThrowCatchEvent::_internal_set_ball_id(int32_t value) {
+  
+  _impl_.ball_id_ = value;
+}
+inline void ThrowCatchEvent::set_ball_id(int32_t value) {
+  _internal_set_ball_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ThrowCatchEvent.ball_id)
+}
+
+// int32 hand_id = 3;
+inline void ThrowCatchEvent::clear_hand_id() {
+  _impl_.hand_id_ = 0;
+}
+inline int32_t ThrowCatchEvent::_internal_hand_id() const {
+  return _impl_.hand_id_;
+}
+inline int32_t ThrowCatchEvent::hand_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ThrowCatchEvent.hand_id)
+  return _internal_hand_id();
+}
+inline void ThrowCatchEvent::_internal_set_hand_id(int32_t value) {
+  
+  _impl_.hand_id_ = value;
+}
+inline void ThrowCatchEvent::set_hand_id(int32_t value) {
+  _internal_set_hand_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ThrowCatchEvent.hand_id)
+}
+
+// uint64 timestamp_us = 4;
+inline void ThrowCatchEvent::clear_timestamp_us() {
+  _impl_.timestamp_us_ = uint64_t{0u};
+}
+inline uint64_t ThrowCatchEvent::_internal_timestamp_us() const {
+  return _impl_.timestamp_us_;
+}
+inline uint64_t ThrowCatchEvent::timestamp_us() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ThrowCatchEvent.timestamp_us)
+  return _internal_timestamp_us();
+}
+inline void ThrowCatchEvent::_internal_set_timestamp_us(uint64_t value) {
+  
+  _impl_.timestamp_us_ = value;
+}
+inline void ThrowCatchEvent::set_timestamp_us(uint64_t value) {
+  _internal_set_timestamp_us(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ThrowCatchEvent.timestamp_us)
+}
+
+// .juggler.v1.Vector3 position = 5;
+inline bool ThrowCatchEvent::_internal_has_position() const {
+  return this != internal_default_instance() && _impl_.position_ != nullptr;
+}
+inline bool ThrowCatchEvent::has_position() const {
+  return _internal_has_position();
+}
+inline void ThrowCatchEvent::clear_position() {
+  if (GetArenaForAllocation() == nullptr && _impl_.position_ != nullptr) {
+    delete _impl_.position_;
+  }
+  _impl_.position_ = nullptr;
+}
+inline const ::juggler::v1::Vector3& ThrowCatchEvent::_internal_position() const {
+  const ::juggler::v1::Vector3* p = _impl_.position_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
+      ::juggler::v1::_Vector3_default_instance_);
+}
+inline const ::juggler::v1::Vector3& ThrowCatchEvent::position() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ThrowCatchEvent.position)
+  return _internal_position();
+}
+inline void ThrowCatchEvent::unsafe_arena_set_allocated_position(
+    ::juggler::v1::Vector3* position) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.position_);
+  }
+  _impl_.position_ = position;
+  if (position) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.ThrowCatchEvent.position)
+}
+inline ::juggler::v1::Vector3* ThrowCatchEvent::release_position() {
+  
+  ::juggler::v1::Vector3* temp = _impl_.position_;
+  _impl_.position_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector3* ThrowCatchEvent::unsafe_arena_release_position() {
+  // @@protoc_insertion_point(field_release:juggler.v1.ThrowCatchEvent.position)
+  
+  ::juggler::v1::Vector3* temp = _impl_.position_;
+  _impl_.position_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector3* ThrowCatchEvent::_internal_mutable_position() {
+  
+  if (_impl_.position_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
+    _impl_.position_ = p;
+  }
+  return _impl_.position_;
+}
+inline ::juggler::v1::Vector3* ThrowCatchEvent::mutable_position() {
+  ::juggler::v1::Vector3* _msg = _internal_mutable_position();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.ThrowCatchEvent.position)
+  return _msg;
+}
+inline void ThrowCatchEvent::set_allocated_position(::juggler::v1::Vector3* position) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.position_;
+  }
+  if (position) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(position);
+    if (message_arena != submessage_arena) {
+      position = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, position, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.position_ = position;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.ThrowCatchEvent.position)
+}
+
+// float confidence = 6;
+inline void ThrowCatchEvent::clear_confidence() {
+  _impl_.confidence_ = 0;
+}
+inline float ThrowCatchEvent::_internal_confidence() const {
+  return _impl_.confidence_;
+}
+inline float ThrowCatchEvent::confidence() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ThrowCatchEvent.confidence)
+  return _internal_confidence();
+}
+inline void ThrowCatchEvent::_internal_set_confidence(float value) {
+  
+  _impl_.confidence_ = value;
+}
+inline void ThrowCatchEvent::set_confidence(float value) {
+  _internal_set_confidence(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ThrowCatchEvent.confidence)
+}
+
+// -------------------------------------------------------------------
+
 // CameraIntrinsics
 
 // double fx = 1;
@@ -7116,6 +7623,46 @@ FrameData::color_tracked_balls() const {
   return _impl_.color_tracked_balls_;
 }
 
+// repeated .juggler.v1.ThrowCatchEvent throw_catch_events = 15;
+inline int FrameData::_internal_throw_catch_events_size() const {
+  return _impl_.throw_catch_events_.size();
+}
+inline int FrameData::throw_catch_events_size() const {
+  return _internal_throw_catch_events_size();
+}
+inline void FrameData::clear_throw_catch_events() {
+  _impl_.throw_catch_events_.Clear();
+}
+inline ::juggler::v1::ThrowCatchEvent* FrameData::mutable_throw_catch_events(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.throw_catch_events)
+  return _impl_.throw_catch_events_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent >*
+FrameData::mutable_throw_catch_events() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.throw_catch_events)
+  return &_impl_.throw_catch_events_;
+}
+inline const ::juggler::v1::ThrowCatchEvent& FrameData::_internal_throw_catch_events(int index) const {
+  return _impl_.throw_catch_events_.Get(index);
+}
+inline const ::juggler::v1::ThrowCatchEvent& FrameData::throw_catch_events(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.throw_catch_events)
+  return _internal_throw_catch_events(index);
+}
+inline ::juggler::v1::ThrowCatchEvent* FrameData::_internal_add_throw_catch_events() {
+  return _impl_.throw_catch_events_.Add();
+}
+inline ::juggler::v1::ThrowCatchEvent* FrameData::add_throw_catch_events() {
+  ::juggler::v1::ThrowCatchEvent* _add = _internal_add_throw_catch_events();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.throw_catch_events)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent >&
+FrameData::throw_catch_events() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.throw_catch_events)
+  return _impl_.throw_catch_events_;
+}
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
@@ -7701,6 +8248,56 @@ inline void CommandRequest::set_click_y(int32_t value) {
   // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.click_y)
 }
 
+// string feature_name = 18;
+inline void CommandRequest::clear_feature_name() {
+  _impl_.feature_name_.ClearToEmpty();
+}
+inline const std::string& CommandRequest::feature_name() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.feature_name)
+  return _internal_feature_name();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void CommandRequest::set_feature_name(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.feature_name_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.feature_name)
+}
+inline std::string* CommandRequest::mutable_feature_name() {
+  std::string* _s = _internal_mutable_feature_name();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.CommandRequest.feature_name)
+  return _s;
+}
+inline const std::string& CommandRequest::_internal_feature_name() const {
+  return _impl_.feature_name_.Get();
+}
+inline void CommandRequest::_internal_set_feature_name(const std::string& value) {
+  
+  _impl_.feature_name_.Set(value, GetArenaForAllocation());
+}
+inline std::string* CommandRequest::_internal_mutable_feature_name() {
+  
+  return _impl_.feature_name_.Mutable(GetArenaForAllocation());
+}
+inline std::string* CommandRequest::release_feature_name() {
+  // @@protoc_insertion_point(field_release:juggler.v1.CommandRequest.feature_name)
+  return _impl_.feature_name_.Release();
+}
+inline void CommandRequest::set_allocated_feature_name(std::string* feature_name) {
+  if (feature_name != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.feature_name_.SetAllocated(feature_name, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.feature_name_.IsDefault()) {
+    _impl_.feature_name_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.feature_name)
+}
+
 // -------------------------------------------------------------------
 
 // ColorCommand
@@ -7974,6 +8571,8 @@ inline void CommandResponse::set_timestamp_us(uint64_t value) {
 
 // -------------------------------------------------------------------
 
+// -------------------------------------------------------------------
+
 
 // @@protoc_insertion_point(namespace_scope)
 
@@ -7986,6 +8585,11 @@ template <> struct is_proto_enum< ::juggler::v1::Ball_Status> : ::std::true_type
 template <>
 inline const EnumDescriptor* GetEnumDescriptor< ::juggler::v1::Ball_Status>() {
   return ::juggler::v1::Ball_Status_descriptor();
+}
+template <> struct is_proto_enum< ::juggler::v1::ThrowCatchEvent_EventType> : ::std::true_type {};
+template <>
+inline const EnumDescriptor* GetEnumDescriptor< ::juggler::v1::ThrowCatchEvent_EventType>() {
+  return ::juggler::v1::ThrowCatchEvent_EventType_descriptor();
 }
 template <> struct is_proto_enum< ::juggler::v1::CommandRequest_CommandType> : ::std::true_type {};
 template <>

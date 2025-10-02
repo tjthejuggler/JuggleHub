@@ -35,6 +35,8 @@ from components.web_ui import WebUI
 from components.screen_controller import ScreenController
 import juggler_pb2
 from components.juggling_system_manager import JugglingSystemManager
+from apps.manager import AppManager
+import zmq
 
 class JuggleHub:
     """Main JuggleHub application class."""
@@ -52,6 +54,8 @@ class JuggleHub:
         self.web_ui: Optional[WebUI] = None
         self.screen_controller: Optional[ScreenController] = None
         self.juggling_system_manager: Optional[JugglingSystemManager] = None
+        self.app_manager: Optional[AppManager] = None
+        self.zmq_context: Optional[zmq.Context] = None
         
         self._data_thread: Optional[threading.Thread] = None
         
@@ -64,8 +68,15 @@ class JuggleHub:
         try:
             print("🚀 Initializing JuggleHub...")
             
+            # Initialize ZMQ context for apps
+            self.zmq_context = zmq.Context()
+            
             # Initialize ZMQ client
             self.zmq_client = ZMQClient()
+            
+            # Initialize App Manager
+            self.app_manager = AppManager(self.zmq_context)
+            print("📱 App Manager initialized")
 
             # Initialize UI
             if self.config['enable_ui']:
@@ -194,6 +205,10 @@ class JuggleHub:
         
         self.running = False
         
+        # Close all running apps
+        if self.app_manager:
+            self.app_manager.close_all_apps()
+        
         # Stop data-generating components first
         if self.imu_listener:
             self.imu_listener.stop()
@@ -212,6 +227,10 @@ class JuggleHub:
         
         if self.juggling_system_manager:
             self.juggling_system_manager.shutdown()
+        
+        # Cleanup ZMQ context
+        if self.zmq_context:
+            self.zmq_context.term()
         
         print("✅ JuggleHub cleanup completed")
     

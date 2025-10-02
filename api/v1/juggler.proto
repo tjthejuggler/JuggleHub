@@ -98,6 +98,21 @@ message IMUData {
   double data_age_ms = 9;           // Age of data in milliseconds
 }
 
+// Throw and catch events for apps
+message ThrowCatchEvent {
+  enum EventType {
+    THROW = 0;
+    CATCH = 1;
+  }
+  
+  EventType type = 1;               // Type of event
+  int32 ball_id = 2;                // Logical ID of the ball
+  int32 hand_id = 3;                // Hand ID (0=left, 1=right)
+  uint64 timestamp_us = 4;          // Event timestamp
+  Vector3 position = 5;             // 3D position where event occurred
+  float confidence = 6;             // Event confidence score
+}
+
 // Camera intrinsics for 3D calculations
 message CameraIntrinsics {
   double fx = 1;                    // Focal length X
@@ -138,6 +153,7 @@ message FrameData {
   bytes depth_image_b64 = 12;      // Base64 encoded depth image
   bool ir_projector_active = 13;   // Status of the IR projector
   repeated ColorTrackedBall color_tracked_balls = 14; // New simplified color tracking
+  repeated ThrowCatchEvent throw_catch_events = 15; // Throw and catch events for apps
 }
 
 // Command and control API for managing engine modules
@@ -157,6 +173,8 @@ message CommandRequest {
     CALIBRATE_OBJECT = 11; // Force-set the position of a logical tracker
     SET_POSE_MODEL_ENABLED = 12; // Enable or disable the pose model
     CALIBRATE_COLOR = 13; // Calibrate a color profile by clicking on a ball
+    ENABLE_FEATURE = 14; // Enable an engine feature for apps
+    DISABLE_FEATURE = 15; // Disable an engine feature for apps
   }
   
   CommandType type = 1;
@@ -180,6 +198,9 @@ message CommandRequest {
   string color_name = 15;           // Name of the color profile to calibrate
   int32 click_x = 16;               // X coordinate of the click
   int32 click_y = 17;               // Y coordinate of the click
+  
+  // For ENABLE_FEATURE / DISABLE_FEATURE
+  string feature_name = 18;         // Name of the feature to enable/disable
 }
 
 message ColorCommand {

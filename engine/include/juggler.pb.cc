@@ -193,6 +193,24 @@ struct IMUDataDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 IMUDataDefaultTypeInternal _IMUData_default_instance_;
+PROTOBUF_CONSTEXPR ThrowCatchEvent::ThrowCatchEvent(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.position_)*/nullptr
+  , /*decltype(_impl_.type_)*/0
+  , /*decltype(_impl_.ball_id_)*/0
+  , /*decltype(_impl_.timestamp_us_)*/uint64_t{0u}
+  , /*decltype(_impl_.hand_id_)*/0
+  , /*decltype(_impl_.confidence_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct ThrowCatchEventDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR ThrowCatchEventDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ThrowCatchEventDefaultTypeInternal() {}
+  union {
+    ThrowCatchEvent _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ThrowCatchEventDefaultTypeInternal _ThrowCatchEvent_default_instance_;
 PROTOBUF_CONSTEXPR CameraIntrinsics::CameraIntrinsics(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.fx_)*/0
@@ -236,6 +254,7 @@ PROTOBUF_CONSTEXPR FrameData::FrameData(
   , /*decltype(_impl_.imu_data_)*/{}
   , /*decltype(_impl_.raw_detections_)*/{}
   , /*decltype(_impl_.color_tracked_balls_)*/{}
+  , /*decltype(_impl_.throw_catch_events_)*/{}
   , /*decltype(_impl_.color_image_b64_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.depth_image_b64_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.intrinsics_)*/nullptr
@@ -272,6 +291,7 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.module_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.camera_settings_file_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.color_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.feature_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.color_command_)*/nullptr
   , /*decltype(_impl_.calibration_pixel_pos_)*/nullptr
   , /*decltype(_impl_.timestamp_us_)*/uint64_t{0u}
@@ -326,8 +346,8 @@ struct CommandResponseDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 CommandResponseDefaultTypeInternal _CommandResponse_default_instance_;
 }  // namespace v1
 }  // namespace juggler
-static ::_pb::Metadata file_level_metadata_juggler_2eproto[17];
-static const ::_pb::EnumDescriptor* file_level_enum_descriptors_juggler_2eproto[2];
+static ::_pb::Metadata file_level_metadata_juggler_2eproto[18];
+static const ::_pb::EnumDescriptor* file_level_enum_descriptors_juggler_2eproto[3];
 static constexpr ::_pb::ServiceDescriptor const** file_level_service_descriptors_juggler_2eproto = nullptr;
 
 const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
@@ -443,6 +463,18 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::IMUData, _impl_.timestamp_us_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::IMUData, _impl_.data_age_ms_),
   ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ThrowCatchEvent, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ThrowCatchEvent, _impl_.type_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ThrowCatchEvent, _impl_.ball_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ThrowCatchEvent, _impl_.hand_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ThrowCatchEvent, _impl_.timestamp_us_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ThrowCatchEvent, _impl_.position_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ThrowCatchEvent, _impl_.confidence_),
+  ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CameraIntrinsics, _internal_metadata_),
   ~0u,  // no _extensions_
   ~0u,  // no _oneof_case_
@@ -486,6 +518,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.depth_image_b64_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.ir_projector_active_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.color_tracked_balls_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.throw_catch_events_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse, _has_bits_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -519,6 +552,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.color_name_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.click_x_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.click_y_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.feature_name_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorCommand, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -548,13 +582,14 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 73, -1, -1, sizeof(::juggler::v1::KeyPoint)},
   { 82, -1, -1, sizeof(::juggler::v1::Hand)},
   { 96, -1, -1, sizeof(::juggler::v1::IMUData)},
-  { 111, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
-  { 122, -1, -1, sizeof(::juggler::v1::SystemStatus)},
-  { 135, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 155, 163, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 165, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 188, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 196, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 111, -1, -1, sizeof(::juggler::v1::ThrowCatchEvent)},
+  { 123, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
+  { 134, -1, -1, sizeof(::juggler::v1::SystemStatus)},
+  { 147, -1, -1, sizeof(::juggler::v1::FrameData)},
+  { 168, 176, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 178, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 202, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 210, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -568,6 +603,7 @@ static const ::_pb::Message* const file_default_instances[] = {
   &::juggler::v1::_KeyPoint_default_instance_._instance,
   &::juggler::v1::_Hand_default_instance_._instance,
   &::juggler::v1::_IMUData_default_instance_._instance,
+  &::juggler::v1::_ThrowCatchEvent_default_instance_._instance,
   &::juggler::v1::_CameraIntrinsics_default_instance_._instance,
   &::juggler::v1::_SystemStatus_default_instance_._instance,
   &::juggler::v1::_FrameData_default_instance_._instance,
@@ -615,25 +651,32 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "etometer\030\005 \001(\0132\023.juggler.v1.Vector3\022\027\n\017a"
   "ccel_magnitude\030\006 \001(\001\022\026\n\016gyro_magnitude\030\007"
   " \001(\001\022\024\n\014timestamp_us\030\010 \001(\004\022\023\n\013data_age_m"
-  "s\030\t \001(\001\"Y\n\020CameraIntrinsics\022\n\n\002fx\030\001 \001(\001\022"
-  "\n\n\002fy\030\002 \001(\001\022\013\n\003ppx\030\003 \001(\001\022\013\n\003ppy\030\004 \001(\001\022\023\n"
-  "\013depth_scale\030\005 \001(\001\"\235\001\n\014SystemStatus\022\030\n\020c"
-  "amera_connected\030\001 \001(\010\022\026\n\016engine_running\030"
-  "\002 \001(\010\022\013\n\003fps\030\003 \001(\001\022\023\n\013frame_count\030\004 \001(\r\022"
-  "\014\n\004mode\030\005 \001(\t\022\025\n\rerror_message\030\006 \001(\t\022\024\n\014"
-  "timestamp_us\030\007 \001(\004\"\344\003\n\tFrameData\022\024\n\014time"
-  "stamp_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler."
-  "v1.Ball\022\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand"
-  "\022%\n\010imu_data\030\004 \003(\0132\023.juggler.v1.IMUData\022"
-  "0\n\nintrinsics\030\005 \001(\0132\034.juggler.v1.CameraI"
-  "ntrinsics\022(\n\006status\030\006 \001(\0132\030.juggler.v1.S"
-  "ystemStatus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014fram"
-  "e_height\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016"
-  "raw_detections\030\n \003(\0132\031.juggler.v1.Boundi"
-  "ngBox2D\022\027\n\017color_image_b64\030\013 \001(\014\022\027\n\017dept"
-  "h_image_b64\030\014 \001(\014\022\033\n\023ir_projector_active"
-  "\030\r \001(\010\0229\n\023color_tracked_balls\030\016 \003(\0132\034.ju"
-  "ggler.v1.ColorTrackedBall\"\247\007\n\016CommandReq"
+  "s\030\t \001(\001\"\334\001\n\017ThrowCatchEvent\0223\n\004type\030\001 \001("
+  "\0162%.juggler.v1.ThrowCatchEvent.EventType"
+  "\022\017\n\007ball_id\030\002 \001(\005\022\017\n\007hand_id\030\003 \001(\005\022\024\n\014ti"
+  "mestamp_us\030\004 \001(\004\022%\n\010position\030\005 \001(\0132\023.jug"
+  "gler.v1.Vector3\022\022\n\nconfidence\030\006 \001(\002\"!\n\tE"
+  "ventType\022\t\n\005THROW\020\000\022\t\n\005CATCH\020\001\"Y\n\020Camera"
+  "Intrinsics\022\n\n\002fx\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003pp"
+  "x\030\003 \001(\001\022\013\n\003ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001("
+  "\001\"\235\001\n\014SystemStatus\022\030\n\020camera_connected\030\001"
+  " \001(\010\022\026\n\016engine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001("
+  "\001\022\023\n\013frame_count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\r"
+  "error_message\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001("
+  "\004\"\235\004\n\tFrameData\022\024\n\014timestamp_us\030\001 \001(\004\022\037\n"
+  "\005balls\030\002 \003(\0132\020.juggler.v1.Ball\022\037\n\005hands\030"
+  "\003 \003(\0132\020.juggler.v1.Hand\022%\n\010imu_data\030\004 \003("
+  "\0132\023.juggler.v1.IMUData\0220\n\nintrinsics\030\005 \001"
+  "(\0132\034.juggler.v1.CameraIntrinsics\022(\n\006stat"
+  "us\030\006 \001(\0132\030.juggler.v1.SystemStatus\022\023\n\013fr"
+  "ame_width\030\007 \001(\r\022\024\n\014frame_height\030\010 \001(\r\022\024\n"
+  "\014frame_number\030\t \001(\r\0221\n\016raw_detections\030\n "
+  "\003(\0132\031.juggler.v1.BoundingBox2D\022\027\n\017color_"
+  "image_b64\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014"
+  "\022\033\n\023ir_projector_active\030\r \001(\010\0229\n\023color_t"
+  "racked_balls\030\016 \003(\0132\034.juggler.v1.ColorTra"
+  "ckedBall\0227\n\022throw_catch_events\030\017 \003(\0132\033.j"
+  "uggler.v1.ThrowCatchEvent\"\346\007\n\016CommandReq"
   "uest\0224\n\004type\030\001 \001(\0162&.juggler.v1.CommandR"
   "equest.CommandType\022\023\n\013module_name\030\002 \001(\t\022"
   "\024\n\014timestamp_us\030\003 \001(\004\022/\n\rcolor_command\030\004"
@@ -647,26 +690,28 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "ecord_with_yolo_boxes\030\014 \001(\010\022#\n\033record_wi"
   "th_bytetrack_boxes\030\r \001(\010\022\032\n\022pose_model_e"
   "nabled\030\016 \001(\010\022\022\n\ncolor_name\030\017 \001(\t\022\017\n\007clic"
-  "k_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\0321\n\017ModuleArgs"
-  "Entry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\303\002"
-  "\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODUL"
-  "E\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COM"
-  "MAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_S"
-  "TART\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026R"
-  "ECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WITH_"
-  "CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CA"
-  "MERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026SE"
-  "T_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COLO"
-  "R\020\r\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005"
-  "color\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017Comman"
-  "dResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 "
-  "\001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
+  "k_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014feature_na"
+  "me\030\022 \001(\t\0321\n\017ModuleArgsEntry\022\013\n\003key\030\001 \001(\t"
+  "\022\r\n\005value\030\002 \001(\t:\0028\001\"\354\002\n\013CommandType\022\013\n\007U"
+  "NKNOWN\020\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rUNLOAD_MODU"
+  "LE\020\002\022\026\n\022SEND_COLOR_COMMAND\020\003\022\024\n\020CONFIGUR"
+  "E_MODULE\020\004\022\020\n\014RECORD_START\020\005\022\033\n\027RECORD_C"
+  "ONTINUOUS_START\020\006\022\032\n\026RECORD_CONTINUOUS_S"
+  "TOP\020\007\022 \n\034RESTART_WITH_CAMERA_SETTINGS\020\010\022"
+  "\017\n\013CAMERA_STOP\020\t\022\020\n\014CAMERA_START\020\n\022\024\n\020CA"
+  "LIBRATE_OBJECT\020\013\022\032\n\026SET_POSE_MODEL_ENABL"
+  "ED\020\014\022\023\n\017CALIBRATE_COLOR\020\r\022\022\n\016ENABLE_FEAT"
+  "URE\020\016\022\023\n\017DISABLE_FEATURE\020\017\"A\n\014ColorComma"
+  "nd\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.jug"
+  "gler.v1.Color\"I\n\017CommandResponse\022\017\n\007succ"
+  "ess\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014timestamp_"
+  "us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 3313, descriptor_table_protodef_juggler_2eproto,
+    false, false, 3656, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
-    &descriptor_table_juggler_2eproto_once, nullptr, 0, 17,
+    &descriptor_table_juggler_2eproto_once, nullptr, 0, 18,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
     file_level_metadata_juggler_2eproto, file_level_enum_descriptors_juggler_2eproto,
     file_level_service_descriptors_juggler_2eproto,
@@ -702,9 +747,30 @@ constexpr Ball_Status Ball::Status_MIN;
 constexpr Ball_Status Ball::Status_MAX;
 constexpr int Ball::Status_ARRAYSIZE;
 #endif  // (__cplusplus < 201703) && (!defined(_MSC_VER) || (_MSC_VER >= 1900 && _MSC_VER < 1912))
-const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor() {
+const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* ThrowCatchEvent_EventType_descriptor() {
   ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(&descriptor_table_juggler_2eproto);
   return file_level_enum_descriptors_juggler_2eproto[1];
+}
+bool ThrowCatchEvent_EventType_IsValid(int value) {
+  switch (value) {
+    case 0:
+    case 1:
+      return true;
+    default:
+      return false;
+  }
+}
+
+#if (__cplusplus < 201703) && (!defined(_MSC_VER) || (_MSC_VER >= 1900 && _MSC_VER < 1912))
+constexpr ThrowCatchEvent_EventType ThrowCatchEvent::THROW;
+constexpr ThrowCatchEvent_EventType ThrowCatchEvent::CATCH;
+constexpr ThrowCatchEvent_EventType ThrowCatchEvent::EventType_MIN;
+constexpr ThrowCatchEvent_EventType ThrowCatchEvent::EventType_MAX;
+constexpr int ThrowCatchEvent::EventType_ARRAYSIZE;
+#endif  // (__cplusplus < 201703) && (!defined(_MSC_VER) || (_MSC_VER >= 1900 && _MSC_VER < 1912))
+const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor() {
+  ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(&descriptor_table_juggler_2eproto);
+  return file_level_enum_descriptors_juggler_2eproto[2];
 }
 bool CommandRequest_CommandType_IsValid(int value) {
   switch (value) {
@@ -722,6 +788,8 @@ bool CommandRequest_CommandType_IsValid(int value) {
     case 11:
     case 12:
     case 13:
+    case 14:
+    case 15:
       return true;
     default:
       return false;
@@ -743,6 +811,8 @@ constexpr CommandRequest_CommandType CommandRequest::CAMERA_START;
 constexpr CommandRequest_CommandType CommandRequest::CALIBRATE_OBJECT;
 constexpr CommandRequest_CommandType CommandRequest::SET_POSE_MODEL_ENABLED;
 constexpr CommandRequest_CommandType CommandRequest::CALIBRATE_COLOR;
+constexpr CommandRequest_CommandType CommandRequest::ENABLE_FEATURE;
+constexpr CommandRequest_CommandType CommandRequest::DISABLE_FEATURE;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MIN;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MAX;
 constexpr int CommandRequest::CommandType_ARRAYSIZE;
@@ -4208,6 +4278,345 @@ void IMUData::InternalSwap(IMUData* other) {
 
 // ===================================================================
 
+class ThrowCatchEvent::_Internal {
+ public:
+  static const ::juggler::v1::Vector3& position(const ThrowCatchEvent* msg);
+};
+
+const ::juggler::v1::Vector3&
+ThrowCatchEvent::_Internal::position(const ThrowCatchEvent* msg) {
+  return *msg->_impl_.position_;
+}
+ThrowCatchEvent::ThrowCatchEvent(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.ThrowCatchEvent)
+}
+ThrowCatchEvent::ThrowCatchEvent(const ThrowCatchEvent& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  ThrowCatchEvent* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.position_){nullptr}
+    , decltype(_impl_.type_){}
+    , decltype(_impl_.ball_id_){}
+    , decltype(_impl_.timestamp_us_){}
+    , decltype(_impl_.hand_id_){}
+    , decltype(_impl_.confidence_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  if (from._internal_has_position()) {
+    _this->_impl_.position_ = new ::juggler::v1::Vector3(*from._impl_.position_);
+  }
+  ::memcpy(&_impl_.type_, &from._impl_.type_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.confidence_) -
+    reinterpret_cast<char*>(&_impl_.type_)) + sizeof(_impl_.confidence_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.ThrowCatchEvent)
+}
+
+inline void ThrowCatchEvent::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.position_){nullptr}
+    , decltype(_impl_.type_){0}
+    , decltype(_impl_.ball_id_){0}
+    , decltype(_impl_.timestamp_us_){uint64_t{0u}}
+    , decltype(_impl_.hand_id_){0}
+    , decltype(_impl_.confidence_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+ThrowCatchEvent::~ThrowCatchEvent() {
+  // @@protoc_insertion_point(destructor:juggler.v1.ThrowCatchEvent)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void ThrowCatchEvent::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  if (this != internal_default_instance()) delete _impl_.position_;
+}
+
+void ThrowCatchEvent::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void ThrowCatchEvent::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.ThrowCatchEvent)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  if (GetArenaForAllocation() == nullptr && _impl_.position_ != nullptr) {
+    delete _impl_.position_;
+  }
+  _impl_.position_ = nullptr;
+  ::memset(&_impl_.type_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.confidence_) -
+      reinterpret_cast<char*>(&_impl_.type_)) + sizeof(_impl_.confidence_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* ThrowCatchEvent::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // .juggler.v1.ThrowCatchEvent.EventType type = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          uint64_t val = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+          _internal_set_type(static_cast<::juggler::v1::ThrowCatchEvent_EventType>(val));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 ball_id = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          _impl_.ball_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 hand_id = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.hand_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint64 timestamp_us = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
+          _impl_.timestamp_us_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector3 position = 5;
+      case 5:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 42)) {
+          ptr = ctx->ParseMessage(_internal_mutable_position(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float confidence = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 53)) {
+          _impl_.confidence_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* ThrowCatchEvent::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.ThrowCatchEvent)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // .juggler.v1.ThrowCatchEvent.EventType type = 1;
+  if (this->_internal_type() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+      1, this->_internal_type(), target);
+  }
+
+  // int32 ball_id = 2;
+  if (this->_internal_ball_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(2, this->_internal_ball_id(), target);
+  }
+
+  // int32 hand_id = 3;
+  if (this->_internal_hand_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_hand_id(), target);
+  }
+
+  // uint64 timestamp_us = 4;
+  if (this->_internal_timestamp_us() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteUInt64ToArray(4, this->_internal_timestamp_us(), target);
+  }
+
+  // .juggler.v1.Vector3 position = 5;
+  if (this->_internal_has_position()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(5, _Internal::position(this),
+        _Internal::position(this).GetCachedSize(), target, stream);
+  }
+
+  // float confidence = 6;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = this->_internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(6, this->_internal_confidence(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.ThrowCatchEvent)
+  return target;
+}
+
+size_t ThrowCatchEvent::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.ThrowCatchEvent)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // .juggler.v1.Vector3 position = 5;
+  if (this->_internal_has_position()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.position_);
+  }
+
+  // .juggler.v1.ThrowCatchEvent.EventType type = 1;
+  if (this->_internal_type() != 0) {
+    total_size += 1 +
+      ::_pbi::WireFormatLite::EnumSize(this->_internal_type());
+  }
+
+  // int32 ball_id = 2;
+  if (this->_internal_ball_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_ball_id());
+  }
+
+  // uint64 timestamp_us = 4;
+  if (this->_internal_timestamp_us() != 0) {
+    total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(this->_internal_timestamp_us());
+  }
+
+  // int32 hand_id = 3;
+  if (this->_internal_hand_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_hand_id());
+  }
+
+  // float confidence = 6;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = this->_internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    total_size += 1 + 4;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData ThrowCatchEvent::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    ThrowCatchEvent::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*ThrowCatchEvent::GetClassData() const { return &_class_data_; }
+
+
+void ThrowCatchEvent::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<ThrowCatchEvent*>(&to_msg);
+  auto& from = static_cast<const ThrowCatchEvent&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.ThrowCatchEvent)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_has_position()) {
+    _this->_internal_mutable_position()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_position());
+  }
+  if (from._internal_type() != 0) {
+    _this->_internal_set_type(from._internal_type());
+  }
+  if (from._internal_ball_id() != 0) {
+    _this->_internal_set_ball_id(from._internal_ball_id());
+  }
+  if (from._internal_timestamp_us() != 0) {
+    _this->_internal_set_timestamp_us(from._internal_timestamp_us());
+  }
+  if (from._internal_hand_id() != 0) {
+    _this->_internal_set_hand_id(from._internal_hand_id());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = from._internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    _this->_internal_set_confidence(from._internal_confidence());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void ThrowCatchEvent::CopyFrom(const ThrowCatchEvent& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.ThrowCatchEvent)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool ThrowCatchEvent::IsInitialized() const {
+  return true;
+}
+
+void ThrowCatchEvent::InternalSwap(ThrowCatchEvent* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ThrowCatchEvent, _impl_.confidence_)
+      + sizeof(ThrowCatchEvent::_impl_.confidence_)
+      - PROTOBUF_FIELD_OFFSET(ThrowCatchEvent, _impl_.position_)>(
+          reinterpret_cast<char*>(&_impl_.position_),
+          reinterpret_cast<char*>(&other->_impl_.position_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata ThrowCatchEvent::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[10]);
+}
+
+// ===================================================================
+
 class CameraIntrinsics::_Internal {
  public:
 };
@@ -4546,7 +4955,7 @@ void CameraIntrinsics::InternalSwap(CameraIntrinsics* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CameraIntrinsics::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[10]);
+      file_level_metadata_juggler_2eproto[11]);
 }
 
 // ===================================================================
@@ -4943,7 +5352,7 @@ void SystemStatus::InternalSwap(SystemStatus* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata SystemStatus::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[11]);
+      file_level_metadata_juggler_2eproto[12]);
 }
 
 // ===================================================================
@@ -4977,6 +5386,7 @@ FrameData::FrameData(const FrameData& from)
     , decltype(_impl_.imu_data_){from._impl_.imu_data_}
     , decltype(_impl_.raw_detections_){from._impl_.raw_detections_}
     , decltype(_impl_.color_tracked_balls_){from._impl_.color_tracked_balls_}
+    , decltype(_impl_.throw_catch_events_){from._impl_.throw_catch_events_}
     , decltype(_impl_.color_image_b64_){}
     , decltype(_impl_.depth_image_b64_){}
     , decltype(_impl_.intrinsics_){nullptr}
@@ -5027,6 +5437,7 @@ inline void FrameData::SharedCtor(
     , decltype(_impl_.imu_data_){arena}
     , decltype(_impl_.raw_detections_){arena}
     , decltype(_impl_.color_tracked_balls_){arena}
+    , decltype(_impl_.throw_catch_events_){arena}
     , decltype(_impl_.color_image_b64_){}
     , decltype(_impl_.depth_image_b64_){}
     , decltype(_impl_.intrinsics_){nullptr}
@@ -5064,6 +5475,7 @@ inline void FrameData::SharedDtor() {
   _impl_.imu_data_.~RepeatedPtrField();
   _impl_.raw_detections_.~RepeatedPtrField();
   _impl_.color_tracked_balls_.~RepeatedPtrField();
+  _impl_.throw_catch_events_.~RepeatedPtrField();
   _impl_.color_image_b64_.Destroy();
   _impl_.depth_image_b64_.Destroy();
   if (this != internal_default_instance()) delete _impl_.intrinsics_;
@@ -5085,6 +5497,7 @@ void FrameData::Clear() {
   _impl_.imu_data_.Clear();
   _impl_.raw_detections_.Clear();
   _impl_.color_tracked_balls_.Clear();
+  _impl_.throw_catch_events_.Clear();
   _impl_.color_image_b64_.ClearToEmpty();
   _impl_.depth_image_b64_.ClearToEmpty();
   if (GetArenaForAllocation() == nullptr && _impl_.intrinsics_ != nullptr) {
@@ -5246,6 +5659,19 @@ const char* FrameData::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx
         } else
           goto handle_unusual;
         continue;
+      // repeated .juggler.v1.ThrowCatchEvent throw_catch_events = 15;
+      case 15:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 122)) {
+          ptr -= 1;
+          do {
+            ptr += 1;
+            ptr = ctx->ParseMessage(_internal_add_throw_catch_events(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<122>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
       default:
         goto handle_unusual;
     }  // switch
@@ -5371,6 +5797,14 @@ uint8_t* FrameData::_InternalSerialize(
         InternalWriteMessage(14, repfield, repfield.GetCachedSize(), target, stream);
   }
 
+  // repeated .juggler.v1.ThrowCatchEvent throw_catch_events = 15;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_throw_catch_events_size()); i < n; i++) {
+    const auto& repfield = this->_internal_throw_catch_events(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(15, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -5418,6 +5852,13 @@ size_t FrameData::ByteSizeLong() const {
   // repeated .juggler.v1.ColorTrackedBall color_tracked_balls = 14;
   total_size += 1UL * this->_internal_color_tracked_balls_size();
   for (const auto& msg : this->_impl_.color_tracked_balls_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.ThrowCatchEvent throw_catch_events = 15;
+  total_size += 1UL * this->_internal_throw_catch_events_size();
+  for (const auto& msg : this->_impl_.throw_catch_events_) {
     total_size +=
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
   }
@@ -5498,6 +5939,7 @@ void FrameData::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROT
   _this->_impl_.imu_data_.MergeFrom(from._impl_.imu_data_);
   _this->_impl_.raw_detections_.MergeFrom(from._impl_.raw_detections_);
   _this->_impl_.color_tracked_balls_.MergeFrom(from._impl_.color_tracked_balls_);
+  _this->_impl_.throw_catch_events_.MergeFrom(from._impl_.throw_catch_events_);
   if (!from._internal_color_image_b64().empty()) {
     _this->_internal_set_color_image_b64(from._internal_color_image_b64());
   }
@@ -5551,6 +5993,7 @@ void FrameData::InternalSwap(FrameData* other) {
   _impl_.imu_data_.InternalSwap(&other->_impl_.imu_data_);
   _impl_.raw_detections_.InternalSwap(&other->_impl_.raw_detections_);
   _impl_.color_tracked_balls_.InternalSwap(&other->_impl_.color_tracked_balls_);
+  _impl_.throw_catch_events_.InternalSwap(&other->_impl_.throw_catch_events_);
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.color_image_b64_, lhs_arena,
       &other->_impl_.color_image_b64_, rhs_arena
@@ -5570,7 +6013,7 @@ void FrameData::InternalSwap(FrameData* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata FrameData::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[12]);
+      file_level_metadata_juggler_2eproto[13]);
 }
 
 // ===================================================================
@@ -5584,7 +6027,7 @@ void CommandRequest_ModuleArgsEntry_DoNotUse::MergeFrom(const CommandRequest_Mod
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandRequest_ModuleArgsEntry_DoNotUse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[13]);
+      file_level_metadata_juggler_2eproto[14]);
 }
 
 // ===================================================================
@@ -5620,6 +6063,7 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.module_name_){}
     , decltype(_impl_.camera_settings_file_){}
     , decltype(_impl_.color_name_){}
+    , decltype(_impl_.feature_name_){}
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.calibration_pixel_pos_){nullptr}
     , decltype(_impl_.timestamp_us_){}
@@ -5661,6 +6105,14 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     _this->_impl_.color_name_.Set(from._internal_color_name(), 
       _this->GetArenaForAllocation());
   }
+  _impl_.feature_name_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.feature_name_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_feature_name().empty()) {
+    _this->_impl_.feature_name_.Set(from._internal_feature_name(), 
+      _this->GetArenaForAllocation());
+  }
   if (from._internal_has_color_command()) {
     _this->_impl_.color_command_ = new ::juggler::v1::ColorCommand(*from._impl_.color_command_);
   }
@@ -5682,6 +6134,7 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.module_name_){}
     , decltype(_impl_.camera_settings_file_){}
     , decltype(_impl_.color_name_){}
+    , decltype(_impl_.feature_name_){}
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.calibration_pixel_pos_){nullptr}
     , decltype(_impl_.timestamp_us_){uint64_t{0u}}
@@ -5709,6 +6162,10 @@ inline void CommandRequest::SharedCtor(
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.color_name_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.feature_name_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.feature_name_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 CommandRequest::~CommandRequest() {
@@ -5728,6 +6185,7 @@ inline void CommandRequest::SharedDtor() {
   _impl_.module_name_.Destroy();
   _impl_.camera_settings_file_.Destroy();
   _impl_.color_name_.Destroy();
+  _impl_.feature_name_.Destroy();
   if (this != internal_default_instance()) delete _impl_.color_command_;
   if (this != internal_default_instance()) delete _impl_.calibration_pixel_pos_;
 }
@@ -5750,6 +6208,7 @@ void CommandRequest::Clear() {
   _impl_.module_name_.ClearToEmpty();
   _impl_.camera_settings_file_.ClearToEmpty();
   _impl_.color_name_.ClearToEmpty();
+  _impl_.feature_name_.ClearToEmpty();
   if (GetArenaForAllocation() == nullptr && _impl_.color_command_ != nullptr) {
     delete _impl_.color_command_;
   }
@@ -5915,6 +6374,16 @@ const char* CommandRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 136)) {
           _impl_.click_y_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string feature_name = 18;
+      case 18:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 146)) {
+          auto str = _internal_mutable_feature_name();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.CommandRequest.feature_name"));
         } else
           goto handle_unusual;
         continue;
@@ -6088,6 +6557,16 @@ uint8_t* CommandRequest::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteInt32ToArray(17, this->_internal_click_y(), target);
   }
 
+  // string feature_name = 18;
+  if (!this->_internal_feature_name().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_feature_name().data(), static_cast<int>(this->_internal_feature_name().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "juggler.v1.CommandRequest.feature_name");
+    target = stream->WriteStringMaybeAliased(
+        18, this->_internal_feature_name(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -6132,6 +6611,13 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
         this->_internal_color_name());
+  }
+
+  // string feature_name = 18;
+  if (!this->_internal_feature_name().empty()) {
+    total_size += 2 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_feature_name());
   }
 
   // .juggler.v1.ColorCommand color_command = 4;
@@ -6236,6 +6722,9 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (!from._internal_color_name().empty()) {
     _this->_internal_set_color_name(from._internal_color_name());
   }
+  if (!from._internal_feature_name().empty()) {
+    _this->_internal_set_feature_name(from._internal_feature_name());
+  }
   if (from._internal_has_color_command()) {
     _this->_internal_mutable_color_command()->::juggler::v1::ColorCommand::MergeFrom(
         from._internal_color_command());
@@ -6309,6 +6798,10 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
       &_impl_.color_name_, lhs_arena,
       &other->_impl_.color_name_, rhs_arena
   );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.feature_name_, lhs_arena,
+      &other->_impl_.feature_name_, rhs_arena
+  );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.click_y_)
       + sizeof(CommandRequest::_impl_.click_y_)
@@ -6320,7 +6813,7 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandRequest::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[14]);
+      file_level_metadata_juggler_2eproto[15]);
 }
 
 // ===================================================================
@@ -6565,7 +7058,7 @@ void ColorCommand::InternalSwap(ColorCommand* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata ColorCommand::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[15]);
+      file_level_metadata_juggler_2eproto[16]);
 }
 
 // ===================================================================
@@ -6828,7 +7321,7 @@ void CommandResponse::InternalSwap(CommandResponse* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandResponse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[16]);
+      file_level_metadata_juggler_2eproto[17]);
 }
 
 // @@protoc_insertion_point(namespace_scope)
@@ -6874,6 +7367,10 @@ Arena::CreateMaybeMessage< ::juggler::v1::Hand >(Arena* arena) {
 template<> PROTOBUF_NOINLINE ::juggler::v1::IMUData*
 Arena::CreateMaybeMessage< ::juggler::v1::IMUData >(Arena* arena) {
   return Arena::CreateMessageInternal< ::juggler::v1::IMUData >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::ThrowCatchEvent*
+Arena::CreateMaybeMessage< ::juggler::v1::ThrowCatchEvent >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::ThrowCatchEvent >(arena);
 }
 template<> PROTOBUF_NOINLINE ::juggler::v1::CameraIntrinsics*
 Arena::CreateMaybeMessage< ::juggler::v1::CameraIntrinsics >(Arena* arena) {

@@ -19,6 +19,20 @@ import json
 from datetime import datetime
 from .color_profile_manager import ColorProfileManager, ColorProfileDialog
 
+# Import ball management components
+try:
+    import sys
+    import os
+    # Add parent directory to path to import from hub.ui
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from ui.ball_management_widget import BallManagementWidget
+    from ui.ball_calibration_overlay import BallCalibrationOverlay
+    from ball_manager import BallManager
+    BALL_MANAGEMENT_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Ball management components not available: {e}")
+    BALL_MANAGEMENT_AVAILABLE = False
+
 
 try:
     import juggler_pb2
@@ -33,7 +47,7 @@ try:
                                  QGroupBox, QGridLayout, QProgressBar, QGraphicsView,
                                  QGraphicsScene, QGraphicsPixmapItem, QSlider, QLineEdit,
                                  QComboBox, QMessageBox, QDialog, QVBoxLayout as QVBoxLayout_Dialog,
-                                 QMenuBar, QFileDialog, QScrollArea)
+                                 QMenuBar, QFileDialog, QScrollArea, QTabWidget)
     from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt
     from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage, QPen, QPainter, QKeySequence, QBrush, QAction
     PYQT_AVAILABLE = True
@@ -1023,6 +1037,16 @@ if PYQT_AVAILABLE:
             self.calibrating_id = -1 # ID of the ball we are currently calibrating
             self.color_profile_manager = ColorProfileManager()
             
+            # Initialize ball manager and ball management widget
+            if BALL_MANAGEMENT_AVAILABLE:
+                self.ball_manager = BallManager(self.zmq_client)
+                self.ball_management_widget = None  # Will be created in init_ui
+                self.ball_calibration_overlay = None  # Will be created in init_ui
+            else:
+                self.ball_manager = None
+                self.ball_management_widget = None
+                self.ball_calibration_overlay = None
+            
             # Signal for thread-safe updates
             self.signal_emitter = FrameDataSignal()
             self.signal_emitter.frame_received.connect(self._update_ui)
@@ -1215,10 +1239,23 @@ if PYQT_AVAILABLE:
             
             content_layout.addWidget(self.video_group, 2)
             
-            # Calibration settings panel
+            # Create tabbed widget for Ball Management and Settings
+            self.settings_tabs = QTabWidget()
+            self.settings_tabs.setVisible(False)
+            
+            # Ball Management tab (if available)
+            if BALL_MANAGEMENT_AVAILABLE and self.ball_manager:
+                self.ball_management_widget = BallManagementWidget(self.ball_manager)
+                self.ball_management_widget.calibration_requested.connect(self.on_ball_calibration_requested)
+                self.settings_tabs.addTab(self.ball_management_widget, "🏀 Ball Management")
+            else:
+                self.ball_management_widget = None
+            
+            # Calibration settings tab
             self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance)
-            self.settings_widget.setVisible(False)
-            content_layout.addWidget(self.settings_widget, 1)
+            self.settings_tabs.addTab(self.settings_widget, "⚙️ Tracking Settings")
+            
+            content_layout.addWidget(self.settings_tabs, 1)
             
             # Right panel - System info
             system_group = QGroupBox("⚙️ System Status")
@@ -1589,14 +1626,27 @@ if PYQT_AVAILABLE:
         
         def toggle_calibration_mode(self):
             self.calibration_mode = not self.calibration_mode
-            # Video feed is always visible, settings widget visibility toggles with calibration mode
-            self.settings_widget.setVisible(self.calibration_mode)
+            
+            # Toggle visibility of tabbed settings panel
+            self.settings_tabs.setVisible(self.calibration_mode)
+            
             self.calibration_button.setText("Exit Calibration Mode" if self.calibration_mode else "Enter Calibration Mode")
             
             # Auto-load settings when entering calibration mode
             if self.calibration_mode:
+                # Set default tab based on availability
+                if BALL_MANAGEMENT_AVAILABLE and self.ball_management_widget:
+                    # Default to Ball Management tab
+                    self.settings_tabs.setCurrentWidget(self.ball_management_widget)
+                    self.ball_management_widget.refresh_ball_list()
+                    self.log_message("🏀 Calibration mode activated - Ball Management & Settings available")
+                else:
+                    # Default to Settings tab
+                    self.settings_tabs.setCurrentWidget(self.settings_widget)
+                    self.log_message("⚙️ Calibration mode activated - Settings available")
+                
+                # Always load settings
                 self.settings_widget.load_settings()
-                self.log_message("💾 Auto-loaded calibration settings")
 
         def toggle_overlays(self):
             if self.last_frame_data: self.update_video_feed(self.last_frame_data)
@@ -1883,7 +1933,37 @@ if PYQT_AVAILABLE:
                 self.color_profile_status_label.setText("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
                 self.log_message("Color profile calibration cancelled.")
 
+        def on_ball_calibration_requested(self, ball_id: str):
+            """Handle ball calibration request from ball management widget."""
+            if self.ball_calibration_overlay:
+                self.ball_calibration_overlay.set_calibration_mode(True)
+                self.ball_calibration_overlay.clear_sample_markers()
+            self.log_message(f"🎯 Ball calibration mode activated for: {ball_id}")
+        
         def video_view_clicked(self, event):
+            # Check if ball management calibration is active
+            if BALL_MANAGEMENT_AVAILABLE and self.ball_management_widget and self.ball_management_widget.is_in_calibration_mode():
+                scene_pos = self.video_view.mapToScene(event.pos())
+                pixmap_item = self.video_pixmap_item
+                
+                if pixmap_item.pixmap() and pixmap_item.sceneBoundingRect().contains(scene_pos):
+                    # Transform scene coordinates to pixmap (image) coordinates
+                    img_pos = pixmap_item.mapFromScene(scene_pos)
+                    x, y = int(img_pos.x()), int(img_pos.y())
+                    
+                    # Add sample marker to overlay
+                    if self.ball_calibration_overlay:
+                        self.ball_calibration_overlay.add_sample_marker(x, y, "Sample")
+                        self.ball_calibration_overlay.set_calibration_mode(False)
+                    
+                    # Notify ball management widget
+                    self.ball_management_widget.on_calibration_click(x, y)
+                    
+                    self.log_message(f"✓ Ball color sample added at ({x}, {y})")
+                
+                # Don't process other click handlers
+                return
+            
             if self.set_color_profile_button.isChecked():
                 scene_pos = self.video_view.mapToScene(event.pos())
                 pixmap_item = self.video_pixmap_item

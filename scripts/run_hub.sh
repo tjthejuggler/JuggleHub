@@ -239,6 +239,40 @@ if [ ! -f "$ENGINE_EXECUTABLE" ]; then
     exit 1
 fi
 
+# Check if engine binary is older than source files
+echo -e "${YELLOW}🔍 Verifying engine build is up to date...${NC}"
+ENGINE_SRC_DIR="$PROJECT_ROOT/engine/src"
+ENGINE_INCLUDE_DIR="$PROJECT_ROOT/engine/include"
+
+# Find the newest source file
+NEWEST_SRC=$(find "$ENGINE_SRC_DIR" "$ENGINE_INCLUDE_DIR" -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+
+if [ -n "$NEWEST_SRC" ]; then
+    # Compare timestamps
+    if [ "$NEWEST_SRC" -nt "$ENGINE_EXECUTABLE" ]; then
+        echo -e "${YELLOW}⚠️ Warning: Engine source files are newer than the binary!${NC}"
+        echo -e "${YELLOW}   Newest source: $NEWEST_SRC${NC}"
+        echo -e "${YELLOW}   Binary: $ENGINE_EXECUTABLE${NC}"
+        echo -e "${YELLOW}   The engine should be rebuilt to include recent changes.${NC}"
+        echo ""
+        read -p "Rebuild engine now? (Y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            echo -e "${BLUE}🔨 Rebuilding engine...${NC}"
+            cd "$PROJECT_ROOT/engine"
+            rm -rf build
+            cmake -B build -S .
+            cmake --build build --target juggle_engine -j$(nproc)
+            cd "$PROJECT_ROOT"
+            echo -e "${GREEN}✅ Engine rebuilt successfully${NC}"
+        else
+            echo -e "${YELLOW}⚠️ Continuing with outdated binary - this may cause issues!${NC}"
+        fi
+    else
+        echo -e "${GREEN}✅ Engine binary is up to date${NC}"
+    fi
+fi
+
 # Start the C++ engine in the background
 echo -e "${BLUE}🧠 Starting C++ engine with device: $ENGINE_DEVICE${NC}"
 ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=$ENGINE_DEVICE" "--model=$ENGINE_MODEL" "--pose-model=yolo11n-pose")

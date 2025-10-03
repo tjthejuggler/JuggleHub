@@ -389,6 +389,49 @@ void DNNTracker::calibrate_color(const std::string& color_name, const cv::Point&
     }
 }
 
+// Ball Registry access methods
+juggler::BallRegistry& DNNTracker::getBallRegistry() {
+    if (!color_tracker_) {
+        throw std::runtime_error("DNNTracker: Color tracker not initialized");
+    }
+    return color_tracker_->getBallRegistry();
+}
+
+const juggler::BallRegistry& DNNTracker::getBallRegistry() const {
+    if (!color_tracker_) {
+        throw std::runtime_error("DNNTracker: Color tracker not initialized");
+    }
+    return color_tracker_->getBallRegistry();
+}
+
+// New tracking system control
+void DNNTracker::setUseNewBallTracking(bool enable) {
+    if (!color_tracker_) {
+        std::cerr << "DNNTracker: Color tracker not initialized" << std::endl;
+        return;
+    }
+    color_tracker_->setUseNewSystem(enable);
+    std::cout << "DNNTracker: " << (enable ? "Enabled" : "Disabled")
+              << " new ball tracking system" << std::endl;
+}
+
+bool DNNTracker::isUsingNewBallTracking() const {
+    if (!color_tracker_) {
+        return false;
+    }
+    return color_tracker_->isUsingNewSystem();
+}
+
+// Save ball registry
+void DNNTracker::saveBallRegistry() {
+    if (!color_tracker_) {
+        std::cerr << "DNNTracker: Color tracker not initialized" << std::endl;
+        return;
+    }
+    color_tracker_->getBallRegistry().saveToFile("ball_registry.json");
+    std::cout << "DNNTracker: Saved ball registry to ball_registry.json" << std::endl;
+}
+
 void DNNTracker::update_setting(const std::string& key, const std::string& value) {
     try {
         if (key == "confidence_threshold") confidence_threshold_ = std::stof(value);
@@ -443,6 +486,10 @@ void DNNTracker::update_setting(const std::string& key, const std::string& value
             auto config = throw_catch_detector_->getConfig();
             config.min_frames_for_event = std::stoi(value);
             throw_catch_detector_->setConfig(config);
+        }
+        else if (key == "use_new_ball_tracking") {
+            bool enable = (value == "true" || value == "1");
+            setUseNewBallTracking(enable);
         }
         else std::cerr << "Warning: Unknown DNNTracker setting key '" << key << "'" << std::endl;
     } catch (const std::exception& e) {

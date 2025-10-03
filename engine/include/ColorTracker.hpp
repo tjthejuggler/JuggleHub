@@ -6,6 +6,9 @@
 #include <string>
 #include <map>
 #include "json.hpp"
+#include "BallRegistry.hpp"
+#include "SkinToneFilter.hpp"
+#include "DetectionConfidence.hpp"
 
 using json = nlohmann::json;
 
@@ -70,12 +73,26 @@ public:
     void calibrateColor(const std::string& color_name, const cv::Mat& hsv_image,
                        const cv::Point& click_point);
     
-    // Getters
+    // Getters - Legacy
     const std::vector<ColorProfile>& getColorProfiles() const { return color_profiles_; }
     std::vector<ColorProfile>& getColorProfiles() { return color_profiles_; }
     
+    // Getters - New System Components
+    BallRegistry& getBallRegistry() { return ball_registry_; }
+    const BallRegistry& getBallRegistry() const { return ball_registry_; }
+    
+    SkinToneFilter& getSkinFilter() { return skin_filter_; }
+    const SkinToneFilter& getSkinFilter() const { return skin_filter_; }
+    
+    ConfidenceScorer& getConfidenceScorer() { return confidence_scorer_; }
+    const ConfidenceScorer& getConfidenceScorer() const { return confidence_scorer_; }
+    
+    // System mode control
+    void setUseNewSystem(bool use_new) { use_new_system_ = use_new; }
+    bool isUsingNewSystem() const { return use_new_system_; }
+    
 private:
-    // Helper methods
+    // Helper methods - Legacy System
     cv::Point2f findLargestColorBlob(const cv::Mat& hsv_frame, const ColorProfile& profile,
                                      const cv::Point2f& search_center, int search_radius);
     cv::Point2f findClosestColorBlob(const cv::Mat& hsv_frame, const ColorProfile& profile,
@@ -87,10 +104,41 @@ private:
     cv::Point3f deprojectToWorld(const cv::Point2f& pixel, float depth,
                                 const rs2_intrinsics& intrinsics);
     
-    // State
+    // Helper methods - New System
+    std::vector<ColorTrackedBall> updateWithNewSystem(
+        const cv::Mat& color_frame,
+        const cv::Mat& depth_frame,
+        const rs2_intrinsics& intrinsics,
+        const std::vector<TrackedObject>& bytetrack_objects,
+        const std::vector<TrackedHand>& tracked_hands
+    );
+    
+    std::vector<ColorTrackedBall> updateWithLegacySystem(
+        const cv::Mat& color_frame,
+        const cv::Mat& depth_frame,
+        const rs2_intrinsics& intrinsics,
+        const std::vector<TrackedObject>& bytetrack_objects,
+        const std::vector<TrackedHand>& tracked_hands
+    );
+    
+    void matchActiveBallWithConfidence(
+        ColorTrackedBall& ball,
+        const cv::Mat& color_frame,
+        const cv::Mat& depth_frame,
+        const rs2_intrinsics& intrinsics,
+        const std::vector<TrackedObject>& bytetrack_objects
+    );
+    
+    // State - Legacy System
     std::vector<ColorProfile> color_profiles_;
     std::vector<ColorTrackedBall> tracked_balls_;
     std::string settings_file_;
+    
+    // State - New System Components
+    BallRegistry ball_registry_;
+    SkinToneFilter skin_filter_;
+    ConfidenceScorer confidence_scorer_;
+    bool use_new_system_;
     
     // Parameters
     static constexpr int NUM_BALLS = 3;

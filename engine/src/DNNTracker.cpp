@@ -445,7 +445,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     // After updates are complete, predict where each tracker will be in the NEXT frame
     // This shows the Kalman filter's trajectory prediction ahead of the current position
     for (auto& ball : logical_ball_trackers_) {
-        if (ball.status == TrackerStatus::TRACKED) {
+        if (ball.status == TrackerStatus::TRACKED || ball.status == TrackerStatus::PREDICTED) {
             // Get current state after update
             ball.update_from_kf();
             
@@ -465,7 +465,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     }
     
     for (auto& hand : logical_hand_trackers_) {
-        if (hand.status == TrackerStatus::TRACKED) {
+        if (hand.status == TrackerStatus::TRACKED || hand.status == TrackerStatus::PREDICTED) {
             // Get current state after update
             hand.update_from_kf();
             

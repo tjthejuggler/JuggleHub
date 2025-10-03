@@ -236,6 +236,42 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         valid_detections.push_back(&det);
     }
     
+    // Remove duplicate detections (identical or nearly identical bboxes)
+    std::vector<const Detection*> unique_detections;
+    std::ofstream dedup_log("engine_debug.log", std::ios::app);
+    dedup_log << "[DEDUP] Filtering duplicates from " << valid_detections.size() << " detections..." << std::endl;
+
+    for (const auto* det : valid_detections) {
+        bool is_duplicate = false;
+        for (const auto* existing : unique_detections) {
+            // Check if bboxes are nearly identical (within 10 pixels tolerance)
+            float bbox_diff = std::abs(det->box.x - existing->box.x) +
+                             std::abs(det->box.y - existing->box.y) +
+                             std::abs(det->box.width - existing->box.width) +
+                             std::abs(det->box.height - existing->box.height);
+            
+            if (bbox_diff < 10.0f) {  // Sum of differences < 10 pixels = duplicate
+                is_duplicate = true;
+                dedup_log << "[DEDUP] Rejected duplicate: bbox[" << det->box.x << "," << det->box.y
+                          << "," << det->box.width << "," << det->box.height << "] matches existing" << std::endl;
+                break;
+            }
+        }
+        
+        if (!is_duplicate) {
+            unique_detections.push_back(det);
+            dedup_log << "[DEDUP] Kept unique detection: bbox[" << det->box.x << "," << det->box.y
+                      << "," << det->box.width << "," << det->box.height << "]" << std::endl;
+        }
+    }
+
+    dedup_log << "[DEDUP] Result: " << unique_detections.size() << " unique detections from "
+              << valid_detections.size() << " total" << std::endl;
+    dedup_log.close();
+
+    // Replace valid_detections with unique_detections for all subsequent operations
+    valid_detections = unique_detections;
+    
     debug_log << "\n[DETECTION DEBUG] ==================" << std::endl;
     debug_log << "[DETECTION DEBUG] Total raw detections: " << last_raw_detections_.size() << std::endl;
     debug_log << "[DETECTION DEBUG] Valid detections after filtering: " << valid_detections.size() << std::endl;
@@ -348,6 +384,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             // Update Kalman filter
             tracker->kf.update(KalmanFilter3D::MeasurementVector(
                 detection->world_pos.x, detection->world_pos.y, detection->world_pos.z));
+            tracker->update_from_kf();  // Sync position field with updated Kalman state
             tracker->status = TrackerStatus::TRACKED;
             tracker->box_2d = detection->box;
             tracker->frames_since_seen = 0;

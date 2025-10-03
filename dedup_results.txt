@@ -1,0 +1,50 @@
+[DEDUP] Filtering duplicates from 31 detections...
+[DEDUP] Kept unique detection: bbox[239,372,39,30]
+[DEDUP] Rejected duplicate: bbox[239,372,39,30] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,38,30] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,38,29] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,39,30] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,38,30] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,39,30] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,39,30] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,38,30] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,39,30] matches existing
+[DEDUP] Rejected duplicate: bbox[239,372,39,30] matches existing
+[DEDUP] Kept unique detection: bbox[142,391,44,36]
+[DEDUP] Rejected duplicate: bbox[142,391,44,36] matches existing
+[DEDUP] Rejected duplicate: bbox[142,391,44,36] matches existing
+[DEDUP] Rejected duplicate: bbox[142,391,44,36] matches existing
+[DEDUP] Rejected duplicate: bbox[142,391,44,36] matches existing
+[DEDUP] Rejected duplicate: bbox[142,391,44,35] matches existing
+[DEDUP] Rejected duplicate: bbox[142,391,44,36] matches existing
+[DEDUP] Kept unique detection: bbox[233,394,41,35]
+[DEDUP] Rejected duplicate: bbox[233,394,41,35] matches existing
+[DEDUP] Rejected duplicate: bbox[233,395,41,34] matches existing
+[DEDUP] Rejected duplicate: bbox[141,391,44,36] matches existing
+[DEDUP] Rejected duplicate: bbox[141,391,44,36] matches existing
+[DEDUP] Rejected duplicate: bbox[141,391,44,36] matches existing
+[DEDUP] Rejected duplicate: bbox[233,395,41,35] matches existing
+[DEDUP] Rejected duplicate: bbox[233,395,41,35] matches existing
+[DEDUP] Rejected duplicate: bbox[232,395,41,35] matches existing
+[DEDUP] Rejected duplicate: bbox[232,395,42,34] matches existing
+[DEDUP] Rejected duplicate: bbox[232,396,42,33] matches existing
+[DEDUP] Rejected duplicate: bbox[232,396,42,34] matches existing
+[DEDUP] Rejected duplicate: bbox[232,396,42,34] matches existing
+[DEDUP] Result: 3 unique detections from 31 total
+[DEDUP] Filtering duplicates from 30 detections...
+[DEDUP] Kept unique detection: bbox[245,383,38,30]
+[DEDUP] Rejected duplicate: bbox[244,383,38,31] matches existing
+[DEDUP] Rejected duplicate: bbox[244,383,38,31] matches existing
+[DEDUP] Kept unique detection: bbox[142,388,44,34]
+[DEDUP] Rejected duplicate: bbox[142,388,43,35] matches existing
+[DEDUP] Rejected duplicate: bbox[142,388,44,35] matches existing
+[DEDUP] Rejected duplicate: bbox[244,383,38,31] matches existing
+[DEDUP] Rejected duplicate: bbox[244,383,38,31] matches existing
+[DEDUP] Rejected duplicate: bbox[244,383,38,31] matches existing
+[DEDUP] Rejected duplicate: bbox[244,383,38,30] matches existing
+[DEDUP] Rejected duplicate: bbox[142,388,44,35] matches existing
+[DEDUP] Rejected duplicate: bbox[142,388,44,35] matches existing
+[DEDUP] Rejected duplicate: bbox[142,388,44,34] matches existing
+[DEDUP] Rejected duplicate: bbox[142,388,44,34] matches existing
+[DEDUP] Rejected duplicate: bbox[244,383,38,31] matches existing
+[DEDUP] Rejected duplicate: bbox[244,383,38,30] matches existing

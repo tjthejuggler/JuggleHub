@@ -1,0 +1,5 @@
+[AUTO-INIT] No active trackers, initializing from detections...
+[AUTO-INIT] Initialized tracker 0 at position (-0.262923, -0.580074, 1.441)
+[AUTO-INIT] Initialized tracker 1 at position (-0.262923, -0.580074, 1.441)
+[AUTO-INIT] Initialized tracker 2 at position (-0.262923, -0.580074, 1.441)
+[AUTO-INIT] Initialized 3 trackers

@@ -2387,23 +2387,30 @@ if PYQT_AVAILABLE:
             if self.show_skeleton_toggle.isChecked():
                 self.log_message(f"UI: Drawing skeleton for {len(frame_data.hands)} hands")
                 
+                # Get frame dimensions for bounds checking
+                frame_width = pixmap.width()
+                frame_height = pixmap.height()
+                
                 # Draw hand wrist markers with bright cyan
                 painter.setPen(QPen(QColor(0, 255, 255), 4)) # Cyan, thick line
                 painter.setBrush(Qt.BrushStyle.NoBrush)
                 for hand in frame_data.hands:
-                    # Draw a large circle for high visibility
-                    center_x, center_y = int(hand.position_2d.x), int(hand.position_2d.y)
-                    radius = 20 # Large radius for visibility
-                    painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
-                    
-                    # Draw hand side label
-                    painter.setPen(QPen(QColor(255, 255, 255)))
-                    painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-                    side_label = "L" if hand.side == "left" else "R"
-                    painter.drawText(center_x - 5, center_y + 5, side_label)
-                    
-                    # Reset pen for keypoints
-                    painter.setPen(QPen(QColor(0, 255, 255), 4))
+                    # Validate wrist position before drawing
+                    if hand.position_2d.x > 0 and hand.position_2d.y > 0 and \
+                       hand.position_2d.x < frame_width and hand.position_2d.y < frame_height:
+                        # Draw a large circle for high visibility
+                        center_x, center_y = int(hand.position_2d.x), int(hand.position_2d.y)
+                        radius = 20 # Large radius for visibility
+                        painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
+                        
+                        # Draw hand side label
+                        painter.setPen(QPen(QColor(255, 255, 255)))
+                        painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+                        side_label = "L" if hand.side == "left" else "R"
+                        painter.drawText(center_x - 5, center_y + 5, side_label)
+                        
+                        # Reset pen for keypoints
+                        painter.setPen(QPen(QColor(0, 255, 255), 4))
                 
                 # Draw all body keypoints
                 painter.setPen(QPen(QColor(0, 255, 255, 200), 3)) # Cyan for skeleton
@@ -2411,12 +2418,15 @@ if PYQT_AVAILABLE:
                 for hand in frame_data.hands:
                     self.log_message(f"UI: Hand has {len(hand.keypoints)} keypoints")
                     for i, kp in enumerate(hand.keypoints):
-                        if kp.confidence > 0.5:
+                        # Validate keypoint position and confidence
+                        if kp.confidence > 0.3 and \
+                           kp.pos_2d.x > 0 and kp.pos_2d.y > 0 and \
+                           kp.pos_2d.x < frame_width and kp.pos_2d.y < frame_height:
                             self.log_message(f"UI: Drawing keypoint {i} at ({kp.pos_2d.x:.1f}, {kp.pos_2d.y:.1f})")
                             # Draw filled circle for keypoint
                             painter.drawEllipse(int(kp.pos_2d.x) - 4, int(kp.pos_2d.y) - 4, 8, 8)
                         else:
-                            self.log_message(f"UI: Skipping keypoint {i} (confidence {kp.confidence:.2f} < 0.5)")
+                            self.log_message(f"UI: Skipping keypoint {i} (confidence {kp.confidence:.2f} or invalid position)")
                     
                     # Draw skeleton connections if we have enough keypoints
                     if len(hand.keypoints) >= 17:  # YOLO pose has 17 keypoints
@@ -2432,7 +2442,12 @@ if PYQT_AVAILABLE:
                             if start_idx < len(hand.keypoints) and end_idx < len(hand.keypoints):
                                 kp_start = hand.keypoints[start_idx]
                                 kp_end = hand.keypoints[end_idx]
-                                if kp_start.confidence > 0.5 and kp_end.confidence > 0.5:
+                                # Validate BOTH keypoints before drawing line
+                                if kp_start.confidence > 0.3 and kp_end.confidence > 0.3 and \
+                                   kp_start.pos_2d.x > 0 and kp_start.pos_2d.y > 0 and \
+                                   kp_end.pos_2d.x > 0 and kp_end.pos_2d.y > 0 and \
+                                   kp_start.pos_2d.x < frame_width and kp_start.pos_2d.y < frame_height and \
+                                   kp_end.pos_2d.x < frame_width and kp_end.pos_2d.y < frame_height:
                                     painter.drawLine(
                                         int(kp_start.pos_2d.x), int(kp_start.pos_2d.y),
                                         int(kp_end.pos_2d.x), int(kp_end.pos_2d.y)

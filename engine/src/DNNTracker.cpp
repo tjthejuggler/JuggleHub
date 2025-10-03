@@ -6,6 +6,7 @@
 #include <set>
 #include <limits>
 #include <vector>
+#include <iomanip>  // for std::setprecision
 
 // --- HELPER FUNCTIONS ---
 
@@ -272,6 +273,14 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         tracker->frames_since_seen++;
     }
     
+    // Log predicted positions for each tracker
+    for (size_t i = 0; i < ball_trackers_list.size(); ++i) {
+        Eigen::Vector3d pred = ball_trackers_list[i]->position;
+        debug_log << "[3D MATCH] Tracker " << ball_trackers_list[i]->logical_id
+                  << " predicted at (" << pred.x() << ", " << pred.y() << ", " << pred.z() << ")"
+                  << " status=" << static_cast<int>(ball_trackers_list[i]->status) << std::endl;
+    }
+    
     if (!ball_trackers_list.empty() && !valid_detections.empty()) {
         // Build cost matrix
         std::vector<std::vector<float>> cost_matrix(
@@ -291,9 +300,41 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         
         // Optimal assignment with 30cm threshold
         const float MAX_ASSOCIATION_DISTANCE = 0.30f;
+        
+        // Log the complete cost matrix
+        debug_log << "[3D MATCH] Cost Matrix (" << ball_trackers_list.size()
+                  << " trackers x " << valid_detections.size() << " detections):" << std::endl;
+        for (size_t i = 0; i < ball_trackers_list.size(); ++i) {
+            debug_log << "[3D MATCH]   Tracker " << ball_trackers_list[i]->logical_id << ": ";
+            for (size_t j = 0; j < valid_detections.size(); ++j) {
+                debug_log << std::fixed << std::setprecision(3) << cost_matrix[i][j] << "m ";
+            }
+            debug_log << std::endl;
+        }
+        debug_log << "[3D MATCH] Distance threshold: " << MAX_ASSOCIATION_DISTANCE << "m" << std::endl;
         auto assignments = optimal_assignment(cost_matrix, MAX_ASSOCIATION_DISTANCE);
         
         debug_log << "[3D Matching] Made " << assignments.size() << " assignments" << std::endl;
+        
+        // Log assignment details
+        debug_log << "[3D MATCH] Assignments made: " << assignments.size() << std::endl;
+        for (const auto& [tracker_idx, detection_idx] : assignments) {
+            debug_log << "[3D MATCH]   Tracker " << ball_trackers_list[tracker_idx]->logical_id
+                      << " <- Detection " << detection_idx
+                      << " (distance: " << cost_matrix[tracker_idx][detection_idx] << "m)" << std::endl;
+        }
+        
+        // Log which trackers were NOT matched
+        for (size_t i = 0; i < ball_trackers_list.size(); ++i) {
+            bool matched = false;
+            for (const auto& [t_idx, d_idx] : assignments) {
+                if (t_idx == i) { matched = true; break; }
+            }
+            if (!matched) {
+                debug_log << "[3D MATCH]   Tracker " << ball_trackers_list[i]->logical_id
+                          << " NOT MATCHED (all distances > threshold)" << std::endl;
+            }
+        }
         
         // Apply assignments
         std::set<int> matched_detection_indices;

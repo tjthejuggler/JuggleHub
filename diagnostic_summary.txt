@@ -1,0 +1,44 @@
+=== DIAGNOSTIC SUMMARY ===
+Total frames with 3D matching:
+586
+
+Frames with active trackers:
+586
+
+Total assignments made:
+830
+
+Trackers that failed to match:
+406
+
+=== SAMPLE COST MATRICES ===
+[3D MATCH] Cost Matrix (3 trackers x 26 detections):
+[3D MATCH]   Tracker 0: 0.117m 0.118m 0.118m 0.117m 0.118m 0.117m 0.117m 0.117m 0.117m 1.174m 1.174m 1.172m 1.176m 1.174m 1.177m 1.208m 1.207m 1.207m 1.207m 1.207m 1.209m 1.209m 1.207m 1.209m 1.209m 0.118m 
+[3D MATCH]   Tracker 1: 0.117m 0.118m 0.118m 0.117m 0.118m 0.117m 0.117m 0.117m 0.117m 1.174m 1.174m 1.172m 1.176m 1.174m 1.177m 1.208m 1.207m 1.207m 1.207m 1.207m 1.209m 1.209m 1.207m 1.209m 1.209m 0.118m 
+[3D MATCH]   Tracker 2: 0.117m 0.118m 0.118m 0.117m 0.118m 0.117m 0.117m 0.117m 0.117m 1.174m 1.174m 1.172m 1.176m 1.174m 1.177m 1.208m 1.207m 1.207m 1.207m 1.207m 1.209m 1.209m 1.207m 1.209m 1.209m 0.118m 
+[3D MATCH] Distance threshold: 0.300m
+[3D Matching] Made 3 assignments
+--
+[3D MATCH] Cost Matrix (3 trackers x 19 detections):
+[3D MATCH]   Tracker 0: 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 1.054m 1.055m 1.054m 1.055m 1.055m 1.055m 1.055m 1.055m 1.054m 
+[3D MATCH]   Tracker 1: 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 1.052m 1.054m 1.052m 1.054m 1.054m 1.054m 1.054m 1.054m 1.052m 
+[3D MATCH]   Tracker 2: 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 1.052m 1.054m 1.052m 1.054m 1.054m 1.054m 1.054m 1.054m 1.052m 
+[3D MATCH] Distance threshold: 0.300m
+[3D Matching] Made 3 assignments
+--
+[3D MATCH] Cost Matrix (3 trackers x 10 detections):
+[3D MATCH]   Tracker 0: 0.055m 0.055m 0.055m 0.055m 0.055m 0.055m 0.056m 0.055m 0.055m 0.056m 
+[3D MATCH]   Tracker 1: 0.090m 0.090m 0.090m 0.090m 0.089m 0.089m 0.091m 0.089m 0.089m 0.091m 
+[3D MATCH]   Tracker 2: 0.090m 0.090m 0.090m 0.090m 0.089m 0.089m 0.091m 0.089m 0.089m 0.091m 
+[3D MATCH] Distance threshold: 0.300m
+[3D Matching] Made 3 assignments
+--
+[3D MATCH] Cost Matrix (3 trackers x 11 detections):
+[3D MATCH]   Tracker 0: 0.057m 0.057m 0.058m 0.057m 0.058m 0.058m 0.058m 0.058m 0.058m 0.058m 0.730m 
+[3D MATCH]   Tracker 1: 0.093m 0.093m 0.095m 0.093m 0.095m 0.095m 0.095m 0.095m 0.095m 0.095m 0.753m 
+[3D MATCH]   Tracker 2: 0.093m 0.093m 0.095m 0.093m 0.095m 0.095m 0.095m 0.095m 0.095m 0.095m 0.753m 
+[3D MATCH] Distance threshold: 0.300m
+[3D Matching] Made 3 assignments
+--
+[3D MATCH] Cost Matrix (3 trackers x 15 detections):
+[3D MATCH]   Tracker 0: 0.062m 0.062m 0.062m 0.062m 0.062m 0.065m 0.062m 0.062m 0.062m 0.062m 0.671m 0.670m 0.671m 0.671m 0.671m 

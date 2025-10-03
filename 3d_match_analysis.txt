@@ -1,0 +1,200 @@
+Build: 3D MATCHING - 2025-10-03
+║  ENGINE WITH 3D MATCHING - BUILD 2025 ║
+3D MATCHING CODE IS RUNNING!
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.262923, -0.580074, 1.441) status=1
+[3D MATCH] Tracker 1 predicted at (-0.262923, -0.580074, 1.441) status=1
+[3D MATCH] Tracker 2 predicted at (-0.262923, -0.580074, 1.441) status=1
+[3D MATCH] Cost Matrix (3 trackers x 26 detections):
+[3D MATCH]   Tracker 0: 0.117m 0.118m 0.118m 0.117m 0.118m 0.117m 0.117m 0.117m 0.117m 1.174m 1.174m 1.172m 1.176m 1.174m 1.177m 1.208m 1.207m 1.207m 1.207m 1.207m 1.209m 1.209m 1.207m 1.209m 1.209m 0.118m 
+[3D MATCH]   Tracker 1: 0.117m 0.118m 0.118m 0.117m 0.118m 0.117m 0.117m 0.117m 0.117m 1.174m 1.174m 1.172m 1.176m 1.174m 1.177m 1.208m 1.207m 1.207m 1.207m 1.207m 1.209m 1.209m 1.207m 1.209m 1.209m 0.118m 
+[3D MATCH]   Tracker 2: 0.117m 0.118m 0.118m 0.117m 0.118m 0.117m 0.117m 0.117m 0.117m 1.174m 1.174m 1.172m 1.176m 1.174m 1.177m 1.208m 1.207m 1.207m 1.207m 1.207m 1.209m 1.209m 1.207m 1.209m 1.209m 0.118m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 0 (distance: 0.117m)
+[3D MATCH]   Tracker 1 <- Detection 3 (distance: 0.117m)
+[3D MATCH]   Tracker 2 <- Detection 5 (distance: 0.117m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.319599, -0.55183, 1.40651) status=1
+[3D MATCH] Tracker 1 predicted at (-0.354495, -0.53444, 1.38528) status=1
+[3D MATCH] Tracker 2 predicted at (-0.354495, -0.53444, 1.38528) status=1
+[3D MATCH] Cost Matrix (3 trackers x 19 detections):
+[3D MATCH]   Tracker 0: 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 0.089m 1.054m 1.055m 1.054m 1.055m 1.055m 1.055m 1.055m 1.055m 1.054m 
+[3D MATCH]   Tracker 1: 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 1.052m 1.054m 1.052m 1.054m 1.054m 1.054m 1.054m 1.054m 1.052m 
+[3D MATCH]   Tracker 2: 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 0.086m 1.052m 1.054m 1.052m 1.054m 1.054m 1.054m 1.054m 1.054m 1.052m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 1 <- Detection 0 (distance: 0.086m)
+[3D MATCH]   Tracker 2 <- Detection 1 (distance: 0.086m)
+[3D MATCH]   Tracker 0 <- Detection 2 (distance: 0.089m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.378479, -0.509099, 1.3692) status=1
+[3D MATCH] Tracker 1 predicted at (-0.38558, -0.501916, 1.36376) status=1
+[3D MATCH] Tracker 2 predicted at (-0.38558, -0.501916, 1.36376) status=1
+[3D MATCH] Cost Matrix (3 trackers x 10 detections):
+[3D MATCH]   Tracker 0: 0.055m 0.055m 0.055m 0.055m 0.055m 0.055m 0.056m 0.055m 0.055m 0.056m 
+[3D MATCH]   Tracker 1: 0.090m 0.090m 0.090m 0.090m 0.089m 0.089m 0.091m 0.089m 0.089m 0.091m 
+[3D MATCH]   Tracker 2: 0.090m 0.090m 0.090m 0.090m 0.089m 0.089m 0.091m 0.089m 0.089m 0.091m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 4 (distance: 0.055m)
+[3D MATCH]   Tracker 1 <- Detection 5 (distance: 0.089m)
+[3D MATCH]   Tracker 2 <- Detection 7 (distance: 0.089m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.43174, -0.454012, 1.33743) status=1
+[3D MATCH] Tracker 1 predicted at (-0.421386, -0.457255, 1.34465) status=1
+[3D MATCH] Tracker 2 predicted at (-0.421386, -0.457255, 1.34465) status=1
+[3D MATCH] Cost Matrix (3 trackers x 11 detections):
+[3D MATCH]   Tracker 0: 0.057m 0.057m 0.058m 0.057m 0.058m 0.058m 0.058m 0.058m 0.058m 0.058m 0.730m 
+[3D MATCH]   Tracker 1: 0.093m 0.093m 0.095m 0.093m 0.095m 0.095m 0.095m 0.095m 0.095m 0.095m 0.753m 
+[3D MATCH]   Tracker 2: 0.093m 0.093m 0.095m 0.093m 0.095m 0.095m 0.095m 0.095m 0.095m 0.095m 0.753m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 0 (distance: 0.057m)
+[3D MATCH]   Tracker 1 <- Detection 1 (distance: 0.093m)
+[3D MATCH]   Tracker 2 <- Detection 3 (distance: 0.093m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.471184, -0.399368, 1.3149) status=1
+[3D MATCH] Tracker 1 predicted at (-0.458066, -0.402815, 1.32295) status=1
+[3D MATCH] Tracker 2 predicted at (-0.458066, -0.402815, 1.32295) status=1
+[3D MATCH] Cost Matrix (3 trackers x 15 detections):
+[3D MATCH]   Tracker 0: 0.062m 0.062m 0.062m 0.062m 0.062m 0.065m 0.062m 0.062m 0.062m 0.062m 0.671m 0.670m 0.671m 0.671m 0.671m 
+[3D MATCH]   Tracker 1: 0.093m 0.093m 0.093m 0.092m 0.092m 0.095m 0.093m 0.092m 0.092m 0.092m 0.690m 0.690m 0.690m 0.690m 0.690m 
+[3D MATCH]   Tracker 2: 0.093m 0.093m 0.093m 0.092m 0.092m 0.095m 0.093m 0.092m 0.092m 0.092m 0.690m 0.690m 0.690m 0.690m 0.690m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 3 (distance: 0.062m)
+[3D MATCH]   Tracker 1 <- Detection 4 (distance: 0.092m)
+[3D MATCH]   Tracker 2 <- Detection 7 (distance: 0.092m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.512234, -0.331587, 1.29046) status=1
+[3D MATCH] Tracker 1 predicted at (-0.498232, -0.332675, 1.29921) status=1
+[3D MATCH] Tracker 2 predicted at (-0.498232, -0.332675, 1.29921) status=1
+[3D MATCH] Cost Matrix (3 trackers x 23 detections):
+[3D MATCH]   Tracker 0: 0.077m 0.077m 0.077m 0.077m 0.078m 0.078m 0.078m 0.077m 0.077m 0.077m 0.426m 0.426m 0.428m 0.614m 0.614m 0.614m 0.613m 0.614m 0.614m 0.614m 0.614m 0.614m 0.614m 
+[3D MATCH]   Tracker 1: 0.099m 0.099m 0.099m 0.100m 0.100m 0.100m 0.100m 0.100m 0.100m 0.100m 0.425m 0.425m 0.427m 0.626m 0.626m 0.626m 0.624m 0.626m 0.626m 0.626m 0.626m 0.626m 0.626m 
+[3D MATCH]   Tracker 2: 0.099m 0.099m 0.099m 0.100m 0.100m 0.100m 0.100m 0.100m 0.100m 0.100m 0.425m 0.425m 0.427m 0.626m 0.626m 0.626m 0.624m 0.626m 0.626m 0.626m 0.626m 0.626m 0.626m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 0 (distance: 0.077m)
+[3D MATCH]   Tracker 1 <- Detection 1 (distance: 0.099m)
+[3D MATCH]   Tracker 2 <- Detection 2 (distance: 0.099m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.549842, -0.25847, 1.27059) status=1
+[3D MATCH] Tracker 1 predicted at (-0.538623, -0.254936, 1.27907) status=1
+[3D MATCH] Tracker 2 predicted at (-0.538623, -0.254936, 1.27907) status=1
+[3D MATCH] Cost Matrix (3 trackers x 37 detections):
+[3D MATCH]   Tracker 0: 0.098m 0.096m 0.096m 0.096m 0.096m 0.096m 0.096m 0.096m 0.098m 0.098m 0.320m 0.320m 0.320m 0.320m 0.320m 0.320m 0.319m 0.320m 0.320m 0.320m 0.566m 0.565m 0.390m 0.390m 0.387m 0.566m 0.566m 0.566m 0.387m 0.390m 0.390m 0.387m 0.566m 0.566m 0.566m 0.387m 0.387m 
+[3D MATCH]   Tracker 1: 0.113m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.113m 0.113m 0.308m 0.308m 0.308m 0.309m 0.308m 0.308m 0.307m 0.309m 0.308m 0.309m 0.571m 0.570m 0.386m 0.386m 0.383m 0.571m 0.571m 0.571m 0.383m 0.386m 0.386m 0.383m 0.571m 0.571m 0.571m 0.383m 0.383m 
+[3D MATCH]   Tracker 2: 0.113m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.113m 0.113m 0.308m 0.308m 0.308m 0.309m 0.308m 0.308m 0.307m 0.309m 0.308m 0.309m 0.571m 0.570m 0.386m 0.386m 0.383m 0.571m 0.571m 0.571m 0.383m 0.386m 0.386m 0.383m 0.571m 0.571m 0.571m 0.383m 0.383m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 1 (distance: 0.096m)
+[3D MATCH]   Tracker 1 <- Detection 2 (distance: 0.111m)
+[3D MATCH]   Tracker 2 <- Detection 3 (distance: 0.111m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.586303, -0.173818, 1.24481) status=1
+[3D MATCH] Tracker 1 predicted at (-0.575033, -0.165502, 1.24822) status=1
+[3D MATCH] Tracker 2 predicted at (-0.575033, -0.165502, 1.24822) status=1
+[3D MATCH] Cost Matrix (3 trackers x 30 detections):
+[3D MATCH]   Tracker 0: 0.304m 0.304m 0.304m 0.304m 0.304m 0.304m 0.304m 0.304m 0.304m 0.304m 0.103m 0.103m 0.103m 0.103m 0.103m 0.103m 0.103m 0.103m 0.103m 0.103m 0.320m 0.320m 0.320m 0.321m 0.320m 0.320m 0.320m 0.321m 0.321m 0.320m 
+[3D MATCH]   Tracker 1: 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.308m 0.308m 0.308m 0.309m 0.308m 0.308m 0.308m 0.309m 0.309m 0.308m 
+[3D MATCH]   Tracker 2: 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.286m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.111m 0.308m 0.308m 0.308m 0.309m 0.308m 0.308m 0.308m 0.309m 0.309m 0.308m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 10 (distance: 0.103m)
+[3D MATCH]   Tracker 1 <- Detection 12 (distance: 0.111m)
+[3D MATCH]   Tracker 2 <- Detection 16 (distance: 0.111m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.622096, -0.0780966, 1.21768) status=1
+[3D MATCH] Tracker 1 predicted at (-0.611813, -0.0665082, 1.22302) status=1
+[3D MATCH] Tracker 2 predicted at (-0.611813, -0.0665082, 1.22302) status=1
+[3D MATCH] Cost Matrix (3 trackers x 29 detections):
+[3D MATCH]   Tracker 0: 0.391m 0.391m 0.391m 0.391m 0.391m 0.391m 0.391m 0.391m 0.391m 0.391m 0.316m 0.316m 0.315m 0.316m 0.315m 0.316m 0.315m 0.315m 0.316m 0.316m 0.105m 0.107m 0.107m 0.107m 0.107m 0.105m 0.107m 0.107m 0.107m 
+[3D MATCH]   Tracker 1: 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.300m 0.300m 0.299m 0.300m 0.299m 0.300m 0.299m 0.299m 0.300m 0.300m 0.108m 0.109m 0.109m 0.109m 0.109m 0.107m 0.109m 0.109m 0.109m 
+[3D MATCH]   Tracker 2: 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.376m 0.300m 0.300m 0.299m 0.300m 0.299m 0.300m 0.299m 0.299m 0.300m 0.300m 0.108m 0.109m 0.109m 0.109m 0.109m 0.107m 0.109m 0.109m 0.109m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 20 (distance: 0.105m)
+[3D MATCH]   Tracker 1 <- Detection 25 (distance: 0.107m)
+[3D MATCH]   Tracker 2 <- Detection 21 (distance: 0.109m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.662379, 0.0347263, 1.19306) status=1
+[3D MATCH] Tracker 1 predicted at (-0.652338, 0.0484639, 1.19986) status=1
+[3D MATCH] Tracker 2 predicted at (-0.652921, 0.0490464, 1.19986) status=1
+[3D MATCH] Cost Matrix (3 trackers x 22 detections):
+[3D MATCH]   Tracker 0: 0.545m 0.545m 0.545m 0.546m 0.549m 0.549m 0.549m 0.544m 0.549m 0.544m 0.372m 0.372m 0.372m 0.372m 0.372m 0.372m 0.372m 0.372m 0.372m 0.147m 0.149m 0.372m 
+[3D MATCH]   Tracker 1: 0.537m 0.537m 0.537m 0.537m 0.540m 0.540m 0.540m 0.535m 0.540m 0.535m 0.360m 0.360m 0.360m 0.360m 0.360m 0.360m 0.360m 0.360m 0.360m 0.146m 0.147m 0.361m 
+[3D MATCH]   Tracker 2: 0.537m 0.537m 0.537m 0.538m 0.541m 0.541m 0.541m 0.536m 0.541m 0.536m 0.360m 0.360m 0.360m 0.360m 0.360m 0.360m 0.360m 0.360m 0.360m 0.145m 0.147m 0.361m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 2
+[3D MATCH]   Tracker 2 <- Detection 19 (distance: 0.145m)
+[3D MATCH]   Tracker 1 <- Detection 20 (distance: 0.147m)
+[3D MATCH]   Tracker 0 NOT MATCHED (all distances > threshold)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.701156, 0.127143, 1.16983) status=1
+[3D MATCH] Tracker 1 predicted at (-0.691816, 0.17915, 1.18586) status=1
+[3D MATCH] Tracker 2 predicted at (-0.693156, 0.178962, 1.18551) status=1
+[3D MATCH] Cost Matrix (3 trackers x 30 detections):
+[3D MATCH]   Tracker 0: 0.697m 0.697m 0.697m 0.697m 0.697m 0.697m 0.695m 0.698m 0.698m 0.697m 0.467m 0.467m 0.467m 0.467m 0.467m 0.467m 0.467m 0.467m 0.466m 0.466m 0.123m 0.122m 0.120m 0.121m 0.121m 0.121m 0.170m 0.121m 0.121m 0.121m 
+[3D MATCH]   Tracker 1: 0.710m 0.710m 0.710m 0.710m 0.710m 0.710m 0.709m 0.712m 0.712m 0.711m 0.472m 0.472m 0.472m 0.472m 0.472m 0.472m 0.472m 0.472m 0.471m 0.471m 0.093m 0.092m 0.090m 0.091m 0.091m 0.091m 0.142m 0.091m 0.091m 0.091m 
+[3D MATCH]   Tracker 2: 0.711m 0.711m 0.711m 0.711m 0.711m 0.711m 0.710m 0.713m 0.713m 0.711m 0.473m 0.473m 0.473m 0.473m 0.473m 0.473m 0.473m 0.473m 0.472m 0.472m 0.094m 0.093m 0.091m 0.092m 0.092m 0.092m 0.143m 0.092m 0.092m 0.092m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 1 <- Detection 22 (distance: 0.090m)
+[3D MATCH]   Tracker 2 <- Detection 23 (distance: 0.092m)
+[3D MATCH]   Tracker 0 <- Detection 24 (distance: 0.121m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.728736, 0.266895, 1.16499) status=1
+[3D MATCH] Tracker 1 predicted at (-0.714818, 0.292955, 1.17853) status=1
+[3D MATCH] Tracker 2 predicted at (-0.715851, 0.293337, 1.17826) status=1
+[3D MATCH] Cost Matrix (3 trackers x 34 detections):
+[3D MATCH]   Tracker 0: 0.839m 0.841m 0.841m 0.841m 0.841m 0.839m 0.841m 0.839m 0.837m 0.837m 0.837m 0.552m 0.552m 0.552m 0.552m 0.552m 0.552m 0.552m 0.552m 0.552m 0.552m 0.552m 0.552m 0.357m 0.133m 0.133m 0.136m 0.134m 0.133m 0.134m 0.133m 0.134m 0.134m 0.134m 
+[3D MATCH]   Tracker 1: 0.851m 0.852m 0.852m 0.852m 0.853m 0.851m 0.852m 0.850m 0.849m 0.849m 0.849m 0.560m 0.560m 0.560m 0.560m 0.560m 0.560m 0.560m 0.560m 0.560m 0.560m 0.560m 0.560m 0.349m 0.120m 0.120m 0.123m 0.121m 0.120m 0.121m 0.120m 0.121m 0.121m 0.121m 
+[3D MATCH]   Tracker 2: 0.852m 0.853m 0.853m 0.853m 0.854m 0.852m 0.853m 0.851m 0.850m 0.850m 0.850m 0.561m 0.561m 0.561m 0.561m 0.561m 0.561m 0.561m 0.561m 0.561m 0.561m 0.561m 0.561m 0.349m 0.121m 0.121m 0.124m 0.122m 0.121m 0.122m 0.121m 0.122m 0.122m 0.122m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 1 <- Detection 24 (distance: 0.120m)
+[3D MATCH]   Tracker 2 <- Detection 25 (distance: 0.121m)
+[3D MATCH]   Tracker 0 <- Detection 28 (distance: 0.133m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.737948, 0.37686, 1.17113) status=1
+[3D MATCH] Tracker 1 predicted at (-0.723437, 0.392612, 1.18496) status=1
+[3D MATCH] Tracker 2 predicted at (-0.724232, 0.392907, 1.18475) status=1
+[3D MATCH] Cost Matrix (3 trackers x 30 detections):
+[3D MATCH]   Tracker 0: 0.952m 0.952m 0.952m 0.951m 0.951m 0.951m 0.951m 0.951m 0.951m 0.951m 0.600m 0.600m 0.599m 0.600m 0.600m 0.600m 0.600m 0.600m 0.600m 0.600m 0.187m 0.187m 0.189m 0.189m 0.189m 0.186m 0.187m 0.189m 0.189m 0.189m 
+[3D MATCH]   Tracker 1: 0.963m 0.963m 0.963m 0.962m 0.962m 0.962m 0.962m 0.962m 0.962m 0.962m 0.610m 0.610m 0.609m 0.610m 0.610m 0.610m 0.610m 0.610m 0.610m 0.610m 0.179m 0.179m 0.181m 0.182m 0.182m 0.178m 0.179m 0.182m 0.182m 0.181m 
+[3D MATCH]   Tracker 2: 0.964m 0.964m 0.964m 0.963m 0.963m 0.963m 0.963m 0.963m 0.963m 0.963m 0.611m 0.611m 0.609m 0.611m 0.611m 0.611m 0.611m 0.611m 0.611m 0.611m 0.180m 0.180m 0.182m 0.183m 0.183m 0.179m 0.180m 0.183m 0.183m 0.182m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 1 <- Detection 25 (distance: 0.178m)
+[3D MATCH]   Tracker 2 <- Detection 20 (distance: 0.180m)
+[3D MATCH]   Tracker 0 <- Detection 21 (distance: 0.187m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.731096, 0.4772, 1.18957) status=1
+[3D MATCH] Tracker 1 predicted at (-0.714595, 0.491787, 1.2045) status=1
+[3D MATCH] Tracker 2 predicted at (-0.714706, 0.492017, 1.20433) status=1
+[3D MATCH] Cost Matrix (3 trackers x 30 detections):
+[3D MATCH]   Tracker 0: 1.065m 1.065m 1.065m 1.061m 1.061m 1.061m 1.061m 1.061m 1.061m 1.061m 0.670m 0.669m 0.669m 0.669m 0.669m 0.669m 0.669m 0.669m 0.669m 0.217m 0.217m 0.218m 0.217m 0.217m 0.217m 0.220m 0.219m 0.217m 0.217m 0.669m 
+[3D MATCH]   Tracker 1: 1.078m 1.078m 1.078m 1.073m 1.073m 1.073m 1.073m 1.073m 1.073m 1.073m 0.682m 0.680m 0.680m 0.680m 0.680m 0.680m 0.680m 0.680m 0.680m 0.219m 0.219m 0.220m 0.219m 0.219m 0.219m 0.222m 0.221m 0.219m 0.219m 0.681m 
+[3D MATCH]   Tracker 2: 1.078m 1.078m 1.078m 1.074m 1.074m 1.074m 1.074m 1.074m 1.074m 1.074m 0.682m 0.681m 0.681m 0.681m 0.681m 0.681m 0.681m 0.681m 0.681m 0.219m 0.219m 0.220m 0.219m 0.219m 0.219m 0.222m 0.221m 0.219m 0.219m 0.681m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 19 (distance: 0.217m)
+[3D MATCH]   Tracker 1 <- Detection 20 (distance: 0.219m)
+[3D MATCH]   Tracker 2 <- Detection 22 (distance: 0.219m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.714813, 0.583549, 1.21695) status=1
+[3D MATCH] Tracker 1 predicted at (-0.697151, 0.590306, 1.23166) status=1
+[3D MATCH] Tracker 2 predicted at (-0.697224, 0.590486, 1.23153) status=1
+[3D MATCH] Cost Matrix (3 trackers x 30 detections):
+[3D MATCH]   Tracker 0: 1.126m 1.126m 1.126m 1.126m 1.126m 1.126m 1.126m 1.126m 1.126m 0.674m 0.678m 0.678m 0.673m 0.674m 0.673m 0.674m 0.673m 0.673m 0.674m 0.278m 0.278m 0.278m 0.278m 0.278m 0.278m 0.278m 0.278m 0.278m 0.278m 1.126m 
+[3D MATCH]   Tracker 1: 1.139m 1.139m 1.139m 1.139m 1.139m 1.139m 1.139m 1.139m 1.139m 0.687m 0.691m 0.691m 0.686m 0.687m 0.686m 0.687m 0.686m 0.686m 0.687m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 1.139m 
+[3D MATCH]   Tracker 2: 1.139m 1.139m 1.139m 1.139m 1.139m 1.139m 1.139m 1.139m 1.139m 0.688m 0.691m 0.691m 0.686m 0.688m 0.686m 0.688m 0.686m 0.686m 0.688m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 0.284m 1.139m 
+[3D MATCH] Distance threshold: 0.300m
+[3D MATCH] Assignments made: 3
+[3D MATCH]   Tracker 0 <- Detection 19 (distance: 0.278m)
+[3D MATCH]   Tracker 1 <- Detection 20 (distance: 0.284m)
+[3D MATCH]   Tracker 2 <- Detection 21 (distance: 0.284m)
+3D MATCHING CODE IS RUNNING!
+[3D MATCH] Tracker 0 predicted at (-0.681653, 0.662351, 1.26076) status=1

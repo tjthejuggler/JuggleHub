@@ -147,6 +147,87 @@ void Engine::run() {
             auto unmatched_detections = dnn_tracker_->get_unmatched_detections();
             color_tracked_balls = dnn_tracker_->get_color_tracked_balls();
             
+            // Get visualization data from DNNTracker
+            auto predicted_positions = dnn_tracker_->get_predicted_positions();
+            auto predicted_labels = dnn_tracker_->get_predicted_labels();
+            auto filtered_dets = dnn_tracker_->get_filtered_detections();
+            auto filter_reasons = dnn_tracker_->get_filter_reasons();
+            auto associations = dnn_tracker_->get_tracker_associations();
+            auto assoc_distances = dnn_tracker_->get_association_distances();
+            auto new_trackers = dnn_tracker_->get_newly_initialized_trackers();
+            auto new_positions = dnn_tracker_->get_new_tracker_positions();
+            auto logical_ball_trackers = dnn_tracker_->get_logical_ball_trackers();
+            auto logical_hand_trackers = dnn_tracker_->get_logical_hand_trackers();
+            
+            // Populate Kalman Predictions (Step 2)
+            for (size_t i = 0; i < predicted_positions.size(); ++i) {
+                auto* pred = frame_data.add_kalman_predictions();
+                auto* pos = pred->mutable_predicted_pos();
+                pos->set_x(predicted_positions[i].x);
+                pos->set_y(predicted_positions[i].y);
+                pos->set_z(predicted_positions[i].z);
+                // Convert label string (e.g., "ball_0") to logical_id integer
+                try {
+                    size_t underscore_pos = predicted_labels[i].find_last_of('_');
+                    if (underscore_pos != std::string::npos) {
+                        int logical_id = std::stoi(predicted_labels[i].substr(underscore_pos + 1));
+                        pred->set_logical_id(logical_id);
+                    }
+                } catch (...) {
+                    // If conversion fails, skip setting logical_id
+                }
+            }
+            
+            // Populate Filtered Detections (Step 4)
+            for (size_t i = 0; i < filtered_dets.size(); ++i) {
+                auto* filt = frame_data.add_filtered_detections();
+                auto* bbox = filt->mutable_box();
+                bbox->set_x(filtered_dets[i].box.x);
+                bbox->set_y(filtered_dets[i].box.y);
+                bbox->set_width(filtered_dets[i].box.width);
+                bbox->set_height(filtered_dets[i].box.height);
+                filt->set_reason(filter_reasons[i]);
+            }
+            
+            // Populate Tracker Associations (Step 5)
+            for (size_t i = 0; i < associations.size(); ++i) {
+                auto* assoc = frame_data.add_tracker_associations();
+                assoc->set_tracker_id(associations[i].first);
+                assoc->set_detection_index(associations[i].second);
+                assoc->set_distance_3d(assoc_distances[i]);
+            }
+            
+            // Populate New Trackers (Step 6)
+            for (size_t i = 0; i < new_trackers.size(); ++i) {
+                auto* nt = frame_data.add_new_trackers();
+                nt->set_logical_id(new_trackers[i]);
+                auto* pos = nt->mutable_initial_pos();
+                pos->set_x(new_positions[i].x);
+                pos->set_y(new_positions[i].y);
+                pos->set_z(new_positions[i].z);
+            }
+            
+            // Populate Occlusion States (Step 9)
+            for (const auto& tracker : logical_ball_trackers) {
+                if (tracker.status == TrackerStatus::OCCLUDED) {
+                    auto* occ = frame_data.add_occlusion_states();
+                    occ->set_logical_id(tracker.logical_id);
+                    occ->set_occluding_hand_id(tracker.parent_id);
+                }
+            }
+            
+            // Populate Color Search Regions (Step 11)
+            if (dnn_tracker_->get_color_tracker()) {
+                auto search_regions = dnn_tracker_->get_color_tracker()->get_search_regions();
+                for (const auto& [center, radius] : search_regions) {
+                    auto* region = frame_data.add_color_search_regions();
+                    auto* c = region->mutable_search_center();
+                    c->set_x(center.x);
+                    c->set_y(center.y);
+                    region->set_search_radius(radius);
+                }
+            }
+            
             DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": DNNTracker returned ",
                       tracked_objects.size(), " tracked objects, ",
                       last_raw_detections_.size(), " raw detections, and ",
@@ -285,6 +366,20 @@ void Engine::run() {
                 auto* proj_pos_2d = ball->mutable_projected_pos_2d();
                 proj_pos_2d->set_x(projected_pos.x);
                 proj_pos_2d->set_y(projected_pos.y);
+                
+                // Add ball state (Step 8) - find corresponding logical tracker to get state
+                if (use_dnn_tracker_) {
+                    auto logical_ball_trackers = dnn_tracker_->get_logical_ball_trackers();
+                    for (const auto& tracker : logical_ball_trackers) {
+                        if (tracker.logical_id == obj.logical_id) {
+                            auto* ball_state = frame_data.add_ball_states();
+                            ball_state->set_logical_id(obj.logical_id);
+                            ball_state->set_state(static_cast<juggler::v1::BallState::State>(tracker.ball_state));
+                            ball_state->set_frames_in_state(tracker.frames_in_current_state);
+                            break;
+                        }
+                    }
+                }
 
             } else if (obj.class_name == "hand") {
                 auto* hand = frame_data.add_hands();

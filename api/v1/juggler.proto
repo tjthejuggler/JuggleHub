@@ -133,6 +133,71 @@ message SystemStatus {
   uint64 timestamp_us = 7;          // Status timestamp
 }
 
+// STEP 2: Kalman Predictions - Predicted positions before detection
+message KalmanPrediction {
+  int32 logical_id = 1;             // Tracker ID
+  Vector3 predicted_pos = 2;        // Predicted 3D position
+  Vector2 predicted_pos_2d = 3;     // Projected 2D position
+  bool is_in_freefall = 4;          // Whether gravity is being applied
+}
+
+// STEP 4: Filtered/Rejected Detections - Detections that failed depth filtering
+message FilteredDetection {
+  BoundingBox2D box = 1;            // Original bounding box
+  string reason = 2;                // Reason for filtering (e.g., "depth_out_of_range", "duplicate")
+  float depth_value = 3;            // Depth value that caused filtering
+}
+
+// STEP 5: 3D Distance Association - Shows matching between trackers and detections
+message TrackerAssociation {
+  int32 tracker_id = 1;             // Tracker logical ID
+  int32 detection_index = 2;        // Index into raw_detections
+  float distance_3d = 3;            // 3D distance used for matching
+  Vector3 tracker_pos = 4;          // Tracker predicted position
+  Vector3 detection_pos = 5;        // Detection 3D position
+}
+
+// STEP 6: Auto-Initialization - Newly initialized trackers
+message NewTracker {
+  int32 logical_id = 1;             // New tracker ID
+  Vector3 initial_pos = 2;          // Initial 3D position
+  Vector2 initial_pos_2d = 3;       // Initial 2D position
+  int32 detection_index = 4;        // Which detection initialized this tracker
+}
+
+// STEP 8: Throw/Catch State - Current state of each ball
+message BallState {
+  int32 logical_id = 1;             // Ball ID
+  enum State {
+    IN_FLIGHT = 0;
+    TRANSITIONING = 1;
+    HELD = 2;
+  }
+  State state = 2;                  // Current state
+  int32 associated_hand_id = 3;     // Hand ID if held/transitioning (-1 if in flight)
+  float confidence = 4;             // State confidence score
+  int32 frames_in_state = 5;        // How many frames in current state
+}
+
+// STEP 9: Legacy Occlusion - Occlusion states
+message OcclusionState {
+  int32 logical_id = 1;             // Ball ID
+  bool is_occluded = 2;             // Whether ball is occluded
+  int32 occluding_hand_id = 3;      // Which hand is occluding (-1 if not occluded)
+  float distance_to_hand = 4;       // Distance to occluding hand
+}
+
+// STEP 11: Color Tracking Search - Shows search regions and found blobs
+message ColorSearchRegion {
+  int32 logical_id = 1;             // Ball ID
+  string color_name = 2;            // Color being searched for
+  Vector2 search_center = 3;        // Center of search region
+  float search_radius = 4;          // Search radius in pixels
+  Vector2 blob_center = 5;          // Found blob center (0,0 if not found)
+  float blob_area = 6;              // Blob area in pixels
+  bool found = 7;                   // Whether blob was found
+}
+
 // Main frame data packet sent from engine to hub
 message FrameData {
   uint64 timestamp_us = 1;          // Frame timestamp in microseconds
@@ -148,13 +213,22 @@ message FrameData {
   uint32 frame_number = 9;          // Sequential frame number
   
   // Optional image data (base64 encoded for streaming)
-  repeated BoundingBox2D raw_detections = 10; // All raw YOLO detections
-  repeated BoundingBox2D unmatched_detections = 16; // Detections that passed filtering but weren't matched
+  repeated BoundingBox2D raw_detections = 10; // All raw YOLO detections (STEP 3)
+  repeated BoundingBox2D unmatched_detections = 16; // Detections that passed filtering but weren't matched (STEP 13)
   bytes color_image_b64 = 11;      // Base64 encoded color image
   bytes depth_image_b64 = 12;      // Base64 encoded depth image
   bool ir_projector_active = 13;   // Status of the IR projector
-  repeated ColorTrackedBall color_tracked_balls = 14; // New simplified color tracking
+  repeated ColorTrackedBall color_tracked_balls = 14; // New simplified color tracking (STEP 11)
   repeated ThrowCatchEvent throw_catch_events = 15; // Throw and catch events for apps
+  
+  // NEW: Visualization data for pipeline steps
+  repeated KalmanPrediction kalman_predictions = 17;      // STEP 2: Predicted positions
+  repeated FilteredDetection filtered_detections = 18;    // STEP 4: Rejected detections
+  repeated TrackerAssociation tracker_associations = 19;  // STEP 5: Matching visualization
+  repeated NewTracker new_trackers = 20;                  // STEP 6: Auto-initialized trackers
+  repeated BallState ball_states = 21;                    // STEP 8: Throw/catch states
+  repeated OcclusionState occlusion_states = 22;          // STEP 9: Occlusion info
+  repeated ColorSearchRegion color_search_regions = 23;   // STEP 11: Color tracking search
 }
 
 // Command and control API for managing engine modules

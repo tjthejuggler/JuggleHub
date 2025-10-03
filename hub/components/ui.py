@@ -1589,61 +1589,150 @@ if PYQT_AVAILABLE:
             self.color_profile_status_label.setWordWrap(True)
             calibration_layout.addWidget(self.color_profile_status_label)
             
-            # --- Visualization Toggles (3 rows, compact buttons) ---
-            # First row of toggles
+            # --- Visualization Toggles (Pipeline Steps) ---
+            # Row 1: Early pipeline steps
             toggles_row1 = QHBoxLayout()
             toggles_row1.setSpacing(5)
-            self.show_raw_detections_toggle = QPushButton("YOLO Detections")
+            
+            self.show_kalman_predictions_toggle = QPushButton("2. Kalman Predictions")
+            self.show_kalman_predictions_toggle.setCheckable(True)
+            self.show_kalman_predictions_toggle.setChecked(False)
+            self.show_kalman_predictions_toggle.clicked.connect(self.toggle_overlays)
+            self.show_kalman_predictions_toggle.setMaximumWidth(170)
+            self.show_kalman_predictions_toggle.setToolTip("Show predicted positions from Kalman filters (blue circles)")
+            toggles_row1.addWidget(self.show_kalman_predictions_toggle)
+            
+            self.show_raw_detections_toggle = QPushButton("3. YOLO Detections")
             self.show_raw_detections_toggle.setCheckable(True)
             self.show_raw_detections_toggle.setChecked(False)
             self.show_raw_detections_toggle.clicked.connect(self.toggle_overlays)
-            self.show_raw_detections_toggle.setMaximumWidth(150)
+            self.show_raw_detections_toggle.setMaximumWidth(160)
+            self.show_raw_detections_toggle.setToolTip("Show raw YOLO detections (red boxes)")
             toggles_row1.addWidget(self.show_raw_detections_toggle)
-
-            self.show_unmatched_detections_toggle = QPushButton("Unmatched Detections")
-            self.show_unmatched_detections_toggle.setCheckable(True)
-            self.show_unmatched_detections_toggle.setChecked(True)
-            self.show_unmatched_detections_toggle.clicked.connect(self.toggle_overlays)
-            self.show_unmatched_detections_toggle.setMaximumWidth(180)
-            toggles_row1.addWidget(self.show_unmatched_detections_toggle)
+            
+            self.show_filtered_detections_toggle = QPushButton("4. Filtered Detections")
+            self.show_filtered_detections_toggle.setCheckable(True)
+            self.show_filtered_detections_toggle.setChecked(False)
+            self.show_filtered_detections_toggle.clicked.connect(self.toggle_overlays)
+            self.show_filtered_detections_toggle.setMaximumWidth(170)
+            self.show_filtered_detections_toggle.setToolTip("Show rejected detections (gray crossed out)")
+            toggles_row1.addWidget(self.show_filtered_detections_toggle)
+            
             toggles_row1.addStretch()
             calibration_layout.addLayout(toggles_row1)
             
-            # Second row of toggles
+            # Row 2: Matching and initialization
             toggles_row2 = QHBoxLayout()
             toggles_row2.setSpacing(5)
-            self.show_tracked_boxes_toggle = QPushButton("ByteTrack Boxes")
+            
+            self.show_associations_toggle = QPushButton("5. 3D Matching")
+            self.show_associations_toggle.setCheckable(True)
+            self.show_associations_toggle.setChecked(False)
+            self.show_associations_toggle.clicked.connect(self.toggle_overlays)
+            self.show_associations_toggle.setMaximumWidth(140)
+            self.show_associations_toggle.setToolTip("Show tracker-detection associations (green lines)")
+            toggles_row2.addWidget(self.show_associations_toggle)
+            
+            self.show_new_trackers_toggle = QPushButton("6. Auto-Init")
+            self.show_new_trackers_toggle.setCheckable(True)
+            self.show_new_trackers_toggle.setChecked(False)
+            self.show_new_trackers_toggle.clicked.connect(self.toggle_overlays)
+            self.show_new_trackers_toggle.setMaximumWidth(120)
+            self.show_new_trackers_toggle.setToolTip("Show newly initialized trackers (yellow stars)")
+            toggles_row2.addWidget(self.show_new_trackers_toggle)
+            
+            self.show_hand_tracking_toggle = QPushButton("7. Hand Tracking")
+            self.show_hand_tracking_toggle.setCheckable(True)
+            self.show_hand_tracking_toggle.setChecked(False)
+            self.show_hand_tracking_toggle.clicked.connect(self.toggle_overlays)
+            self.show_hand_tracking_toggle.setMaximumWidth(150)
+            self.show_hand_tracking_toggle.setToolTip("Show hand detections (purple boxes)")
+            toggles_row2.addWidget(self.show_hand_tracking_toggle)
+            
+            toggles_row2.addStretch()
+            calibration_layout.addLayout(toggles_row2)
+            
+            # Row 3: State and occlusion
+            toggles_row3 = QHBoxLayout()
+            toggles_row3.setSpacing(5)
+            
+            self.show_ball_states_toggle = QPushButton("8. Throw/Catch States")
+            self.show_ball_states_toggle.setCheckable(True)
+            self.show_ball_states_toggle.setChecked(False)
+            self.show_ball_states_toggle.clicked.connect(self.toggle_overlays)
+            self.show_ball_states_toggle.setMaximumWidth(180)
+            self.show_ball_states_toggle.setToolTip("Show ball states (orange indicators with labels)")
+            toggles_row3.addWidget(self.show_ball_states_toggle)
+            
+            self.show_occlusion_toggle = QPushButton("9. Occlusion")
+            self.show_occlusion_toggle.setCheckable(True)
+            self.show_occlusion_toggle.setChecked(False)
+            self.show_occlusion_toggle.clicked.connect(self.toggle_overlays)
+            self.show_occlusion_toggle.setMaximumWidth(130)
+            self.show_occlusion_toggle.setToolTip("Show occlusion states")
+            toggles_row3.addWidget(self.show_occlusion_toggle)
+            
+            self.show_skeleton_toggle = QPushButton("10. Pose Skeleton")
+            self.show_skeleton_toggle.setCheckable(True)
+            self.show_skeleton_toggle.setChecked(False)
+            self.show_skeleton_toggle.clicked.connect(self.toggle_overlays)
+            self.show_skeleton_toggle.setMaximumWidth(150)
+            self.show_skeleton_toggle.setToolTip("Show pose estimation keypoints (cyan skeleton)")
+            toggles_row3.addWidget(self.show_skeleton_toggle)
+            
+            toggles_row3.addStretch()
+            calibration_layout.addLayout(toggles_row3)
+            
+            # Row 4: Color tracking and final results
+            toggles_row4 = QHBoxLayout()
+            toggles_row4.setSpacing(5)
+            
+            self.show_color_search_toggle = QPushButton("11. Color Search")
+            self.show_color_search_toggle.setCheckable(True)
+            self.show_color_search_toggle.setChecked(False)
+            self.show_color_search_toggle.clicked.connect(self.toggle_overlays)
+            self.show_color_search_toggle.setMaximumWidth(150)
+            self.show_color_search_toggle.setToolTip("Show color tracking search regions")
+            toggles_row4.addWidget(self.show_color_search_toggle)
+            
+            self.show_color_tracker_toggle = QPushButton("11. Color Tracking")
+            self.show_color_tracker_toggle.setCheckable(True)
+            self.show_color_tracker_toggle.setChecked(True)
+            self.show_color_tracker_toggle.clicked.connect(self.toggle_overlays)
+            self.show_color_tracker_toggle.setMaximumWidth(160)
+            self.show_color_tracker_toggle.setToolTip("Show color-tracked balls (colored circles)")
+            toggles_row4.addWidget(self.show_color_tracker_toggle)
+            
+            self.show_tracked_boxes_toggle = QPushButton("12. Final Trackers")
             self.show_tracked_boxes_toggle.setCheckable(True)
             self.show_tracked_boxes_toggle.setChecked(False)
             self.show_tracked_boxes_toggle.clicked.connect(self.toggle_overlays)
             self.show_tracked_boxes_toggle.setMaximumWidth(150)
-            toggles_row2.addWidget(self.show_tracked_boxes_toggle)
-
-            self.show_color_tracker_toggle = QPushButton("Color Tracking")
-            self.show_color_tracker_toggle.setCheckable(True)
-            self.show_color_tracker_toggle.setChecked(True)
-            self.show_color_tracker_toggle.clicked.connect(self.toggle_overlays)
-            self.show_color_tracker_toggle.setMaximumWidth(130)
-            toggles_row2.addWidget(self.show_color_tracker_toggle)
-            toggles_row2.addStretch()
-            calibration_layout.addLayout(toggles_row2)
+            self.show_tracked_boxes_toggle.setToolTip("Show final persistent tracker boxes (thick green)")
+            toggles_row4.addWidget(self.show_tracked_boxes_toggle)
             
-            # Third row of toggles
-            toggles_row3 = QHBoxLayout()
-            toggles_row3.setSpacing(5)
+            toggles_row4.addStretch()
+            calibration_layout.addLayout(toggles_row4)
+            
+            # Row 5: Unmatched and utility
+            toggles_row5 = QHBoxLayout()
+            toggles_row5.setSpacing(5)
+            
+            self.show_unmatched_detections_toggle = QPushButton("13. Unmatched")
+            self.show_unmatched_detections_toggle.setCheckable(True)
+            self.show_unmatched_detections_toggle.setChecked(True)
+            self.show_unmatched_detections_toggle.clicked.connect(self.toggle_overlays)
+            self.show_unmatched_detections_toggle.setMaximumWidth(140)
+            self.show_unmatched_detections_toggle.setToolTip("Show unmatched detections (yellow boxes)")
+            toggles_row5.addWidget(self.show_unmatched_detections_toggle)
+            
             self.show_tails_toggle = QPushButton("Show Tails")
             self.show_tails_toggle.setCheckable(True)
             self.show_tails_toggle.setChecked(False)
             self.show_tails_toggle.clicked.connect(self.toggle_overlays)
             self.show_tails_toggle.setMaximumWidth(110)
-            toggles_row3.addWidget(self.show_tails_toggle)
-            
-            self.show_skeleton_toggle = QPushButton("Show Skeleton")
-            self.show_skeleton_toggle.setCheckable(True)
-            self.show_skeleton_toggle.setChecked(False)
-            self.show_skeleton_toggle.clicked.connect(self.toggle_overlays)
-            self.show_skeleton_toggle.setMaximumWidth(130)
-            toggles_row3.addWidget(self.show_skeleton_toggle)
+            self.show_tails_toggle.setToolTip("Show tracker history trails")
+            toggles_row5.addWidget(self.show_tails_toggle)
             
             self.hide_video_feed_toggle = QPushButton("Hide Video Feed")
             self.hide_video_feed_toggle.setCheckable(True)
@@ -1651,9 +1740,10 @@ if PYQT_AVAILABLE:
             self.hide_video_feed_toggle.clicked.connect(self.toggle_overlays)
             self.hide_video_feed_toggle.setToolTip("Hide the video feed but keep overlays visible")
             self.hide_video_feed_toggle.setMaximumWidth(140)
-            toggles_row3.addWidget(self.hide_video_feed_toggle)
-            toggles_row3.addStretch()
-            calibration_layout.addLayout(toggles_row3)
+            toggles_row5.addWidget(self.hide_video_feed_toggle)
+            
+            toggles_row5.addStretch()
+            calibration_layout.addLayout(toggles_row5)
 
             # --- Tail Length Slider ---
             tail_layout = QHBoxLayout()
@@ -2066,27 +2156,153 @@ if PYQT_AVAILABLE:
             
             painter = QPainter(pixmap)
             
-            # --- Draw YOLO Detections ---
+            # --- Draw Kalman Predictions (Step 2) ---
+            if self.show_kalman_predictions_toggle.isChecked():
+                painter.setPen(QPen(QColor(0, 0, 255, 150), 3))  # Blue
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                for ball in frame_data.balls:
+                    if hasattr(ball, 'kalman_prediction_2d') and ball.kalman_prediction_2d.x > 0:
+                        center_x = int(ball.kalman_prediction_2d.x)
+                        center_y = int(ball.kalman_prediction_2d.y)
+                        radius = 8
+                        painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
+            
+            # --- Draw YOLO Detections (Step 3) ---
             if self.show_raw_detections_toggle.isChecked():
                 painter.setPen(QPen(QColor(255, 0, 0, 100), 2)) # Semi-transparent red
                 for det in frame_data.raw_detections:
                     painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
+            
+            # --- Draw Filtered Detections (Step 4) ---
+            if self.show_filtered_detections_toggle.isChecked():
+                painter.setPen(QPen(QColor(128, 128, 128, 150), 2))  # Gray
+                for det in frame_data.filtered_detections:
+                    # Draw crossed-out box
+                    x, y, w, h = int(det.box.x), int(det.box.y), int(det.box.width), int(det.box.height)
+                    painter.drawRect(x, y, w, h)
+                    painter.drawLine(x, y, x + w, y + h)
+                    painter.drawLine(x + w, y, x, y + h)
+            
+            # --- Draw 3D Matching/Associations (Step 5) ---
+            if self.show_associations_toggle.isChecked():
+                painter.setPen(QPen(QColor(0, 255, 0, 150), 2))  # Green lines
+                for ball in frame_data.balls:
+                    if hasattr(ball, 'matched_detection_2d') and ball.matched_detection_2d.x > 0:
+                        # Draw line from tracker position to matched detection
+                        painter.drawLine(
+                            int(ball.projected_pos_2d.x), int(ball.projected_pos_2d.y),
+                            int(ball.matched_detection_2d.x), int(ball.matched_detection_2d.y)
+                        )
+            
+            # --- Draw New Trackers/Auto-Init (Step 6) ---
+            if self.show_new_trackers_toggle.isChecked():
+                painter.setPen(QPen(QColor(255, 255, 0, 200), 3))  # Bright yellow
+                painter.setBrush(QBrush(QColor(255, 255, 0, 100)))
+                for ball in frame_data.balls:
+                    if hasattr(ball, 'is_new_tracker') and ball.is_new_tracker:
+                        # Draw star marker
+                        center_x = int(ball.projected_pos_2d.x)
+                        center_y = int(ball.projected_pos_2d.y)
+                        size = 15
+                        # Draw a simple star shape
+                        painter.drawEllipse(center_x - size, center_y - size, size * 2, size * 2)
+                        painter.drawText(center_x + size + 5, center_y, "NEW")
 
-            # --- Draw Unmatched Detections ---
+            # --- Draw Unmatched Detections (Step 13) ---
             if self.show_unmatched_detections_toggle.isChecked():
                 painter.setPen(QPen(QColor(255, 255, 0, 150), 2)) # Yellow
                 for det in frame_data.unmatched_detections:
                     painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
 
-            # --- Draw ByteTrack Boxes ---
+            # --- Draw ByteTrack Boxes (Step 12) ---
             if self.show_tracked_boxes_toggle.isChecked():
-                painter.setPen(QPen(QColor(255, 165, 0, 150), 2, Qt.PenStyle.DashLine)) # Orange dash
+                painter.setPen(QPen(QColor(0, 255, 0, 200), 3))  # Thick green
                 for obj in frame_data.balls:
                     if obj.status == juggler_pb2.Ball.TRACKED:
                         bbox = obj.bounding_box_2d
                         painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
 
-            # --- Draw Color Trackers (NEW SIMPLIFIED SYSTEM) ---
+            # --- Draw Hand Tracking (Step 7) ---
+            if self.show_hand_tracking_toggle.isChecked():
+                painter.setPen(QPen(QColor(128, 0, 128, 150), 2))  # Purple
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                for hand in frame_data.hands:
+                    # Draw purple box around hand detection
+                    if hasattr(hand, 'bounding_box_2d'):
+                        bbox = hand.bounding_box_2d
+                        painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
+                    # Draw wrist position
+                    center_x, center_y = int(hand.position_2d.x), int(hand.position_2d.y)
+                    painter.drawEllipse(center_x - 5, center_y - 5, 10, 10)
+                    # Label
+                    painter.setPen(QPen(QColor(255, 255, 255)))
+                    painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                    side_label = "L" if hand.side == "left" else "R"
+                    painter.drawText(center_x + 10, center_y, f"Hand-{side_label}")
+                    painter.setPen(QPen(QColor(128, 0, 128, 150), 2))
+            
+            # --- Draw Ball States (Step 8) ---
+            if self.show_ball_states_toggle.isChecked():
+                painter.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+                for ball in frame_data.balls:
+                    if hasattr(ball, 'throw_catch_state'):
+                        center_x = int(ball.projected_pos_2d.x)
+                        center_y = int(ball.projected_pos_2d.y)
+                        
+                        # Draw state indicator
+                        state_text = ""
+                        state_color = QColor(255, 165, 0)  # Orange
+                        
+                        if ball.throw_catch_state == juggler_pb2.Ball.THROWN:
+                            state_text = "THROW"
+                            state_color = QColor(255, 100, 0)
+                        elif ball.throw_catch_state == juggler_pb2.Ball.CAUGHT:
+                            state_text = "CATCH"
+                            state_color = QColor(0, 255, 100)
+                        elif ball.throw_catch_state == juggler_pb2.Ball.IN_FLIGHT:
+                            state_text = "FLIGHT"
+                            state_color = QColor(100, 150, 255)
+                        
+                        if state_text:
+                            # Draw background rectangle
+                            painter.setBrush(QBrush(QColor(0, 0, 0, 180)))
+                            painter.setPen(QPen(state_color, 2))
+                            text_width = 60
+                            text_height = 20
+                            painter.drawRect(center_x - text_width//2, center_y - 30, text_width, text_height)
+                            
+                            # Draw text
+                            painter.setPen(QPen(state_color))
+                            painter.drawText(center_x - text_width//2 + 5, center_y - 15, state_text)
+            
+            # --- Draw Occlusion (Step 9) ---
+            if self.show_occlusion_toggle.isChecked():
+                for ball in frame_data.balls:
+                    if ball.status == juggler_pb2.Ball.OCCLUDED:
+                        center_x = int(ball.projected_pos_2d.x)
+                        center_y = int(ball.projected_pos_2d.y)
+                        
+                        # Draw red X over occluded balls
+                        painter.setPen(QPen(QColor(255, 0, 0, 200), 3))
+                        size = 15
+                        painter.drawLine(center_x - size, center_y - size, center_x + size, center_y + size)
+                        painter.drawLine(center_x + size, center_y - size, center_x - size, center_y + size)
+                        
+                        # Draw "OCCLUDED" label
+                        painter.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+                        painter.setPen(QPen(QColor(255, 0, 0)))
+                        painter.drawText(center_x + 20, center_y, "OCCLUDED")
+            
+            # --- Draw Color Search Regions (Step 11) ---
+            if self.show_color_search_toggle.isChecked():
+                painter.setPen(QPen(QColor(255, 255, 0, 100), 1, Qt.PenStyle.DotLine))  # Yellow dotted
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                for ball in frame_data.balls:
+                    if hasattr(ball, 'color_search_region'):
+                        region = ball.color_search_region
+                        painter.drawRect(int(region.x), int(region.y), int(region.width), int(region.height))
+            
+            # --- Draw Color Trackers (Step 11 - NEW SIMPLIFIED SYSTEM) ---
             if self.show_color_tracker_toggle.isChecked():
                 # Get color map from profile manager
                 color_name_map = self.color_profile_manager.get_color_map()
@@ -2167,12 +2383,12 @@ if PYQT_AVAILABLE:
                                     painter.setPen(pen)
                                     painter.drawLine(int(p1[0]), int(p1[1]), int(p2[0]), int(p2[1]))
 
-            # --- Draw Skeleton and Hand Trackers ---
+            # --- Draw Pose Skeleton (Step 10) ---
             if self.show_skeleton_toggle.isChecked():
                 self.log_message(f"UI: Drawing skeleton for {len(frame_data.hands)} hands")
                 
-                # Draw hand wrist markers
-                painter.setPen(QPen(QColor(3, 169, 244), 4)) # Bright blue, thick line
+                # Draw hand wrist markers with bright cyan
+                painter.setPen(QPen(QColor(0, 255, 255), 4)) # Cyan, thick line
                 painter.setBrush(Qt.BrushStyle.NoBrush)
                 for hand in frame_data.hands:
                     # Draw a large circle for high visibility
@@ -2187,18 +2403,40 @@ if PYQT_AVAILABLE:
                     painter.drawText(center_x - 5, center_y + 5, side_label)
                     
                     # Reset pen for keypoints
-                    painter.setPen(QPen(QColor(3, 169, 244), 4))
+                    painter.setPen(QPen(QColor(0, 255, 255), 4))
                 
                 # Draw all body keypoints
-                painter.setPen(QPen(QColor(0, 255, 0, 150), 2)) # Green for skeleton
+                painter.setPen(QPen(QColor(0, 255, 255, 200), 3)) # Cyan for skeleton
+                painter.setBrush(QBrush(QColor(0, 255, 255, 150)))
                 for hand in frame_data.hands:
                     self.log_message(f"UI: Hand has {len(hand.keypoints)} keypoints")
                     for i, kp in enumerate(hand.keypoints):
                         if kp.confidence > 0.5:
                             self.log_message(f"UI: Drawing keypoint {i} at ({kp.pos_2d.x:.1f}, {kp.pos_2d.y:.1f})")
-                            painter.drawEllipse(int(kp.pos_2d.x) - 3, int(kp.pos_2d.y) - 3, 6, 6)
+                            # Draw filled circle for keypoint
+                            painter.drawEllipse(int(kp.pos_2d.x) - 4, int(kp.pos_2d.y) - 4, 8, 8)
                         else:
                             self.log_message(f"UI: Skipping keypoint {i} (confidence {kp.confidence:.2f} < 0.5)")
+                    
+                    # Draw skeleton connections if we have enough keypoints
+                    if len(hand.keypoints) >= 17:  # YOLO pose has 17 keypoints
+                        # Define skeleton connections (COCO format)
+                        skeleton_pairs = [
+                            (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # Arms
+                            (5, 11), (6, 12), (11, 12),  # Torso
+                            (11, 13), (13, 15), (12, 14), (14, 16)  # Legs
+                        ]
+                        
+                        painter.setPen(QPen(QColor(0, 255, 255, 150), 2))
+                        for start_idx, end_idx in skeleton_pairs:
+                            if start_idx < len(hand.keypoints) and end_idx < len(hand.keypoints):
+                                kp_start = hand.keypoints[start_idx]
+                                kp_end = hand.keypoints[end_idx]
+                                if kp_start.confidence > 0.5 and kp_end.confidence > 0.5:
+                                    painter.drawLine(
+                                        int(kp_start.pos_2d.x), int(kp_start.pos_2d.y),
+                                        int(kp_end.pos_2d.x), int(kp_end.pos_2d.y)
+                                    )
 
             painter.end()
             self.video_pixmap_item.setPixmap(pixmap)

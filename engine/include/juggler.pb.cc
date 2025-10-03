@@ -247,6 +247,122 @@ struct SystemStatusDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 SystemStatusDefaultTypeInternal _SystemStatus_default_instance_;
+PROTOBUF_CONSTEXPR KalmanPrediction::KalmanPrediction(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.predicted_pos_)*/nullptr
+  , /*decltype(_impl_.predicted_pos_2d_)*/nullptr
+  , /*decltype(_impl_.logical_id_)*/0
+  , /*decltype(_impl_.is_in_freefall_)*/false
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct KalmanPredictionDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR KalmanPredictionDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~KalmanPredictionDefaultTypeInternal() {}
+  union {
+    KalmanPrediction _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 KalmanPredictionDefaultTypeInternal _KalmanPrediction_default_instance_;
+PROTOBUF_CONSTEXPR FilteredDetection::FilteredDetection(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.reason_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.box_)*/nullptr
+  , /*decltype(_impl_.depth_value_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct FilteredDetectionDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR FilteredDetectionDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~FilteredDetectionDefaultTypeInternal() {}
+  union {
+    FilteredDetection _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 FilteredDetectionDefaultTypeInternal _FilteredDetection_default_instance_;
+PROTOBUF_CONSTEXPR TrackerAssociation::TrackerAssociation(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.tracker_pos_)*/nullptr
+  , /*decltype(_impl_.detection_pos_)*/nullptr
+  , /*decltype(_impl_.tracker_id_)*/0
+  , /*decltype(_impl_.detection_index_)*/0
+  , /*decltype(_impl_.distance_3d_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct TrackerAssociationDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR TrackerAssociationDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~TrackerAssociationDefaultTypeInternal() {}
+  union {
+    TrackerAssociation _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 TrackerAssociationDefaultTypeInternal _TrackerAssociation_default_instance_;
+PROTOBUF_CONSTEXPR NewTracker::NewTracker(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.initial_pos_)*/nullptr
+  , /*decltype(_impl_.initial_pos_2d_)*/nullptr
+  , /*decltype(_impl_.logical_id_)*/0
+  , /*decltype(_impl_.detection_index_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct NewTrackerDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR NewTrackerDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~NewTrackerDefaultTypeInternal() {}
+  union {
+    NewTracker _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 NewTrackerDefaultTypeInternal _NewTracker_default_instance_;
+PROTOBUF_CONSTEXPR BallState::BallState(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.logical_id_)*/0
+  , /*decltype(_impl_.state_)*/0
+  , /*decltype(_impl_.associated_hand_id_)*/0
+  , /*decltype(_impl_.confidence_)*/0
+  , /*decltype(_impl_.frames_in_state_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct BallStateDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR BallStateDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~BallStateDefaultTypeInternal() {}
+  union {
+    BallState _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 BallStateDefaultTypeInternal _BallState_default_instance_;
+PROTOBUF_CONSTEXPR OcclusionState::OcclusionState(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.logical_id_)*/0
+  , /*decltype(_impl_.is_occluded_)*/false
+  , /*decltype(_impl_.occluding_hand_id_)*/0
+  , /*decltype(_impl_.distance_to_hand_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct OcclusionStateDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR OcclusionStateDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~OcclusionStateDefaultTypeInternal() {}
+  union {
+    OcclusionState _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 OcclusionStateDefaultTypeInternal _OcclusionState_default_instance_;
+PROTOBUF_CONSTEXPR ColorSearchRegion::ColorSearchRegion(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.color_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.search_center_)*/nullptr
+  , /*decltype(_impl_.blob_center_)*/nullptr
+  , /*decltype(_impl_.logical_id_)*/0
+  , /*decltype(_impl_.search_radius_)*/0
+  , /*decltype(_impl_.blob_area_)*/0
+  , /*decltype(_impl_.found_)*/false
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct ColorSearchRegionDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR ColorSearchRegionDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ColorSearchRegionDefaultTypeInternal() {}
+  union {
+    ColorSearchRegion _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ColorSearchRegionDefaultTypeInternal _ColorSearchRegion_default_instance_;
 PROTOBUF_CONSTEXPR FrameData::FrameData(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.balls_)*/{}
@@ -256,6 +372,13 @@ PROTOBUF_CONSTEXPR FrameData::FrameData(
   , /*decltype(_impl_.color_tracked_balls_)*/{}
   , /*decltype(_impl_.throw_catch_events_)*/{}
   , /*decltype(_impl_.unmatched_detections_)*/{}
+  , /*decltype(_impl_.kalman_predictions_)*/{}
+  , /*decltype(_impl_.filtered_detections_)*/{}
+  , /*decltype(_impl_.tracker_associations_)*/{}
+  , /*decltype(_impl_.new_trackers_)*/{}
+  , /*decltype(_impl_.ball_states_)*/{}
+  , /*decltype(_impl_.occlusion_states_)*/{}
+  , /*decltype(_impl_.color_search_regions_)*/{}
   , /*decltype(_impl_.color_image_b64_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.depth_image_b64_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.intrinsics_)*/nullptr
@@ -347,8 +470,8 @@ struct CommandResponseDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 CommandResponseDefaultTypeInternal _CommandResponse_default_instance_;
 }  // namespace v1
 }  // namespace juggler
-static ::_pb::Metadata file_level_metadata_juggler_2eproto[18];
-static const ::_pb::EnumDescriptor* file_level_enum_descriptors_juggler_2eproto[3];
+static ::_pb::Metadata file_level_metadata_juggler_2eproto[25];
+static const ::_pb::EnumDescriptor* file_level_enum_descriptors_juggler_2eproto[4];
 static constexpr ::_pb::ServiceDescriptor const** file_level_service_descriptors_juggler_2eproto = nullptr;
 
 const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
@@ -500,6 +623,80 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.error_message_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.timestamp_us_),
   ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KalmanPrediction, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KalmanPrediction, _impl_.logical_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KalmanPrediction, _impl_.predicted_pos_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KalmanPrediction, _impl_.predicted_pos_2d_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::KalmanPrediction, _impl_.is_in_freefall_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FilteredDetection, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FilteredDetection, _impl_.box_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FilteredDetection, _impl_.reason_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FilteredDetection, _impl_.depth_value_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrackerAssociation, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrackerAssociation, _impl_.tracker_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrackerAssociation, _impl_.detection_index_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrackerAssociation, _impl_.distance_3d_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrackerAssociation, _impl_.tracker_pos_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrackerAssociation, _impl_.detection_pos_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::NewTracker, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::NewTracker, _impl_.logical_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::NewTracker, _impl_.initial_pos_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::NewTracker, _impl_.initial_pos_2d_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::NewTracker, _impl_.detection_index_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.logical_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.state_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.associated_hand_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.confidence_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.frames_in_state_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::OcclusionState, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::OcclusionState, _impl_.logical_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::OcclusionState, _impl_.is_occluded_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::OcclusionState, _impl_.occluding_hand_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::OcclusionState, _impl_.distance_to_hand_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorSearchRegion, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorSearchRegion, _impl_.logical_id_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorSearchRegion, _impl_.color_name_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorSearchRegion, _impl_.search_center_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorSearchRegion, _impl_.search_radius_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorSearchRegion, _impl_.blob_center_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorSearchRegion, _impl_.blob_area_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorSearchRegion, _impl_.found_),
+  ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _internal_metadata_),
   ~0u,  // no _extensions_
   ~0u,  // no _oneof_case_
@@ -521,6 +718,13 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.ir_projector_active_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.color_tracked_balls_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.throw_catch_events_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.kalman_predictions_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.filtered_detections_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.tracker_associations_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.new_trackers_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.ball_states_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.occlusion_states_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.color_search_regions_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse, _has_bits_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -587,11 +791,18 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 111, -1, -1, sizeof(::juggler::v1::ThrowCatchEvent)},
   { 123, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
   { 134, -1, -1, sizeof(::juggler::v1::SystemStatus)},
-  { 147, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 169, 177, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 179, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 203, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 211, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 147, -1, -1, sizeof(::juggler::v1::KalmanPrediction)},
+  { 157, -1, -1, sizeof(::juggler::v1::FilteredDetection)},
+  { 166, -1, -1, sizeof(::juggler::v1::TrackerAssociation)},
+  { 177, -1, -1, sizeof(::juggler::v1::NewTracker)},
+  { 187, -1, -1, sizeof(::juggler::v1::BallState)},
+  { 198, -1, -1, sizeof(::juggler::v1::OcclusionState)},
+  { 208, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
+  { 221, -1, -1, sizeof(::juggler::v1::FrameData)},
+  { 250, 258, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 260, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 284, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 292, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -608,6 +819,13 @@ static const ::_pb::Message* const file_default_instances[] = {
   &::juggler::v1::_ThrowCatchEvent_default_instance_._instance,
   &::juggler::v1::_CameraIntrinsics_default_instance_._instance,
   &::juggler::v1::_SystemStatus_default_instance_._instance,
+  &::juggler::v1::_KalmanPrediction_default_instance_._instance,
+  &::juggler::v1::_FilteredDetection_default_instance_._instance,
+  &::juggler::v1::_TrackerAssociation_default_instance_._instance,
+  &::juggler::v1::_NewTracker_default_instance_._instance,
+  &::juggler::v1::_BallState_default_instance_._instance,
+  &::juggler::v1::_OcclusionState_default_instance_._instance,
+  &::juggler::v1::_ColorSearchRegion_default_instance_._instance,
   &::juggler::v1::_FrameData_default_instance_._instance,
   &::juggler::v1::_CommandRequest_ModuleArgsEntry_DoNotUse_default_instance_._instance,
   &::juggler::v1::_CommandRequest_default_instance_._instance,
@@ -665,56 +883,93 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   " \001(\010\022\026\n\016engine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001("
   "\001\022\023\n\013frame_count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\r"
   "error_message\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001("
-  "\004\"\326\004\n\tFrameData\022\024\n\014timestamp_us\030\001 \001(\004\022\037\n"
-  "\005balls\030\002 \003(\0132\020.juggler.v1.Ball\022\037\n\005hands\030"
-  "\003 \003(\0132\020.juggler.v1.Hand\022%\n\010imu_data\030\004 \003("
-  "\0132\023.juggler.v1.IMUData\0220\n\nintrinsics\030\005 \001"
-  "(\0132\034.juggler.v1.CameraIntrinsics\022(\n\006stat"
-  "us\030\006 \001(\0132\030.juggler.v1.SystemStatus\022\023\n\013fr"
-  "ame_width\030\007 \001(\r\022\024\n\014frame_height\030\010 \001(\r\022\024\n"
-  "\014frame_number\030\t \001(\r\0221\n\016raw_detections\030\n "
-  "\003(\0132\031.juggler.v1.BoundingBox2D\0227\n\024unmatc"
-  "hed_detections\030\020 \003(\0132\031.juggler.v1.Boundi"
-  "ngBox2D\022\027\n\017color_image_b64\030\013 \001(\014\022\027\n\017dept"
-  "h_image_b64\030\014 \001(\014\022\033\n\023ir_projector_active"
-  "\030\r \001(\010\0229\n\023color_tracked_balls\030\016 \003(\0132\034.ju"
-  "ggler.v1.ColorTrackedBall\0227\n\022throw_catch"
-  "_events\030\017 \003(\0132\033.juggler.v1.ThrowCatchEve"
-  "nt\"\346\007\n\016CommandRequest\0224\n\004type\030\001 \001(\0162&.ju"
-  "ggler.v1.CommandRequest.CommandType\022\023\n\013m"
-  "odule_name\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/"
-  "\n\rcolor_command\030\004 \001(\0132\030.juggler.v1.Color"
-  "Command\022\?\n\013module_args\030\005 \003(\0132*.juggler.v"
-  "1.CommandRequest.ModuleArgsEntry\022\034\n\024came"
-  "ra_settings_file\030\006 \001(\t\022\024\n\014camera_width\030\007"
-  " \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n\ncamera_fp"
-  "s\030\t \001(\r\022\037\n\027logical_id_to_calibrate\030\n \001(\005"
-  "\0222\n\025calibration_pixel_pos\030\013 \001(\0132\023.juggle"
-  "r.v1.Vector2\022\036\n\026record_with_yolo_boxes\030\014"
-  " \001(\010\022#\n\033record_with_bytetrack_boxes\030\r \001("
-  "\010\022\032\n\022pose_model_enabled\030\016 \001(\010\022\022\n\ncolor_n"
-  "ame\030\017 \001(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030\021 "
-  "\001(\005\022\024\n\014feature_name\030\022 \001(\t\0321\n\017ModuleArgsE"
-  "ntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\354\002\n"
-  "\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE"
-  "\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMM"
-  "AND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_ST"
-  "ART\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026RE"
-  "CORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WITH_C"
-  "AMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CAM"
-  "ERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026SET"
-  "_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COLOR"
-  "\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_FEATUR"
-  "E\020\017\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005"
-  "color\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017Comman"
-  "dResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 "
-  "\001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
+  "\004\"\231\001\n\020KalmanPrediction\022\022\n\nlogical_id\030\001 \001"
+  "(\005\022*\n\rpredicted_pos\030\002 \001(\0132\023.juggler.v1.V"
+  "ector3\022-\n\020predicted_pos_2d\030\003 \001(\0132\023.juggl"
+  "er.v1.Vector2\022\026\n\016is_in_freefall\030\004 \001(\010\"`\n"
+  "\021FilteredDetection\022&\n\003box\030\001 \001(\0132\031.juggle"
+  "r.v1.BoundingBox2D\022\016\n\006reason\030\002 \001(\t\022\023\n\013de"
+  "pth_value\030\003 \001(\002\"\254\001\n\022TrackerAssociation\022\022"
+  "\n\ntracker_id\030\001 \001(\005\022\027\n\017detection_index\030\002 "
+  "\001(\005\022\023\n\013distance_3d\030\003 \001(\002\022(\n\013tracker_pos\030"
+  "\004 \001(\0132\023.juggler.v1.Vector3\022*\n\rdetection_"
+  "pos\030\005 \001(\0132\023.juggler.v1.Vector3\"\220\001\n\nNewTr"
+  "acker\022\022\n\nlogical_id\030\001 \001(\005\022(\n\013initial_pos"
+  "\030\002 \001(\0132\023.juggler.v1.Vector3\022+\n\016initial_p"
+  "os_2d\030\003 \001(\0132\023.juggler.v1.Vector2\022\027\n\017dete"
+  "ction_index\030\004 \001(\005\"\311\001\n\tBallState\022\022\n\nlogic"
+  "al_id\030\001 \001(\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1."
+  "BallState.State\022\032\n\022associated_hand_id\030\003 "
+  "\001(\005\022\022\n\nconfidence\030\004 \001(\002\022\027\n\017frames_in_sta"
+  "te\030\005 \001(\005\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRAN"
+  "SITIONING\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022"
+  "\022\n\nlogical_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010"
+  "\022\031\n\021occluding_hand_id\030\003 \001(\005\022\030\n\020distance_"
+  "to_hand\030\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nl"
+  "ogical_id\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rs"
+  "earch_center\030\003 \001(\0132\023.juggler.v1.Vector2\022"
+  "\025\n\rsearch_radius\030\004 \001(\002\022(\n\013blob_center\030\005 "
+  "\001(\0132\023.juggler.v1.Vector2\022\021\n\tblob_area\030\006 "
+  "\001(\002\022\r\n\005found\030\007 \001(\010\"\327\007\n\tFrameData\022\024\n\014time"
+  "stamp_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler."
+  "v1.Ball\022\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand"
+  "\022%\n\010imu_data\030\004 \003(\0132\023.juggler.v1.IMUData\022"
+  "0\n\nintrinsics\030\005 \001(\0132\034.juggler.v1.CameraI"
+  "ntrinsics\022(\n\006status\030\006 \001(\0132\030.juggler.v1.S"
+  "ystemStatus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014fram"
+  "e_height\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016"
+  "raw_detections\030\n \003(\0132\031.juggler.v1.Boundi"
+  "ngBox2D\0227\n\024unmatched_detections\030\020 \003(\0132\031."
+  "juggler.v1.BoundingBox2D\022\027\n\017color_image_"
+  "b64\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir"
+  "_projector_active\030\r \001(\010\0229\n\023color_tracked"
+  "_balls\030\016 \003(\0132\034.juggler.v1.ColorTrackedBa"
+  "ll\0227\n\022throw_catch_events\030\017 \003(\0132\033.juggler"
+  ".v1.ThrowCatchEvent\0228\n\022kalman_prediction"
+  "s\030\021 \003(\0132\034.juggler.v1.KalmanPrediction\022:\n"
+  "\023filtered_detections\030\022 \003(\0132\035.juggler.v1."
+  "FilteredDetection\022<\n\024tracker_association"
+  "s\030\023 \003(\0132\036.juggler.v1.TrackerAssociation\022"
+  ",\n\014new_trackers\030\024 \003(\0132\026.juggler.v1.NewTr"
+  "acker\022*\n\013ball_states\030\025 \003(\0132\025.juggler.v1."
+  "BallState\0224\n\020occlusion_states\030\026 \003(\0132\032.ju"
+  "ggler.v1.OcclusionState\022;\n\024color_search_"
+  "regions\030\027 \003(\0132\035.juggler.v1.ColorSearchRe"
+  "gion\"\346\007\n\016CommandRequest\0224\n\004type\030\001 \001(\0162&."
+  "juggler.v1.CommandRequest.CommandType\022\023\n"
+  "\013module_name\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004"
+  "\022/\n\rcolor_command\030\004 \001(\0132\030.juggler.v1.Col"
+  "orCommand\022\?\n\013module_args\030\005 \003(\0132*.juggler"
+  ".v1.CommandRequest.ModuleArgsEntry\022\034\n\024ca"
+  "mera_settings_file\030\006 \001(\t\022\024\n\014camera_width"
+  "\030\007 \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n\ncamera_"
+  "fps\030\t \001(\r\022\037\n\027logical_id_to_calibrate\030\n \001"
+  "(\005\0222\n\025calibration_pixel_pos\030\013 \001(\0132\023.jugg"
+  "ler.v1.Vector2\022\036\n\026record_with_yolo_boxes"
+  "\030\014 \001(\010\022#\n\033record_with_bytetrack_boxes\030\r "
+  "\001(\010\022\032\n\022pose_model_enabled\030\016 \001(\010\022\022\n\ncolor"
+  "_name\030\017 \001(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030"
+  "\021 \001(\005\022\024\n\014feature_name\030\022 \001(\t\0321\n\017ModuleArg"
+  "sEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\354"
+  "\002\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODU"
+  "LE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_CO"
+  "MMAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_"
+  "START\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026"
+  "RECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WITH"
+  "_CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014C"
+  "AMERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026S"
+  "ET_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COL"
+  "OR\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_FEAT"
+  "URE\020\017\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 "
+  "\n\005color\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017Comm"
+  "andResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030"
+  "\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 3713, descriptor_table_protodef_juggler_2eproto,
+    false, false, 5195, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
-    &descriptor_table_juggler_2eproto_once, nullptr, 0, 18,
+    &descriptor_table_juggler_2eproto_once, nullptr, 0, 25,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
     file_level_metadata_juggler_2eproto, file_level_enum_descriptors_juggler_2eproto,
     file_level_service_descriptors_juggler_2eproto,
@@ -771,9 +1026,32 @@ constexpr ThrowCatchEvent_EventType ThrowCatchEvent::EventType_MIN;
 constexpr ThrowCatchEvent_EventType ThrowCatchEvent::EventType_MAX;
 constexpr int ThrowCatchEvent::EventType_ARRAYSIZE;
 #endif  // (__cplusplus < 201703) && (!defined(_MSC_VER) || (_MSC_VER >= 1900 && _MSC_VER < 1912))
-const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor() {
+const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* BallState_State_descriptor() {
   ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(&descriptor_table_juggler_2eproto);
   return file_level_enum_descriptors_juggler_2eproto[2];
+}
+bool BallState_State_IsValid(int value) {
+  switch (value) {
+    case 0:
+    case 1:
+    case 2:
+      return true;
+    default:
+      return false;
+  }
+}
+
+#if (__cplusplus < 201703) && (!defined(_MSC_VER) || (_MSC_VER >= 1900 && _MSC_VER < 1912))
+constexpr BallState_State BallState::IN_FLIGHT;
+constexpr BallState_State BallState::TRANSITIONING;
+constexpr BallState_State BallState::HELD;
+constexpr BallState_State BallState::State_MIN;
+constexpr BallState_State BallState::State_MAX;
+constexpr int BallState::State_ARRAYSIZE;
+#endif  // (__cplusplus < 201703) && (!defined(_MSC_VER) || (_MSC_VER >= 1900 && _MSC_VER < 1912))
+const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor() {
+  ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(&descriptor_table_juggler_2eproto);
+  return file_level_enum_descriptors_juggler_2eproto[3];
 }
 bool CommandRequest_CommandType_IsValid(int value) {
   switch (value) {
@@ -5360,6 +5638,2195 @@ void SystemStatus::InternalSwap(SystemStatus* other) {
 
 // ===================================================================
 
+class KalmanPrediction::_Internal {
+ public:
+  static const ::juggler::v1::Vector3& predicted_pos(const KalmanPrediction* msg);
+  static const ::juggler::v1::Vector2& predicted_pos_2d(const KalmanPrediction* msg);
+};
+
+const ::juggler::v1::Vector3&
+KalmanPrediction::_Internal::predicted_pos(const KalmanPrediction* msg) {
+  return *msg->_impl_.predicted_pos_;
+}
+const ::juggler::v1::Vector2&
+KalmanPrediction::_Internal::predicted_pos_2d(const KalmanPrediction* msg) {
+  return *msg->_impl_.predicted_pos_2d_;
+}
+KalmanPrediction::KalmanPrediction(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.KalmanPrediction)
+}
+KalmanPrediction::KalmanPrediction(const KalmanPrediction& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  KalmanPrediction* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.predicted_pos_){nullptr}
+    , decltype(_impl_.predicted_pos_2d_){nullptr}
+    , decltype(_impl_.logical_id_){}
+    , decltype(_impl_.is_in_freefall_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  if (from._internal_has_predicted_pos()) {
+    _this->_impl_.predicted_pos_ = new ::juggler::v1::Vector3(*from._impl_.predicted_pos_);
+  }
+  if (from._internal_has_predicted_pos_2d()) {
+    _this->_impl_.predicted_pos_2d_ = new ::juggler::v1::Vector2(*from._impl_.predicted_pos_2d_);
+  }
+  ::memcpy(&_impl_.logical_id_, &from._impl_.logical_id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.is_in_freefall_) -
+    reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.is_in_freefall_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.KalmanPrediction)
+}
+
+inline void KalmanPrediction::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.predicted_pos_){nullptr}
+    , decltype(_impl_.predicted_pos_2d_){nullptr}
+    , decltype(_impl_.logical_id_){0}
+    , decltype(_impl_.is_in_freefall_){false}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+KalmanPrediction::~KalmanPrediction() {
+  // @@protoc_insertion_point(destructor:juggler.v1.KalmanPrediction)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void KalmanPrediction::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  if (this != internal_default_instance()) delete _impl_.predicted_pos_;
+  if (this != internal_default_instance()) delete _impl_.predicted_pos_2d_;
+}
+
+void KalmanPrediction::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void KalmanPrediction::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.KalmanPrediction)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  if (GetArenaForAllocation() == nullptr && _impl_.predicted_pos_ != nullptr) {
+    delete _impl_.predicted_pos_;
+  }
+  _impl_.predicted_pos_ = nullptr;
+  if (GetArenaForAllocation() == nullptr && _impl_.predicted_pos_2d_ != nullptr) {
+    delete _impl_.predicted_pos_2d_;
+  }
+  _impl_.predicted_pos_2d_ = nullptr;
+  ::memset(&_impl_.logical_id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.is_in_freefall_) -
+      reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.is_in_freefall_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* KalmanPrediction::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int32 logical_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.logical_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector3 predicted_pos = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          ptr = ctx->ParseMessage(_internal_mutable_predicted_pos(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector2 predicted_pos_2d = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
+          ptr = ctx->ParseMessage(_internal_mutable_predicted_pos_2d(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool is_in_freefall = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
+          _impl_.is_in_freefall_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* KalmanPrediction::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.KalmanPrediction)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(1, this->_internal_logical_id(), target);
+  }
+
+  // .juggler.v1.Vector3 predicted_pos = 2;
+  if (this->_internal_has_predicted_pos()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(2, _Internal::predicted_pos(this),
+        _Internal::predicted_pos(this).GetCachedSize(), target, stream);
+  }
+
+  // .juggler.v1.Vector2 predicted_pos_2d = 3;
+  if (this->_internal_has_predicted_pos_2d()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(3, _Internal::predicted_pos_2d(this),
+        _Internal::predicted_pos_2d(this).GetCachedSize(), target, stream);
+  }
+
+  // bool is_in_freefall = 4;
+  if (this->_internal_is_in_freefall() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(4, this->_internal_is_in_freefall(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.KalmanPrediction)
+  return target;
+}
+
+size_t KalmanPrediction::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.KalmanPrediction)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // .juggler.v1.Vector3 predicted_pos = 2;
+  if (this->_internal_has_predicted_pos()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.predicted_pos_);
+  }
+
+  // .juggler.v1.Vector2 predicted_pos_2d = 3;
+  if (this->_internal_has_predicted_pos_2d()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.predicted_pos_2d_);
+  }
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_logical_id());
+  }
+
+  // bool is_in_freefall = 4;
+  if (this->_internal_is_in_freefall() != 0) {
+    total_size += 1 + 1;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData KalmanPrediction::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    KalmanPrediction::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*KalmanPrediction::GetClassData() const { return &_class_data_; }
+
+
+void KalmanPrediction::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<KalmanPrediction*>(&to_msg);
+  auto& from = static_cast<const KalmanPrediction&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.KalmanPrediction)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_has_predicted_pos()) {
+    _this->_internal_mutable_predicted_pos()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_predicted_pos());
+  }
+  if (from._internal_has_predicted_pos_2d()) {
+    _this->_internal_mutable_predicted_pos_2d()->::juggler::v1::Vector2::MergeFrom(
+        from._internal_predicted_pos_2d());
+  }
+  if (from._internal_logical_id() != 0) {
+    _this->_internal_set_logical_id(from._internal_logical_id());
+  }
+  if (from._internal_is_in_freefall() != 0) {
+    _this->_internal_set_is_in_freefall(from._internal_is_in_freefall());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void KalmanPrediction::CopyFrom(const KalmanPrediction& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.KalmanPrediction)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool KalmanPrediction::IsInitialized() const {
+  return true;
+}
+
+void KalmanPrediction::InternalSwap(KalmanPrediction* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(KalmanPrediction, _impl_.is_in_freefall_)
+      + sizeof(KalmanPrediction::_impl_.is_in_freefall_)
+      - PROTOBUF_FIELD_OFFSET(KalmanPrediction, _impl_.predicted_pos_)>(
+          reinterpret_cast<char*>(&_impl_.predicted_pos_),
+          reinterpret_cast<char*>(&other->_impl_.predicted_pos_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata KalmanPrediction::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[13]);
+}
+
+// ===================================================================
+
+class FilteredDetection::_Internal {
+ public:
+  static const ::juggler::v1::BoundingBox2D& box(const FilteredDetection* msg);
+};
+
+const ::juggler::v1::BoundingBox2D&
+FilteredDetection::_Internal::box(const FilteredDetection* msg) {
+  return *msg->_impl_.box_;
+}
+FilteredDetection::FilteredDetection(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.FilteredDetection)
+}
+FilteredDetection::FilteredDetection(const FilteredDetection& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  FilteredDetection* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.reason_){}
+    , decltype(_impl_.box_){nullptr}
+    , decltype(_impl_.depth_value_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.reason_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.reason_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_reason().empty()) {
+    _this->_impl_.reason_.Set(from._internal_reason(), 
+      _this->GetArenaForAllocation());
+  }
+  if (from._internal_has_box()) {
+    _this->_impl_.box_ = new ::juggler::v1::BoundingBox2D(*from._impl_.box_);
+  }
+  _this->_impl_.depth_value_ = from._impl_.depth_value_;
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.FilteredDetection)
+}
+
+inline void FilteredDetection::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.reason_){}
+    , decltype(_impl_.box_){nullptr}
+    , decltype(_impl_.depth_value_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.reason_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.reason_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+FilteredDetection::~FilteredDetection() {
+  // @@protoc_insertion_point(destructor:juggler.v1.FilteredDetection)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void FilteredDetection::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.reason_.Destroy();
+  if (this != internal_default_instance()) delete _impl_.box_;
+}
+
+void FilteredDetection::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void FilteredDetection::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.FilteredDetection)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.reason_.ClearToEmpty();
+  if (GetArenaForAllocation() == nullptr && _impl_.box_ != nullptr) {
+    delete _impl_.box_;
+  }
+  _impl_.box_ = nullptr;
+  _impl_.depth_value_ = 0;
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* FilteredDetection::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // .juggler.v1.BoundingBox2D box = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+          ptr = ctx->ParseMessage(_internal_mutable_box(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string reason = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_reason();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.FilteredDetection.reason"));
+        } else
+          goto handle_unusual;
+        continue;
+      // float depth_value = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 29)) {
+          _impl_.depth_value_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* FilteredDetection::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.FilteredDetection)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // .juggler.v1.BoundingBox2D box = 1;
+  if (this->_internal_has_box()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(1, _Internal::box(this),
+        _Internal::box(this).GetCachedSize(), target, stream);
+  }
+
+  // string reason = 2;
+  if (!this->_internal_reason().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_reason().data(), static_cast<int>(this->_internal_reason().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "juggler.v1.FilteredDetection.reason");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_reason(), target);
+  }
+
+  // float depth_value = 3;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_depth_value = this->_internal_depth_value();
+  uint32_t raw_depth_value;
+  memcpy(&raw_depth_value, &tmp_depth_value, sizeof(tmp_depth_value));
+  if (raw_depth_value != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(3, this->_internal_depth_value(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.FilteredDetection)
+  return target;
+}
+
+size_t FilteredDetection::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.FilteredDetection)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string reason = 2;
+  if (!this->_internal_reason().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_reason());
+  }
+
+  // .juggler.v1.BoundingBox2D box = 1;
+  if (this->_internal_has_box()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.box_);
+  }
+
+  // float depth_value = 3;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_depth_value = this->_internal_depth_value();
+  uint32_t raw_depth_value;
+  memcpy(&raw_depth_value, &tmp_depth_value, sizeof(tmp_depth_value));
+  if (raw_depth_value != 0) {
+    total_size += 1 + 4;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData FilteredDetection::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    FilteredDetection::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*FilteredDetection::GetClassData() const { return &_class_data_; }
+
+
+void FilteredDetection::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<FilteredDetection*>(&to_msg);
+  auto& from = static_cast<const FilteredDetection&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.FilteredDetection)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_reason().empty()) {
+    _this->_internal_set_reason(from._internal_reason());
+  }
+  if (from._internal_has_box()) {
+    _this->_internal_mutable_box()->::juggler::v1::BoundingBox2D::MergeFrom(
+        from._internal_box());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_depth_value = from._internal_depth_value();
+  uint32_t raw_depth_value;
+  memcpy(&raw_depth_value, &tmp_depth_value, sizeof(tmp_depth_value));
+  if (raw_depth_value != 0) {
+    _this->_internal_set_depth_value(from._internal_depth_value());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void FilteredDetection::CopyFrom(const FilteredDetection& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.FilteredDetection)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool FilteredDetection::IsInitialized() const {
+  return true;
+}
+
+void FilteredDetection::InternalSwap(FilteredDetection* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.reason_, lhs_arena,
+      &other->_impl_.reason_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(FilteredDetection, _impl_.depth_value_)
+      + sizeof(FilteredDetection::_impl_.depth_value_)
+      - PROTOBUF_FIELD_OFFSET(FilteredDetection, _impl_.box_)>(
+          reinterpret_cast<char*>(&_impl_.box_),
+          reinterpret_cast<char*>(&other->_impl_.box_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata FilteredDetection::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[14]);
+}
+
+// ===================================================================
+
+class TrackerAssociation::_Internal {
+ public:
+  static const ::juggler::v1::Vector3& tracker_pos(const TrackerAssociation* msg);
+  static const ::juggler::v1::Vector3& detection_pos(const TrackerAssociation* msg);
+};
+
+const ::juggler::v1::Vector3&
+TrackerAssociation::_Internal::tracker_pos(const TrackerAssociation* msg) {
+  return *msg->_impl_.tracker_pos_;
+}
+const ::juggler::v1::Vector3&
+TrackerAssociation::_Internal::detection_pos(const TrackerAssociation* msg) {
+  return *msg->_impl_.detection_pos_;
+}
+TrackerAssociation::TrackerAssociation(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.TrackerAssociation)
+}
+TrackerAssociation::TrackerAssociation(const TrackerAssociation& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  TrackerAssociation* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.tracker_pos_){nullptr}
+    , decltype(_impl_.detection_pos_){nullptr}
+    , decltype(_impl_.tracker_id_){}
+    , decltype(_impl_.detection_index_){}
+    , decltype(_impl_.distance_3d_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  if (from._internal_has_tracker_pos()) {
+    _this->_impl_.tracker_pos_ = new ::juggler::v1::Vector3(*from._impl_.tracker_pos_);
+  }
+  if (from._internal_has_detection_pos()) {
+    _this->_impl_.detection_pos_ = new ::juggler::v1::Vector3(*from._impl_.detection_pos_);
+  }
+  ::memcpy(&_impl_.tracker_id_, &from._impl_.tracker_id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.distance_3d_) -
+    reinterpret_cast<char*>(&_impl_.tracker_id_)) + sizeof(_impl_.distance_3d_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.TrackerAssociation)
+}
+
+inline void TrackerAssociation::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.tracker_pos_){nullptr}
+    , decltype(_impl_.detection_pos_){nullptr}
+    , decltype(_impl_.tracker_id_){0}
+    , decltype(_impl_.detection_index_){0}
+    , decltype(_impl_.distance_3d_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+TrackerAssociation::~TrackerAssociation() {
+  // @@protoc_insertion_point(destructor:juggler.v1.TrackerAssociation)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void TrackerAssociation::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  if (this != internal_default_instance()) delete _impl_.tracker_pos_;
+  if (this != internal_default_instance()) delete _impl_.detection_pos_;
+}
+
+void TrackerAssociation::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void TrackerAssociation::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.TrackerAssociation)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  if (GetArenaForAllocation() == nullptr && _impl_.tracker_pos_ != nullptr) {
+    delete _impl_.tracker_pos_;
+  }
+  _impl_.tracker_pos_ = nullptr;
+  if (GetArenaForAllocation() == nullptr && _impl_.detection_pos_ != nullptr) {
+    delete _impl_.detection_pos_;
+  }
+  _impl_.detection_pos_ = nullptr;
+  ::memset(&_impl_.tracker_id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.distance_3d_) -
+      reinterpret_cast<char*>(&_impl_.tracker_id_)) + sizeof(_impl_.distance_3d_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* TrackerAssociation::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int32 tracker_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.tracker_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 detection_index = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          _impl_.detection_index_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float distance_3d = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 29)) {
+          _impl_.distance_3d_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector3 tracker_pos = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 34)) {
+          ptr = ctx->ParseMessage(_internal_mutable_tracker_pos(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector3 detection_pos = 5;
+      case 5:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 42)) {
+          ptr = ctx->ParseMessage(_internal_mutable_detection_pos(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* TrackerAssociation::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.TrackerAssociation)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int32 tracker_id = 1;
+  if (this->_internal_tracker_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(1, this->_internal_tracker_id(), target);
+  }
+
+  // int32 detection_index = 2;
+  if (this->_internal_detection_index() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(2, this->_internal_detection_index(), target);
+  }
+
+  // float distance_3d = 3;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_distance_3d = this->_internal_distance_3d();
+  uint32_t raw_distance_3d;
+  memcpy(&raw_distance_3d, &tmp_distance_3d, sizeof(tmp_distance_3d));
+  if (raw_distance_3d != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(3, this->_internal_distance_3d(), target);
+  }
+
+  // .juggler.v1.Vector3 tracker_pos = 4;
+  if (this->_internal_has_tracker_pos()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(4, _Internal::tracker_pos(this),
+        _Internal::tracker_pos(this).GetCachedSize(), target, stream);
+  }
+
+  // .juggler.v1.Vector3 detection_pos = 5;
+  if (this->_internal_has_detection_pos()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(5, _Internal::detection_pos(this),
+        _Internal::detection_pos(this).GetCachedSize(), target, stream);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.TrackerAssociation)
+  return target;
+}
+
+size_t TrackerAssociation::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.TrackerAssociation)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // .juggler.v1.Vector3 tracker_pos = 4;
+  if (this->_internal_has_tracker_pos()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.tracker_pos_);
+  }
+
+  // .juggler.v1.Vector3 detection_pos = 5;
+  if (this->_internal_has_detection_pos()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.detection_pos_);
+  }
+
+  // int32 tracker_id = 1;
+  if (this->_internal_tracker_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_tracker_id());
+  }
+
+  // int32 detection_index = 2;
+  if (this->_internal_detection_index() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_detection_index());
+  }
+
+  // float distance_3d = 3;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_distance_3d = this->_internal_distance_3d();
+  uint32_t raw_distance_3d;
+  memcpy(&raw_distance_3d, &tmp_distance_3d, sizeof(tmp_distance_3d));
+  if (raw_distance_3d != 0) {
+    total_size += 1 + 4;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData TrackerAssociation::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    TrackerAssociation::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*TrackerAssociation::GetClassData() const { return &_class_data_; }
+
+
+void TrackerAssociation::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<TrackerAssociation*>(&to_msg);
+  auto& from = static_cast<const TrackerAssociation&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.TrackerAssociation)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_has_tracker_pos()) {
+    _this->_internal_mutable_tracker_pos()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_tracker_pos());
+  }
+  if (from._internal_has_detection_pos()) {
+    _this->_internal_mutable_detection_pos()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_detection_pos());
+  }
+  if (from._internal_tracker_id() != 0) {
+    _this->_internal_set_tracker_id(from._internal_tracker_id());
+  }
+  if (from._internal_detection_index() != 0) {
+    _this->_internal_set_detection_index(from._internal_detection_index());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_distance_3d = from._internal_distance_3d();
+  uint32_t raw_distance_3d;
+  memcpy(&raw_distance_3d, &tmp_distance_3d, sizeof(tmp_distance_3d));
+  if (raw_distance_3d != 0) {
+    _this->_internal_set_distance_3d(from._internal_distance_3d());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void TrackerAssociation::CopyFrom(const TrackerAssociation& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.TrackerAssociation)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool TrackerAssociation::IsInitialized() const {
+  return true;
+}
+
+void TrackerAssociation::InternalSwap(TrackerAssociation* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(TrackerAssociation, _impl_.distance_3d_)
+      + sizeof(TrackerAssociation::_impl_.distance_3d_)
+      - PROTOBUF_FIELD_OFFSET(TrackerAssociation, _impl_.tracker_pos_)>(
+          reinterpret_cast<char*>(&_impl_.tracker_pos_),
+          reinterpret_cast<char*>(&other->_impl_.tracker_pos_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata TrackerAssociation::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[15]);
+}
+
+// ===================================================================
+
+class NewTracker::_Internal {
+ public:
+  static const ::juggler::v1::Vector3& initial_pos(const NewTracker* msg);
+  static const ::juggler::v1::Vector2& initial_pos_2d(const NewTracker* msg);
+};
+
+const ::juggler::v1::Vector3&
+NewTracker::_Internal::initial_pos(const NewTracker* msg) {
+  return *msg->_impl_.initial_pos_;
+}
+const ::juggler::v1::Vector2&
+NewTracker::_Internal::initial_pos_2d(const NewTracker* msg) {
+  return *msg->_impl_.initial_pos_2d_;
+}
+NewTracker::NewTracker(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.NewTracker)
+}
+NewTracker::NewTracker(const NewTracker& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  NewTracker* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.initial_pos_){nullptr}
+    , decltype(_impl_.initial_pos_2d_){nullptr}
+    , decltype(_impl_.logical_id_){}
+    , decltype(_impl_.detection_index_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  if (from._internal_has_initial_pos()) {
+    _this->_impl_.initial_pos_ = new ::juggler::v1::Vector3(*from._impl_.initial_pos_);
+  }
+  if (from._internal_has_initial_pos_2d()) {
+    _this->_impl_.initial_pos_2d_ = new ::juggler::v1::Vector2(*from._impl_.initial_pos_2d_);
+  }
+  ::memcpy(&_impl_.logical_id_, &from._impl_.logical_id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.detection_index_) -
+    reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.detection_index_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.NewTracker)
+}
+
+inline void NewTracker::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.initial_pos_){nullptr}
+    , decltype(_impl_.initial_pos_2d_){nullptr}
+    , decltype(_impl_.logical_id_){0}
+    , decltype(_impl_.detection_index_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+NewTracker::~NewTracker() {
+  // @@protoc_insertion_point(destructor:juggler.v1.NewTracker)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void NewTracker::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  if (this != internal_default_instance()) delete _impl_.initial_pos_;
+  if (this != internal_default_instance()) delete _impl_.initial_pos_2d_;
+}
+
+void NewTracker::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void NewTracker::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.NewTracker)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  if (GetArenaForAllocation() == nullptr && _impl_.initial_pos_ != nullptr) {
+    delete _impl_.initial_pos_;
+  }
+  _impl_.initial_pos_ = nullptr;
+  if (GetArenaForAllocation() == nullptr && _impl_.initial_pos_2d_ != nullptr) {
+    delete _impl_.initial_pos_2d_;
+  }
+  _impl_.initial_pos_2d_ = nullptr;
+  ::memset(&_impl_.logical_id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.detection_index_) -
+      reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.detection_index_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* NewTracker::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int32 logical_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.logical_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector3 initial_pos = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          ptr = ctx->ParseMessage(_internal_mutable_initial_pos(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector2 initial_pos_2d = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
+          ptr = ctx->ParseMessage(_internal_mutable_initial_pos_2d(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 detection_index = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
+          _impl_.detection_index_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* NewTracker::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.NewTracker)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(1, this->_internal_logical_id(), target);
+  }
+
+  // .juggler.v1.Vector3 initial_pos = 2;
+  if (this->_internal_has_initial_pos()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(2, _Internal::initial_pos(this),
+        _Internal::initial_pos(this).GetCachedSize(), target, stream);
+  }
+
+  // .juggler.v1.Vector2 initial_pos_2d = 3;
+  if (this->_internal_has_initial_pos_2d()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(3, _Internal::initial_pos_2d(this),
+        _Internal::initial_pos_2d(this).GetCachedSize(), target, stream);
+  }
+
+  // int32 detection_index = 4;
+  if (this->_internal_detection_index() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(4, this->_internal_detection_index(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.NewTracker)
+  return target;
+}
+
+size_t NewTracker::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.NewTracker)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // .juggler.v1.Vector3 initial_pos = 2;
+  if (this->_internal_has_initial_pos()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.initial_pos_);
+  }
+
+  // .juggler.v1.Vector2 initial_pos_2d = 3;
+  if (this->_internal_has_initial_pos_2d()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.initial_pos_2d_);
+  }
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_logical_id());
+  }
+
+  // int32 detection_index = 4;
+  if (this->_internal_detection_index() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_detection_index());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData NewTracker::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    NewTracker::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*NewTracker::GetClassData() const { return &_class_data_; }
+
+
+void NewTracker::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<NewTracker*>(&to_msg);
+  auto& from = static_cast<const NewTracker&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.NewTracker)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_has_initial_pos()) {
+    _this->_internal_mutable_initial_pos()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_initial_pos());
+  }
+  if (from._internal_has_initial_pos_2d()) {
+    _this->_internal_mutable_initial_pos_2d()->::juggler::v1::Vector2::MergeFrom(
+        from._internal_initial_pos_2d());
+  }
+  if (from._internal_logical_id() != 0) {
+    _this->_internal_set_logical_id(from._internal_logical_id());
+  }
+  if (from._internal_detection_index() != 0) {
+    _this->_internal_set_detection_index(from._internal_detection_index());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void NewTracker::CopyFrom(const NewTracker& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.NewTracker)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool NewTracker::IsInitialized() const {
+  return true;
+}
+
+void NewTracker::InternalSwap(NewTracker* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(NewTracker, _impl_.detection_index_)
+      + sizeof(NewTracker::_impl_.detection_index_)
+      - PROTOBUF_FIELD_OFFSET(NewTracker, _impl_.initial_pos_)>(
+          reinterpret_cast<char*>(&_impl_.initial_pos_),
+          reinterpret_cast<char*>(&other->_impl_.initial_pos_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata NewTracker::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[16]);
+}
+
+// ===================================================================
+
+class BallState::_Internal {
+ public:
+};
+
+BallState::BallState(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.BallState)
+}
+BallState::BallState(const BallState& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  BallState* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.logical_id_){}
+    , decltype(_impl_.state_){}
+    , decltype(_impl_.associated_hand_id_){}
+    , decltype(_impl_.confidence_){}
+    , decltype(_impl_.frames_in_state_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  ::memcpy(&_impl_.logical_id_, &from._impl_.logical_id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.frames_in_state_) -
+    reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.frames_in_state_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.BallState)
+}
+
+inline void BallState::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.logical_id_){0}
+    , decltype(_impl_.state_){0}
+    , decltype(_impl_.associated_hand_id_){0}
+    , decltype(_impl_.confidence_){0}
+    , decltype(_impl_.frames_in_state_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+BallState::~BallState() {
+  // @@protoc_insertion_point(destructor:juggler.v1.BallState)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void BallState::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+}
+
+void BallState::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void BallState::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.BallState)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  ::memset(&_impl_.logical_id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.frames_in_state_) -
+      reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.frames_in_state_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* BallState::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int32 logical_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.logical_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.BallState.State state = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          uint64_t val = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+          _internal_set_state(static_cast<::juggler::v1::BallState_State>(val));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 associated_hand_id = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.associated_hand_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float confidence = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 37)) {
+          _impl_.confidence_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 frames_in_state = 5;
+      case 5:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
+          _impl_.frames_in_state_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* BallState::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.BallState)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(1, this->_internal_logical_id(), target);
+  }
+
+  // .juggler.v1.BallState.State state = 2;
+  if (this->_internal_state() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+      2, this->_internal_state(), target);
+  }
+
+  // int32 associated_hand_id = 3;
+  if (this->_internal_associated_hand_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_associated_hand_id(), target);
+  }
+
+  // float confidence = 4;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = this->_internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(4, this->_internal_confidence(), target);
+  }
+
+  // int32 frames_in_state = 5;
+  if (this->_internal_frames_in_state() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(5, this->_internal_frames_in_state(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.BallState)
+  return target;
+}
+
+size_t BallState::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.BallState)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_logical_id());
+  }
+
+  // .juggler.v1.BallState.State state = 2;
+  if (this->_internal_state() != 0) {
+    total_size += 1 +
+      ::_pbi::WireFormatLite::EnumSize(this->_internal_state());
+  }
+
+  // int32 associated_hand_id = 3;
+  if (this->_internal_associated_hand_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_associated_hand_id());
+  }
+
+  // float confidence = 4;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = this->_internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    total_size += 1 + 4;
+  }
+
+  // int32 frames_in_state = 5;
+  if (this->_internal_frames_in_state() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_frames_in_state());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData BallState::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    BallState::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*BallState::GetClassData() const { return &_class_data_; }
+
+
+void BallState::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<BallState*>(&to_msg);
+  auto& from = static_cast<const BallState&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.BallState)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_logical_id() != 0) {
+    _this->_internal_set_logical_id(from._internal_logical_id());
+  }
+  if (from._internal_state() != 0) {
+    _this->_internal_set_state(from._internal_state());
+  }
+  if (from._internal_associated_hand_id() != 0) {
+    _this->_internal_set_associated_hand_id(from._internal_associated_hand_id());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = from._internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    _this->_internal_set_confidence(from._internal_confidence());
+  }
+  if (from._internal_frames_in_state() != 0) {
+    _this->_internal_set_frames_in_state(from._internal_frames_in_state());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void BallState::CopyFrom(const BallState& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.BallState)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool BallState::IsInitialized() const {
+  return true;
+}
+
+void BallState::InternalSwap(BallState* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(BallState, _impl_.frames_in_state_)
+      + sizeof(BallState::_impl_.frames_in_state_)
+      - PROTOBUF_FIELD_OFFSET(BallState, _impl_.logical_id_)>(
+          reinterpret_cast<char*>(&_impl_.logical_id_),
+          reinterpret_cast<char*>(&other->_impl_.logical_id_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata BallState::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[17]);
+}
+
+// ===================================================================
+
+class OcclusionState::_Internal {
+ public:
+};
+
+OcclusionState::OcclusionState(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.OcclusionState)
+}
+OcclusionState::OcclusionState(const OcclusionState& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  OcclusionState* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.logical_id_){}
+    , decltype(_impl_.is_occluded_){}
+    , decltype(_impl_.occluding_hand_id_){}
+    , decltype(_impl_.distance_to_hand_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  ::memcpy(&_impl_.logical_id_, &from._impl_.logical_id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.distance_to_hand_) -
+    reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.distance_to_hand_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.OcclusionState)
+}
+
+inline void OcclusionState::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.logical_id_){0}
+    , decltype(_impl_.is_occluded_){false}
+    , decltype(_impl_.occluding_hand_id_){0}
+    , decltype(_impl_.distance_to_hand_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+OcclusionState::~OcclusionState() {
+  // @@protoc_insertion_point(destructor:juggler.v1.OcclusionState)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void OcclusionState::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+}
+
+void OcclusionState::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void OcclusionState::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.OcclusionState)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  ::memset(&_impl_.logical_id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.distance_to_hand_) -
+      reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.distance_to_hand_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* OcclusionState::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int32 logical_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.logical_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool is_occluded = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          _impl_.is_occluded_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 occluding_hand_id = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.occluding_hand_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float distance_to_hand = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 37)) {
+          _impl_.distance_to_hand_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* OcclusionState::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.OcclusionState)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(1, this->_internal_logical_id(), target);
+  }
+
+  // bool is_occluded = 2;
+  if (this->_internal_is_occluded() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(2, this->_internal_is_occluded(), target);
+  }
+
+  // int32 occluding_hand_id = 3;
+  if (this->_internal_occluding_hand_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_occluding_hand_id(), target);
+  }
+
+  // float distance_to_hand = 4;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_distance_to_hand = this->_internal_distance_to_hand();
+  uint32_t raw_distance_to_hand;
+  memcpy(&raw_distance_to_hand, &tmp_distance_to_hand, sizeof(tmp_distance_to_hand));
+  if (raw_distance_to_hand != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(4, this->_internal_distance_to_hand(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.OcclusionState)
+  return target;
+}
+
+size_t OcclusionState::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.OcclusionState)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_logical_id());
+  }
+
+  // bool is_occluded = 2;
+  if (this->_internal_is_occluded() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // int32 occluding_hand_id = 3;
+  if (this->_internal_occluding_hand_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_occluding_hand_id());
+  }
+
+  // float distance_to_hand = 4;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_distance_to_hand = this->_internal_distance_to_hand();
+  uint32_t raw_distance_to_hand;
+  memcpy(&raw_distance_to_hand, &tmp_distance_to_hand, sizeof(tmp_distance_to_hand));
+  if (raw_distance_to_hand != 0) {
+    total_size += 1 + 4;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData OcclusionState::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    OcclusionState::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*OcclusionState::GetClassData() const { return &_class_data_; }
+
+
+void OcclusionState::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<OcclusionState*>(&to_msg);
+  auto& from = static_cast<const OcclusionState&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.OcclusionState)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_logical_id() != 0) {
+    _this->_internal_set_logical_id(from._internal_logical_id());
+  }
+  if (from._internal_is_occluded() != 0) {
+    _this->_internal_set_is_occluded(from._internal_is_occluded());
+  }
+  if (from._internal_occluding_hand_id() != 0) {
+    _this->_internal_set_occluding_hand_id(from._internal_occluding_hand_id());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_distance_to_hand = from._internal_distance_to_hand();
+  uint32_t raw_distance_to_hand;
+  memcpy(&raw_distance_to_hand, &tmp_distance_to_hand, sizeof(tmp_distance_to_hand));
+  if (raw_distance_to_hand != 0) {
+    _this->_internal_set_distance_to_hand(from._internal_distance_to_hand());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void OcclusionState::CopyFrom(const OcclusionState& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.OcclusionState)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool OcclusionState::IsInitialized() const {
+  return true;
+}
+
+void OcclusionState::InternalSwap(OcclusionState* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(OcclusionState, _impl_.distance_to_hand_)
+      + sizeof(OcclusionState::_impl_.distance_to_hand_)
+      - PROTOBUF_FIELD_OFFSET(OcclusionState, _impl_.logical_id_)>(
+          reinterpret_cast<char*>(&_impl_.logical_id_),
+          reinterpret_cast<char*>(&other->_impl_.logical_id_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata OcclusionState::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[18]);
+}
+
+// ===================================================================
+
+class ColorSearchRegion::_Internal {
+ public:
+  static const ::juggler::v1::Vector2& search_center(const ColorSearchRegion* msg);
+  static const ::juggler::v1::Vector2& blob_center(const ColorSearchRegion* msg);
+};
+
+const ::juggler::v1::Vector2&
+ColorSearchRegion::_Internal::search_center(const ColorSearchRegion* msg) {
+  return *msg->_impl_.search_center_;
+}
+const ::juggler::v1::Vector2&
+ColorSearchRegion::_Internal::blob_center(const ColorSearchRegion* msg) {
+  return *msg->_impl_.blob_center_;
+}
+ColorSearchRegion::ColorSearchRegion(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.ColorSearchRegion)
+}
+ColorSearchRegion::ColorSearchRegion(const ColorSearchRegion& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  ColorSearchRegion* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.color_name_){}
+    , decltype(_impl_.search_center_){nullptr}
+    , decltype(_impl_.blob_center_){nullptr}
+    , decltype(_impl_.logical_id_){}
+    , decltype(_impl_.search_radius_){}
+    , decltype(_impl_.blob_area_){}
+    , decltype(_impl_.found_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.color_name_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.color_name_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_color_name().empty()) {
+    _this->_impl_.color_name_.Set(from._internal_color_name(), 
+      _this->GetArenaForAllocation());
+  }
+  if (from._internal_has_search_center()) {
+    _this->_impl_.search_center_ = new ::juggler::v1::Vector2(*from._impl_.search_center_);
+  }
+  if (from._internal_has_blob_center()) {
+    _this->_impl_.blob_center_ = new ::juggler::v1::Vector2(*from._impl_.blob_center_);
+  }
+  ::memcpy(&_impl_.logical_id_, &from._impl_.logical_id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.found_) -
+    reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.found_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.ColorSearchRegion)
+}
+
+inline void ColorSearchRegion::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.color_name_){}
+    , decltype(_impl_.search_center_){nullptr}
+    , decltype(_impl_.blob_center_){nullptr}
+    , decltype(_impl_.logical_id_){0}
+    , decltype(_impl_.search_radius_){0}
+    , decltype(_impl_.blob_area_){0}
+    , decltype(_impl_.found_){false}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.color_name_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.color_name_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+ColorSearchRegion::~ColorSearchRegion() {
+  // @@protoc_insertion_point(destructor:juggler.v1.ColorSearchRegion)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void ColorSearchRegion::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.color_name_.Destroy();
+  if (this != internal_default_instance()) delete _impl_.search_center_;
+  if (this != internal_default_instance()) delete _impl_.blob_center_;
+}
+
+void ColorSearchRegion::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void ColorSearchRegion::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.ColorSearchRegion)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.color_name_.ClearToEmpty();
+  if (GetArenaForAllocation() == nullptr && _impl_.search_center_ != nullptr) {
+    delete _impl_.search_center_;
+  }
+  _impl_.search_center_ = nullptr;
+  if (GetArenaForAllocation() == nullptr && _impl_.blob_center_ != nullptr) {
+    delete _impl_.blob_center_;
+  }
+  _impl_.blob_center_ = nullptr;
+  ::memset(&_impl_.logical_id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.found_) -
+      reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.found_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* ColorSearchRegion::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int32 logical_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.logical_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string color_name = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_color_name();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.ColorSearchRegion.color_name"));
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector2 search_center = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
+          ptr = ctx->ParseMessage(_internal_mutable_search_center(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float search_radius = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 37)) {
+          _impl_.search_radius_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector2 blob_center = 5;
+      case 5:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 42)) {
+          ptr = ctx->ParseMessage(_internal_mutable_blob_center(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float blob_area = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 53)) {
+          _impl_.blob_area_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool found = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 56)) {
+          _impl_.found_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* ColorSearchRegion::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.ColorSearchRegion)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(1, this->_internal_logical_id(), target);
+  }
+
+  // string color_name = 2;
+  if (!this->_internal_color_name().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_color_name().data(), static_cast<int>(this->_internal_color_name().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "juggler.v1.ColorSearchRegion.color_name");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_color_name(), target);
+  }
+
+  // .juggler.v1.Vector2 search_center = 3;
+  if (this->_internal_has_search_center()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(3, _Internal::search_center(this),
+        _Internal::search_center(this).GetCachedSize(), target, stream);
+  }
+
+  // float search_radius = 4;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_search_radius = this->_internal_search_radius();
+  uint32_t raw_search_radius;
+  memcpy(&raw_search_radius, &tmp_search_radius, sizeof(tmp_search_radius));
+  if (raw_search_radius != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(4, this->_internal_search_radius(), target);
+  }
+
+  // .juggler.v1.Vector2 blob_center = 5;
+  if (this->_internal_has_blob_center()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(5, _Internal::blob_center(this),
+        _Internal::blob_center(this).GetCachedSize(), target, stream);
+  }
+
+  // float blob_area = 6;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_blob_area = this->_internal_blob_area();
+  uint32_t raw_blob_area;
+  memcpy(&raw_blob_area, &tmp_blob_area, sizeof(tmp_blob_area));
+  if (raw_blob_area != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(6, this->_internal_blob_area(), target);
+  }
+
+  // bool found = 7;
+  if (this->_internal_found() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(7, this->_internal_found(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.ColorSearchRegion)
+  return target;
+}
+
+size_t ColorSearchRegion::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.ColorSearchRegion)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string color_name = 2;
+  if (!this->_internal_color_name().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_color_name());
+  }
+
+  // .juggler.v1.Vector2 search_center = 3;
+  if (this->_internal_has_search_center()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.search_center_);
+  }
+
+  // .juggler.v1.Vector2 blob_center = 5;
+  if (this->_internal_has_blob_center()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.blob_center_);
+  }
+
+  // int32 logical_id = 1;
+  if (this->_internal_logical_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_logical_id());
+  }
+
+  // float search_radius = 4;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_search_radius = this->_internal_search_radius();
+  uint32_t raw_search_radius;
+  memcpy(&raw_search_radius, &tmp_search_radius, sizeof(tmp_search_radius));
+  if (raw_search_radius != 0) {
+    total_size += 1 + 4;
+  }
+
+  // float blob_area = 6;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_blob_area = this->_internal_blob_area();
+  uint32_t raw_blob_area;
+  memcpy(&raw_blob_area, &tmp_blob_area, sizeof(tmp_blob_area));
+  if (raw_blob_area != 0) {
+    total_size += 1 + 4;
+  }
+
+  // bool found = 7;
+  if (this->_internal_found() != 0) {
+    total_size += 1 + 1;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData ColorSearchRegion::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    ColorSearchRegion::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*ColorSearchRegion::GetClassData() const { return &_class_data_; }
+
+
+void ColorSearchRegion::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<ColorSearchRegion*>(&to_msg);
+  auto& from = static_cast<const ColorSearchRegion&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.ColorSearchRegion)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_color_name().empty()) {
+    _this->_internal_set_color_name(from._internal_color_name());
+  }
+  if (from._internal_has_search_center()) {
+    _this->_internal_mutable_search_center()->::juggler::v1::Vector2::MergeFrom(
+        from._internal_search_center());
+  }
+  if (from._internal_has_blob_center()) {
+    _this->_internal_mutable_blob_center()->::juggler::v1::Vector2::MergeFrom(
+        from._internal_blob_center());
+  }
+  if (from._internal_logical_id() != 0) {
+    _this->_internal_set_logical_id(from._internal_logical_id());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_search_radius = from._internal_search_radius();
+  uint32_t raw_search_radius;
+  memcpy(&raw_search_radius, &tmp_search_radius, sizeof(tmp_search_radius));
+  if (raw_search_radius != 0) {
+    _this->_internal_set_search_radius(from._internal_search_radius());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_blob_area = from._internal_blob_area();
+  uint32_t raw_blob_area;
+  memcpy(&raw_blob_area, &tmp_blob_area, sizeof(tmp_blob_area));
+  if (raw_blob_area != 0) {
+    _this->_internal_set_blob_area(from._internal_blob_area());
+  }
+  if (from._internal_found() != 0) {
+    _this->_internal_set_found(from._internal_found());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void ColorSearchRegion::CopyFrom(const ColorSearchRegion& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.ColorSearchRegion)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool ColorSearchRegion::IsInitialized() const {
+  return true;
+}
+
+void ColorSearchRegion::InternalSwap(ColorSearchRegion* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.color_name_, lhs_arena,
+      &other->_impl_.color_name_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ColorSearchRegion, _impl_.found_)
+      + sizeof(ColorSearchRegion::_impl_.found_)
+      - PROTOBUF_FIELD_OFFSET(ColorSearchRegion, _impl_.search_center_)>(
+          reinterpret_cast<char*>(&_impl_.search_center_),
+          reinterpret_cast<char*>(&other->_impl_.search_center_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata ColorSearchRegion::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[19]);
+}
+
+// ===================================================================
+
 class FrameData::_Internal {
  public:
   static const ::juggler::v1::CameraIntrinsics& intrinsics(const FrameData* msg);
@@ -5391,6 +7858,13 @@ FrameData::FrameData(const FrameData& from)
     , decltype(_impl_.color_tracked_balls_){from._impl_.color_tracked_balls_}
     , decltype(_impl_.throw_catch_events_){from._impl_.throw_catch_events_}
     , decltype(_impl_.unmatched_detections_){from._impl_.unmatched_detections_}
+    , decltype(_impl_.kalman_predictions_){from._impl_.kalman_predictions_}
+    , decltype(_impl_.filtered_detections_){from._impl_.filtered_detections_}
+    , decltype(_impl_.tracker_associations_){from._impl_.tracker_associations_}
+    , decltype(_impl_.new_trackers_){from._impl_.new_trackers_}
+    , decltype(_impl_.ball_states_){from._impl_.ball_states_}
+    , decltype(_impl_.occlusion_states_){from._impl_.occlusion_states_}
+    , decltype(_impl_.color_search_regions_){from._impl_.color_search_regions_}
     , decltype(_impl_.color_image_b64_){}
     , decltype(_impl_.depth_image_b64_){}
     , decltype(_impl_.intrinsics_){nullptr}
@@ -5443,6 +7917,13 @@ inline void FrameData::SharedCtor(
     , decltype(_impl_.color_tracked_balls_){arena}
     , decltype(_impl_.throw_catch_events_){arena}
     , decltype(_impl_.unmatched_detections_){arena}
+    , decltype(_impl_.kalman_predictions_){arena}
+    , decltype(_impl_.filtered_detections_){arena}
+    , decltype(_impl_.tracker_associations_){arena}
+    , decltype(_impl_.new_trackers_){arena}
+    , decltype(_impl_.ball_states_){arena}
+    , decltype(_impl_.occlusion_states_){arena}
+    , decltype(_impl_.color_search_regions_){arena}
     , decltype(_impl_.color_image_b64_){}
     , decltype(_impl_.depth_image_b64_){}
     , decltype(_impl_.intrinsics_){nullptr}
@@ -5482,6 +7963,13 @@ inline void FrameData::SharedDtor() {
   _impl_.color_tracked_balls_.~RepeatedPtrField();
   _impl_.throw_catch_events_.~RepeatedPtrField();
   _impl_.unmatched_detections_.~RepeatedPtrField();
+  _impl_.kalman_predictions_.~RepeatedPtrField();
+  _impl_.filtered_detections_.~RepeatedPtrField();
+  _impl_.tracker_associations_.~RepeatedPtrField();
+  _impl_.new_trackers_.~RepeatedPtrField();
+  _impl_.ball_states_.~RepeatedPtrField();
+  _impl_.occlusion_states_.~RepeatedPtrField();
+  _impl_.color_search_regions_.~RepeatedPtrField();
   _impl_.color_image_b64_.Destroy();
   _impl_.depth_image_b64_.Destroy();
   if (this != internal_default_instance()) delete _impl_.intrinsics_;
@@ -5505,6 +7993,13 @@ void FrameData::Clear() {
   _impl_.color_tracked_balls_.Clear();
   _impl_.throw_catch_events_.Clear();
   _impl_.unmatched_detections_.Clear();
+  _impl_.kalman_predictions_.Clear();
+  _impl_.filtered_detections_.Clear();
+  _impl_.tracker_associations_.Clear();
+  _impl_.new_trackers_.Clear();
+  _impl_.ball_states_.Clear();
+  _impl_.occlusion_states_.Clear();
+  _impl_.color_search_regions_.Clear();
   _impl_.color_image_b64_.ClearToEmpty();
   _impl_.depth_image_b64_.ClearToEmpty();
   if (GetArenaForAllocation() == nullptr && _impl_.intrinsics_ != nullptr) {
@@ -5692,6 +8187,97 @@ const char* FrameData::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx
         } else
           goto handle_unusual;
         continue;
+      // repeated .juggler.v1.KalmanPrediction kalman_predictions = 17;
+      case 17:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 138)) {
+          ptr -= 2;
+          do {
+            ptr += 2;
+            ptr = ctx->ParseMessage(_internal_add_kalman_predictions(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<138>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.FilteredDetection filtered_detections = 18;
+      case 18:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 146)) {
+          ptr -= 2;
+          do {
+            ptr += 2;
+            ptr = ctx->ParseMessage(_internal_add_filtered_detections(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<146>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.TrackerAssociation tracker_associations = 19;
+      case 19:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 154)) {
+          ptr -= 2;
+          do {
+            ptr += 2;
+            ptr = ctx->ParseMessage(_internal_add_tracker_associations(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<154>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.NewTracker new_trackers = 20;
+      case 20:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 162)) {
+          ptr -= 2;
+          do {
+            ptr += 2;
+            ptr = ctx->ParseMessage(_internal_add_new_trackers(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<162>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.BallState ball_states = 21;
+      case 21:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 170)) {
+          ptr -= 2;
+          do {
+            ptr += 2;
+            ptr = ctx->ParseMessage(_internal_add_ball_states(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<170>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.OcclusionState occlusion_states = 22;
+      case 22:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 178)) {
+          ptr -= 2;
+          do {
+            ptr += 2;
+            ptr = ctx->ParseMessage(_internal_add_occlusion_states(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<178>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.ColorSearchRegion color_search_regions = 23;
+      case 23:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 186)) {
+          ptr -= 2;
+          do {
+            ptr += 2;
+            ptr = ctx->ParseMessage(_internal_add_color_search_regions(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<186>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
       default:
         goto handle_unusual;
     }  // switch
@@ -5833,6 +8419,62 @@ uint8_t* FrameData::_InternalSerialize(
         InternalWriteMessage(16, repfield, repfield.GetCachedSize(), target, stream);
   }
 
+  // repeated .juggler.v1.KalmanPrediction kalman_predictions = 17;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_kalman_predictions_size()); i < n; i++) {
+    const auto& repfield = this->_internal_kalman_predictions(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(17, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
+  // repeated .juggler.v1.FilteredDetection filtered_detections = 18;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_filtered_detections_size()); i < n; i++) {
+    const auto& repfield = this->_internal_filtered_detections(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(18, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
+  // repeated .juggler.v1.TrackerAssociation tracker_associations = 19;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_tracker_associations_size()); i < n; i++) {
+    const auto& repfield = this->_internal_tracker_associations(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(19, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
+  // repeated .juggler.v1.NewTracker new_trackers = 20;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_new_trackers_size()); i < n; i++) {
+    const auto& repfield = this->_internal_new_trackers(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(20, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
+  // repeated .juggler.v1.BallState ball_states = 21;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_ball_states_size()); i < n; i++) {
+    const auto& repfield = this->_internal_ball_states(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(21, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
+  // repeated .juggler.v1.OcclusionState occlusion_states = 22;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_occlusion_states_size()); i < n; i++) {
+    const auto& repfield = this->_internal_occlusion_states(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(22, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
+  // repeated .juggler.v1.ColorSearchRegion color_search_regions = 23;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_color_search_regions_size()); i < n; i++) {
+    const auto& repfield = this->_internal_color_search_regions(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(23, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -5894,6 +8536,55 @@ size_t FrameData::ByteSizeLong() const {
   // repeated .juggler.v1.BoundingBox2D unmatched_detections = 16;
   total_size += 2UL * this->_internal_unmatched_detections_size();
   for (const auto& msg : this->_impl_.unmatched_detections_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.KalmanPrediction kalman_predictions = 17;
+  total_size += 2UL * this->_internal_kalman_predictions_size();
+  for (const auto& msg : this->_impl_.kalman_predictions_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.FilteredDetection filtered_detections = 18;
+  total_size += 2UL * this->_internal_filtered_detections_size();
+  for (const auto& msg : this->_impl_.filtered_detections_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.TrackerAssociation tracker_associations = 19;
+  total_size += 2UL * this->_internal_tracker_associations_size();
+  for (const auto& msg : this->_impl_.tracker_associations_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.NewTracker new_trackers = 20;
+  total_size += 2UL * this->_internal_new_trackers_size();
+  for (const auto& msg : this->_impl_.new_trackers_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.BallState ball_states = 21;
+  total_size += 2UL * this->_internal_ball_states_size();
+  for (const auto& msg : this->_impl_.ball_states_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.OcclusionState occlusion_states = 22;
+  total_size += 2UL * this->_internal_occlusion_states_size();
+  for (const auto& msg : this->_impl_.occlusion_states_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.ColorSearchRegion color_search_regions = 23;
+  total_size += 2UL * this->_internal_color_search_regions_size();
+  for (const auto& msg : this->_impl_.color_search_regions_) {
     total_size +=
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
   }
@@ -5976,6 +8667,13 @@ void FrameData::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROT
   _this->_impl_.color_tracked_balls_.MergeFrom(from._impl_.color_tracked_balls_);
   _this->_impl_.throw_catch_events_.MergeFrom(from._impl_.throw_catch_events_);
   _this->_impl_.unmatched_detections_.MergeFrom(from._impl_.unmatched_detections_);
+  _this->_impl_.kalman_predictions_.MergeFrom(from._impl_.kalman_predictions_);
+  _this->_impl_.filtered_detections_.MergeFrom(from._impl_.filtered_detections_);
+  _this->_impl_.tracker_associations_.MergeFrom(from._impl_.tracker_associations_);
+  _this->_impl_.new_trackers_.MergeFrom(from._impl_.new_trackers_);
+  _this->_impl_.ball_states_.MergeFrom(from._impl_.ball_states_);
+  _this->_impl_.occlusion_states_.MergeFrom(from._impl_.occlusion_states_);
+  _this->_impl_.color_search_regions_.MergeFrom(from._impl_.color_search_regions_);
   if (!from._internal_color_image_b64().empty()) {
     _this->_internal_set_color_image_b64(from._internal_color_image_b64());
   }
@@ -6031,6 +8729,13 @@ void FrameData::InternalSwap(FrameData* other) {
   _impl_.color_tracked_balls_.InternalSwap(&other->_impl_.color_tracked_balls_);
   _impl_.throw_catch_events_.InternalSwap(&other->_impl_.throw_catch_events_);
   _impl_.unmatched_detections_.InternalSwap(&other->_impl_.unmatched_detections_);
+  _impl_.kalman_predictions_.InternalSwap(&other->_impl_.kalman_predictions_);
+  _impl_.filtered_detections_.InternalSwap(&other->_impl_.filtered_detections_);
+  _impl_.tracker_associations_.InternalSwap(&other->_impl_.tracker_associations_);
+  _impl_.new_trackers_.InternalSwap(&other->_impl_.new_trackers_);
+  _impl_.ball_states_.InternalSwap(&other->_impl_.ball_states_);
+  _impl_.occlusion_states_.InternalSwap(&other->_impl_.occlusion_states_);
+  _impl_.color_search_regions_.InternalSwap(&other->_impl_.color_search_regions_);
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.color_image_b64_, lhs_arena,
       &other->_impl_.color_image_b64_, rhs_arena
@@ -6050,7 +8755,7 @@ void FrameData::InternalSwap(FrameData* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata FrameData::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[13]);
+      file_level_metadata_juggler_2eproto[20]);
 }
 
 // ===================================================================
@@ -6064,7 +8769,7 @@ void CommandRequest_ModuleArgsEntry_DoNotUse::MergeFrom(const CommandRequest_Mod
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandRequest_ModuleArgsEntry_DoNotUse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[14]);
+      file_level_metadata_juggler_2eproto[21]);
 }
 
 // ===================================================================
@@ -6850,7 +9555,7 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandRequest::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[15]);
+      file_level_metadata_juggler_2eproto[22]);
 }
 
 // ===================================================================
@@ -7095,7 +9800,7 @@ void ColorCommand::InternalSwap(ColorCommand* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata ColorCommand::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[16]);
+      file_level_metadata_juggler_2eproto[23]);
 }
 
 // ===================================================================
@@ -7358,7 +10063,7 @@ void CommandResponse::InternalSwap(CommandResponse* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandResponse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[17]);
+      file_level_metadata_juggler_2eproto[24]);
 }
 
 // @@protoc_insertion_point(namespace_scope)
@@ -7416,6 +10121,34 @@ Arena::CreateMaybeMessage< ::juggler::v1::CameraIntrinsics >(Arena* arena) {
 template<> PROTOBUF_NOINLINE ::juggler::v1::SystemStatus*
 Arena::CreateMaybeMessage< ::juggler::v1::SystemStatus >(Arena* arena) {
   return Arena::CreateMessageInternal< ::juggler::v1::SystemStatus >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::KalmanPrediction*
+Arena::CreateMaybeMessage< ::juggler::v1::KalmanPrediction >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::KalmanPrediction >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::FilteredDetection*
+Arena::CreateMaybeMessage< ::juggler::v1::FilteredDetection >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::FilteredDetection >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::TrackerAssociation*
+Arena::CreateMaybeMessage< ::juggler::v1::TrackerAssociation >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::TrackerAssociation >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::NewTracker*
+Arena::CreateMaybeMessage< ::juggler::v1::NewTracker >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::NewTracker >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::BallState*
+Arena::CreateMaybeMessage< ::juggler::v1::BallState >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::BallState >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::OcclusionState*
+Arena::CreateMaybeMessage< ::juggler::v1::OcclusionState >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::OcclusionState >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::ColorSearchRegion*
+Arena::CreateMaybeMessage< ::juggler::v1::ColorSearchRegion >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::ColorSearchRegion >(arena);
 }
 template<> PROTOBUF_NOINLINE ::juggler::v1::FrameData*
 Arena::CreateMaybeMessage< ::juggler::v1::FrameData >(Arena* arena) {

@@ -79,6 +79,7 @@ public:
     // Getters
     const std::vector<ColorProfile>& getColorProfiles() const { return color_profiles_; }
     std::vector<ColorProfile>& getColorProfiles() { return color_profiles_; }
+    const std::vector<std::pair<cv::Point2f, float>>& get_search_regions() const { return search_regions_; }
     
 private:
     // Helper methods
@@ -97,6 +98,9 @@ private:
     std::vector<ColorProfile> color_profiles_;
     std::vector<ColorTrackedBall> tracked_balls_;
     std::string settings_file_;
+    
+    // Visualization data
+    std::vector<std::pair<cv::Point2f, float>> search_regions_; // (center, radius)
     
     // Parameters
     static constexpr int NUM_BALLS = 3;

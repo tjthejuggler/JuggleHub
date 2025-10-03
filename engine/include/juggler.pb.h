@@ -53,6 +53,9 @@ namespace v1 {
 class Ball;
 struct BallDefaultTypeInternal;
 extern BallDefaultTypeInternal _Ball_default_instance_;
+class BallState;
+struct BallStateDefaultTypeInternal;
+extern BallStateDefaultTypeInternal _BallState_default_instance_;
 class BoundingBox2D;
 struct BoundingBox2DDefaultTypeInternal;
 extern BoundingBox2DDefaultTypeInternal _BoundingBox2D_default_instance_;
@@ -65,6 +68,9 @@ extern ColorDefaultTypeInternal _Color_default_instance_;
 class ColorCommand;
 struct ColorCommandDefaultTypeInternal;
 extern ColorCommandDefaultTypeInternal _ColorCommand_default_instance_;
+class ColorSearchRegion;
+struct ColorSearchRegionDefaultTypeInternal;
+extern ColorSearchRegionDefaultTypeInternal _ColorSearchRegion_default_instance_;
 class ColorTrackedBall;
 struct ColorTrackedBallDefaultTypeInternal;
 extern ColorTrackedBallDefaultTypeInternal _ColorTrackedBall_default_instance_;
@@ -77,6 +83,9 @@ extern CommandRequest_ModuleArgsEntry_DoNotUseDefaultTypeInternal _CommandReques
 class CommandResponse;
 struct CommandResponseDefaultTypeInternal;
 extern CommandResponseDefaultTypeInternal _CommandResponse_default_instance_;
+class FilteredDetection;
+struct FilteredDetectionDefaultTypeInternal;
+extern FilteredDetectionDefaultTypeInternal _FilteredDetection_default_instance_;
 class FrameData;
 struct FrameDataDefaultTypeInternal;
 extern FrameDataDefaultTypeInternal _FrameData_default_instance_;
@@ -89,15 +98,27 @@ extern HandDefaultTypeInternal _Hand_default_instance_;
 class IMUData;
 struct IMUDataDefaultTypeInternal;
 extern IMUDataDefaultTypeInternal _IMUData_default_instance_;
+class KalmanPrediction;
+struct KalmanPredictionDefaultTypeInternal;
+extern KalmanPredictionDefaultTypeInternal _KalmanPrediction_default_instance_;
 class KeyPoint;
 struct KeyPointDefaultTypeInternal;
 extern KeyPointDefaultTypeInternal _KeyPoint_default_instance_;
+class NewTracker;
+struct NewTrackerDefaultTypeInternal;
+extern NewTrackerDefaultTypeInternal _NewTracker_default_instance_;
+class OcclusionState;
+struct OcclusionStateDefaultTypeInternal;
+extern OcclusionStateDefaultTypeInternal _OcclusionState_default_instance_;
 class SystemStatus;
 struct SystemStatusDefaultTypeInternal;
 extern SystemStatusDefaultTypeInternal _SystemStatus_default_instance_;
 class ThrowCatchEvent;
 struct ThrowCatchEventDefaultTypeInternal;
 extern ThrowCatchEventDefaultTypeInternal _ThrowCatchEvent_default_instance_;
+class TrackerAssociation;
+struct TrackerAssociationDefaultTypeInternal;
+extern TrackerAssociationDefaultTypeInternal _TrackerAssociation_default_instance_;
 class Vector2;
 struct Vector2DefaultTypeInternal;
 extern Vector2DefaultTypeInternal _Vector2_default_instance_;
@@ -108,21 +129,28 @@ extern Vector3DefaultTypeInternal _Vector3_default_instance_;
 }  // namespace juggler
 PROTOBUF_NAMESPACE_OPEN
 template<> ::juggler::v1::Ball* Arena::CreateMaybeMessage<::juggler::v1::Ball>(Arena*);
+template<> ::juggler::v1::BallState* Arena::CreateMaybeMessage<::juggler::v1::BallState>(Arena*);
 template<> ::juggler::v1::BoundingBox2D* Arena::CreateMaybeMessage<::juggler::v1::BoundingBox2D>(Arena*);
 template<> ::juggler::v1::CameraIntrinsics* Arena::CreateMaybeMessage<::juggler::v1::CameraIntrinsics>(Arena*);
 template<> ::juggler::v1::Color* Arena::CreateMaybeMessage<::juggler::v1::Color>(Arena*);
 template<> ::juggler::v1::ColorCommand* Arena::CreateMaybeMessage<::juggler::v1::ColorCommand>(Arena*);
+template<> ::juggler::v1::ColorSearchRegion* Arena::CreateMaybeMessage<::juggler::v1::ColorSearchRegion>(Arena*);
 template<> ::juggler::v1::ColorTrackedBall* Arena::CreateMaybeMessage<::juggler::v1::ColorTrackedBall>(Arena*);
 template<> ::juggler::v1::CommandRequest* Arena::CreateMaybeMessage<::juggler::v1::CommandRequest>(Arena*);
 template<> ::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse* Arena::CreateMaybeMessage<::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse>(Arena*);
 template<> ::juggler::v1::CommandResponse* Arena::CreateMaybeMessage<::juggler::v1::CommandResponse>(Arena*);
+template<> ::juggler::v1::FilteredDetection* Arena::CreateMaybeMessage<::juggler::v1::FilteredDetection>(Arena*);
 template<> ::juggler::v1::FrameData* Arena::CreateMaybeMessage<::juggler::v1::FrameData>(Arena*);
 template<> ::juggler::v1::HSVRange* Arena::CreateMaybeMessage<::juggler::v1::HSVRange>(Arena*);
 template<> ::juggler::v1::Hand* Arena::CreateMaybeMessage<::juggler::v1::Hand>(Arena*);
 template<> ::juggler::v1::IMUData* Arena::CreateMaybeMessage<::juggler::v1::IMUData>(Arena*);
+template<> ::juggler::v1::KalmanPrediction* Arena::CreateMaybeMessage<::juggler::v1::KalmanPrediction>(Arena*);
 template<> ::juggler::v1::KeyPoint* Arena::CreateMaybeMessage<::juggler::v1::KeyPoint>(Arena*);
+template<> ::juggler::v1::NewTracker* Arena::CreateMaybeMessage<::juggler::v1::NewTracker>(Arena*);
+template<> ::juggler::v1::OcclusionState* Arena::CreateMaybeMessage<::juggler::v1::OcclusionState>(Arena*);
 template<> ::juggler::v1::SystemStatus* Arena::CreateMaybeMessage<::juggler::v1::SystemStatus>(Arena*);
 template<> ::juggler::v1::ThrowCatchEvent* Arena::CreateMaybeMessage<::juggler::v1::ThrowCatchEvent>(Arena*);
+template<> ::juggler::v1::TrackerAssociation* Arena::CreateMaybeMessage<::juggler::v1::TrackerAssociation>(Arena*);
 template<> ::juggler::v1::Vector2* Arena::CreateMaybeMessage<::juggler::v1::Vector2>(Arena*);
 template<> ::juggler::v1::Vector3* Arena::CreateMaybeMessage<::juggler::v1::Vector3>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
@@ -179,6 +207,32 @@ inline bool ThrowCatchEvent_EventType_Parse(
     ::PROTOBUF_NAMESPACE_ID::ConstStringParam name, ThrowCatchEvent_EventType* value) {
   return ::PROTOBUF_NAMESPACE_ID::internal::ParseNamedEnum<ThrowCatchEvent_EventType>(
     ThrowCatchEvent_EventType_descriptor(), name, value);
+}
+enum BallState_State : int {
+  BallState_State_IN_FLIGHT = 0,
+  BallState_State_TRANSITIONING = 1,
+  BallState_State_HELD = 2,
+  BallState_State_BallState_State_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
+  BallState_State_BallState_State_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
+};
+bool BallState_State_IsValid(int value);
+constexpr BallState_State BallState_State_State_MIN = BallState_State_IN_FLIGHT;
+constexpr BallState_State BallState_State_State_MAX = BallState_State_HELD;
+constexpr int BallState_State_State_ARRAYSIZE = BallState_State_State_MAX + 1;
+
+const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* BallState_State_descriptor();
+template<typename T>
+inline const std::string& BallState_State_Name(T enum_t_value) {
+  static_assert(::std::is_same<T, BallState_State>::value ||
+    ::std::is_integral<T>::value,
+    "Incorrect type passed to function BallState_State_Name.");
+  return ::PROTOBUF_NAMESPACE_ID::internal::NameOfEnum(
+    BallState_State_descriptor(), enum_t_value);
+}
+inline bool BallState_State_Parse(
+    ::PROTOBUF_NAMESPACE_ID::ConstStringParam name, BallState_State* value) {
+  return ::PROTOBUF_NAMESPACE_ID::internal::ParseNamedEnum<BallState_State>(
+    BallState_State_descriptor(), name, value);
 }
 enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_UNKNOWN = 0,
@@ -3016,6 +3070,1440 @@ class SystemStatus final :
 };
 // -------------------------------------------------------------------
 
+class KalmanPrediction final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.KalmanPrediction) */ {
+ public:
+  inline KalmanPrediction() : KalmanPrediction(nullptr) {}
+  ~KalmanPrediction() override;
+  explicit PROTOBUF_CONSTEXPR KalmanPrediction(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  KalmanPrediction(const KalmanPrediction& from);
+  KalmanPrediction(KalmanPrediction&& from) noexcept
+    : KalmanPrediction() {
+    *this = ::std::move(from);
+  }
+
+  inline KalmanPrediction& operator=(const KalmanPrediction& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline KalmanPrediction& operator=(KalmanPrediction&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const KalmanPrediction& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const KalmanPrediction* internal_default_instance() {
+    return reinterpret_cast<const KalmanPrediction*>(
+               &_KalmanPrediction_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    13;
+
+  friend void swap(KalmanPrediction& a, KalmanPrediction& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(KalmanPrediction* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(KalmanPrediction* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  KalmanPrediction* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<KalmanPrediction>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const KalmanPrediction& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const KalmanPrediction& from) {
+    KalmanPrediction::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(KalmanPrediction* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.KalmanPrediction";
+  }
+  protected:
+  explicit KalmanPrediction(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kPredictedPosFieldNumber = 2,
+    kPredictedPos2DFieldNumber = 3,
+    kLogicalIdFieldNumber = 1,
+    kIsInFreefallFieldNumber = 4,
+  };
+  // .juggler.v1.Vector3 predicted_pos = 2;
+  bool has_predicted_pos() const;
+  private:
+  bool _internal_has_predicted_pos() const;
+  public:
+  void clear_predicted_pos();
+  const ::juggler::v1::Vector3& predicted_pos() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector3* release_predicted_pos();
+  ::juggler::v1::Vector3* mutable_predicted_pos();
+  void set_allocated_predicted_pos(::juggler::v1::Vector3* predicted_pos);
+  private:
+  const ::juggler::v1::Vector3& _internal_predicted_pos() const;
+  ::juggler::v1::Vector3* _internal_mutable_predicted_pos();
+  public:
+  void unsafe_arena_set_allocated_predicted_pos(
+      ::juggler::v1::Vector3* predicted_pos);
+  ::juggler::v1::Vector3* unsafe_arena_release_predicted_pos();
+
+  // .juggler.v1.Vector2 predicted_pos_2d = 3;
+  bool has_predicted_pos_2d() const;
+  private:
+  bool _internal_has_predicted_pos_2d() const;
+  public:
+  void clear_predicted_pos_2d();
+  const ::juggler::v1::Vector2& predicted_pos_2d() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector2* release_predicted_pos_2d();
+  ::juggler::v1::Vector2* mutable_predicted_pos_2d();
+  void set_allocated_predicted_pos_2d(::juggler::v1::Vector2* predicted_pos_2d);
+  private:
+  const ::juggler::v1::Vector2& _internal_predicted_pos_2d() const;
+  ::juggler::v1::Vector2* _internal_mutable_predicted_pos_2d();
+  public:
+  void unsafe_arena_set_allocated_predicted_pos_2d(
+      ::juggler::v1::Vector2* predicted_pos_2d);
+  ::juggler::v1::Vector2* unsafe_arena_release_predicted_pos_2d();
+
+  // int32 logical_id = 1;
+  void clear_logical_id();
+  int32_t logical_id() const;
+  void set_logical_id(int32_t value);
+  private:
+  int32_t _internal_logical_id() const;
+  void _internal_set_logical_id(int32_t value);
+  public:
+
+  // bool is_in_freefall = 4;
+  void clear_is_in_freefall();
+  bool is_in_freefall() const;
+  void set_is_in_freefall(bool value);
+  private:
+  bool _internal_is_in_freefall() const;
+  void _internal_set_is_in_freefall(bool value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.KalmanPrediction)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::juggler::v1::Vector3* predicted_pos_;
+    ::juggler::v1::Vector2* predicted_pos_2d_;
+    int32_t logical_id_;
+    bool is_in_freefall_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
+class FilteredDetection final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.FilteredDetection) */ {
+ public:
+  inline FilteredDetection() : FilteredDetection(nullptr) {}
+  ~FilteredDetection() override;
+  explicit PROTOBUF_CONSTEXPR FilteredDetection(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  FilteredDetection(const FilteredDetection& from);
+  FilteredDetection(FilteredDetection&& from) noexcept
+    : FilteredDetection() {
+    *this = ::std::move(from);
+  }
+
+  inline FilteredDetection& operator=(const FilteredDetection& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline FilteredDetection& operator=(FilteredDetection&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const FilteredDetection& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const FilteredDetection* internal_default_instance() {
+    return reinterpret_cast<const FilteredDetection*>(
+               &_FilteredDetection_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    14;
+
+  friend void swap(FilteredDetection& a, FilteredDetection& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(FilteredDetection* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(FilteredDetection* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  FilteredDetection* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<FilteredDetection>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const FilteredDetection& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const FilteredDetection& from) {
+    FilteredDetection::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(FilteredDetection* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.FilteredDetection";
+  }
+  protected:
+  explicit FilteredDetection(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kReasonFieldNumber = 2,
+    kBoxFieldNumber = 1,
+    kDepthValueFieldNumber = 3,
+  };
+  // string reason = 2;
+  void clear_reason();
+  const std::string& reason() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_reason(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_reason();
+  PROTOBUF_NODISCARD std::string* release_reason();
+  void set_allocated_reason(std::string* reason);
+  private:
+  const std::string& _internal_reason() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_reason(const std::string& value);
+  std::string* _internal_mutable_reason();
+  public:
+
+  // .juggler.v1.BoundingBox2D box = 1;
+  bool has_box() const;
+  private:
+  bool _internal_has_box() const;
+  public:
+  void clear_box();
+  const ::juggler::v1::BoundingBox2D& box() const;
+  PROTOBUF_NODISCARD ::juggler::v1::BoundingBox2D* release_box();
+  ::juggler::v1::BoundingBox2D* mutable_box();
+  void set_allocated_box(::juggler::v1::BoundingBox2D* box);
+  private:
+  const ::juggler::v1::BoundingBox2D& _internal_box() const;
+  ::juggler::v1::BoundingBox2D* _internal_mutable_box();
+  public:
+  void unsafe_arena_set_allocated_box(
+      ::juggler::v1::BoundingBox2D* box);
+  ::juggler::v1::BoundingBox2D* unsafe_arena_release_box();
+
+  // float depth_value = 3;
+  void clear_depth_value();
+  float depth_value() const;
+  void set_depth_value(float value);
+  private:
+  float _internal_depth_value() const;
+  void _internal_set_depth_value(float value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.FilteredDetection)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr reason_;
+    ::juggler::v1::BoundingBox2D* box_;
+    float depth_value_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
+class TrackerAssociation final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.TrackerAssociation) */ {
+ public:
+  inline TrackerAssociation() : TrackerAssociation(nullptr) {}
+  ~TrackerAssociation() override;
+  explicit PROTOBUF_CONSTEXPR TrackerAssociation(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  TrackerAssociation(const TrackerAssociation& from);
+  TrackerAssociation(TrackerAssociation&& from) noexcept
+    : TrackerAssociation() {
+    *this = ::std::move(from);
+  }
+
+  inline TrackerAssociation& operator=(const TrackerAssociation& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline TrackerAssociation& operator=(TrackerAssociation&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const TrackerAssociation& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const TrackerAssociation* internal_default_instance() {
+    return reinterpret_cast<const TrackerAssociation*>(
+               &_TrackerAssociation_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    15;
+
+  friend void swap(TrackerAssociation& a, TrackerAssociation& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(TrackerAssociation* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(TrackerAssociation* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  TrackerAssociation* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<TrackerAssociation>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const TrackerAssociation& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const TrackerAssociation& from) {
+    TrackerAssociation::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(TrackerAssociation* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.TrackerAssociation";
+  }
+  protected:
+  explicit TrackerAssociation(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kTrackerPosFieldNumber = 4,
+    kDetectionPosFieldNumber = 5,
+    kTrackerIdFieldNumber = 1,
+    kDetectionIndexFieldNumber = 2,
+    kDistance3DFieldNumber = 3,
+  };
+  // .juggler.v1.Vector3 tracker_pos = 4;
+  bool has_tracker_pos() const;
+  private:
+  bool _internal_has_tracker_pos() const;
+  public:
+  void clear_tracker_pos();
+  const ::juggler::v1::Vector3& tracker_pos() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector3* release_tracker_pos();
+  ::juggler::v1::Vector3* mutable_tracker_pos();
+  void set_allocated_tracker_pos(::juggler::v1::Vector3* tracker_pos);
+  private:
+  const ::juggler::v1::Vector3& _internal_tracker_pos() const;
+  ::juggler::v1::Vector3* _internal_mutable_tracker_pos();
+  public:
+  void unsafe_arena_set_allocated_tracker_pos(
+      ::juggler::v1::Vector3* tracker_pos);
+  ::juggler::v1::Vector3* unsafe_arena_release_tracker_pos();
+
+  // .juggler.v1.Vector3 detection_pos = 5;
+  bool has_detection_pos() const;
+  private:
+  bool _internal_has_detection_pos() const;
+  public:
+  void clear_detection_pos();
+  const ::juggler::v1::Vector3& detection_pos() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector3* release_detection_pos();
+  ::juggler::v1::Vector3* mutable_detection_pos();
+  void set_allocated_detection_pos(::juggler::v1::Vector3* detection_pos);
+  private:
+  const ::juggler::v1::Vector3& _internal_detection_pos() const;
+  ::juggler::v1::Vector3* _internal_mutable_detection_pos();
+  public:
+  void unsafe_arena_set_allocated_detection_pos(
+      ::juggler::v1::Vector3* detection_pos);
+  ::juggler::v1::Vector3* unsafe_arena_release_detection_pos();
+
+  // int32 tracker_id = 1;
+  void clear_tracker_id();
+  int32_t tracker_id() const;
+  void set_tracker_id(int32_t value);
+  private:
+  int32_t _internal_tracker_id() const;
+  void _internal_set_tracker_id(int32_t value);
+  public:
+
+  // int32 detection_index = 2;
+  void clear_detection_index();
+  int32_t detection_index() const;
+  void set_detection_index(int32_t value);
+  private:
+  int32_t _internal_detection_index() const;
+  void _internal_set_detection_index(int32_t value);
+  public:
+
+  // float distance_3d = 3;
+  void clear_distance_3d();
+  float distance_3d() const;
+  void set_distance_3d(float value);
+  private:
+  float _internal_distance_3d() const;
+  void _internal_set_distance_3d(float value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.TrackerAssociation)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::juggler::v1::Vector3* tracker_pos_;
+    ::juggler::v1::Vector3* detection_pos_;
+    int32_t tracker_id_;
+    int32_t detection_index_;
+    float distance_3d_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
+class NewTracker final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.NewTracker) */ {
+ public:
+  inline NewTracker() : NewTracker(nullptr) {}
+  ~NewTracker() override;
+  explicit PROTOBUF_CONSTEXPR NewTracker(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  NewTracker(const NewTracker& from);
+  NewTracker(NewTracker&& from) noexcept
+    : NewTracker() {
+    *this = ::std::move(from);
+  }
+
+  inline NewTracker& operator=(const NewTracker& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline NewTracker& operator=(NewTracker&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const NewTracker& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const NewTracker* internal_default_instance() {
+    return reinterpret_cast<const NewTracker*>(
+               &_NewTracker_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    16;
+
+  friend void swap(NewTracker& a, NewTracker& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(NewTracker* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(NewTracker* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  NewTracker* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<NewTracker>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const NewTracker& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const NewTracker& from) {
+    NewTracker::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(NewTracker* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.NewTracker";
+  }
+  protected:
+  explicit NewTracker(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kInitialPosFieldNumber = 2,
+    kInitialPos2DFieldNumber = 3,
+    kLogicalIdFieldNumber = 1,
+    kDetectionIndexFieldNumber = 4,
+  };
+  // .juggler.v1.Vector3 initial_pos = 2;
+  bool has_initial_pos() const;
+  private:
+  bool _internal_has_initial_pos() const;
+  public:
+  void clear_initial_pos();
+  const ::juggler::v1::Vector3& initial_pos() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector3* release_initial_pos();
+  ::juggler::v1::Vector3* mutable_initial_pos();
+  void set_allocated_initial_pos(::juggler::v1::Vector3* initial_pos);
+  private:
+  const ::juggler::v1::Vector3& _internal_initial_pos() const;
+  ::juggler::v1::Vector3* _internal_mutable_initial_pos();
+  public:
+  void unsafe_arena_set_allocated_initial_pos(
+      ::juggler::v1::Vector3* initial_pos);
+  ::juggler::v1::Vector3* unsafe_arena_release_initial_pos();
+
+  // .juggler.v1.Vector2 initial_pos_2d = 3;
+  bool has_initial_pos_2d() const;
+  private:
+  bool _internal_has_initial_pos_2d() const;
+  public:
+  void clear_initial_pos_2d();
+  const ::juggler::v1::Vector2& initial_pos_2d() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector2* release_initial_pos_2d();
+  ::juggler::v1::Vector2* mutable_initial_pos_2d();
+  void set_allocated_initial_pos_2d(::juggler::v1::Vector2* initial_pos_2d);
+  private:
+  const ::juggler::v1::Vector2& _internal_initial_pos_2d() const;
+  ::juggler::v1::Vector2* _internal_mutable_initial_pos_2d();
+  public:
+  void unsafe_arena_set_allocated_initial_pos_2d(
+      ::juggler::v1::Vector2* initial_pos_2d);
+  ::juggler::v1::Vector2* unsafe_arena_release_initial_pos_2d();
+
+  // int32 logical_id = 1;
+  void clear_logical_id();
+  int32_t logical_id() const;
+  void set_logical_id(int32_t value);
+  private:
+  int32_t _internal_logical_id() const;
+  void _internal_set_logical_id(int32_t value);
+  public:
+
+  // int32 detection_index = 4;
+  void clear_detection_index();
+  int32_t detection_index() const;
+  void set_detection_index(int32_t value);
+  private:
+  int32_t _internal_detection_index() const;
+  void _internal_set_detection_index(int32_t value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.NewTracker)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::juggler::v1::Vector3* initial_pos_;
+    ::juggler::v1::Vector2* initial_pos_2d_;
+    int32_t logical_id_;
+    int32_t detection_index_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
+class BallState final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.BallState) */ {
+ public:
+  inline BallState() : BallState(nullptr) {}
+  ~BallState() override;
+  explicit PROTOBUF_CONSTEXPR BallState(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  BallState(const BallState& from);
+  BallState(BallState&& from) noexcept
+    : BallState() {
+    *this = ::std::move(from);
+  }
+
+  inline BallState& operator=(const BallState& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline BallState& operator=(BallState&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const BallState& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const BallState* internal_default_instance() {
+    return reinterpret_cast<const BallState*>(
+               &_BallState_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    17;
+
+  friend void swap(BallState& a, BallState& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(BallState* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(BallState* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  BallState* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<BallState>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const BallState& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const BallState& from) {
+    BallState::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(BallState* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.BallState";
+  }
+  protected:
+  explicit BallState(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  typedef BallState_State State;
+  static constexpr State IN_FLIGHT =
+    BallState_State_IN_FLIGHT;
+  static constexpr State TRANSITIONING =
+    BallState_State_TRANSITIONING;
+  static constexpr State HELD =
+    BallState_State_HELD;
+  static inline bool State_IsValid(int value) {
+    return BallState_State_IsValid(value);
+  }
+  static constexpr State State_MIN =
+    BallState_State_State_MIN;
+  static constexpr State State_MAX =
+    BallState_State_State_MAX;
+  static constexpr int State_ARRAYSIZE =
+    BallState_State_State_ARRAYSIZE;
+  static inline const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor*
+  State_descriptor() {
+    return BallState_State_descriptor();
+  }
+  template<typename T>
+  static inline const std::string& State_Name(T enum_t_value) {
+    static_assert(::std::is_same<T, State>::value ||
+      ::std::is_integral<T>::value,
+      "Incorrect type passed to function State_Name.");
+    return BallState_State_Name(enum_t_value);
+  }
+  static inline bool State_Parse(::PROTOBUF_NAMESPACE_ID::ConstStringParam name,
+      State* value) {
+    return BallState_State_Parse(name, value);
+  }
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kLogicalIdFieldNumber = 1,
+    kStateFieldNumber = 2,
+    kAssociatedHandIdFieldNumber = 3,
+    kConfidenceFieldNumber = 4,
+    kFramesInStateFieldNumber = 5,
+  };
+  // int32 logical_id = 1;
+  void clear_logical_id();
+  int32_t logical_id() const;
+  void set_logical_id(int32_t value);
+  private:
+  int32_t _internal_logical_id() const;
+  void _internal_set_logical_id(int32_t value);
+  public:
+
+  // .juggler.v1.BallState.State state = 2;
+  void clear_state();
+  ::juggler::v1::BallState_State state() const;
+  void set_state(::juggler::v1::BallState_State value);
+  private:
+  ::juggler::v1::BallState_State _internal_state() const;
+  void _internal_set_state(::juggler::v1::BallState_State value);
+  public:
+
+  // int32 associated_hand_id = 3;
+  void clear_associated_hand_id();
+  int32_t associated_hand_id() const;
+  void set_associated_hand_id(int32_t value);
+  private:
+  int32_t _internal_associated_hand_id() const;
+  void _internal_set_associated_hand_id(int32_t value);
+  public:
+
+  // float confidence = 4;
+  void clear_confidence();
+  float confidence() const;
+  void set_confidence(float value);
+  private:
+  float _internal_confidence() const;
+  void _internal_set_confidence(float value);
+  public:
+
+  // int32 frames_in_state = 5;
+  void clear_frames_in_state();
+  int32_t frames_in_state() const;
+  void set_frames_in_state(int32_t value);
+  private:
+  int32_t _internal_frames_in_state() const;
+  void _internal_set_frames_in_state(int32_t value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.BallState)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    int32_t logical_id_;
+    int state_;
+    int32_t associated_hand_id_;
+    float confidence_;
+    int32_t frames_in_state_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
+class OcclusionState final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.OcclusionState) */ {
+ public:
+  inline OcclusionState() : OcclusionState(nullptr) {}
+  ~OcclusionState() override;
+  explicit PROTOBUF_CONSTEXPR OcclusionState(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  OcclusionState(const OcclusionState& from);
+  OcclusionState(OcclusionState&& from) noexcept
+    : OcclusionState() {
+    *this = ::std::move(from);
+  }
+
+  inline OcclusionState& operator=(const OcclusionState& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline OcclusionState& operator=(OcclusionState&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const OcclusionState& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const OcclusionState* internal_default_instance() {
+    return reinterpret_cast<const OcclusionState*>(
+               &_OcclusionState_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    18;
+
+  friend void swap(OcclusionState& a, OcclusionState& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(OcclusionState* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(OcclusionState* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  OcclusionState* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<OcclusionState>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const OcclusionState& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const OcclusionState& from) {
+    OcclusionState::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(OcclusionState* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.OcclusionState";
+  }
+  protected:
+  explicit OcclusionState(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kLogicalIdFieldNumber = 1,
+    kIsOccludedFieldNumber = 2,
+    kOccludingHandIdFieldNumber = 3,
+    kDistanceToHandFieldNumber = 4,
+  };
+  // int32 logical_id = 1;
+  void clear_logical_id();
+  int32_t logical_id() const;
+  void set_logical_id(int32_t value);
+  private:
+  int32_t _internal_logical_id() const;
+  void _internal_set_logical_id(int32_t value);
+  public:
+
+  // bool is_occluded = 2;
+  void clear_is_occluded();
+  bool is_occluded() const;
+  void set_is_occluded(bool value);
+  private:
+  bool _internal_is_occluded() const;
+  void _internal_set_is_occluded(bool value);
+  public:
+
+  // int32 occluding_hand_id = 3;
+  void clear_occluding_hand_id();
+  int32_t occluding_hand_id() const;
+  void set_occluding_hand_id(int32_t value);
+  private:
+  int32_t _internal_occluding_hand_id() const;
+  void _internal_set_occluding_hand_id(int32_t value);
+  public:
+
+  // float distance_to_hand = 4;
+  void clear_distance_to_hand();
+  float distance_to_hand() const;
+  void set_distance_to_hand(float value);
+  private:
+  float _internal_distance_to_hand() const;
+  void _internal_set_distance_to_hand(float value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.OcclusionState)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    int32_t logical_id_;
+    bool is_occluded_;
+    int32_t occluding_hand_id_;
+    float distance_to_hand_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
+class ColorSearchRegion final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.ColorSearchRegion) */ {
+ public:
+  inline ColorSearchRegion() : ColorSearchRegion(nullptr) {}
+  ~ColorSearchRegion() override;
+  explicit PROTOBUF_CONSTEXPR ColorSearchRegion(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  ColorSearchRegion(const ColorSearchRegion& from);
+  ColorSearchRegion(ColorSearchRegion&& from) noexcept
+    : ColorSearchRegion() {
+    *this = ::std::move(from);
+  }
+
+  inline ColorSearchRegion& operator=(const ColorSearchRegion& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ColorSearchRegion& operator=(ColorSearchRegion&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const ColorSearchRegion& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const ColorSearchRegion* internal_default_instance() {
+    return reinterpret_cast<const ColorSearchRegion*>(
+               &_ColorSearchRegion_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    19;
+
+  friend void swap(ColorSearchRegion& a, ColorSearchRegion& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(ColorSearchRegion* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ColorSearchRegion* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  ColorSearchRegion* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<ColorSearchRegion>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const ColorSearchRegion& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const ColorSearchRegion& from) {
+    ColorSearchRegion::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(ColorSearchRegion* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.ColorSearchRegion";
+  }
+  protected:
+  explicit ColorSearchRegion(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kColorNameFieldNumber = 2,
+    kSearchCenterFieldNumber = 3,
+    kBlobCenterFieldNumber = 5,
+    kLogicalIdFieldNumber = 1,
+    kSearchRadiusFieldNumber = 4,
+    kBlobAreaFieldNumber = 6,
+    kFoundFieldNumber = 7,
+  };
+  // string color_name = 2;
+  void clear_color_name();
+  const std::string& color_name() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_color_name(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_color_name();
+  PROTOBUF_NODISCARD std::string* release_color_name();
+  void set_allocated_color_name(std::string* color_name);
+  private:
+  const std::string& _internal_color_name() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_color_name(const std::string& value);
+  std::string* _internal_mutable_color_name();
+  public:
+
+  // .juggler.v1.Vector2 search_center = 3;
+  bool has_search_center() const;
+  private:
+  bool _internal_has_search_center() const;
+  public:
+  void clear_search_center();
+  const ::juggler::v1::Vector2& search_center() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector2* release_search_center();
+  ::juggler::v1::Vector2* mutable_search_center();
+  void set_allocated_search_center(::juggler::v1::Vector2* search_center);
+  private:
+  const ::juggler::v1::Vector2& _internal_search_center() const;
+  ::juggler::v1::Vector2* _internal_mutable_search_center();
+  public:
+  void unsafe_arena_set_allocated_search_center(
+      ::juggler::v1::Vector2* search_center);
+  ::juggler::v1::Vector2* unsafe_arena_release_search_center();
+
+  // .juggler.v1.Vector2 blob_center = 5;
+  bool has_blob_center() const;
+  private:
+  bool _internal_has_blob_center() const;
+  public:
+  void clear_blob_center();
+  const ::juggler::v1::Vector2& blob_center() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector2* release_blob_center();
+  ::juggler::v1::Vector2* mutable_blob_center();
+  void set_allocated_blob_center(::juggler::v1::Vector2* blob_center);
+  private:
+  const ::juggler::v1::Vector2& _internal_blob_center() const;
+  ::juggler::v1::Vector2* _internal_mutable_blob_center();
+  public:
+  void unsafe_arena_set_allocated_blob_center(
+      ::juggler::v1::Vector2* blob_center);
+  ::juggler::v1::Vector2* unsafe_arena_release_blob_center();
+
+  // int32 logical_id = 1;
+  void clear_logical_id();
+  int32_t logical_id() const;
+  void set_logical_id(int32_t value);
+  private:
+  int32_t _internal_logical_id() const;
+  void _internal_set_logical_id(int32_t value);
+  public:
+
+  // float search_radius = 4;
+  void clear_search_radius();
+  float search_radius() const;
+  void set_search_radius(float value);
+  private:
+  float _internal_search_radius() const;
+  void _internal_set_search_radius(float value);
+  public:
+
+  // float blob_area = 6;
+  void clear_blob_area();
+  float blob_area() const;
+  void set_blob_area(float value);
+  private:
+  float _internal_blob_area() const;
+  void _internal_set_blob_area(float value);
+  public:
+
+  // bool found = 7;
+  void clear_found();
+  bool found() const;
+  void set_found(bool value);
+  private:
+  bool _internal_found() const;
+  void _internal_set_found(bool value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.ColorSearchRegion)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_name_;
+    ::juggler::v1::Vector2* search_center_;
+    ::juggler::v1::Vector2* blob_center_;
+    int32_t logical_id_;
+    float search_radius_;
+    float blob_area_;
+    bool found_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
 class FrameData final :
     public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.FrameData) */ {
  public:
@@ -3064,7 +4552,7 @@ class FrameData final :
                &_FrameData_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    13;
+    20;
 
   friend void swap(FrameData& a, FrameData& b) {
     a.Swap(&b);
@@ -3144,6 +4632,13 @@ class FrameData final :
     kColorTrackedBallsFieldNumber = 14,
     kThrowCatchEventsFieldNumber = 15,
     kUnmatchedDetectionsFieldNumber = 16,
+    kKalmanPredictionsFieldNumber = 17,
+    kFilteredDetectionsFieldNumber = 18,
+    kTrackerAssociationsFieldNumber = 19,
+    kNewTrackersFieldNumber = 20,
+    kBallStatesFieldNumber = 21,
+    kOcclusionStatesFieldNumber = 22,
+    kColorSearchRegionsFieldNumber = 23,
     kColorImageB64FieldNumber = 11,
     kDepthImageB64FieldNumber = 12,
     kIntrinsicsFieldNumber = 5,
@@ -3280,6 +4775,132 @@ class FrameData final :
   const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D >&
       unmatched_detections() const;
 
+  // repeated .juggler.v1.KalmanPrediction kalman_predictions = 17;
+  int kalman_predictions_size() const;
+  private:
+  int _internal_kalman_predictions_size() const;
+  public:
+  void clear_kalman_predictions();
+  ::juggler::v1::KalmanPrediction* mutable_kalman_predictions(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction >*
+      mutable_kalman_predictions();
+  private:
+  const ::juggler::v1::KalmanPrediction& _internal_kalman_predictions(int index) const;
+  ::juggler::v1::KalmanPrediction* _internal_add_kalman_predictions();
+  public:
+  const ::juggler::v1::KalmanPrediction& kalman_predictions(int index) const;
+  ::juggler::v1::KalmanPrediction* add_kalman_predictions();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction >&
+      kalman_predictions() const;
+
+  // repeated .juggler.v1.FilteredDetection filtered_detections = 18;
+  int filtered_detections_size() const;
+  private:
+  int _internal_filtered_detections_size() const;
+  public:
+  void clear_filtered_detections();
+  ::juggler::v1::FilteredDetection* mutable_filtered_detections(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::FilteredDetection >*
+      mutable_filtered_detections();
+  private:
+  const ::juggler::v1::FilteredDetection& _internal_filtered_detections(int index) const;
+  ::juggler::v1::FilteredDetection* _internal_add_filtered_detections();
+  public:
+  const ::juggler::v1::FilteredDetection& filtered_detections(int index) const;
+  ::juggler::v1::FilteredDetection* add_filtered_detections();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::FilteredDetection >&
+      filtered_detections() const;
+
+  // repeated .juggler.v1.TrackerAssociation tracker_associations = 19;
+  int tracker_associations_size() const;
+  private:
+  int _internal_tracker_associations_size() const;
+  public:
+  void clear_tracker_associations();
+  ::juggler::v1::TrackerAssociation* mutable_tracker_associations(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrackerAssociation >*
+      mutable_tracker_associations();
+  private:
+  const ::juggler::v1::TrackerAssociation& _internal_tracker_associations(int index) const;
+  ::juggler::v1::TrackerAssociation* _internal_add_tracker_associations();
+  public:
+  const ::juggler::v1::TrackerAssociation& tracker_associations(int index) const;
+  ::juggler::v1::TrackerAssociation* add_tracker_associations();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrackerAssociation >&
+      tracker_associations() const;
+
+  // repeated .juggler.v1.NewTracker new_trackers = 20;
+  int new_trackers_size() const;
+  private:
+  int _internal_new_trackers_size() const;
+  public:
+  void clear_new_trackers();
+  ::juggler::v1::NewTracker* mutable_new_trackers(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::NewTracker >*
+      mutable_new_trackers();
+  private:
+  const ::juggler::v1::NewTracker& _internal_new_trackers(int index) const;
+  ::juggler::v1::NewTracker* _internal_add_new_trackers();
+  public:
+  const ::juggler::v1::NewTracker& new_trackers(int index) const;
+  ::juggler::v1::NewTracker* add_new_trackers();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::NewTracker >&
+      new_trackers() const;
+
+  // repeated .juggler.v1.BallState ball_states = 21;
+  int ball_states_size() const;
+  private:
+  int _internal_ball_states_size() const;
+  public:
+  void clear_ball_states();
+  ::juggler::v1::BallState* mutable_ball_states(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BallState >*
+      mutable_ball_states();
+  private:
+  const ::juggler::v1::BallState& _internal_ball_states(int index) const;
+  ::juggler::v1::BallState* _internal_add_ball_states();
+  public:
+  const ::juggler::v1::BallState& ball_states(int index) const;
+  ::juggler::v1::BallState* add_ball_states();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BallState >&
+      ball_states() const;
+
+  // repeated .juggler.v1.OcclusionState occlusion_states = 22;
+  int occlusion_states_size() const;
+  private:
+  int _internal_occlusion_states_size() const;
+  public:
+  void clear_occlusion_states();
+  ::juggler::v1::OcclusionState* mutable_occlusion_states(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::OcclusionState >*
+      mutable_occlusion_states();
+  private:
+  const ::juggler::v1::OcclusionState& _internal_occlusion_states(int index) const;
+  ::juggler::v1::OcclusionState* _internal_add_occlusion_states();
+  public:
+  const ::juggler::v1::OcclusionState& occlusion_states(int index) const;
+  ::juggler::v1::OcclusionState* add_occlusion_states();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::OcclusionState >&
+      occlusion_states() const;
+
+  // repeated .juggler.v1.ColorSearchRegion color_search_regions = 23;
+  int color_search_regions_size() const;
+  private:
+  int _internal_color_search_regions_size() const;
+  public:
+  void clear_color_search_regions();
+  ::juggler::v1::ColorSearchRegion* mutable_color_search_regions(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorSearchRegion >*
+      mutable_color_search_regions();
+  private:
+  const ::juggler::v1::ColorSearchRegion& _internal_color_search_regions(int index) const;
+  ::juggler::v1::ColorSearchRegion* _internal_add_color_search_regions();
+  public:
+  const ::juggler::v1::ColorSearchRegion& color_search_regions(int index) const;
+  ::juggler::v1::ColorSearchRegion* add_color_search_regions();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorSearchRegion >&
+      color_search_regions() const;
+
   // bytes color_image_b64 = 11;
   void clear_color_image_b64();
   const std::string& color_image_b64() const;
@@ -3404,6 +5025,13 @@ class FrameData final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall > color_tracked_balls_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent > throw_catch_events_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D > unmatched_detections_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction > kalman_predictions_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::FilteredDetection > filtered_detections_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrackerAssociation > tracker_associations_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::NewTracker > new_trackers_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BallState > ball_states_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::OcclusionState > occlusion_states_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorSearchRegion > color_search_regions_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_image_b64_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr depth_image_b64_;
     ::juggler::v1::CameraIntrinsics* intrinsics_;
@@ -3496,7 +5124,7 @@ class CommandRequest final :
                &_CommandRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    15;
+    22;
 
   friend void swap(CommandRequest& a, CommandRequest& b) {
     a.Swap(&b);
@@ -3942,7 +5570,7 @@ class ColorCommand final :
                &_ColorCommand_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    16;
+    23;
 
   friend void swap(ColorCommand& a, ColorCommand& b) {
     a.Swap(&b);
@@ -4115,7 +5743,7 @@ class CommandResponse final :
                &_CommandResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    17;
+    24;
 
   friend void swap(CommandResponse& a, CommandResponse& b) {
     a.Swap(&b);
@@ -7061,6 +8689,1364 @@ inline void SystemStatus::set_timestamp_us(uint64_t value) {
 
 // -------------------------------------------------------------------
 
+// KalmanPrediction
+
+// int32 logical_id = 1;
+inline void KalmanPrediction::clear_logical_id() {
+  _impl_.logical_id_ = 0;
+}
+inline int32_t KalmanPrediction::_internal_logical_id() const {
+  return _impl_.logical_id_;
+}
+inline int32_t KalmanPrediction::logical_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.KalmanPrediction.logical_id)
+  return _internal_logical_id();
+}
+inline void KalmanPrediction::_internal_set_logical_id(int32_t value) {
+  
+  _impl_.logical_id_ = value;
+}
+inline void KalmanPrediction::set_logical_id(int32_t value) {
+  _internal_set_logical_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.KalmanPrediction.logical_id)
+}
+
+// .juggler.v1.Vector3 predicted_pos = 2;
+inline bool KalmanPrediction::_internal_has_predicted_pos() const {
+  return this != internal_default_instance() && _impl_.predicted_pos_ != nullptr;
+}
+inline bool KalmanPrediction::has_predicted_pos() const {
+  return _internal_has_predicted_pos();
+}
+inline void KalmanPrediction::clear_predicted_pos() {
+  if (GetArenaForAllocation() == nullptr && _impl_.predicted_pos_ != nullptr) {
+    delete _impl_.predicted_pos_;
+  }
+  _impl_.predicted_pos_ = nullptr;
+}
+inline const ::juggler::v1::Vector3& KalmanPrediction::_internal_predicted_pos() const {
+  const ::juggler::v1::Vector3* p = _impl_.predicted_pos_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
+      ::juggler::v1::_Vector3_default_instance_);
+}
+inline const ::juggler::v1::Vector3& KalmanPrediction::predicted_pos() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.KalmanPrediction.predicted_pos)
+  return _internal_predicted_pos();
+}
+inline void KalmanPrediction::unsafe_arena_set_allocated_predicted_pos(
+    ::juggler::v1::Vector3* predicted_pos) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.predicted_pos_);
+  }
+  _impl_.predicted_pos_ = predicted_pos;
+  if (predicted_pos) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.KalmanPrediction.predicted_pos)
+}
+inline ::juggler::v1::Vector3* KalmanPrediction::release_predicted_pos() {
+  
+  ::juggler::v1::Vector3* temp = _impl_.predicted_pos_;
+  _impl_.predicted_pos_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector3* KalmanPrediction::unsafe_arena_release_predicted_pos() {
+  // @@protoc_insertion_point(field_release:juggler.v1.KalmanPrediction.predicted_pos)
+  
+  ::juggler::v1::Vector3* temp = _impl_.predicted_pos_;
+  _impl_.predicted_pos_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector3* KalmanPrediction::_internal_mutable_predicted_pos() {
+  
+  if (_impl_.predicted_pos_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
+    _impl_.predicted_pos_ = p;
+  }
+  return _impl_.predicted_pos_;
+}
+inline ::juggler::v1::Vector3* KalmanPrediction::mutable_predicted_pos() {
+  ::juggler::v1::Vector3* _msg = _internal_mutable_predicted_pos();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.KalmanPrediction.predicted_pos)
+  return _msg;
+}
+inline void KalmanPrediction::set_allocated_predicted_pos(::juggler::v1::Vector3* predicted_pos) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.predicted_pos_;
+  }
+  if (predicted_pos) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(predicted_pos);
+    if (message_arena != submessage_arena) {
+      predicted_pos = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, predicted_pos, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.predicted_pos_ = predicted_pos;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.KalmanPrediction.predicted_pos)
+}
+
+// .juggler.v1.Vector2 predicted_pos_2d = 3;
+inline bool KalmanPrediction::_internal_has_predicted_pos_2d() const {
+  return this != internal_default_instance() && _impl_.predicted_pos_2d_ != nullptr;
+}
+inline bool KalmanPrediction::has_predicted_pos_2d() const {
+  return _internal_has_predicted_pos_2d();
+}
+inline void KalmanPrediction::clear_predicted_pos_2d() {
+  if (GetArenaForAllocation() == nullptr && _impl_.predicted_pos_2d_ != nullptr) {
+    delete _impl_.predicted_pos_2d_;
+  }
+  _impl_.predicted_pos_2d_ = nullptr;
+}
+inline const ::juggler::v1::Vector2& KalmanPrediction::_internal_predicted_pos_2d() const {
+  const ::juggler::v1::Vector2* p = _impl_.predicted_pos_2d_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector2&>(
+      ::juggler::v1::_Vector2_default_instance_);
+}
+inline const ::juggler::v1::Vector2& KalmanPrediction::predicted_pos_2d() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.KalmanPrediction.predicted_pos_2d)
+  return _internal_predicted_pos_2d();
+}
+inline void KalmanPrediction::unsafe_arena_set_allocated_predicted_pos_2d(
+    ::juggler::v1::Vector2* predicted_pos_2d) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.predicted_pos_2d_);
+  }
+  _impl_.predicted_pos_2d_ = predicted_pos_2d;
+  if (predicted_pos_2d) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.KalmanPrediction.predicted_pos_2d)
+}
+inline ::juggler::v1::Vector2* KalmanPrediction::release_predicted_pos_2d() {
+  
+  ::juggler::v1::Vector2* temp = _impl_.predicted_pos_2d_;
+  _impl_.predicted_pos_2d_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector2* KalmanPrediction::unsafe_arena_release_predicted_pos_2d() {
+  // @@protoc_insertion_point(field_release:juggler.v1.KalmanPrediction.predicted_pos_2d)
+  
+  ::juggler::v1::Vector2* temp = _impl_.predicted_pos_2d_;
+  _impl_.predicted_pos_2d_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector2* KalmanPrediction::_internal_mutable_predicted_pos_2d() {
+  
+  if (_impl_.predicted_pos_2d_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector2>(GetArenaForAllocation());
+    _impl_.predicted_pos_2d_ = p;
+  }
+  return _impl_.predicted_pos_2d_;
+}
+inline ::juggler::v1::Vector2* KalmanPrediction::mutable_predicted_pos_2d() {
+  ::juggler::v1::Vector2* _msg = _internal_mutable_predicted_pos_2d();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.KalmanPrediction.predicted_pos_2d)
+  return _msg;
+}
+inline void KalmanPrediction::set_allocated_predicted_pos_2d(::juggler::v1::Vector2* predicted_pos_2d) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.predicted_pos_2d_;
+  }
+  if (predicted_pos_2d) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(predicted_pos_2d);
+    if (message_arena != submessage_arena) {
+      predicted_pos_2d = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, predicted_pos_2d, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.predicted_pos_2d_ = predicted_pos_2d;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.KalmanPrediction.predicted_pos_2d)
+}
+
+// bool is_in_freefall = 4;
+inline void KalmanPrediction::clear_is_in_freefall() {
+  _impl_.is_in_freefall_ = false;
+}
+inline bool KalmanPrediction::_internal_is_in_freefall() const {
+  return _impl_.is_in_freefall_;
+}
+inline bool KalmanPrediction::is_in_freefall() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.KalmanPrediction.is_in_freefall)
+  return _internal_is_in_freefall();
+}
+inline void KalmanPrediction::_internal_set_is_in_freefall(bool value) {
+  
+  _impl_.is_in_freefall_ = value;
+}
+inline void KalmanPrediction::set_is_in_freefall(bool value) {
+  _internal_set_is_in_freefall(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.KalmanPrediction.is_in_freefall)
+}
+
+// -------------------------------------------------------------------
+
+// FilteredDetection
+
+// .juggler.v1.BoundingBox2D box = 1;
+inline bool FilteredDetection::_internal_has_box() const {
+  return this != internal_default_instance() && _impl_.box_ != nullptr;
+}
+inline bool FilteredDetection::has_box() const {
+  return _internal_has_box();
+}
+inline void FilteredDetection::clear_box() {
+  if (GetArenaForAllocation() == nullptr && _impl_.box_ != nullptr) {
+    delete _impl_.box_;
+  }
+  _impl_.box_ = nullptr;
+}
+inline const ::juggler::v1::BoundingBox2D& FilteredDetection::_internal_box() const {
+  const ::juggler::v1::BoundingBox2D* p = _impl_.box_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::BoundingBox2D&>(
+      ::juggler::v1::_BoundingBox2D_default_instance_);
+}
+inline const ::juggler::v1::BoundingBox2D& FilteredDetection::box() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FilteredDetection.box)
+  return _internal_box();
+}
+inline void FilteredDetection::unsafe_arena_set_allocated_box(
+    ::juggler::v1::BoundingBox2D* box) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.box_);
+  }
+  _impl_.box_ = box;
+  if (box) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.FilteredDetection.box)
+}
+inline ::juggler::v1::BoundingBox2D* FilteredDetection::release_box() {
+  
+  ::juggler::v1::BoundingBox2D* temp = _impl_.box_;
+  _impl_.box_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::BoundingBox2D* FilteredDetection::unsafe_arena_release_box() {
+  // @@protoc_insertion_point(field_release:juggler.v1.FilteredDetection.box)
+  
+  ::juggler::v1::BoundingBox2D* temp = _impl_.box_;
+  _impl_.box_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::BoundingBox2D* FilteredDetection::_internal_mutable_box() {
+  
+  if (_impl_.box_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::BoundingBox2D>(GetArenaForAllocation());
+    _impl_.box_ = p;
+  }
+  return _impl_.box_;
+}
+inline ::juggler::v1::BoundingBox2D* FilteredDetection::mutable_box() {
+  ::juggler::v1::BoundingBox2D* _msg = _internal_mutable_box();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FilteredDetection.box)
+  return _msg;
+}
+inline void FilteredDetection::set_allocated_box(::juggler::v1::BoundingBox2D* box) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.box_;
+  }
+  if (box) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(box);
+    if (message_arena != submessage_arena) {
+      box = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, box, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.box_ = box;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.FilteredDetection.box)
+}
+
+// string reason = 2;
+inline void FilteredDetection::clear_reason() {
+  _impl_.reason_.ClearToEmpty();
+}
+inline const std::string& FilteredDetection::reason() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FilteredDetection.reason)
+  return _internal_reason();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void FilteredDetection::set_reason(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.reason_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.FilteredDetection.reason)
+}
+inline std::string* FilteredDetection::mutable_reason() {
+  std::string* _s = _internal_mutable_reason();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FilteredDetection.reason)
+  return _s;
+}
+inline const std::string& FilteredDetection::_internal_reason() const {
+  return _impl_.reason_.Get();
+}
+inline void FilteredDetection::_internal_set_reason(const std::string& value) {
+  
+  _impl_.reason_.Set(value, GetArenaForAllocation());
+}
+inline std::string* FilteredDetection::_internal_mutable_reason() {
+  
+  return _impl_.reason_.Mutable(GetArenaForAllocation());
+}
+inline std::string* FilteredDetection::release_reason() {
+  // @@protoc_insertion_point(field_release:juggler.v1.FilteredDetection.reason)
+  return _impl_.reason_.Release();
+}
+inline void FilteredDetection::set_allocated_reason(std::string* reason) {
+  if (reason != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.reason_.SetAllocated(reason, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.reason_.IsDefault()) {
+    _impl_.reason_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.FilteredDetection.reason)
+}
+
+// float depth_value = 3;
+inline void FilteredDetection::clear_depth_value() {
+  _impl_.depth_value_ = 0;
+}
+inline float FilteredDetection::_internal_depth_value() const {
+  return _impl_.depth_value_;
+}
+inline float FilteredDetection::depth_value() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FilteredDetection.depth_value)
+  return _internal_depth_value();
+}
+inline void FilteredDetection::_internal_set_depth_value(float value) {
+  
+  _impl_.depth_value_ = value;
+}
+inline void FilteredDetection::set_depth_value(float value) {
+  _internal_set_depth_value(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.FilteredDetection.depth_value)
+}
+
+// -------------------------------------------------------------------
+
+// TrackerAssociation
+
+// int32 tracker_id = 1;
+inline void TrackerAssociation::clear_tracker_id() {
+  _impl_.tracker_id_ = 0;
+}
+inline int32_t TrackerAssociation::_internal_tracker_id() const {
+  return _impl_.tracker_id_;
+}
+inline int32_t TrackerAssociation::tracker_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrackerAssociation.tracker_id)
+  return _internal_tracker_id();
+}
+inline void TrackerAssociation::_internal_set_tracker_id(int32_t value) {
+  
+  _impl_.tracker_id_ = value;
+}
+inline void TrackerAssociation::set_tracker_id(int32_t value) {
+  _internal_set_tracker_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.TrackerAssociation.tracker_id)
+}
+
+// int32 detection_index = 2;
+inline void TrackerAssociation::clear_detection_index() {
+  _impl_.detection_index_ = 0;
+}
+inline int32_t TrackerAssociation::_internal_detection_index() const {
+  return _impl_.detection_index_;
+}
+inline int32_t TrackerAssociation::detection_index() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrackerAssociation.detection_index)
+  return _internal_detection_index();
+}
+inline void TrackerAssociation::_internal_set_detection_index(int32_t value) {
+  
+  _impl_.detection_index_ = value;
+}
+inline void TrackerAssociation::set_detection_index(int32_t value) {
+  _internal_set_detection_index(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.TrackerAssociation.detection_index)
+}
+
+// float distance_3d = 3;
+inline void TrackerAssociation::clear_distance_3d() {
+  _impl_.distance_3d_ = 0;
+}
+inline float TrackerAssociation::_internal_distance_3d() const {
+  return _impl_.distance_3d_;
+}
+inline float TrackerAssociation::distance_3d() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrackerAssociation.distance_3d)
+  return _internal_distance_3d();
+}
+inline void TrackerAssociation::_internal_set_distance_3d(float value) {
+  
+  _impl_.distance_3d_ = value;
+}
+inline void TrackerAssociation::set_distance_3d(float value) {
+  _internal_set_distance_3d(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.TrackerAssociation.distance_3d)
+}
+
+// .juggler.v1.Vector3 tracker_pos = 4;
+inline bool TrackerAssociation::_internal_has_tracker_pos() const {
+  return this != internal_default_instance() && _impl_.tracker_pos_ != nullptr;
+}
+inline bool TrackerAssociation::has_tracker_pos() const {
+  return _internal_has_tracker_pos();
+}
+inline void TrackerAssociation::clear_tracker_pos() {
+  if (GetArenaForAllocation() == nullptr && _impl_.tracker_pos_ != nullptr) {
+    delete _impl_.tracker_pos_;
+  }
+  _impl_.tracker_pos_ = nullptr;
+}
+inline const ::juggler::v1::Vector3& TrackerAssociation::_internal_tracker_pos() const {
+  const ::juggler::v1::Vector3* p = _impl_.tracker_pos_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
+      ::juggler::v1::_Vector3_default_instance_);
+}
+inline const ::juggler::v1::Vector3& TrackerAssociation::tracker_pos() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrackerAssociation.tracker_pos)
+  return _internal_tracker_pos();
+}
+inline void TrackerAssociation::unsafe_arena_set_allocated_tracker_pos(
+    ::juggler::v1::Vector3* tracker_pos) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.tracker_pos_);
+  }
+  _impl_.tracker_pos_ = tracker_pos;
+  if (tracker_pos) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.TrackerAssociation.tracker_pos)
+}
+inline ::juggler::v1::Vector3* TrackerAssociation::release_tracker_pos() {
+  
+  ::juggler::v1::Vector3* temp = _impl_.tracker_pos_;
+  _impl_.tracker_pos_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector3* TrackerAssociation::unsafe_arena_release_tracker_pos() {
+  // @@protoc_insertion_point(field_release:juggler.v1.TrackerAssociation.tracker_pos)
+  
+  ::juggler::v1::Vector3* temp = _impl_.tracker_pos_;
+  _impl_.tracker_pos_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector3* TrackerAssociation::_internal_mutable_tracker_pos() {
+  
+  if (_impl_.tracker_pos_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
+    _impl_.tracker_pos_ = p;
+  }
+  return _impl_.tracker_pos_;
+}
+inline ::juggler::v1::Vector3* TrackerAssociation::mutable_tracker_pos() {
+  ::juggler::v1::Vector3* _msg = _internal_mutable_tracker_pos();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.TrackerAssociation.tracker_pos)
+  return _msg;
+}
+inline void TrackerAssociation::set_allocated_tracker_pos(::juggler::v1::Vector3* tracker_pos) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.tracker_pos_;
+  }
+  if (tracker_pos) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(tracker_pos);
+    if (message_arena != submessage_arena) {
+      tracker_pos = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, tracker_pos, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.tracker_pos_ = tracker_pos;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.TrackerAssociation.tracker_pos)
+}
+
+// .juggler.v1.Vector3 detection_pos = 5;
+inline bool TrackerAssociation::_internal_has_detection_pos() const {
+  return this != internal_default_instance() && _impl_.detection_pos_ != nullptr;
+}
+inline bool TrackerAssociation::has_detection_pos() const {
+  return _internal_has_detection_pos();
+}
+inline void TrackerAssociation::clear_detection_pos() {
+  if (GetArenaForAllocation() == nullptr && _impl_.detection_pos_ != nullptr) {
+    delete _impl_.detection_pos_;
+  }
+  _impl_.detection_pos_ = nullptr;
+}
+inline const ::juggler::v1::Vector3& TrackerAssociation::_internal_detection_pos() const {
+  const ::juggler::v1::Vector3* p = _impl_.detection_pos_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
+      ::juggler::v1::_Vector3_default_instance_);
+}
+inline const ::juggler::v1::Vector3& TrackerAssociation::detection_pos() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrackerAssociation.detection_pos)
+  return _internal_detection_pos();
+}
+inline void TrackerAssociation::unsafe_arena_set_allocated_detection_pos(
+    ::juggler::v1::Vector3* detection_pos) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.detection_pos_);
+  }
+  _impl_.detection_pos_ = detection_pos;
+  if (detection_pos) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.TrackerAssociation.detection_pos)
+}
+inline ::juggler::v1::Vector3* TrackerAssociation::release_detection_pos() {
+  
+  ::juggler::v1::Vector3* temp = _impl_.detection_pos_;
+  _impl_.detection_pos_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector3* TrackerAssociation::unsafe_arena_release_detection_pos() {
+  // @@protoc_insertion_point(field_release:juggler.v1.TrackerAssociation.detection_pos)
+  
+  ::juggler::v1::Vector3* temp = _impl_.detection_pos_;
+  _impl_.detection_pos_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector3* TrackerAssociation::_internal_mutable_detection_pos() {
+  
+  if (_impl_.detection_pos_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
+    _impl_.detection_pos_ = p;
+  }
+  return _impl_.detection_pos_;
+}
+inline ::juggler::v1::Vector3* TrackerAssociation::mutable_detection_pos() {
+  ::juggler::v1::Vector3* _msg = _internal_mutable_detection_pos();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.TrackerAssociation.detection_pos)
+  return _msg;
+}
+inline void TrackerAssociation::set_allocated_detection_pos(::juggler::v1::Vector3* detection_pos) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.detection_pos_;
+  }
+  if (detection_pos) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(detection_pos);
+    if (message_arena != submessage_arena) {
+      detection_pos = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, detection_pos, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.detection_pos_ = detection_pos;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.TrackerAssociation.detection_pos)
+}
+
+// -------------------------------------------------------------------
+
+// NewTracker
+
+// int32 logical_id = 1;
+inline void NewTracker::clear_logical_id() {
+  _impl_.logical_id_ = 0;
+}
+inline int32_t NewTracker::_internal_logical_id() const {
+  return _impl_.logical_id_;
+}
+inline int32_t NewTracker::logical_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.NewTracker.logical_id)
+  return _internal_logical_id();
+}
+inline void NewTracker::_internal_set_logical_id(int32_t value) {
+  
+  _impl_.logical_id_ = value;
+}
+inline void NewTracker::set_logical_id(int32_t value) {
+  _internal_set_logical_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.NewTracker.logical_id)
+}
+
+// .juggler.v1.Vector3 initial_pos = 2;
+inline bool NewTracker::_internal_has_initial_pos() const {
+  return this != internal_default_instance() && _impl_.initial_pos_ != nullptr;
+}
+inline bool NewTracker::has_initial_pos() const {
+  return _internal_has_initial_pos();
+}
+inline void NewTracker::clear_initial_pos() {
+  if (GetArenaForAllocation() == nullptr && _impl_.initial_pos_ != nullptr) {
+    delete _impl_.initial_pos_;
+  }
+  _impl_.initial_pos_ = nullptr;
+}
+inline const ::juggler::v1::Vector3& NewTracker::_internal_initial_pos() const {
+  const ::juggler::v1::Vector3* p = _impl_.initial_pos_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
+      ::juggler::v1::_Vector3_default_instance_);
+}
+inline const ::juggler::v1::Vector3& NewTracker::initial_pos() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.NewTracker.initial_pos)
+  return _internal_initial_pos();
+}
+inline void NewTracker::unsafe_arena_set_allocated_initial_pos(
+    ::juggler::v1::Vector3* initial_pos) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.initial_pos_);
+  }
+  _impl_.initial_pos_ = initial_pos;
+  if (initial_pos) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.NewTracker.initial_pos)
+}
+inline ::juggler::v1::Vector3* NewTracker::release_initial_pos() {
+  
+  ::juggler::v1::Vector3* temp = _impl_.initial_pos_;
+  _impl_.initial_pos_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector3* NewTracker::unsafe_arena_release_initial_pos() {
+  // @@protoc_insertion_point(field_release:juggler.v1.NewTracker.initial_pos)
+  
+  ::juggler::v1::Vector3* temp = _impl_.initial_pos_;
+  _impl_.initial_pos_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector3* NewTracker::_internal_mutable_initial_pos() {
+  
+  if (_impl_.initial_pos_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
+    _impl_.initial_pos_ = p;
+  }
+  return _impl_.initial_pos_;
+}
+inline ::juggler::v1::Vector3* NewTracker::mutable_initial_pos() {
+  ::juggler::v1::Vector3* _msg = _internal_mutable_initial_pos();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.NewTracker.initial_pos)
+  return _msg;
+}
+inline void NewTracker::set_allocated_initial_pos(::juggler::v1::Vector3* initial_pos) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.initial_pos_;
+  }
+  if (initial_pos) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(initial_pos);
+    if (message_arena != submessage_arena) {
+      initial_pos = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, initial_pos, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.initial_pos_ = initial_pos;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.NewTracker.initial_pos)
+}
+
+// .juggler.v1.Vector2 initial_pos_2d = 3;
+inline bool NewTracker::_internal_has_initial_pos_2d() const {
+  return this != internal_default_instance() && _impl_.initial_pos_2d_ != nullptr;
+}
+inline bool NewTracker::has_initial_pos_2d() const {
+  return _internal_has_initial_pos_2d();
+}
+inline void NewTracker::clear_initial_pos_2d() {
+  if (GetArenaForAllocation() == nullptr && _impl_.initial_pos_2d_ != nullptr) {
+    delete _impl_.initial_pos_2d_;
+  }
+  _impl_.initial_pos_2d_ = nullptr;
+}
+inline const ::juggler::v1::Vector2& NewTracker::_internal_initial_pos_2d() const {
+  const ::juggler::v1::Vector2* p = _impl_.initial_pos_2d_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector2&>(
+      ::juggler::v1::_Vector2_default_instance_);
+}
+inline const ::juggler::v1::Vector2& NewTracker::initial_pos_2d() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.NewTracker.initial_pos_2d)
+  return _internal_initial_pos_2d();
+}
+inline void NewTracker::unsafe_arena_set_allocated_initial_pos_2d(
+    ::juggler::v1::Vector2* initial_pos_2d) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.initial_pos_2d_);
+  }
+  _impl_.initial_pos_2d_ = initial_pos_2d;
+  if (initial_pos_2d) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.NewTracker.initial_pos_2d)
+}
+inline ::juggler::v1::Vector2* NewTracker::release_initial_pos_2d() {
+  
+  ::juggler::v1::Vector2* temp = _impl_.initial_pos_2d_;
+  _impl_.initial_pos_2d_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector2* NewTracker::unsafe_arena_release_initial_pos_2d() {
+  // @@protoc_insertion_point(field_release:juggler.v1.NewTracker.initial_pos_2d)
+  
+  ::juggler::v1::Vector2* temp = _impl_.initial_pos_2d_;
+  _impl_.initial_pos_2d_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector2* NewTracker::_internal_mutable_initial_pos_2d() {
+  
+  if (_impl_.initial_pos_2d_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector2>(GetArenaForAllocation());
+    _impl_.initial_pos_2d_ = p;
+  }
+  return _impl_.initial_pos_2d_;
+}
+inline ::juggler::v1::Vector2* NewTracker::mutable_initial_pos_2d() {
+  ::juggler::v1::Vector2* _msg = _internal_mutable_initial_pos_2d();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.NewTracker.initial_pos_2d)
+  return _msg;
+}
+inline void NewTracker::set_allocated_initial_pos_2d(::juggler::v1::Vector2* initial_pos_2d) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.initial_pos_2d_;
+  }
+  if (initial_pos_2d) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(initial_pos_2d);
+    if (message_arena != submessage_arena) {
+      initial_pos_2d = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, initial_pos_2d, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.initial_pos_2d_ = initial_pos_2d;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.NewTracker.initial_pos_2d)
+}
+
+// int32 detection_index = 4;
+inline void NewTracker::clear_detection_index() {
+  _impl_.detection_index_ = 0;
+}
+inline int32_t NewTracker::_internal_detection_index() const {
+  return _impl_.detection_index_;
+}
+inline int32_t NewTracker::detection_index() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.NewTracker.detection_index)
+  return _internal_detection_index();
+}
+inline void NewTracker::_internal_set_detection_index(int32_t value) {
+  
+  _impl_.detection_index_ = value;
+}
+inline void NewTracker::set_detection_index(int32_t value) {
+  _internal_set_detection_index(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.NewTracker.detection_index)
+}
+
+// -------------------------------------------------------------------
+
+// BallState
+
+// int32 logical_id = 1;
+inline void BallState::clear_logical_id() {
+  _impl_.logical_id_ = 0;
+}
+inline int32_t BallState::_internal_logical_id() const {
+  return _impl_.logical_id_;
+}
+inline int32_t BallState::logical_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.BallState.logical_id)
+  return _internal_logical_id();
+}
+inline void BallState::_internal_set_logical_id(int32_t value) {
+  
+  _impl_.logical_id_ = value;
+}
+inline void BallState::set_logical_id(int32_t value) {
+  _internal_set_logical_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.BallState.logical_id)
+}
+
+// .juggler.v1.BallState.State state = 2;
+inline void BallState::clear_state() {
+  _impl_.state_ = 0;
+}
+inline ::juggler::v1::BallState_State BallState::_internal_state() const {
+  return static_cast< ::juggler::v1::BallState_State >(_impl_.state_);
+}
+inline ::juggler::v1::BallState_State BallState::state() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.BallState.state)
+  return _internal_state();
+}
+inline void BallState::_internal_set_state(::juggler::v1::BallState_State value) {
+  
+  _impl_.state_ = value;
+}
+inline void BallState::set_state(::juggler::v1::BallState_State value) {
+  _internal_set_state(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.BallState.state)
+}
+
+// int32 associated_hand_id = 3;
+inline void BallState::clear_associated_hand_id() {
+  _impl_.associated_hand_id_ = 0;
+}
+inline int32_t BallState::_internal_associated_hand_id() const {
+  return _impl_.associated_hand_id_;
+}
+inline int32_t BallState::associated_hand_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.BallState.associated_hand_id)
+  return _internal_associated_hand_id();
+}
+inline void BallState::_internal_set_associated_hand_id(int32_t value) {
+  
+  _impl_.associated_hand_id_ = value;
+}
+inline void BallState::set_associated_hand_id(int32_t value) {
+  _internal_set_associated_hand_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.BallState.associated_hand_id)
+}
+
+// float confidence = 4;
+inline void BallState::clear_confidence() {
+  _impl_.confidence_ = 0;
+}
+inline float BallState::_internal_confidence() const {
+  return _impl_.confidence_;
+}
+inline float BallState::confidence() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.BallState.confidence)
+  return _internal_confidence();
+}
+inline void BallState::_internal_set_confidence(float value) {
+  
+  _impl_.confidence_ = value;
+}
+inline void BallState::set_confidence(float value) {
+  _internal_set_confidence(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.BallState.confidence)
+}
+
+// int32 frames_in_state = 5;
+inline void BallState::clear_frames_in_state() {
+  _impl_.frames_in_state_ = 0;
+}
+inline int32_t BallState::_internal_frames_in_state() const {
+  return _impl_.frames_in_state_;
+}
+inline int32_t BallState::frames_in_state() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.BallState.frames_in_state)
+  return _internal_frames_in_state();
+}
+inline void BallState::_internal_set_frames_in_state(int32_t value) {
+  
+  _impl_.frames_in_state_ = value;
+}
+inline void BallState::set_frames_in_state(int32_t value) {
+  _internal_set_frames_in_state(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.BallState.frames_in_state)
+}
+
+// -------------------------------------------------------------------
+
+// OcclusionState
+
+// int32 logical_id = 1;
+inline void OcclusionState::clear_logical_id() {
+  _impl_.logical_id_ = 0;
+}
+inline int32_t OcclusionState::_internal_logical_id() const {
+  return _impl_.logical_id_;
+}
+inline int32_t OcclusionState::logical_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.OcclusionState.logical_id)
+  return _internal_logical_id();
+}
+inline void OcclusionState::_internal_set_logical_id(int32_t value) {
+  
+  _impl_.logical_id_ = value;
+}
+inline void OcclusionState::set_logical_id(int32_t value) {
+  _internal_set_logical_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.OcclusionState.logical_id)
+}
+
+// bool is_occluded = 2;
+inline void OcclusionState::clear_is_occluded() {
+  _impl_.is_occluded_ = false;
+}
+inline bool OcclusionState::_internal_is_occluded() const {
+  return _impl_.is_occluded_;
+}
+inline bool OcclusionState::is_occluded() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.OcclusionState.is_occluded)
+  return _internal_is_occluded();
+}
+inline void OcclusionState::_internal_set_is_occluded(bool value) {
+  
+  _impl_.is_occluded_ = value;
+}
+inline void OcclusionState::set_is_occluded(bool value) {
+  _internal_set_is_occluded(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.OcclusionState.is_occluded)
+}
+
+// int32 occluding_hand_id = 3;
+inline void OcclusionState::clear_occluding_hand_id() {
+  _impl_.occluding_hand_id_ = 0;
+}
+inline int32_t OcclusionState::_internal_occluding_hand_id() const {
+  return _impl_.occluding_hand_id_;
+}
+inline int32_t OcclusionState::occluding_hand_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.OcclusionState.occluding_hand_id)
+  return _internal_occluding_hand_id();
+}
+inline void OcclusionState::_internal_set_occluding_hand_id(int32_t value) {
+  
+  _impl_.occluding_hand_id_ = value;
+}
+inline void OcclusionState::set_occluding_hand_id(int32_t value) {
+  _internal_set_occluding_hand_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.OcclusionState.occluding_hand_id)
+}
+
+// float distance_to_hand = 4;
+inline void OcclusionState::clear_distance_to_hand() {
+  _impl_.distance_to_hand_ = 0;
+}
+inline float OcclusionState::_internal_distance_to_hand() const {
+  return _impl_.distance_to_hand_;
+}
+inline float OcclusionState::distance_to_hand() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.OcclusionState.distance_to_hand)
+  return _internal_distance_to_hand();
+}
+inline void OcclusionState::_internal_set_distance_to_hand(float value) {
+  
+  _impl_.distance_to_hand_ = value;
+}
+inline void OcclusionState::set_distance_to_hand(float value) {
+  _internal_set_distance_to_hand(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.OcclusionState.distance_to_hand)
+}
+
+// -------------------------------------------------------------------
+
+// ColorSearchRegion
+
+// int32 logical_id = 1;
+inline void ColorSearchRegion::clear_logical_id() {
+  _impl_.logical_id_ = 0;
+}
+inline int32_t ColorSearchRegion::_internal_logical_id() const {
+  return _impl_.logical_id_;
+}
+inline int32_t ColorSearchRegion::logical_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorSearchRegion.logical_id)
+  return _internal_logical_id();
+}
+inline void ColorSearchRegion::_internal_set_logical_id(int32_t value) {
+  
+  _impl_.logical_id_ = value;
+}
+inline void ColorSearchRegion::set_logical_id(int32_t value) {
+  _internal_set_logical_id(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorSearchRegion.logical_id)
+}
+
+// string color_name = 2;
+inline void ColorSearchRegion::clear_color_name() {
+  _impl_.color_name_.ClearToEmpty();
+}
+inline const std::string& ColorSearchRegion::color_name() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorSearchRegion.color_name)
+  return _internal_color_name();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ColorSearchRegion::set_color_name(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.color_name_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorSearchRegion.color_name)
+}
+inline std::string* ColorSearchRegion::mutable_color_name() {
+  std::string* _s = _internal_mutable_color_name();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.ColorSearchRegion.color_name)
+  return _s;
+}
+inline const std::string& ColorSearchRegion::_internal_color_name() const {
+  return _impl_.color_name_.Get();
+}
+inline void ColorSearchRegion::_internal_set_color_name(const std::string& value) {
+  
+  _impl_.color_name_.Set(value, GetArenaForAllocation());
+}
+inline std::string* ColorSearchRegion::_internal_mutable_color_name() {
+  
+  return _impl_.color_name_.Mutable(GetArenaForAllocation());
+}
+inline std::string* ColorSearchRegion::release_color_name() {
+  // @@protoc_insertion_point(field_release:juggler.v1.ColorSearchRegion.color_name)
+  return _impl_.color_name_.Release();
+}
+inline void ColorSearchRegion::set_allocated_color_name(std::string* color_name) {
+  if (color_name != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.color_name_.SetAllocated(color_name, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.color_name_.IsDefault()) {
+    _impl_.color_name_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.ColorSearchRegion.color_name)
+}
+
+// .juggler.v1.Vector2 search_center = 3;
+inline bool ColorSearchRegion::_internal_has_search_center() const {
+  return this != internal_default_instance() && _impl_.search_center_ != nullptr;
+}
+inline bool ColorSearchRegion::has_search_center() const {
+  return _internal_has_search_center();
+}
+inline void ColorSearchRegion::clear_search_center() {
+  if (GetArenaForAllocation() == nullptr && _impl_.search_center_ != nullptr) {
+    delete _impl_.search_center_;
+  }
+  _impl_.search_center_ = nullptr;
+}
+inline const ::juggler::v1::Vector2& ColorSearchRegion::_internal_search_center() const {
+  const ::juggler::v1::Vector2* p = _impl_.search_center_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector2&>(
+      ::juggler::v1::_Vector2_default_instance_);
+}
+inline const ::juggler::v1::Vector2& ColorSearchRegion::search_center() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorSearchRegion.search_center)
+  return _internal_search_center();
+}
+inline void ColorSearchRegion::unsafe_arena_set_allocated_search_center(
+    ::juggler::v1::Vector2* search_center) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.search_center_);
+  }
+  _impl_.search_center_ = search_center;
+  if (search_center) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.ColorSearchRegion.search_center)
+}
+inline ::juggler::v1::Vector2* ColorSearchRegion::release_search_center() {
+  
+  ::juggler::v1::Vector2* temp = _impl_.search_center_;
+  _impl_.search_center_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector2* ColorSearchRegion::unsafe_arena_release_search_center() {
+  // @@protoc_insertion_point(field_release:juggler.v1.ColorSearchRegion.search_center)
+  
+  ::juggler::v1::Vector2* temp = _impl_.search_center_;
+  _impl_.search_center_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector2* ColorSearchRegion::_internal_mutable_search_center() {
+  
+  if (_impl_.search_center_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector2>(GetArenaForAllocation());
+    _impl_.search_center_ = p;
+  }
+  return _impl_.search_center_;
+}
+inline ::juggler::v1::Vector2* ColorSearchRegion::mutable_search_center() {
+  ::juggler::v1::Vector2* _msg = _internal_mutable_search_center();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.ColorSearchRegion.search_center)
+  return _msg;
+}
+inline void ColorSearchRegion::set_allocated_search_center(::juggler::v1::Vector2* search_center) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.search_center_;
+  }
+  if (search_center) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(search_center);
+    if (message_arena != submessage_arena) {
+      search_center = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, search_center, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.search_center_ = search_center;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.ColorSearchRegion.search_center)
+}
+
+// float search_radius = 4;
+inline void ColorSearchRegion::clear_search_radius() {
+  _impl_.search_radius_ = 0;
+}
+inline float ColorSearchRegion::_internal_search_radius() const {
+  return _impl_.search_radius_;
+}
+inline float ColorSearchRegion::search_radius() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorSearchRegion.search_radius)
+  return _internal_search_radius();
+}
+inline void ColorSearchRegion::_internal_set_search_radius(float value) {
+  
+  _impl_.search_radius_ = value;
+}
+inline void ColorSearchRegion::set_search_radius(float value) {
+  _internal_set_search_radius(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorSearchRegion.search_radius)
+}
+
+// .juggler.v1.Vector2 blob_center = 5;
+inline bool ColorSearchRegion::_internal_has_blob_center() const {
+  return this != internal_default_instance() && _impl_.blob_center_ != nullptr;
+}
+inline bool ColorSearchRegion::has_blob_center() const {
+  return _internal_has_blob_center();
+}
+inline void ColorSearchRegion::clear_blob_center() {
+  if (GetArenaForAllocation() == nullptr && _impl_.blob_center_ != nullptr) {
+    delete _impl_.blob_center_;
+  }
+  _impl_.blob_center_ = nullptr;
+}
+inline const ::juggler::v1::Vector2& ColorSearchRegion::_internal_blob_center() const {
+  const ::juggler::v1::Vector2* p = _impl_.blob_center_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector2&>(
+      ::juggler::v1::_Vector2_default_instance_);
+}
+inline const ::juggler::v1::Vector2& ColorSearchRegion::blob_center() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorSearchRegion.blob_center)
+  return _internal_blob_center();
+}
+inline void ColorSearchRegion::unsafe_arena_set_allocated_blob_center(
+    ::juggler::v1::Vector2* blob_center) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.blob_center_);
+  }
+  _impl_.blob_center_ = blob_center;
+  if (blob_center) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.ColorSearchRegion.blob_center)
+}
+inline ::juggler::v1::Vector2* ColorSearchRegion::release_blob_center() {
+  
+  ::juggler::v1::Vector2* temp = _impl_.blob_center_;
+  _impl_.blob_center_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector2* ColorSearchRegion::unsafe_arena_release_blob_center() {
+  // @@protoc_insertion_point(field_release:juggler.v1.ColorSearchRegion.blob_center)
+  
+  ::juggler::v1::Vector2* temp = _impl_.blob_center_;
+  _impl_.blob_center_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector2* ColorSearchRegion::_internal_mutable_blob_center() {
+  
+  if (_impl_.blob_center_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector2>(GetArenaForAllocation());
+    _impl_.blob_center_ = p;
+  }
+  return _impl_.blob_center_;
+}
+inline ::juggler::v1::Vector2* ColorSearchRegion::mutable_blob_center() {
+  ::juggler::v1::Vector2* _msg = _internal_mutable_blob_center();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.ColorSearchRegion.blob_center)
+  return _msg;
+}
+inline void ColorSearchRegion::set_allocated_blob_center(::juggler::v1::Vector2* blob_center) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.blob_center_;
+  }
+  if (blob_center) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(blob_center);
+    if (message_arena != submessage_arena) {
+      blob_center = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, blob_center, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.blob_center_ = blob_center;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.ColorSearchRegion.blob_center)
+}
+
+// float blob_area = 6;
+inline void ColorSearchRegion::clear_blob_area() {
+  _impl_.blob_area_ = 0;
+}
+inline float ColorSearchRegion::_internal_blob_area() const {
+  return _impl_.blob_area_;
+}
+inline float ColorSearchRegion::blob_area() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorSearchRegion.blob_area)
+  return _internal_blob_area();
+}
+inline void ColorSearchRegion::_internal_set_blob_area(float value) {
+  
+  _impl_.blob_area_ = value;
+}
+inline void ColorSearchRegion::set_blob_area(float value) {
+  _internal_set_blob_area(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorSearchRegion.blob_area)
+}
+
+// bool found = 7;
+inline void ColorSearchRegion::clear_found() {
+  _impl_.found_ = false;
+}
+inline bool ColorSearchRegion::_internal_found() const {
+  return _impl_.found_;
+}
+inline bool ColorSearchRegion::found() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.ColorSearchRegion.found)
+  return _internal_found();
+}
+inline void ColorSearchRegion::_internal_set_found(bool value) {
+  
+  _impl_.found_ = value;
+}
+inline void ColorSearchRegion::set_found(bool value) {
+  _internal_set_found(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.ColorSearchRegion.found)
+}
+
+// -------------------------------------------------------------------
+
 // FrameData
 
 // uint64 timestamp_us = 1;
@@ -7721,6 +10707,286 @@ inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatc
 FrameData::throw_catch_events() const {
   // @@protoc_insertion_point(field_list:juggler.v1.FrameData.throw_catch_events)
   return _impl_.throw_catch_events_;
+}
+
+// repeated .juggler.v1.KalmanPrediction kalman_predictions = 17;
+inline int FrameData::_internal_kalman_predictions_size() const {
+  return _impl_.kalman_predictions_.size();
+}
+inline int FrameData::kalman_predictions_size() const {
+  return _internal_kalman_predictions_size();
+}
+inline void FrameData::clear_kalman_predictions() {
+  _impl_.kalman_predictions_.Clear();
+}
+inline ::juggler::v1::KalmanPrediction* FrameData::mutable_kalman_predictions(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.kalman_predictions)
+  return _impl_.kalman_predictions_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction >*
+FrameData::mutable_kalman_predictions() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.kalman_predictions)
+  return &_impl_.kalman_predictions_;
+}
+inline const ::juggler::v1::KalmanPrediction& FrameData::_internal_kalman_predictions(int index) const {
+  return _impl_.kalman_predictions_.Get(index);
+}
+inline const ::juggler::v1::KalmanPrediction& FrameData::kalman_predictions(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.kalman_predictions)
+  return _internal_kalman_predictions(index);
+}
+inline ::juggler::v1::KalmanPrediction* FrameData::_internal_add_kalman_predictions() {
+  return _impl_.kalman_predictions_.Add();
+}
+inline ::juggler::v1::KalmanPrediction* FrameData::add_kalman_predictions() {
+  ::juggler::v1::KalmanPrediction* _add = _internal_add_kalman_predictions();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.kalman_predictions)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction >&
+FrameData::kalman_predictions() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.kalman_predictions)
+  return _impl_.kalman_predictions_;
+}
+
+// repeated .juggler.v1.FilteredDetection filtered_detections = 18;
+inline int FrameData::_internal_filtered_detections_size() const {
+  return _impl_.filtered_detections_.size();
+}
+inline int FrameData::filtered_detections_size() const {
+  return _internal_filtered_detections_size();
+}
+inline void FrameData::clear_filtered_detections() {
+  _impl_.filtered_detections_.Clear();
+}
+inline ::juggler::v1::FilteredDetection* FrameData::mutable_filtered_detections(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.filtered_detections)
+  return _impl_.filtered_detections_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::FilteredDetection >*
+FrameData::mutable_filtered_detections() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.filtered_detections)
+  return &_impl_.filtered_detections_;
+}
+inline const ::juggler::v1::FilteredDetection& FrameData::_internal_filtered_detections(int index) const {
+  return _impl_.filtered_detections_.Get(index);
+}
+inline const ::juggler::v1::FilteredDetection& FrameData::filtered_detections(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.filtered_detections)
+  return _internal_filtered_detections(index);
+}
+inline ::juggler::v1::FilteredDetection* FrameData::_internal_add_filtered_detections() {
+  return _impl_.filtered_detections_.Add();
+}
+inline ::juggler::v1::FilteredDetection* FrameData::add_filtered_detections() {
+  ::juggler::v1::FilteredDetection* _add = _internal_add_filtered_detections();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.filtered_detections)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::FilteredDetection >&
+FrameData::filtered_detections() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.filtered_detections)
+  return _impl_.filtered_detections_;
+}
+
+// repeated .juggler.v1.TrackerAssociation tracker_associations = 19;
+inline int FrameData::_internal_tracker_associations_size() const {
+  return _impl_.tracker_associations_.size();
+}
+inline int FrameData::tracker_associations_size() const {
+  return _internal_tracker_associations_size();
+}
+inline void FrameData::clear_tracker_associations() {
+  _impl_.tracker_associations_.Clear();
+}
+inline ::juggler::v1::TrackerAssociation* FrameData::mutable_tracker_associations(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.tracker_associations)
+  return _impl_.tracker_associations_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrackerAssociation >*
+FrameData::mutable_tracker_associations() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.tracker_associations)
+  return &_impl_.tracker_associations_;
+}
+inline const ::juggler::v1::TrackerAssociation& FrameData::_internal_tracker_associations(int index) const {
+  return _impl_.tracker_associations_.Get(index);
+}
+inline const ::juggler::v1::TrackerAssociation& FrameData::tracker_associations(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.tracker_associations)
+  return _internal_tracker_associations(index);
+}
+inline ::juggler::v1::TrackerAssociation* FrameData::_internal_add_tracker_associations() {
+  return _impl_.tracker_associations_.Add();
+}
+inline ::juggler::v1::TrackerAssociation* FrameData::add_tracker_associations() {
+  ::juggler::v1::TrackerAssociation* _add = _internal_add_tracker_associations();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.tracker_associations)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrackerAssociation >&
+FrameData::tracker_associations() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.tracker_associations)
+  return _impl_.tracker_associations_;
+}
+
+// repeated .juggler.v1.NewTracker new_trackers = 20;
+inline int FrameData::_internal_new_trackers_size() const {
+  return _impl_.new_trackers_.size();
+}
+inline int FrameData::new_trackers_size() const {
+  return _internal_new_trackers_size();
+}
+inline void FrameData::clear_new_trackers() {
+  _impl_.new_trackers_.Clear();
+}
+inline ::juggler::v1::NewTracker* FrameData::mutable_new_trackers(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.new_trackers)
+  return _impl_.new_trackers_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::NewTracker >*
+FrameData::mutable_new_trackers() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.new_trackers)
+  return &_impl_.new_trackers_;
+}
+inline const ::juggler::v1::NewTracker& FrameData::_internal_new_trackers(int index) const {
+  return _impl_.new_trackers_.Get(index);
+}
+inline const ::juggler::v1::NewTracker& FrameData::new_trackers(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.new_trackers)
+  return _internal_new_trackers(index);
+}
+inline ::juggler::v1::NewTracker* FrameData::_internal_add_new_trackers() {
+  return _impl_.new_trackers_.Add();
+}
+inline ::juggler::v1::NewTracker* FrameData::add_new_trackers() {
+  ::juggler::v1::NewTracker* _add = _internal_add_new_trackers();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.new_trackers)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::NewTracker >&
+FrameData::new_trackers() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.new_trackers)
+  return _impl_.new_trackers_;
+}
+
+// repeated .juggler.v1.BallState ball_states = 21;
+inline int FrameData::_internal_ball_states_size() const {
+  return _impl_.ball_states_.size();
+}
+inline int FrameData::ball_states_size() const {
+  return _internal_ball_states_size();
+}
+inline void FrameData::clear_ball_states() {
+  _impl_.ball_states_.Clear();
+}
+inline ::juggler::v1::BallState* FrameData::mutable_ball_states(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.ball_states)
+  return _impl_.ball_states_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BallState >*
+FrameData::mutable_ball_states() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.ball_states)
+  return &_impl_.ball_states_;
+}
+inline const ::juggler::v1::BallState& FrameData::_internal_ball_states(int index) const {
+  return _impl_.ball_states_.Get(index);
+}
+inline const ::juggler::v1::BallState& FrameData::ball_states(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.ball_states)
+  return _internal_ball_states(index);
+}
+inline ::juggler::v1::BallState* FrameData::_internal_add_ball_states() {
+  return _impl_.ball_states_.Add();
+}
+inline ::juggler::v1::BallState* FrameData::add_ball_states() {
+  ::juggler::v1::BallState* _add = _internal_add_ball_states();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.ball_states)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BallState >&
+FrameData::ball_states() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.ball_states)
+  return _impl_.ball_states_;
+}
+
+// repeated .juggler.v1.OcclusionState occlusion_states = 22;
+inline int FrameData::_internal_occlusion_states_size() const {
+  return _impl_.occlusion_states_.size();
+}
+inline int FrameData::occlusion_states_size() const {
+  return _internal_occlusion_states_size();
+}
+inline void FrameData::clear_occlusion_states() {
+  _impl_.occlusion_states_.Clear();
+}
+inline ::juggler::v1::OcclusionState* FrameData::mutable_occlusion_states(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.occlusion_states)
+  return _impl_.occlusion_states_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::OcclusionState >*
+FrameData::mutable_occlusion_states() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.occlusion_states)
+  return &_impl_.occlusion_states_;
+}
+inline const ::juggler::v1::OcclusionState& FrameData::_internal_occlusion_states(int index) const {
+  return _impl_.occlusion_states_.Get(index);
+}
+inline const ::juggler::v1::OcclusionState& FrameData::occlusion_states(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.occlusion_states)
+  return _internal_occlusion_states(index);
+}
+inline ::juggler::v1::OcclusionState* FrameData::_internal_add_occlusion_states() {
+  return _impl_.occlusion_states_.Add();
+}
+inline ::juggler::v1::OcclusionState* FrameData::add_occlusion_states() {
+  ::juggler::v1::OcclusionState* _add = _internal_add_occlusion_states();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.occlusion_states)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::OcclusionState >&
+FrameData::occlusion_states() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.occlusion_states)
+  return _impl_.occlusion_states_;
+}
+
+// repeated .juggler.v1.ColorSearchRegion color_search_regions = 23;
+inline int FrameData::_internal_color_search_regions_size() const {
+  return _impl_.color_search_regions_.size();
+}
+inline int FrameData::color_search_regions_size() const {
+  return _internal_color_search_regions_size();
+}
+inline void FrameData::clear_color_search_regions() {
+  _impl_.color_search_regions_.Clear();
+}
+inline ::juggler::v1::ColorSearchRegion* FrameData::mutable_color_search_regions(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.color_search_regions)
+  return _impl_.color_search_regions_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorSearchRegion >*
+FrameData::mutable_color_search_regions() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.color_search_regions)
+  return &_impl_.color_search_regions_;
+}
+inline const ::juggler::v1::ColorSearchRegion& FrameData::_internal_color_search_regions(int index) const {
+  return _impl_.color_search_regions_.Get(index);
+}
+inline const ::juggler::v1::ColorSearchRegion& FrameData::color_search_regions(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.color_search_regions)
+  return _internal_color_search_regions(index);
+}
+inline ::juggler::v1::ColorSearchRegion* FrameData::_internal_add_color_search_regions() {
+  return _impl_.color_search_regions_.Add();
+}
+inline ::juggler::v1::ColorSearchRegion* FrameData::add_color_search_regions() {
+  ::juggler::v1::ColorSearchRegion* _add = _internal_add_color_search_regions();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.color_search_regions)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorSearchRegion >&
+FrameData::color_search_regions() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.color_search_regions)
+  return _impl_.color_search_regions_;
 }
 
 // -------------------------------------------------------------------
@@ -8633,6 +11899,20 @@ inline void CommandResponse::set_timestamp_us(uint64_t value) {
 
 // -------------------------------------------------------------------
 
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
 
 // @@protoc_insertion_point(namespace_scope)
 
@@ -8650,6 +11930,11 @@ template <> struct is_proto_enum< ::juggler::v1::ThrowCatchEvent_EventType> : ::
 template <>
 inline const EnumDescriptor* GetEnumDescriptor< ::juggler::v1::ThrowCatchEvent_EventType>() {
   return ::juggler::v1::ThrowCatchEvent_EventType_descriptor();
+}
+template <> struct is_proto_enum< ::juggler::v1::BallState_State> : ::std::true_type {};
+template <>
+inline const EnumDescriptor* GetEnumDescriptor< ::juggler::v1::BallState_State>() {
+  return ::juggler::v1::BallState_State_descriptor();
 }
 template <> struct is_proto_enum< ::juggler::v1::CommandRequest_CommandType> : ::std::true_type {};
 template <>

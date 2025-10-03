@@ -65,6 +65,21 @@ public:
     const std::vector<juggler::ColorTrackedBall>& get_color_tracked_balls() const { return color_tracked_balls_; }
     static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
     
+    // Getters for logical trackers (needed for Engine.cpp)
+    const std::vector<PersistentTracker>& get_logical_ball_trackers() const { return logical_ball_trackers_; }
+    const std::vector<PersistentTracker>& get_logical_hand_trackers() const { return logical_hand_trackers_; }
+    juggler::ColorTracker* get_color_tracker() { return color_tracker_.get(); }
+    
+    // Getters for visualization data
+    const std::vector<cv::Point3f>& get_predicted_positions() const { return predicted_positions_; }
+    const std::vector<std::string>& get_predicted_labels() const { return predicted_tracker_labels_; }
+    const std::vector<Detection>& get_filtered_detections() const { return filtered_detections_; }
+    const std::vector<std::string>& get_filter_reasons() const { return filter_reasons_; }
+    const std::vector<std::pair<int, int>>& get_tracker_associations() const { return tracker_associations_; }
+    const std::vector<float>& get_association_distances() const { return association_distances_; }
+    const std::vector<int>& get_newly_initialized_trackers() const { return newly_initialized_tracker_ids_; }
+    const std::vector<cv::Point3f>& get_new_tracker_positions() const { return new_tracker_positions_; }
+    
 
 private:
     void reinitialize_tracker();
@@ -102,6 +117,16 @@ private:
     std::vector<Detection> last_raw_detections_;
     std::vector<Detection> unmatched_detections_;
     cv::Mat last_color_frame_; // For color calibration
+    
+    // --- Visualization Data ---
+    std::vector<cv::Point3f> predicted_positions_;
+    std::vector<std::string> predicted_tracker_labels_;
+    std::vector<Detection> filtered_detections_;
+    std::vector<std::string> filter_reasons_;
+    std::vector<std::pair<int, int>> tracker_associations_; // (tracker_idx, detection_idx)
+    std::vector<float> association_distances_;
+    std::vector<int> newly_initialized_tracker_ids_;
+    std::vector<cv::Point3f> new_tracker_positions_;
 
     // Model & Preprocessing Parameters
     int input_width_ = 640;

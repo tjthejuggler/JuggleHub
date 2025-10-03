@@ -186,6 +186,16 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     // Clear unmatched detections at the start of each frame
     unmatched_detections_.clear();
     
+    // Clear visualization data from previous frame
+    predicted_positions_.clear();
+    predicted_tracker_labels_.clear();
+    filtered_detections_.clear();
+    filter_reasons_.clear();
+    tracker_associations_.clear();
+    association_distances_.clear();
+    newly_initialized_tracker_ids_.clear();
+    new_tracker_positions_.clear();
+    
     auto current_time = std::chrono::steady_clock::now();
     float dt = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - last_update_time_).count();
     last_update_time_ = current_time;
@@ -202,6 +212,22 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     }
     for (auto& hand : logical_hand_trackers_) {
         if (hand.status != TrackerStatus::LOST) hand.kf.predict(dt);
+    }
+    
+    // Store predicted positions for visualization (Step 2: Kalman Predictions)
+    for (const auto& ball : logical_ball_trackers_) {
+        if (ball.status != TrackerStatus::LOST) {
+            predicted_positions_.push_back(cv::Point3f(
+                ball.position.x(), ball.position.y(), ball.position.z()));
+            predicted_tracker_labels_.push_back("Ball " + std::to_string(ball.logical_id));
+        }
+    }
+    for (const auto& hand : logical_hand_trackers_) {
+        if (hand.status != TrackerStatus::LOST) {
+            predicted_positions_.push_back(cv::Point3f(
+                hand.position.x(), hand.position.y(), hand.position.z()));
+            predicted_tracker_labels_.push_back("Hand " + std::to_string(hand.logical_id));
+        }
     }
 
     // --- 2. DETECT BALLS ---
@@ -229,11 +255,26 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         }
     }
     
-    // Filter valid ball detections
+    // Filter valid ball detections and store filtered ones for visualization (Step 4: Filtered Detections)
     std::vector<const Detection*> valid_detections;
     for (const auto& det : last_raw_detections_) {
-        // TEMPORARY: Accept ALL detections to diagnose class_id issue
-        valid_detections.push_back(&det);
+        // Check various filter conditions
+        if (det.class_id == 3) {
+            filtered_detections_.push_back(det);
+            filter_reasons_.push_back("Hand detection");
+        } else if (det.world_pos.z <= 0.2f) {
+            filtered_detections_.push_back(det);
+            filter_reasons_.push_back("Too close (<0.2m)");
+        } else if (det.world_pos.z >= 2.0f) {
+            filtered_detections_.push_back(det);
+            filter_reasons_.push_back("Too far (>2.0m)");
+        } else if (det.world_pos.z == 0.0f) {
+            filtered_detections_.push_back(det);
+            filter_reasons_.push_back("No depth");
+        } else {
+            // TEMPORARY: Accept ALL detections to diagnose class_id issue
+            valid_detections.push_back(&det);
+        }
     }
     
     // Remove duplicate detections (identical or nearly identical bboxes)
@@ -254,6 +295,9 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
                 is_duplicate = true;
                 dedup_log << "[DEDUP] Rejected duplicate: bbox[" << det->box.x << "," << det->box.y
                           << "," << det->box.width << "," << det->box.height << "] matches existing" << std::endl;
+                // Store duplicate for visualization
+                filtered_detections_.push_back(*det);
+                filter_reasons_.push_back("Duplicate detection");
                 break;
             }
         }
@@ -372,11 +416,15 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             }
         }
         
-        // Apply assignments
+        // Apply assignments and store for visualization (Step 5: 3D Matching)
         std::set<int> matched_detection_indices;
         for (const auto& [tracker_idx, detection_idx] : assignments) {
             auto* tracker = ball_trackers_list[tracker_idx];
             const auto* detection = valid_detections[detection_idx];
+            
+            // Store association for visualization
+            tracker_associations_.push_back({tracker->logical_id, detection_idx});
+            association_distances_.push_back(cost_matrix[tracker_idx][detection_idx]);
             
             // Track which detections were matched
             matched_detection_indices.insert(detection_idx);
@@ -406,7 +454,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         debug_log.close();
     }
     
-    // Auto-initialize trackers from unmatched detections if no active trackers
+    // Auto-initialize trackers from unmatched detections if no active trackers (Step 6: Auto-Init)
     if (ball_trackers_list.empty() && !valid_detections.empty()) {
         std::ofstream debug_log("engine_debug.log", std::ios::app);
         debug_log << "[AUTO-INIT] No active trackers, initializing from detections..." << std::endl;
@@ -424,6 +472,10 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             tracker.frames_since_seen = 0;
             tracker.box_2d = det->box;
             tracker.parent_id = -1;
+            
+            // Store newly initialized tracker for visualization
+            newly_initialized_tracker_ids_.push_back(tracker.logical_id);
+            new_tracker_positions_.push_back(det->world_pos);
             
             debug_log << "[AUTO-INIT] Initialized tracker " << tracker.logical_id
                       << " at position (" << det->world_pos.x << ", "

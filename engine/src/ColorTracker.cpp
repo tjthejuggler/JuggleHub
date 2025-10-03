@@ -45,6 +45,9 @@ std::vector<ColorTrackedBall> ColorTracker::update(
     const std::vector<TrackedObject>& bytetrack_objects,
     const std::vector<TrackedHand>& tracked_hands) {
     
+    // Clear visualization data from previous frame
+    search_regions_.clear();
+    
     // Convert to HSV once for all operations
     cv::Mat hsv_frame;
     cv::cvtColor(color_frame, hsv_frame, cv::COLOR_BGR2HSV);
@@ -292,6 +295,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 
                 // When associated with wrist, ALWAYS try color blob detection first
                 // Try to find the closest color blob in a reasonable radius around wrist
+                search_regions_.push_back({wrist_2d, static_cast<float>(WRIST_SEARCH_RADIUS)});
                 cv::Point2f close_blob = findClosestColorBlob(hsv_frame, *profile,
                                                               wrist_2d, WRIST_SEARCH_RADIUS);
                 
@@ -375,6 +379,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
         if (!found_this_frame) {
             cv::Point2f search_center = ball.pixel_pos; // Use last known position
             
+            search_regions_.push_back({search_center, static_cast<float>(WRIST_SEARCH_RADIUS)});
             cv::Point2f new_pos = findLargestColorBlob(hsv_frame, *profile,
                                                       search_center, WRIST_SEARCH_RADIUS);
             

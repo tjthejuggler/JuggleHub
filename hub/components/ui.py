@@ -2160,12 +2160,42 @@ if PYQT_AVAILABLE:
             if self.show_kalman_predictions_toggle.isChecked():
                 painter.setPen(QPen(QColor(0, 0, 255, 150), 3))  # Blue
                 painter.setBrush(Qt.BrushStyle.NoBrush)
-                for ball in frame_data.balls:
-                    if hasattr(ball, 'kalman_prediction_2d') and ball.kalman_prediction_2d.x > 0:
-                        center_x = int(ball.kalman_prediction_2d.x)
-                        center_y = int(ball.kalman_prediction_2d.y)
+                
+                # Debug logging
+                if len(frame_data.kalman_predictions) > 0:
+                    self.log_message(f"[KALMAN VIZ] Rendering {len(frame_data.kalman_predictions)} Kalman predictions")
+                
+                # Get camera intrinsics from the first ball (if available)
+                if frame_data.balls:
+                    # We need intrinsics to project 3D to 2D
+                    # For now, use a simple projection assuming we have the data
+                    pass
+                
+                for i, pred in enumerate(frame_data.kalman_predictions):
+                    # Project 3D predicted position to 2D
+                    if pred.predicted_pos.z > 0:
+                        # Simple projection (you may need to get actual intrinsics)
+                        # For now, we'll use approximate values or get from first ball
+                        # Assuming standard D455 intrinsics at 640x480
+                        fx = 385.0  # Approximate
+                        fy = 385.0
+                        ppx = 320.0
+                        ppy = 240.0
+                        
+                        x_2d = int((pred.predicted_pos.x * fx) / pred.predicted_pos.z + ppx)
+                        y_2d = int((pred.predicted_pos.y * fy) / pred.predicted_pos.z + ppy)
+                        
+                        if i == 0:  # Log first prediction for debugging
+                            self.log_message(f"[KALMAN VIZ]   Pred {i}: 3D({pred.predicted_pos.x:.3f}, {pred.predicted_pos.y:.3f}, {pred.predicted_pos.z:.3f}) -> 2D({x_2d}, {y_2d})")
+                        
                         radius = 8
-                        painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
+                        painter.drawEllipse(x_2d - radius, y_2d - radius, radius * 2, radius * 2)
+                        
+                        # Draw label
+                        painter.setPen(QPen(QColor(255, 255, 255)))
+                        painter.setFont(QFont("Arial", 8))
+                        painter.drawText(x_2d + 10, y_2d, f"KF-{pred.logical_id}")
+                        painter.setPen(QPen(QColor(0, 0, 255, 150), 3))
             
             # --- Draw YOLO Detections (Step 3) ---
             if self.show_raw_detections_toggle.isChecked():

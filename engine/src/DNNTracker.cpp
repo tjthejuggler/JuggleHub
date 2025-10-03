@@ -215,15 +215,17 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     }
     
     // Store predicted positions for visualization (Step 2: Kalman Predictions)
-    for (const auto& ball : logical_ball_trackers_) {
+    for (auto& ball : logical_ball_trackers_) {
         if (ball.status != TrackerStatus::LOST) {
+            ball.update_from_kf();  // CRITICAL: Sync position from Kalman filter state
             predicted_positions_.push_back(cv::Point3f(
                 ball.position.x(), ball.position.y(), ball.position.z()));
             predicted_tracker_labels_.push_back("Ball " + std::to_string(ball.logical_id));
         }
     }
-    for (const auto& hand : logical_hand_trackers_) {
+    for (auto& hand : logical_hand_trackers_) {
         if (hand.status != TrackerStatus::LOST) {
+            hand.update_from_kf();  // CRITICAL: Sync position from Kalman filter state
             predicted_positions_.push_back(cv::Point3f(
                 hand.position.x(), hand.position.y(), hand.position.z()));
             predicted_tracker_labels_.push_back("Hand " + std::to_string(hand.logical_id));

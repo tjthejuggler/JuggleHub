@@ -160,23 +160,34 @@ void Engine::run() {
             auto logical_hand_trackers = dnn_tracker_->get_logical_hand_trackers();
             
             // Populate Kalman Predictions (Step 2)
+            std::ofstream debug_log("engine_debug.log", std::ios::app);
+            debug_log << "[KALMAN VIZ] Sending " << predicted_positions.size() << " Kalman predictions to UI" << std::endl;
+            
             for (size_t i = 0; i < predicted_positions.size(); ++i) {
                 auto* pred = frame_data.add_kalman_predictions();
                 auto* pos = pred->mutable_predicted_pos();
                 pos->set_x(predicted_positions[i].x);
                 pos->set_y(predicted_positions[i].y);
                 pos->set_z(predicted_positions[i].z);
-                // Convert label string (e.g., "ball_0") to logical_id integer
+                
+                debug_log << "[KALMAN VIZ]   Prediction " << i << ": ("
+                          << predicted_positions[i].x << ", "
+                          << predicted_positions[i].y << ", "
+                          << predicted_positions[i].z << ") label=" << predicted_labels[i] << std::endl;
+                
+                // Convert label string (e.g., "Ball 0") to logical_id integer
                 try {
-                    size_t underscore_pos = predicted_labels[i].find_last_of('_');
-                    if (underscore_pos != std::string::npos) {
-                        int logical_id = std::stoi(predicted_labels[i].substr(underscore_pos + 1));
+                    size_t space_pos = predicted_labels[i].find_last_of(' ');
+                    if (space_pos != std::string::npos) {
+                        int logical_id = std::stoi(predicted_labels[i].substr(space_pos + 1));
                         pred->set_logical_id(logical_id);
+                        debug_log << "[KALMAN VIZ]     -> logical_id=" << logical_id << std::endl;
                     }
                 } catch (...) {
-                    // If conversion fails, skip setting logical_id
+                    debug_log << "[KALMAN VIZ]     -> Failed to parse logical_id from label" << std::endl;
                 }
             }
+            debug_log.close();
             
             // Populate Filtered Detections (Step 4)
             for (size_t i = 0; i < filtered_dets.size(); ++i) {

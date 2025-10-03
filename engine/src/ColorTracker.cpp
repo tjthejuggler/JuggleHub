@@ -62,134 +62,208 @@ std::vector<ColorTrackedBall> ColorTracker::update(
     cv::Mat hsv_frame;
     cv::cvtColor(color_frame, hsv_frame, cv::COLOR_BGR2HSV);
     
-    // Step 1: Try to associate inactive trackers with ByteTrack detections that match color profiles
-    // Track which ByteTrack detections have been assigned to avoid double-assignment
-    std::set<int> assigned_bytetrack_ids;
+    // Step 1: GLOBAL ASSIGNMENT - Associate inactive trackers with ByteTrack detections
+    // This replaces the sequential loop to prevent the "first ball claims everything" problem
     
-    // Log inactive trackers and available detections (INFO level for visibility)
-    int inactive_count = 0;
-    for (const auto& ball : tracked_balls_) {
-        if (!ball.is_active) inactive_count++;
-    }
-    if (inactive_count > 0 || bytetrack_objects.size() > 0) {
-        INFO_LOG("ColorTracker: ", inactive_count, " inactive trackers, ",
-                  bytetrack_objects.size(), " ByteTrack detections available");
-    }
-    
-    for (auto& ball : tracked_balls_) {
+    // Step 1a: Build list of inactive balls that need reactivation
+    std::vector<int> inactive_ball_indices;
+    for (size_t i = 0; i < tracked_balls_.size(); ++i) {
+        auto& ball = tracked_balls_[i];
         if (!ball.is_active) {
             // Increment frames_since_deactivated for inactive balls
             ball.frames_since_deactivated++;
             
-            // CRITICAL: Skip reactivation if ball was recently deactivated (within 10 frames)
-            if (ball.frames_since_deactivated < 10) {
+            // Only consider balls that have been inactive for at least 10 frames
+            if (ball.frames_since_deactivated >= 10) {
+                inactive_ball_indices.push_back(i);
+            } else {
                 DEBUG_LOG("ColorTracker: Skipping ball ", ball.logical_id,
                          " - recently deactivated (", ball.frames_since_deactivated, " frames ago)");
-                continue;
-            }
-            
-            INFO_LOG("ColorTracker: Attempting to reactivate ball ", ball.logical_id,
-                     " (previous color: ", (ball.color_name.empty() ? "none" : ball.color_name), ")");
-            
-            // Strategy: If ball had a previous color, try to find a detection matching that color first
-            // This preserves color identity across temporary occlusions
-            std::vector<const ColorProfile*> profiles_to_try;
-            
-            if (!ball.color_name.empty()) {
-                // Try previous color first (but ONLY if it's enabled)
-                for (const auto& profile : color_profiles_) {
-                    if (profile.name == ball.color_name && profile.enabled) {
-                        profiles_to_try.push_back(&profile);
-                        break;
-                    }
-                }
-            }
-            
-            // Then try all other ENABLED colors
-            for (const auto& profile : color_profiles_) {
-                if (profile.name != ball.color_name && profile.enabled) {
-                    profiles_to_try.push_back(&profile);
-                }
-            }
-            
-            // Look for ByteTrack objects that match this ball's color profile
-            for (const auto& obj : bytetrack_objects) {
-                if (obj.class_name != "ball") continue;
-                
-                // Skip if this detection is already assigned to another ball
-                if (assigned_bytetrack_ids.count(obj.id) > 0) continue;
-                
-                // Get center of bounding box
-                cv::Point2f center(obj.box.x + obj.box.width / 2.0f,
-                                  obj.box.y + obj.box.height / 2.0f);
-                
-                // Check color profiles in priority order (skip disabled profiles)
-                for (const auto* profile : profiles_to_try) {
-                    if (!profile->enabled) continue;
-                    float confidence = matchesColorProfile(hsv_frame, center, *profile);
-                    DEBUG_LOG("ColorTracker: Testing detection at (", center.x, ",", center.y,
-                              ") against ", profile->name, ": confidence=", confidence);
-                    if (confidence > 0.10f) {
-                        // INLINE DEDUPLICATION: Check if another ball is already tracking this location
-                        bool location_already_tracked = false;
-                        for (const auto& other_ball : tracked_balls_) {
-                            if (other_ball.is_active && other_ball.logical_id != ball.logical_id) {
-                                // Check 2D pixel distance
-                                float pixel_dist = std::sqrt(
-                                    std::pow(center.x - other_ball.pixel_pos.x, 2) +
-                                    std::pow(center.y - other_ball.pixel_pos.y, 2)
-                                );
-                                
-                                // If another ball is already tracking this location, skip it
-                                if (pixel_dist < 50.0f) { // 50 pixels threshold
-                                    location_already_tracked = true;
-                                    DEBUG_LOG("ColorTracker: Location already tracked by ball ",
-                                             other_ball.logical_id, " (", other_ball.color_name,
-                                             ") - pixel distance: ", pixel_dist);
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if (!location_already_tracked) {
-                            DEBUG_LOG("ColorTracker: Reactivating ball ", ball.logical_id,
-                                     " with color ", profile->name, " at (", center.x, ",", center.y, ")");
-                            // Found a match! Activate this tracker
-                            ball.is_active = true;
-                            ball.color_name = profile->name;
-                            ball.pixel_pos = center;
-                            ball.frames_since_seen = 0;
-                            ball.frames_since_deactivated = 999; // Reset since now active
-                            ball.color_match_confidence = confidence;
-                            ball.associated_wrist_id = -1;
-                            assigned_bytetrack_ids.insert(obj.id);
-                            
-                            // Get depth and world position
-                            if (center.x >= 0 && center.x < depth_frame.cols &&
-                                center.y >= 0 && center.y < depth_frame.rows) {
-                                uint16_t depth_mm = depth_frame.at<uint16_t>(
-                                    static_cast<int>(center.y), static_cast<int>(center.x));
-                                float depth_m = depth_mm / 1000.0f;
-                                
-                                if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                                    ball.world_pos = deprojectToWorld(center, depth_m, intrinsics);
-                                    
-                                    // Initialize Kalman filter with this measurement
-                                    KalmanFilter3D::MeasurementVector measurement(
-                                        ball.world_pos.x, ball.world_pos.y, ball.world_pos.z);
-                                    ball.kf.init(measurement);
-                                    ball.predicted_world_pos = ball.world_pos;
-                                }
-                            }
-                            
-                            break; // Break out of color profiles loop
-                        }
-                    }
-                }
-                if (ball.is_active) break; // Break out of ByteTrack objects loop
             }
         }
     }
+    
+    // Step 1b: Build list of available ByteTrack detections (balls only)
+    std::vector<int> available_detection_indices;
+    for (size_t i = 0; i < bytetrack_objects.size(); ++i) {
+        if (bytetrack_objects[i].class_name == "ball") {
+            available_detection_indices.push_back(i);
+        }
+    }
+    
+    // Log status
+    INFO_LOG("ColorTracker: Global assignment - ", inactive_ball_indices.size(),
+             " inactive balls, ", available_detection_indices.size(), " ball detections");
+    
+    // Step 1c: Create scoring matrix [ball_index][detection_index] = confidence score
+    std::vector<std::vector<float>> score_matrix(
+        inactive_ball_indices.size(),
+        std::vector<float>(available_detection_indices.size(), 0.0f)
+    );
+    
+    // Also track which color matched best for each (ball, detection) pair
+    std::vector<std::vector<std::string>> color_matrix(
+        inactive_ball_indices.size(),
+        std::vector<std::string>(available_detection_indices.size(), "")
+    );
+    
+    // Step 1d: Fill scoring matrix
+    for (size_t i = 0; i < inactive_ball_indices.size(); ++i) {
+        auto& ball = tracked_balls_[inactive_ball_indices[i]];
+        
+        INFO_LOG("ColorTracker: Scoring ball ", ball.logical_id,
+                 " (previous color: ", (ball.color_name.empty() ? "none" : ball.color_name), ")");
+        
+        // Determine which color profiles to try
+        std::vector<const ColorProfile*> profiles_to_try;
+        if (!ball.color_name.empty()) {
+            // Try previous color first (if enabled)
+            for (const auto& profile : color_profiles_) {
+                if (profile.name == ball.color_name && profile.enabled) {
+                    profiles_to_try.push_back(&profile);
+                    break;
+                }
+            }
+        }
+        // Then try all other enabled colors
+        for (const auto& profile : color_profiles_) {
+            if (profile.name != ball.color_name && profile.enabled) {
+                profiles_to_try.push_back(&profile);
+            }
+        }
+        
+        // Score each detection
+        for (size_t j = 0; j < available_detection_indices.size(); ++j) {
+            const auto& obj = bytetrack_objects[available_detection_indices[j]];
+            cv::Point2f center(obj.box.x + obj.box.width / 2.0f,
+                              obj.box.y + obj.box.height / 2.0f);
+            
+            float best_confidence = 0.0f;
+            std::string best_color;
+            
+            // Try each color profile
+            for (const auto* profile : profiles_to_try) {
+                float confidence = matchesColorProfile(hsv_frame, center, *profile);
+                if (confidence > best_confidence) {
+                    best_confidence = confidence;
+                    best_color = profile->name;
+                }
+            }
+            
+            // Apply bonus if this matches the ball's previous color (color consistency)
+            if (!ball.color_name.empty() && best_color == ball.color_name) {
+                best_confidence *= 1.5f; // 50% bonus for color consistency
+            }
+            
+            score_matrix[i][j] = best_confidence;
+            color_matrix[i][j] = best_color;
+            
+            DEBUG_LOG("  Detection ", j, " at (", center.x, ",", center.y,
+                     "): best_color=", best_color, " confidence=", best_confidence);
+        }
+    }
+    
+    // Step 1e: Greedy assignment - repeatedly find and assign the best (ball, detection) pair
+    std::set<int> assigned_ball_indices;
+    std::set<int> assigned_detection_indices;
+    
+    INFO_LOG("ColorTracker: Starting greedy assignment");
+    
+    while (assigned_ball_indices.size() < inactive_ball_indices.size() &&
+           assigned_detection_indices.size() < available_detection_indices.size()) {
+        
+        // Find the best unassigned (ball, detection) pair
+        float best_score = 0.10f; // Minimum threshold
+        int best_ball_idx = -1;
+        int best_det_idx = -1;
+        
+        for (size_t i = 0; i < inactive_ball_indices.size(); ++i) {
+            if (assigned_ball_indices.count(i) > 0) continue;
+            
+            for (size_t j = 0; j < available_detection_indices.size(); ++j) {
+                if (assigned_detection_indices.count(j) > 0) continue;
+                
+                if (score_matrix[i][j] > best_score) {
+                    best_score = score_matrix[i][j];
+                    best_ball_idx = i;
+                    best_det_idx = j;
+                }
+            }
+        }
+        
+        // If no valid assignment found, stop
+        if (best_ball_idx == -1) {
+            INFO_LOG("ColorTracker: No more valid assignments (best score below threshold)");
+            break;
+        }
+        
+        // Assign this pair
+        assigned_ball_indices.insert(best_ball_idx);
+        assigned_detection_indices.insert(best_det_idx);
+        
+        // Activate the ball
+        auto& ball = tracked_balls_[inactive_ball_indices[best_ball_idx]];
+        const auto& obj = bytetrack_objects[available_detection_indices[best_det_idx]];
+        
+        cv::Point2f center(obj.box.x + obj.box.width / 2.0f,
+                          obj.box.y + obj.box.height / 2.0f);
+        
+        std::string matched_color = color_matrix[best_ball_idx][best_det_idx];
+        float matched_confidence = score_matrix[best_ball_idx][best_det_idx];
+        
+        // Check if another active ball is already tracking this location (deduplication)
+        bool location_already_tracked = false;
+        for (const auto& other_ball : tracked_balls_) {
+            if (other_ball.is_active && other_ball.logical_id != ball.logical_id) {
+                float pixel_dist = std::sqrt(
+                    std::pow(center.x - other_ball.pixel_pos.x, 2) +
+                    std::pow(center.y - other_ball.pixel_pos.y, 2)
+                );
+                
+                if (pixel_dist < 50.0f) {
+                    location_already_tracked = true;
+                    INFO_LOG("ColorTracker: Skipping assignment - location already tracked by ball ",
+                             other_ball.logical_id, " (distance: ", pixel_dist, " pixels)");
+                    break;
+                }
+            }
+        }
+        
+        if (location_already_tracked) {
+            continue; // Skip this assignment
+        }
+        
+        // Activate the ball
+        ball.is_active = true;
+        ball.color_name = matched_color;
+        ball.pixel_pos = center;
+        ball.frames_since_seen = 0;
+        ball.frames_since_deactivated = 999;
+        ball.associated_wrist_id = -1;
+        ball.color_match_confidence = matched_confidence;
+        
+        INFO_LOG("ColorTracker: ✓ Assigned ball ", ball.logical_id,
+                 " to detection at (", center.x, ",", center.y,
+                 ") with color ", matched_color, " (confidence: ", matched_confidence, ")");
+        
+        // Get depth and initialize Kalman filter
+        if (center.x >= 0 && center.x < depth_frame.cols &&
+            center.y >= 0 && center.y < depth_frame.rows) {
+            uint16_t depth_mm = depth_frame.at<uint16_t>(
+                static_cast<int>(center.y), static_cast<int>(center.x));
+            float depth_m = depth_mm / 1000.0f;
+            
+            if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
+                ball.world_pos = deprojectToWorld(center, depth_m, intrinsics);
+                ball.kf.init(KalmanFilter3D::MeasurementVector(
+                    ball.world_pos.x, ball.world_pos.y, ball.world_pos.z));
+                ball.predicted_world_pos = ball.world_pos;
+            }
+        }
+    }
+    
+    INFO_LOG("ColorTracker: Global assignment complete - ", assigned_ball_indices.size(),
+             " balls activated");
     
     // Step 2: Update active trackers
     for (auto& ball : tracked_balls_) {

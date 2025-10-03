@@ -114,6 +114,20 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
 
     // --- 3. TRACK (ByteTrack) ---
     std::vector<std::shared_ptr<byte_track::STrack>> byte_tracks = tracker->update(detections_for_bytetrack);
+    
+    // Log ByteTrack behavior for analysis
+    int high_conf_tracks = 0;
+    int low_conf_tracks = 0;
+    for (const auto& track : byte_tracks) {
+        if (track->getScore() >= high_thresh_) {
+            high_conf_tracks++;
+        } else {
+            low_conf_tracks++;
+        }
+    }
+    std::cout << "[ByteTrack] Total tracks: " << byte_tracks.size()
+              << " | High-conf: " << high_conf_tracks
+              << " | Low-conf: " << low_conf_tracks << std::endl;
 
     // --- 4. ASSOCIATE Persistent Trackers with ByteTrack Tracks ---
     std::set<int> matched_byte_track_ids;
@@ -188,6 +202,72 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             best_match_tracker->parent_id = -1;
             matched_byte_track_ids.insert(b_track_id);
         }
+    }
+    
+    // --- 4b. 3D DISTANCE-BASED RE-ASSOCIATION (Fallback for fast-moving balls) ---
+    // This catches balls that ByteTrack's IoU matching missed due to fast motion
+    const float MAX_3D_DISTANCE = 0.30f; // 30cm threshold for 3D matching
+    int distance_matches = 0;
+    
+    // Find unmatched detections with valid 3D positions
+    std::vector<const Detection*> unmatched_detections;
+    for (const auto& det : last_raw_detections_) {
+        if (det.class_id == 3) continue; // Skip hands
+        if (det.world_pos.z < 0.2f || det.world_pos.z > 2.0f) continue; // Invalid depth
+        
+        // Check if this detection was already matched to a ByteTrack track
+        bool already_matched = false;
+        byte_track::Rect<float> det_rect(det.box.x, det.box.y, det.box.width, det.box.height);
+        for (const auto& b_track : byte_tracks) {
+            if (matched_byte_track_ids.count((int)b_track->getTrackId()) > 0) {
+                float iou = calculate_iou(b_track->getRect(), det_rect);
+                if (iou > 0.3f) { // If this detection has significant overlap with a matched track
+                    already_matched = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!already_matched) {
+            unmatched_detections.push_back(&det);
+        }
+    }
+    
+    // Try to match unmatched detections to predicted ball trackers using 3D distance
+    for (const auto* det : unmatched_detections) {
+        PersistentTracker* best_match = nullptr;
+        float min_distance = MAX_3D_DISTANCE;
+        
+        for (auto& ball : logical_ball_trackers_) {
+            if (ball.status == TrackerStatus::PREDICTED || ball.status == TrackerStatus::OCCLUDED) {
+                ball.update_from_kf();
+                cv::Point3f predicted_pos(ball.position.x(), ball.position.y(), ball.position.z());
+                float dist = calculate_distance(predicted_pos, det->world_pos);
+                
+                if (dist < min_distance) {
+                    min_distance = dist;
+                    best_match = &ball;
+                }
+            }
+        }
+        
+        if (best_match) {
+            // Manually associate this detection with the predicted tracker
+            best_match->kf.update(KalmanFilter3D::MeasurementVector(det->world_pos.x, det->world_pos.y, det->world_pos.z));
+            best_match->status = TrackerStatus::TRACKED;
+            best_match->box_2d = det->box;
+            best_match->frames_since_seen = 0;
+            best_match->parent_id = -1;
+            distance_matches++;
+            
+            std::cout << "[3D Distance Match] Recovered ball " << best_match->logical_id
+                      << " at distance " << min_distance << "m (conf: " << det->confidence << ")" << std::endl;
+        }
+    }
+    
+    if (distance_matches > 0) {
+        std::cout << "[3D Distance Match] Successfully matched " << distance_matches
+                  << " balls using 3D distance fallback" << std::endl;
     }
 
     // --- 5. RUN THROW/CATCH DETECTION ---

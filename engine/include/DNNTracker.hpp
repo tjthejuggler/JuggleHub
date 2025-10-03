@@ -108,10 +108,10 @@ private:
     float nms_threshold_ = 0.5;
 
     // ByteTrack Parameters
-    int track_buffer_ = 150;
-    float track_thresh_ = 0.25f;
-    float high_thresh_ = 0.5f;
-    float match_thresh_ = 0.7f;
+    int track_buffer_ = 150;      // How many frames to keep lost tracks (5 seconds at 30fps)
+    float track_thresh_ = 0.25f;  // Minimum confidence to START a new track
+    float high_thresh_ = 0.35f;   // CHANGED from 0.5 - treat more balls as high confidence
+    float match_thresh_ = 0.5f;   // CHANGED from 0.7 - allow larger motion between frames
 
     bool pose_model_enabled_ = true;
 

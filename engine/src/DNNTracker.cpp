@@ -445,6 +445,12 @@ void DNNTracker::update_setting(const std::string& key, const std::string& value
             config.min_frames_for_event = std::stoi(value);
             throw_catch_detector_->setConfig(config);
         }
+        // Forward color tracker settings (track_*, color hue settings)
+        else if (key.find("track_") == 0 || key.find("_min_hue") != std::string::npos || key.find("_max_hue") != std::string::npos) {
+            if (color_tracker_) {
+                color_tracker_->updateSetting(key, value);
+            }
+        }
         else std::cerr << "Warning: Unknown DNNTracker setting key '" << key << "'" << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "Error updating setting " << key << " with value " << value << ": " << e.what() << std::endl;

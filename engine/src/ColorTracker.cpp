@@ -72,18 +72,18 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             std::vector<const ColorProfile*> profiles_to_try;
             
             if (!ball.color_name.empty()) {
-                // Try previous color first
+                // Try previous color first (but ONLY if it's enabled)
                 for (const auto& profile : color_profiles_) {
-                    if (profile.name == ball.color_name) {
+                    if (profile.name == ball.color_name && profile.enabled) {
                         profiles_to_try.push_back(&profile);
                         break;
                     }
                 }
             }
             
-            // Then try all other colors
+            // Then try all other ENABLED colors
             for (const auto& profile : color_profiles_) {
-                if (profile.name != ball.color_name) {
+                if (profile.name != ball.color_name && profile.enabled) {
                     profiles_to_try.push_back(&profile);
                 }
             }
@@ -99,8 +99,9 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 cv::Point2f center(obj.box.x + obj.box.width / 2.0f,
                                   obj.box.y + obj.box.height / 2.0f);
                 
-                // Check color profiles in priority order
+                // Check color profiles in priority order (skip disabled profiles)
                 for (const auto* profile : profiles_to_try) {
+                    if (!profile->enabled) continue;
                     bool matches = matchesColorProfile(hsv_frame, center, *profile);
                     DEBUG_LOG("ColorTracker: Testing detection at (", center.x, ",", center.y,
                               ") against ", profile->name, ": ", (matches ? "MATCH" : "no match"));
@@ -162,6 +163,15 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             }
         }
         if (!profile) continue;
+        
+        // CRITICAL: If the profile is disabled, deactivate this ball immediately
+        if (!profile->enabled) {
+            INFO_LOG("ColorTracker: Deactivating ball ", ball.logical_id,
+                     " because color '", ball.color_name, "' is now disabled");
+            ball.is_active = false;
+            ball.associated_wrist_id = -1;
+            continue;
+        }
         
         bool found_this_frame = false;
         
@@ -450,8 +460,14 @@ cv::Point2f ColorTracker::findClosestColorBlob(const cv::Mat& hsv_frame,
 
 bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
                                        const cv::Point2f& center,
-                                       const ColorProfile& profile, 
+                                       const ColorProfile& profile,
                                        int sample_radius) {
+    // CRITICAL: Immediately reject if profile is disabled
+    if (!profile.enabled) {
+        DEBUG_LOG("ColorTracker: Rejecting disabled profile '", profile.name, "'");
+        return false;
+    }
+    
     // Sample area around center
     int x_min = std::max(0, static_cast<int>(center.x - sample_radius));
     int y_min = std::max(0, static_cast<int>(center.y - sample_radius));
@@ -510,26 +526,34 @@ bool ColorTracker::loadSettings() {
         for (auto& profile : color_profiles_) {
             if (j.contains(profile.name)) {
                 auto& color_data = j[profile.name];
+                
+                // Load enabled state (default to true if not present)
+                if (color_data.contains("enabled")) {
+                    profile.enabled = color_data["enabled"].get<bool>();
+                } else {
+                    profile.enabled = true;
+                }
+                
                 profile.min_hsv = cv::Scalar(
-                    color_data["min_hsv"][0], 
-                    color_data["min_hsv"][1], 
+                    color_data["min_hsv"][0],
+                    color_data["min_hsv"][1],
                     color_data["min_hsv"][2]
                 );
                 profile.max_hsv = cv::Scalar(
-                    color_data["max_hsv"][0], 
-                    color_data["max_hsv"][1], 
+                    color_data["max_hsv"][0],
+                    color_data["max_hsv"][1],
                     color_data["max_hsv"][2]
                 );
                 
                 if (color_data.contains("min_hsv2")) {
                     profile.min_hsv2 = cv::Scalar(
-                        color_data["min_hsv2"][0], 
-                        color_data["min_hsv2"][1], 
+                        color_data["min_hsv2"][0],
+                        color_data["min_hsv2"][1],
                         color_data["min_hsv2"][2]
                     );
                     profile.max_hsv2 = cv::Scalar(
-                        color_data["max_hsv2"][0], 
-                        color_data["max_hsv2"][1], 
+                        color_data["max_hsv2"][0],
+                        color_data["max_hsv2"][1],
                         color_data["max_hsv2"][2]
                     );
                 }
@@ -548,26 +572,27 @@ bool ColorTracker::loadSettings() {
 void ColorTracker::saveSettings() {
     json j;
     for (const auto& profile : color_profiles_) {
+        j[profile.name]["enabled"] = profile.enabled;
         j[profile.name]["min_hsv"] = {
-            profile.min_hsv[0], 
-            profile.min_hsv[1], 
+            profile.min_hsv[0],
+            profile.min_hsv[1],
             profile.min_hsv[2]
         };
         j[profile.name]["max_hsv"] = {
-            profile.max_hsv[0], 
-            profile.max_hsv[1], 
+            profile.max_hsv[0],
+            profile.max_hsv[1],
             profile.max_hsv[2]
         };
         
         if (profile.min_hsv2[0] >= 0) {
             j[profile.name]["min_hsv2"] = {
-                profile.min_hsv2[0], 
-                profile.min_hsv2[1], 
+                profile.min_hsv2[0],
+                profile.min_hsv2[1],
                 profile.min_hsv2[2]
             };
             j[profile.name]["max_hsv2"] = {
-                profile.max_hsv2[0], 
-                profile.max_hsv2[1], 
+                profile.max_hsv2[0],
+                profile.max_hsv2[1],
                 profile.max_hsv2[2]
             };
         }
@@ -699,6 +724,32 @@ void ColorTracker::calibrateColor(const std::string& color_name,
 
 bool ColorTracker::updateSetting(const std::string& key, const std::string& value) {
     try {
+        // Check if this is an enabled/disabled setting (format: "track_colorname")
+        if (key.find("track_") == 0) {
+            std::string color_name = key.substr(6); // Remove "track_" prefix
+            
+            auto it = std::find_if(color_profiles_.begin(), color_profiles_.end(),
+                                  [&](const ColorProfile& p) { return p.name == color_name; });
+            
+            if (it == color_profiles_.end()) {
+                ERROR_LOG("ColorTracker: Color '", color_name, "' not found");
+                return false;
+            }
+            
+            bool enabled = (std::stoi(value) != 0);
+            it->enabled = enabled;
+            INFO_LOG("ColorTracker: ", (enabled ? "Enabled" : "Disabled"), " tracking for ", color_name);
+            saveSettings(); // Save to persist the change
+            
+            // Log all profile states for debugging
+            INFO_LOG("ColorTracker: Current profile states:");
+            for (const auto& p : color_profiles_) {
+                INFO_LOG("  ", p.name, ": ", (p.enabled ? "ENABLED" : "DISABLED"));
+            }
+            
+            return true;
+        }
+        
         // Parse key format: colorname_minmax_hsv (e.g., "pink_min_h")
         size_t pos1 = key.find('_');
         size_t pos2 = key.find('_', pos1 + 1);

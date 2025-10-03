@@ -18,17 +18,19 @@ namespace juggler {
 // Struct to hold HSV color range
 struct ColorProfile {
     std::string name;
+    bool enabled;  // Whether this color profile is active for tracking
     cv::Scalar min_hsv;
     cv::Scalar max_hsv;
     cv::Scalar min_hsv2; // For colors that wrap around HSV (like red)
     cv::Scalar max_hsv2;
     
-    ColorProfile(const std::string& n = "", 
-                 const cv::Scalar& min = cv::Scalar(0, 0, 0), 
+    ColorProfile(const std::string& n = "",
+                 const cv::Scalar& min = cv::Scalar(0, 0, 0),
                  const cv::Scalar& max = cv::Scalar(180, 255, 255),
-                 const cv::Scalar& min2 = cv::Scalar(-1, -1, -1), 
-                 const cv::Scalar& max2 = cv::Scalar(-1, -1, -1))
-        : name(n), min_hsv(min), max_hsv(max), min_hsv2(min2), max_hsv2(max2) {}
+                 const cv::Scalar& min2 = cv::Scalar(-1, -1, -1),
+                 const cv::Scalar& max2 = cv::Scalar(-1, -1, -1),
+                 bool en = true)
+        : name(n), enabled(en), min_hsv(min), max_hsv(max), min_hsv2(min2), max_hsv2(max2) {}
 };
 
 // Color-tracked ball state

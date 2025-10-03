@@ -1432,10 +1432,7 @@ if PYQT_AVAILABLE:
             self.ball_list.setReadOnly(True)
             ball_layout.addWidget(self.ball_list)
             
-            # Calibration button
-            self.calibration_button = QPushButton("Enter Calibration Mode")
-            self.calibration_button.clicked.connect(self.toggle_calibration_mode)
-            ball_layout.addWidget(self.calibration_button)
+            # Calibration mode is now always on - no button needed
 
             # Record button
             self.record_button = QPushButton("Record 5s Clip")
@@ -1479,119 +1476,32 @@ if PYQT_AVAILABLE:
             self.video_layout = QVBoxLayout(self.video_group)
             self.video_scene = QGraphicsScene()
             self.video_view = QGraphicsView(self.video_scene)
+            
+            # Configure video view to minimize extra space
+            self.video_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.video_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.video_view.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            
             self.video_pixmap_item = QGraphicsPixmapItem()
             self.video_scene.addItem(self.video_pixmap_item)
             self.video_view.mousePressEvent = self.video_view_clicked
             self.video_layout.addWidget(self.video_view)
-
-            # --- Color Profile Controls ---
-            color_profile_layout = QVBoxLayout()
-            
-            # Top row: dropdown and button
-            profile_control_layout = QHBoxLayout()
-            profile_control_layout.addWidget(QLabel("Color Profile:"))
-            
-            self.color_profile_combo = QComboBox()
-            self.populate_color_profiles()
-            profile_control_layout.addWidget(self.color_profile_combo)
-            
-            self.set_color_profile_button = QPushButton("Set Color Profile")
-            self.set_color_profile_button.setCheckable(True)
-            self.set_color_profile_button.clicked.connect(self.start_color_profile_calibration)
-            self.set_color_profile_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #555;
-                    color: white;
-                    border: 1px solid #777;
-                    padding: 5px;
-                    border-radius: 3px;
-                }
-                QPushButton:checked {
-                    background-color: #007ACC;
-                    border-color: #005A9E;
-                }
-            """)
-            profile_control_layout.addWidget(self.set_color_profile_button)
-            
-            color_profile_layout.addLayout(profile_control_layout)
-            
-            # Status label
-            self.color_profile_status_label = QLabel("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
-            self.color_profile_status_label.setWordWrap(True)
-            color_profile_layout.addWidget(self.color_profile_status_label)
-            
-            self.video_layout.addLayout(color_profile_layout)
-
-            # --- NEW: Visualization Toggles ---
-            toggles_layout = QHBoxLayout()
-            self.show_raw_detections_toggle = QPushButton("YOLO Detections")
-            self.show_raw_detections_toggle.setCheckable(True)
-            self.show_raw_detections_toggle.setChecked(False)
-            self.show_raw_detections_toggle.clicked.connect(self.toggle_overlays)
-            toggles_layout.addWidget(self.show_raw_detections_toggle)
-
-            self.show_unmatched_detections_toggle = QPushButton("Unmatched Detections")
-            self.show_unmatched_detections_toggle.setCheckable(True)
-            self.show_unmatched_detections_toggle.setChecked(True)
-            self.show_unmatched_detections_toggle.clicked.connect(self.toggle_overlays)
-            toggles_layout.addWidget(self.show_unmatched_detections_toggle)
-
-            self.show_tracked_boxes_toggle = QPushButton("ByteTrack Boxes")
-            self.show_tracked_boxes_toggle.setCheckable(True)
-            self.show_tracked_boxes_toggle.setChecked(False)
-            self.show_tracked_boxes_toggle.clicked.connect(self.toggle_overlays)
-            toggles_layout.addWidget(self.show_tracked_boxes_toggle)
-
-            self.show_color_tracker_toggle = QPushButton("Color Tracking")
-            self.show_color_tracker_toggle.setCheckable(True)
-            self.show_color_tracker_toggle.setChecked(True) # Default to on
-            self.show_color_tracker_toggle.clicked.connect(self.toggle_overlays)
-            toggles_layout.addWidget(self.show_color_tracker_toggle)
-
-            self.show_tails_toggle = QPushButton("Show Tails")
-            self.show_tails_toggle.setCheckable(True)
-            self.show_tails_toggle.setChecked(False)
-            self.show_tails_toggle.clicked.connect(self.toggle_overlays)
-            toggles_layout.addWidget(self.show_tails_toggle)
-            
-            self.show_skeleton_toggle = QPushButton("Show Skeleton")
-            self.show_skeleton_toggle.setCheckable(True)
-            self.show_skeleton_toggle.setChecked(False)
-            self.show_skeleton_toggle.clicked.connect(self.toggle_overlays)
-            toggles_layout.addWidget(self.show_skeleton_toggle)
-            
-            self.hide_video_feed_toggle = QPushButton("Hide Video Feed")
-            self.hide_video_feed_toggle.setCheckable(True)
-            self.hide_video_feed_toggle.setChecked(False)
-            self.hide_video_feed_toggle.clicked.connect(self.toggle_overlays)
-            self.hide_video_feed_toggle.setToolTip("Hide the video feed but keep overlays visible")
-            toggles_layout.addWidget(self.hide_video_feed_toggle)
-            
-            self.video_layout.addLayout(toggles_layout)
-
-            # --- NEW: Tail Length Slider ---
-            tail_layout = QHBoxLayout()
-            tail_layout.addWidget(QLabel("Tail Length:"))
-            self.tail_length_slider = QSlider(Qt.Orientation.Horizontal)
-            self.tail_length_slider.setRange(10, 200) # 10 to 200 frames
-            self.tail_length_slider.setValue(50)
-            self.tail_length_slider.valueChanged.connect(self.update_tail_length)
-            tail_layout.addWidget(self.tail_length_slider)
-            self.tail_length_label = QLabel("50 frames")
-            tail_layout.addWidget(self.tail_length_label)
-            self.video_layout.addLayout(tail_layout)
             
             content_layout.addWidget(self.video_group, 2)
             
-            # Create settings panel (Ball Management removed)
+            # Create settings panel - always visible now
             self.settings_tabs = QTabWidget()
-            self.settings_tabs.setVisible(False)
+            self.settings_tabs.setVisible(True)  # Always visible
+            self.settings_tabs.setMinimumWidth(400)  # Ensure enough width to avoid horizontal scroll
             
             # Calibration settings tab
             self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance)
             self.settings_tabs.addTab(self.settings_widget, "⚙️ Tracking Settings")
             
-            content_layout.addWidget(self.settings_tabs, 1)
+            content_layout.addWidget(self.settings_tabs, 2)  # Increased stretch factor from 1 to 2
+            
+            # Set calibration mode to always on
+            self.calibration_mode = True
             
             # Right panel - System info
             system_group = QGroupBox("⚙️ System Status")
@@ -1643,9 +1553,154 @@ if PYQT_AVAILABLE:
             
             main_layout.addLayout(content_layout)
             
+            # Calibration Controls Section (above activity log)
+            calibration_group = QGroupBox("🎨 Calibration & Visualization")
+            calibration_layout = QVBoxLayout(calibration_group)
+            
+            # --- Color Profile Controls ---
+            color_profile_layout = QHBoxLayout()
+            color_profile_layout.addWidget(QLabel("Color Profile:"))
+            
+            self.color_profile_combo = QComboBox()
+            self.populate_color_profiles()
+            color_profile_layout.addWidget(self.color_profile_combo)
+            
+            self.set_color_profile_button = QPushButton("Set Color Profile")
+            self.set_color_profile_button.setCheckable(True)
+            self.set_color_profile_button.clicked.connect(self.start_color_profile_calibration)
+            self.set_color_profile_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #555;
+                    color: white;
+                    border: 1px solid #777;
+                    padding: 5px;
+                    border-radius: 3px;
+                }
+                QPushButton:checked {
+                    background-color: #007ACC;
+                    border-color: #005A9E;
+                }
+            """)
+            color_profile_layout.addWidget(self.set_color_profile_button)
+            calibration_layout.addLayout(color_profile_layout)
+            
+            # Status label
+            self.color_profile_status_label = QLabel("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
+            self.color_profile_status_label.setWordWrap(True)
+            calibration_layout.addWidget(self.color_profile_status_label)
+            
+            # --- Visualization Toggles (3 rows, compact buttons) ---
+            # First row of toggles
+            toggles_row1 = QHBoxLayout()
+            toggles_row1.setSpacing(5)
+            self.show_raw_detections_toggle = QPushButton("YOLO Detections")
+            self.show_raw_detections_toggle.setCheckable(True)
+            self.show_raw_detections_toggle.setChecked(False)
+            self.show_raw_detections_toggle.clicked.connect(self.toggle_overlays)
+            self.show_raw_detections_toggle.setMaximumWidth(150)
+            toggles_row1.addWidget(self.show_raw_detections_toggle)
+
+            self.show_unmatched_detections_toggle = QPushButton("Unmatched Detections")
+            self.show_unmatched_detections_toggle.setCheckable(True)
+            self.show_unmatched_detections_toggle.setChecked(True)
+            self.show_unmatched_detections_toggle.clicked.connect(self.toggle_overlays)
+            self.show_unmatched_detections_toggle.setMaximumWidth(180)
+            toggles_row1.addWidget(self.show_unmatched_detections_toggle)
+            toggles_row1.addStretch()
+            calibration_layout.addLayout(toggles_row1)
+            
+            # Second row of toggles
+            toggles_row2 = QHBoxLayout()
+            toggles_row2.setSpacing(5)
+            self.show_tracked_boxes_toggle = QPushButton("ByteTrack Boxes")
+            self.show_tracked_boxes_toggle.setCheckable(True)
+            self.show_tracked_boxes_toggle.setChecked(False)
+            self.show_tracked_boxes_toggle.clicked.connect(self.toggle_overlays)
+            self.show_tracked_boxes_toggle.setMaximumWidth(150)
+            toggles_row2.addWidget(self.show_tracked_boxes_toggle)
+
+            self.show_color_tracker_toggle = QPushButton("Color Tracking")
+            self.show_color_tracker_toggle.setCheckable(True)
+            self.show_color_tracker_toggle.setChecked(True)
+            self.show_color_tracker_toggle.clicked.connect(self.toggle_overlays)
+            self.show_color_tracker_toggle.setMaximumWidth(130)
+            toggles_row2.addWidget(self.show_color_tracker_toggle)
+            toggles_row2.addStretch()
+            calibration_layout.addLayout(toggles_row2)
+            
+            # Third row of toggles
+            toggles_row3 = QHBoxLayout()
+            toggles_row3.setSpacing(5)
+            self.show_tails_toggle = QPushButton("Show Tails")
+            self.show_tails_toggle.setCheckable(True)
+            self.show_tails_toggle.setChecked(False)
+            self.show_tails_toggle.clicked.connect(self.toggle_overlays)
+            self.show_tails_toggle.setMaximumWidth(110)
+            toggles_row3.addWidget(self.show_tails_toggle)
+            
+            self.show_skeleton_toggle = QPushButton("Show Skeleton")
+            self.show_skeleton_toggle.setCheckable(True)
+            self.show_skeleton_toggle.setChecked(False)
+            self.show_skeleton_toggle.clicked.connect(self.toggle_overlays)
+            self.show_skeleton_toggle.setMaximumWidth(130)
+            toggles_row3.addWidget(self.show_skeleton_toggle)
+            
+            self.hide_video_feed_toggle = QPushButton("Hide Video Feed")
+            self.hide_video_feed_toggle.setCheckable(True)
+            self.hide_video_feed_toggle.setChecked(False)
+            self.hide_video_feed_toggle.clicked.connect(self.toggle_overlays)
+            self.hide_video_feed_toggle.setToolTip("Hide the video feed but keep overlays visible")
+            self.hide_video_feed_toggle.setMaximumWidth(140)
+            toggles_row3.addWidget(self.hide_video_feed_toggle)
+            toggles_row3.addStretch()
+            calibration_layout.addLayout(toggles_row3)
+
+            # --- Tail Length Slider ---
+            tail_layout = QHBoxLayout()
+            tail_layout.addWidget(QLabel("Tail Length:"))
+            self.tail_length_slider = QSlider(Qt.Orientation.Horizontal)
+            self.tail_length_slider.setRange(10, 200)
+            self.tail_length_slider.setValue(50)
+            self.tail_length_slider.valueChanged.connect(self.update_tail_length)
+            tail_layout.addWidget(self.tail_length_slider)
+            self.tail_length_label = QLabel("50 frames")
+            tail_layout.addWidget(self.tail_length_label)
+            calibration_layout.addLayout(tail_layout)
+            
+            main_layout.addWidget(calibration_group)
+            
             # Bottom panel - Log
             log_group = QGroupBox("📝 Activity Log")
             log_layout = QVBoxLayout(log_group)
+            
+            # Add control buttons for the log
+            log_controls_layout = QHBoxLayout()
+            
+            self.log_paused = False
+            self.pause_log_button = QPushButton("⏸ Pause Log")
+            self.pause_log_button.setCheckable(True)
+            self.pause_log_button.clicked.connect(self.toggle_log_pause)
+            self.pause_log_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #555;
+                    color: white;
+                    border: 1px solid #777;
+                    padding: 5px;
+                    border-radius: 3px;
+                }
+                QPushButton:checked {
+                    background-color: #f44336;
+                    border-color: #d32f2f;
+                }
+            """)
+            log_controls_layout.addWidget(self.pause_log_button)
+            
+            self.clear_log_button = QPushButton("🗑 Clear Log")
+            self.clear_log_button.clicked.connect(self.clear_log)
+            log_controls_layout.addWidget(self.clear_log_button)
+            
+            log_controls_layout.addStretch()
+            log_layout.addLayout(log_controls_layout)
             
             self.log_text = QTextEdit()
             self.log_text.setMaximumHeight(150)
@@ -1951,7 +2006,23 @@ if PYQT_AVAILABLE:
                 time_since_last = (time.time() * 1000000 - self.last_frame_data.timestamp_us) / 1000000
                 if time_since_last > 2.0: self.status_label.setText("⚠️ No data received recently")
         
+        def toggle_log_pause(self):
+            """Toggle the activity log pause state."""
+            self.log_paused = self.pause_log_button.isChecked()
+            if self.log_paused:
+                self.pause_log_button.setText("▶ Resume Log")
+            else:
+                self.pause_log_button.setText("⏸ Pause Log")
+        
+        def clear_log(self):
+            """Clear all messages from the activity log."""
+            self.log_text.clear()
+        
         def log_message(self, message: str):
+            # Don't add messages if log is paused
+            if self.log_paused:
+                return
+            
             timestamp = time.strftime("%H:%M:%S")
             self.log_text.append(f"[{timestamp}] {message}")
             if self.log_text.document().blockCount() > 100:
@@ -1960,22 +2031,7 @@ if PYQT_AVAILABLE:
                 cursor.select(cursor.SelectionType.BlockUnderCursor)
                 cursor.removeSelectedText()
         
-        def toggle_calibration_mode(self):
-            self.calibration_mode = not self.calibration_mode
-            
-            # Toggle visibility of tabbed settings panel
-            self.settings_tabs.setVisible(self.calibration_mode)
-            
-            self.calibration_button.setText("Exit Calibration Mode" if self.calibration_mode else "Enter Calibration Mode")
-            
-            # Auto-load settings when entering calibration mode
-            if self.calibration_mode:
-                # Default to Settings tab
-                self.settings_tabs.setCurrentWidget(self.settings_widget)
-                self.log_message("⚙️ Calibration mode activated - Settings available")
-                
-                # Load settings
-                self.settings_widget.load_settings()
+        # Calibration mode is now always on - no toggle needed
 
         def toggle_overlays(self):
             if self.last_frame_data: self.update_video_feed(self.last_frame_data)
@@ -2146,6 +2202,9 @@ if PYQT_AVAILABLE:
 
             painter.end()
             self.video_pixmap_item.setPixmap(pixmap)
+            
+            # Update scene rect to match pixmap size exactly
+            self.video_scene.setSceneRect(self.video_pixmap_item.boundingRect())
             self.video_view.fitInView(self.video_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
         def update_tail_length(self, value):

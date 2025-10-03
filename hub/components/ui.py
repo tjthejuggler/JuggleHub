@@ -638,6 +638,42 @@ if PYQT_AVAILABLE:
             
             return section
 
+        def _calculate_hsv_range_from_rgb(self, rgb):
+            """Calculate appropriate HSV range from RGB color values."""
+            import cv2
+            import numpy as np
+            
+            # Convert RGB to HSV
+            rgb_array = np.uint8([[rgb]])  # Shape: (1, 1, 3)
+            hsv_array = cv2.cvtColor(rgb_array, cv2.COLOR_RGB2HSV)
+            h, s, v = hsv_array[0][0]
+            
+            # Define hue tolerance based on color characteristics
+            # Colors near red (hue ~0 or ~180) need special handling due to wrap-around
+            hue_tolerance = 15  # degrees
+            
+            # Calculate min/max hue with wrap-around handling
+            min_hue = float(max(0, h - hue_tolerance))
+            max_hue = float(min(180, h + hue_tolerance))
+            
+            # For colors near red (hue < 15 or hue > 165), we need to handle wrap-around
+            if h < 15:
+                # Red wraps around: use range like [165, 180] + [0, 15]
+                min_hue = float(max(0, 180 - (15 - h)))
+                max_hue = float(h + hue_tolerance)
+            elif h > 165:
+                # Red wraps around: use range like [165, 180] + [0, 15]
+                min_hue = float(h - hue_tolerance)
+                max_hue = float(min(15, h + hue_tolerance - 180))
+            
+            # Saturation and value ranges (more forgiving)
+            min_s = float(max(30, s - 80))
+            max_s = 255.0
+            min_v = float(max(30, v - 80))
+            max_v = 255.0
+            
+            return [min_hue, min_s, min_v], [max_hue, max_s, max_v]
+        
         def create_ball_profiles_section(self):
             """Create the Ball Profiles section for tracking configuration"""
             section = CollapsibleGroupBox("🎨 Ball Profiles", collapsed=False)
@@ -662,19 +698,53 @@ if PYQT_AVAILABLE:
             from components.color_profile_manager import ColorProfileManager
             color_manager = ColorProfileManager()
             
-            # Merge profiles - ONLY add colors that don't exist yet, don't overwrite existing ones
+            # Merge profiles - calculate proper HSV ranges for new colors OR fix existing ones with default 0-180 range
+            profiles_updated = False
             for profile in color_manager.profiles:
                 ball_name = profile['name']
+                
+                # Check if profile needs updating (new or has default 0-180 hue range)
+                needs_update = False
                 if ball_name not in self.ball_profiles:
-                    # Add this profile to ball_settings with default HSV values ONLY if it doesn't exist
-                    print(f"⚠️ Adding missing profile '{ball_name}' with default values")
-                    self.ball_profiles[ball_name] = {
-                        'enabled': profile.get('enabled', True),
-                        'min_hsv': [0.0, 100.0, 100.0],
-                        'max_hsv': [180.0, 255.0, 255.0]
-                    }
+                    needs_update = True
+                    print(f"⚠️ Adding missing profile '{ball_name}'")
                 else:
-                    print(f"✓ Profile '{ball_name}' already exists with min_hue={self.ball_profiles[ball_name]['min_hsv'][0]}, max_hue={self.ball_profiles[ball_name]['max_hsv'][0]}")
+                    # Check if it has the default 0-180 hue range (needs fixing)
+                    existing_min_hue = self.ball_profiles[ball_name]['min_hsv'][0]
+                    existing_max_hue = self.ball_profiles[ball_name]['max_hsv'][0]
+                    if existing_min_hue == 0.0 and existing_max_hue == 180.0:
+                        needs_update = True
+                        print(f"⚠️ Fixing profile '{ball_name}' with default 0-180 range")
+                    else:
+                        print(f"✓ Profile '{ball_name}' already has custom hue range: {existing_min_hue:.1f}-{existing_max_hue:.1f}")
+                
+                if needs_update:
+                    # Calculate HSV range from RGB color
+                    rgb = profile.get('rgb', [255, 255, 255])
+                    min_hsv, max_hsv = self._calculate_hsv_range_from_rgb(rgb)
+                    
+                    print(f"   RGB: {rgb} -> Hue range: {min_hsv[0]:.1f}-{max_hsv[0]:.1f}")
+                    
+                    # Preserve enabled state if profile already exists
+                    enabled = self.ball_profiles[ball_name].get('enabled', True) if ball_name in self.ball_profiles else profile.get('enabled', True)
+                    
+                    self.ball_profiles[ball_name] = {
+                        'enabled': enabled,
+                        'min_hsv': min_hsv,
+                        'max_hsv': max_hsv
+                    }
+                    profiles_updated = True
+            
+            # Save updated ball_settings.json if we updated any profiles
+            if profiles_updated:
+                try:
+                    with open(ball_settings_path, 'w') as f:
+                        json.dump(self.ball_profiles, f, indent=4)
+                    print(f"✅ Ball settings saved with updated HSV ranges")
+                except Exception as e:
+                    print(f"❌ Error saving ball_settings.json: {e}")
+            else:
+                print(f"ℹ️ No profile updates needed")
             
             # Store checkbox and slider references
             self.ball_checkboxes = {}
@@ -1230,11 +1300,15 @@ if PYQT_AVAILABLE:
                     if ball_name in self.ball_checkboxes:
                         self.ball_checkboxes[ball_name].setChecked(enabled)
             
-            if 'ball_hue_ranges' in settings and hasattr(self, 'ball_hue_sliders'):
-                for ball_name, hue_data in settings['ball_hue_ranges'].items():
-                    if ball_name in self.ball_hue_sliders:
-                        self.ball_hue_sliders[ball_name]['min'].setValue(hue_data['min_hue'])
-                        self.ball_hue_sliders[ball_name]['max'].setValue(hue_data['max_hue'])
+            # NOTE: We do NOT load ball_hue_ranges from calibration_settings.json anymore
+            # Ball hue ranges should only come from ball_settings.json, which is loaded
+            # when the Ball Profiles section is created. This prevents old saved settings
+            # from overwriting the correct calculated ranges.
+            # if 'ball_hue_ranges' in settings and hasattr(self, 'ball_hue_sliders'):
+            #     for ball_name, hue_data in settings['ball_hue_ranges'].items():
+            #         if ball_name in self.ball_hue_sliders:
+            #             self.ball_hue_sliders[ball_name]['min'].setValue(hue_data['min_hue'])
+            #             self.ball_hue_sliders[ball_name]['max'].setValue(hue_data['max_hue'])
 
         def save_settings(self, filepath: str = None):
             """Save current calibration settings to a JSON file."""

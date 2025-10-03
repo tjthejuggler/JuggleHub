@@ -1554,6 +1554,13 @@ if PYQT_AVAILABLE:
             self.show_skeleton_toggle.clicked.connect(self.toggle_overlays)
             toggles_layout.addWidget(self.show_skeleton_toggle)
             
+            self.hide_video_feed_toggle = QPushButton("Hide Video Feed")
+            self.hide_video_feed_toggle.setCheckable(True)
+            self.hide_video_feed_toggle.setChecked(False)
+            self.hide_video_feed_toggle.clicked.connect(self.toggle_overlays)
+            self.hide_video_feed_toggle.setToolTip("Hide the video feed but keep overlays visible")
+            toggles_layout.addWidget(self.hide_video_feed_toggle)
+            
             self.video_layout.addLayout(toggles_layout)
 
             # --- NEW: Tail Length Slider ---
@@ -1986,7 +1993,15 @@ if PYQT_AVAILABLE:
             
             self.log_message(f"UI: Frame {frame_data.frame_number} loaded into QImage successfully. Size: {image.width()}x{image.height()}.")
 
-            pixmap = QPixmap.fromImage(image)
+            # Check if video feed should be hidden
+            if self.hide_video_feed_toggle.isChecked():
+                # Create a blank black image with the same dimensions
+                pixmap = QPixmap(image.width(), image.height())
+                pixmap.fill(QColor(0, 0, 0))  # Fill with black
+            else:
+                # Use the actual video frame
+                pixmap = QPixmap.fromImage(image)
+            
             painter = QPainter(pixmap)
             
             # --- Draw YOLO Detections ---

@@ -19,19 +19,8 @@ import json
 from datetime import datetime
 from .color_profile_manager import ColorProfileManager, ColorProfileDialog
 
-# Import ball management components
-try:
-    import sys
-    import os
-    # Add parent directory to path to import from hub.ui
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from ui.ball_management_widget import BallManagementWidget
-    from ui.ball_calibration_overlay import BallCalibrationOverlay
-    from ball_manager import BallManager
-    BALL_MANAGEMENT_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Ball management components not available: {e}")
-    BALL_MANAGEMENT_AVAILABLE = False
+# Ball management components removed - using legacy color tracking only
+BALL_MANAGEMENT_AVAILABLE = False
 
 
 try:
@@ -279,6 +268,9 @@ if PYQT_AVAILABLE:
             
             self.throw_catch_section = self.create_throw_catch_section()
             container_layout.addWidget(self.throw_catch_section)
+            
+            self.ball_profiles_section = self.create_ball_profiles_section()
+            container_layout.addWidget(self.ball_profiles_section)
             
             # Add stretch to push sections to top
             container_layout.addStretch()
@@ -646,6 +638,243 @@ if PYQT_AVAILABLE:
             
             return section
 
+        def create_ball_profiles_section(self):
+            """Create the Ball Profiles section for tracking configuration"""
+            section = CollapsibleGroupBox("🎨 Ball Profiles", collapsed=False)
+            layout = QVBoxLayout()
+            section.get_content_layout().addLayout(layout)
+            
+            # Load ball profiles from ball_settings.json
+            import json
+            import os
+            ball_settings_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ball_settings.json")
+            
+            try:
+                with open(ball_settings_path, 'r') as f:
+                    self.ball_profiles = json.load(f)
+                print(f"✅ Loaded ball profiles from {ball_settings_path}")
+                print(f"   Profiles loaded: {list(self.ball_profiles.keys())}")
+            except Exception as e:
+                print(f"❌ Error loading ball_settings.json: {e}")
+                self.ball_profiles = {}
+            
+            # Also get profiles from ColorProfileManager to ensure we have all colors
+            from components.color_profile_manager import ColorProfileManager
+            color_manager = ColorProfileManager()
+            
+            # Merge profiles - ONLY add colors that don't exist yet, don't overwrite existing ones
+            for profile in color_manager.profiles:
+                ball_name = profile['name']
+                if ball_name not in self.ball_profiles:
+                    # Add this profile to ball_settings with default HSV values ONLY if it doesn't exist
+                    print(f"⚠️ Adding missing profile '{ball_name}' with default values")
+                    self.ball_profiles[ball_name] = {
+                        'enabled': profile.get('enabled', True),
+                        'min_hsv': [0.0, 100.0, 100.0],
+                        'max_hsv': [180.0, 255.0, 255.0]
+                    }
+                else:
+                    print(f"✓ Profile '{ball_name}' already exists with min_hue={self.ball_profiles[ball_name]['min_hsv'][0]}, max_hue={self.ball_profiles[ball_name]['max_hsv'][0]}")
+            
+            # Store checkbox and slider references
+            self.ball_checkboxes = {}
+            self.ball_hue_sliders = {}
+            
+            # Create a widget for each ball profile
+            for ball_name in sorted(self.ball_profiles.keys()):
+                ball_group = QGroupBox(ball_name.capitalize())
+                ball_layout = QGridLayout(ball_group)
+                
+                # Checkbox for enabling/disabling this ball
+                checkbox = QPushButton(f"Track {ball_name.capitalize()}")
+                checkbox.setCheckable(True)
+                # Read enabled state from ball_settings.json
+                is_enabled = self.ball_profiles[ball_name].get('enabled', True)
+                checkbox.setChecked(is_enabled)
+                checkbox.clicked.connect(lambda checked, name=ball_name: self.toggle_ball_tracking(name, checked))
+                self.ball_checkboxes[ball_name] = checkbox
+                ball_layout.addWidget(checkbox, 0, 0, 1, 3)
+                
+                # Get current HSV values - use the actual hue values from ball_settings.json
+                hsv_data = self.ball_profiles[ball_name]
+                min_hsv = hsv_data.get('min_hsv', [0, 0, 0])
+                max_hsv = hsv_data.get('max_hsv', [180, 255, 255])
+                
+                print(f"🔍 DEBUG {ball_name}: hsv_data = {hsv_data}")
+                print(f"🔍 DEBUG {ball_name}: min_hsv = {min_hsv}, max_hsv = {max_hsv}")
+                
+                # Extract hue values (first element of HSV arrays)
+                min_hue_value = int(min_hsv[0])
+                max_hue_value = int(max_hsv[0])
+                
+                print(f"🔍 DEBUG {ball_name}: Setting sliders to min={min_hue_value}, max={max_hue_value}")
+                
+                # Min Hue slider
+                ball_layout.addWidget(QLabel("Min Hue:"), 1, 0)
+                min_hue_slider = QSlider(Qt.Orientation.Horizontal)
+                min_hue_slider.setRange(0, 180)
+                min_hue_slider.setValue(min_hue_value)
+                ball_layout.addWidget(min_hue_slider, 1, 1)
+                
+                print(f"🔍 DEBUG {ball_name}: Min slider actual value after setValue: {min_hue_slider.value()}")
+                
+                min_hue_label = QLabel(f"{min_hue_value}")
+                min_hue_label.setMinimumWidth(40)
+                ball_layout.addWidget(min_hue_label, 1, 2)
+                
+                # Max Hue slider
+                ball_layout.addWidget(QLabel("Max Hue:"), 2, 0)
+                max_hue_slider = QSlider(Qt.Orientation.Horizontal)
+                max_hue_slider.setRange(0, 180)
+                max_hue_slider.setValue(max_hue_value)
+                ball_layout.addWidget(max_hue_slider, 2, 1)
+                
+                print(f"🔍 DEBUG {ball_name}: Max slider actual value after setValue: {max_hue_slider.value()}")
+                
+                max_hue_label = QLabel(f"{max_hue_value}")
+                max_hue_label.setMinimumWidth(40)
+                ball_layout.addWidget(max_hue_label, 2, 2)
+                
+                # Connect sliders to update functions
+                min_hue_slider.valueChanged.connect(
+                    lambda value, name=ball_name, label=min_hue_label: self.update_ball_hue(name, 'min', value, label)
+                )
+                max_hue_slider.valueChanged.connect(
+                    lambda value, name=ball_name, label=max_hue_label: self.update_ball_hue(name, 'max', value, label)
+                )
+                
+                # Store slider references
+                self.ball_hue_sliders[ball_name] = {
+                    'min': min_hue_slider,
+                    'max': max_hue_slider,
+                    'min_label': min_hue_label,
+                    'max_label': max_hue_label
+                }
+                
+                # Info label about wrapping
+                info_label = QLabel("ℹ️ Hue wraps: if max < min, uses values outside the range")
+                info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+                info_label.setWordWrap(True)
+                ball_layout.addWidget(info_label, 3, 0, 1, 3)
+                
+                layout.addWidget(ball_group)
+            
+            # Auto-calibrate button
+            auto_cal_button = QPushButton("🎯 Auto-Calibrate from Current Colors")
+            auto_cal_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF9800;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #F57C00; }
+            """)
+            auto_cal_button.clicked.connect(self.auto_calibrate_hues)
+            layout.addWidget(auto_cal_button)
+            
+            return section
+
+        def toggle_ball_tracking(self, ball_name: str, enabled: bool):
+            """Toggle tracking for a specific ball color"""
+            print(f"{'Enabling' if enabled else 'Disabling'} tracking for {ball_name}")
+            
+            # Update the ball_profiles dict
+            if ball_name in self.ball_profiles:
+                self.ball_profiles[ball_name]['enabled'] = enabled
+                # Save to ball_settings.json
+                self.save_ball_settings()
+            
+            # Send command to engine via UDP
+            self.udp_client.send_setting(f"track_{ball_name}", 1 if enabled else 0)
+            
+            # Auto-save settings
+            if not self._loading_settings:
+                self.save_settings()
+
+        def update_ball_hue(self, ball_name: str, hue_type: str, value: int, label: QLabel):
+            """Update hue value for a ball profile"""
+            label.setText(str(value))
+            
+            # Update the ball_profiles dict
+            if ball_name in self.ball_profiles:
+                if hue_type == 'min':
+                    self.ball_profiles[ball_name]['min_hsv'][0] = float(value)
+                else:
+                    self.ball_profiles[ball_name]['max_hsv'][0] = float(value)
+                
+                # Send to engine
+                self.udp_client.send_setting(f"{ball_name}_{hue_type}_hue", value)
+                
+                # Save ball_settings.json
+                self.save_ball_settings()
+                
+                # Auto-save calibration settings
+                if not self._loading_settings:
+                    self.save_settings()
+
+        def save_ball_settings(self):
+            """Save ball profiles to ball_settings.json"""
+            import json
+            import os
+            ball_settings_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ball_settings.json")
+            
+            try:
+                with open(ball_settings_path, 'w') as f:
+                    json.dump(self.ball_profiles, f, indent=4)
+                print(f"✅ Ball settings saved to {ball_settings_path}")
+            except Exception as e:
+                print(f"❌ Error saving ball settings: {e}")
+
+        def auto_calibrate_hues(self):
+            """Auto-calibrate hue ranges from current color calibration"""
+            # This will trigger the existing color calibration system to update hue ranges
+            # for all enabled balls
+            print("🎯 Auto-calibrating hue ranges from current ball colors...")
+            
+            # Send command to engine to recalculate hue ranges from current samples
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.ENABLE_FEATURE
+            command.feature_name = "recalculate_hue_ranges"
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print("✅ Hue ranges auto-calibrated successfully")
+                    # Reload ball settings to update UI
+                    self.reload_ball_profiles()
+                else:
+                    print(f"❌ Auto-calibration failed: {response.message}")
+            except Exception as e:
+                print(f"❌ Error during auto-calibration: {e}")
+
+        def reload_ball_profiles(self):
+            """Reload ball profiles from ball_settings.json and update sliders"""
+            import json
+            import os
+            ball_settings_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ball_settings.json")
+            
+            try:
+                with open(ball_settings_path, 'r') as f:
+                    self.ball_profiles = json.load(f)
+                
+                # Update slider values
+                for ball_name, sliders in self.ball_hue_sliders.items():
+                    if ball_name in self.ball_profiles:
+                        hsv_data = self.ball_profiles[ball_name]
+                        min_hsv = hsv_data.get('min_hsv', [0, 0, 0])
+                        max_hsv = hsv_data.get('max_hsv', [180, 255, 255])
+                        
+                        sliders['min'].setValue(int(min_hsv[0]))
+                        sliders['max'].setValue(int(max_hsv[0]))
+                        sliders['min_label'].setText(str(int(min_hsv[0])))
+                        sliders['max_label'].setText(str(int(max_hsv[0])))
+                
+                print("✅ Ball profiles reloaded")
+            except Exception as e:
+                print(f"❌ Error reloading ball profiles: {e}")
+
         def toggle_pose_model(self):
             is_enabled = self.pose_model_toggle.isChecked()
             command = juggler_pb2.CommandRequest(
@@ -849,7 +1078,7 @@ if PYQT_AVAILABLE:
                 if not hasattr(self, attr):
                     return {}
             
-            return {
+            settings = {
                 'camera_settings_profile': self.camera_settings_combo.currentData(),
                 'resolution': self.resolution_combo.currentText(),
                 'fps': self.fps_combo.currentData(),
@@ -877,8 +1106,28 @@ if PYQT_AVAILABLE:
                 'collapsed_yolo': self.yolo_section.is_collapsed,
                 'collapsed_bytetrack': self.bytetrack_section.is_collapsed,
                 'collapsed_pose': self.pose_section.is_collapsed,
-                'collapsed_throw_catch': self.throw_catch_section.is_collapsed
+                'collapsed_throw_catch': self.throw_catch_section.is_collapsed,
+                'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False
             }
+            
+            # Add ball profile settings
+            if hasattr(self, 'ball_checkboxes') and hasattr(self, 'ball_hue_sliders'):
+                ball_tracking = {}
+                ball_hues = {}
+                
+                for ball_name, checkbox in self.ball_checkboxes.items():
+                    ball_tracking[ball_name] = checkbox.isChecked()
+                
+                for ball_name, sliders in self.ball_hue_sliders.items():
+                    ball_hues[ball_name] = {
+                        'min_hue': sliders['min'].value(),
+                        'max_hue': sliders['max'].value()
+                    }
+                
+                settings['ball_tracking_enabled'] = ball_tracking
+                settings['ball_hue_ranges'] = ball_hues
+            
+            return settings
 
         def apply_settings(self, settings: dict):
             """Apply settings from a dictionary to the UI controls."""
@@ -970,6 +1219,22 @@ if PYQT_AVAILABLE:
             if 'collapsed_throw_catch' in settings:
                 if settings['collapsed_throw_catch'] != self.throw_catch_section.is_collapsed:
                     self.throw_catch_section.toggle_collapsed()
+            
+            if 'collapsed_ball_profiles' in settings and hasattr(self, 'ball_profiles_section'):
+                if settings['collapsed_ball_profiles'] != self.ball_profiles_section.is_collapsed:
+                    self.ball_profiles_section.toggle_collapsed()
+            
+            # Restore ball profile settings
+            if 'ball_tracking_enabled' in settings and hasattr(self, 'ball_checkboxes'):
+                for ball_name, enabled in settings['ball_tracking_enabled'].items():
+                    if ball_name in self.ball_checkboxes:
+                        self.ball_checkboxes[ball_name].setChecked(enabled)
+            
+            if 'ball_hue_ranges' in settings and hasattr(self, 'ball_hue_sliders'):
+                for ball_name, hue_data in settings['ball_hue_ranges'].items():
+                    if ball_name in self.ball_hue_sliders:
+                        self.ball_hue_sliders[ball_name]['min'].setValue(hue_data['min_hue'])
+                        self.ball_hue_sliders[ball_name]['max'].setValue(hue_data['max_hue'])
 
         def save_settings(self, filepath: str = None):
             """Save current calibration settings to a JSON file."""
@@ -1037,15 +1302,7 @@ if PYQT_AVAILABLE:
             self.calibrating_id = -1 # ID of the ball we are currently calibrating
             self.color_profile_manager = ColorProfileManager()
             
-            # Initialize ball manager and ball management widget
-            if BALL_MANAGEMENT_AVAILABLE:
-                self.ball_manager = BallManager(self.zmq_client)
-                self.ball_management_widget = None  # Will be created in init_ui
-                self.ball_calibration_overlay = None  # Will be created in init_ui
-            else:
-                self.ball_manager = None
-                self.ball_management_widget = None
-                self.ball_calibration_overlay = None
+            # Ball management removed - using legacy color tracking only
             
             # Signal for thread-safe updates
             self.signal_emitter = FrameDataSignal()
@@ -1239,17 +1496,9 @@ if PYQT_AVAILABLE:
             
             content_layout.addWidget(self.video_group, 2)
             
-            # Create tabbed widget for Ball Management and Settings
+            # Create settings panel (Ball Management removed)
             self.settings_tabs = QTabWidget()
             self.settings_tabs.setVisible(False)
-            
-            # Ball Management tab (if available)
-            if BALL_MANAGEMENT_AVAILABLE and self.ball_manager:
-                self.ball_management_widget = BallManagementWidget(self.ball_manager)
-                self.ball_management_widget.calibration_requested.connect(self.on_ball_calibration_requested)
-                self.settings_tabs.addTab(self.ball_management_widget, "🏀 Ball Management")
-            else:
-                self.ball_management_widget = None
             
             # Calibration settings tab
             self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance)
@@ -1634,18 +1883,11 @@ if PYQT_AVAILABLE:
             
             # Auto-load settings when entering calibration mode
             if self.calibration_mode:
-                # Set default tab based on availability
-                if BALL_MANAGEMENT_AVAILABLE and self.ball_management_widget:
-                    # Default to Ball Management tab
-                    self.settings_tabs.setCurrentWidget(self.ball_management_widget)
-                    self.ball_management_widget.refresh_ball_list()
-                    self.log_message("🏀 Calibration mode activated - Ball Management & Settings available")
-                else:
-                    # Default to Settings tab
-                    self.settings_tabs.setCurrentWidget(self.settings_widget)
-                    self.log_message("⚙️ Calibration mode activated - Settings available")
+                # Default to Settings tab
+                self.settings_tabs.setCurrentWidget(self.settings_widget)
+                self.log_message("⚙️ Calibration mode activated - Settings available")
                 
-                # Always load settings
+                # Load settings
                 self.settings_widget.load_settings()
 
         def toggle_overlays(self):
@@ -1933,37 +2175,8 @@ if PYQT_AVAILABLE:
                 self.color_profile_status_label.setText("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
                 self.log_message("Color profile calibration cancelled.")
 
-        def on_ball_calibration_requested(self, ball_id: str):
-            """Handle ball calibration request from ball management widget."""
-            if self.ball_calibration_overlay:
-                self.ball_calibration_overlay.set_calibration_mode(True)
-                self.ball_calibration_overlay.clear_sample_markers()
-            self.log_message(f"🎯 Ball calibration mode activated for: {ball_id}")
-        
         def video_view_clicked(self, event):
-            # Check if ball management calibration is active
-            if BALL_MANAGEMENT_AVAILABLE and self.ball_management_widget and self.ball_management_widget.is_in_calibration_mode():
-                scene_pos = self.video_view.mapToScene(event.pos())
-                pixmap_item = self.video_pixmap_item
-                
-                if pixmap_item.pixmap() and pixmap_item.sceneBoundingRect().contains(scene_pos):
-                    # Transform scene coordinates to pixmap (image) coordinates
-                    img_pos = pixmap_item.mapFromScene(scene_pos)
-                    x, y = int(img_pos.x()), int(img_pos.y())
-                    
-                    # Add sample marker to overlay
-                    if self.ball_calibration_overlay:
-                        self.ball_calibration_overlay.add_sample_marker(x, y, "Sample")
-                        self.ball_calibration_overlay.set_calibration_mode(False)
-                    
-                    # Notify ball management widget
-                    self.ball_management_widget.on_calibration_click(x, y)
-                    
-                    self.log_message(f"✓ Ball color sample added at ({x}, {y})")
-                
-                # Don't process other click handlers
-                return
-            
+            # Ball management calibration removed - using legacy color tracking only
             if self.set_color_profile_button.isChecked():
                 scene_pos = self.video_view.mapToScene(event.pos())
                 pixmap_item = self.video_pixmap_item
@@ -2010,6 +2223,12 @@ if PYQT_AVAILABLE:
                             if response.success:
                                 self.log_message(f"✅ Color profile '{color_name}' updated successfully")
                                 self.color_profile_status_label.setText(f"✅ '{color_name}' profile set! Click 'Set Color Profile' again to calibrate another color.")
+                                
+                                # Reload ball profiles to update the hue sliders in Ball Profiles section
+                                # Add a small delay to allow the C++ engine to save the file
+                                if hasattr(self, 'settings_widget') and self.settings_widget:
+                                    # Use QTimer to delay the reload slightly
+                                    QTimer.singleShot(200, lambda: self._reload_ball_profiles_after_calibration(color_name))
                             else:
                                 self.log_message(f"❌ Failed to update color profile: {response.message}")
                                 self.color_profile_status_label.setText(f"❌ Failed to set '{color_name}' profile")
@@ -2025,6 +2244,15 @@ if PYQT_AVAILABLE:
                     self.color_profile_status_label.setText("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
             # Call original event handler
             QGraphicsView.mousePressEvent(self.video_view, event)
+        
+        def _reload_ball_profiles_after_calibration(self, color_name: str):
+            """Helper method to reload ball profiles after calibration with proper error handling"""
+            try:
+                if hasattr(self, 'settings_widget') and self.settings_widget:
+                    self.settings_widget.reload_ball_profiles()
+                    self.log_message(f"🎨 Ball profile hue sliders updated for '{color_name}'")
+            except Exception as e:
+                self.log_message(f"⚠️ Warning: Could not reload ball profiles: {e}")
 
 class JuggleHubUI:
     def __init__(self, config: dict, zmq_client: Optional['ZMQClient'] = None, hub_instance=None):

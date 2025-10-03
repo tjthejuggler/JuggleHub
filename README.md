@@ -2,7 +2,13 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-01 12:27:00 UTC
+**Last Updated:** 2025-10-03 14:49:00 UTC
+
+**Recent Changes (2025-10-03):**
+- Removed new color tracking system - now using legacy color tracking exclusively
+- The legacy color tracking system has proven more reliable and is now the only supported method
+- Removed Ball Management UI, API routes, and related components
+- Simplified codebase for better maintainability
 
 ## 🎯 Overview
 
@@ -611,36 +617,28 @@ Color profiles are stored in [`hub/config/color_profiles.json`](hub/config/color
 
 You can also manually edit this file if needed, though the UI provides a more user-friendly interface.
 
-## 🎯 Advanced Ball Tracking System
+## 🎯 Color-Based Ball Tracking System
 
-**Last Updated:** 2025-10-03 11:26:00 UTC
+**Last Updated:** 2025-10-03 14:49:00 UTC
 
-JuggleHub features a sophisticated ball tracking system with two operational modes: a legacy color-based system and an advanced multi-sample calibration system with confidence scoring.
+JuggleHub uses a proven legacy color-based tracking system that provides reliable ball detection and tracking.
 
 ### System Overview
 
 The ball tracking system provides:
-- **Dual Mode Operation**: Legacy mode for backward compatibility, new mode for enhanced accuracy
-- **Multi-Sample Calibration**: Capture multiple color samples under varying conditions
-- **Confidence-Based Detection**: Real-time confidence scoring for reliable tracking
-- **API-First Design**: Complete REST API for programmatic control
-- **Persistent Profiles**: Ball profiles saved and loaded automatically
-- **Real-Time Activation**: Enable/disable balls dynamically during operation
+- **HSV Color Ranges**: Define color ranges for each ball type
+- **Simple Calibration**: Click-to-calibrate functionality for quick setup
+- **Persistent Profiles**: Ball color profiles saved and loaded automatically
+- **Real-Time Tracking**: Low-latency color-based detection
+- **Wrist Association**: Intelligent ball-hand association for occlusion handling
 
 ### Key Features
 
-**Legacy Mode:**
+**Color Tracking:**
 - Single HSV color range per ball
 - Fast, simple calibration process
-- Backward compatible with existing profiles
-- Suitable for controlled lighting environments
-
-**New Mode (Recommended):**
-- Multi-sample calibration (3-10 samples per ball)
-- Adaptive to lighting variations
-- Confidence-based detection (0.0-1.0 scale)
-- Robust to background clutter and shadows
-- Improved multi-ball tracking stability
+- Proven reliability in various lighting conditions
+- Suitable for most juggling scenarios
 
 ### Quick Start
 
@@ -775,6 +773,121 @@ For more troubleshooting tips, see the [User Guide](BALL_TRACKING_USER_GUIDE.md#
 
 The system will now only track balls that match your saved color profiles, eliminating false positives from hands or other objects.
 
+### Ball Profile Tracking Configuration
+
+**Last Updated:** 2025-10-03 14:22:00 UTC
+
+JuggleHub now includes a comprehensive ball profile management section in the calibration settings that allows you to control which balls are tracked and fine-tune their color detection parameters.
+
+#### Features
+
+- **Individual Ball Tracking Control**: Enable or disable tracking for each ball color profile with a simple checkbox
+- **Hue Range Adjustment**: Fine-tune the minimum and maximum hue values for each ball color using intuitive sliders
+- **Wrapping Hue Support**: Hue values wrap around (0-180), so if max < min, the system tracks colors outside the range
+- **Auto-Calibration**: Automatically update hue ranges from current color calibration samples
+- **Real-time Updates**: Changes are immediately applied to the tracking system
+- **Persistent Settings**: All configurations are saved automatically and restored on next session
+
+#### Accessing Ball Profile Settings
+
+1. **Enter Calibration Mode** in the hub UI
+2. Navigate to the **"🎨 Ball Profiles"** section in the settings panel
+3. Each ball color (blue, green, orange, pink, purple, red, white, yellow) has its own configuration group
+
+#### Configuration Options
+
+**For Each Ball Color:**
+
+- **Track Checkbox**: Enable/disable tracking for this specific ball color
+  - Checked: Ball will be tracked when detected
+  - Unchecked: Ball will be ignored even if detected
+  
+- **Min Hue Slider**: Set the minimum hue value (0-180)
+  - Adjusts the lower bound of the color range
+  - Real-time preview of the value
+  
+- **Max Hue Slider**: Set the maximum hue value (0-180)
+  - Adjusts the upper bound of the color range
+  - Real-time preview of the value
+
+**Hue Wrapping Behavior:**
+- If `max_hue > min_hue`: Tracks colors between min and max (normal range)
+- If `max_hue < min_hue`: Tracks colors outside the range (wraps around)
+  - Example: min=170, max=10 tracks red colors (170-180 and 0-10)
+
+#### Auto-Calibration Feature
+
+The **"🎯 Auto-Calibrate from Current Colors"** button automatically updates all hue ranges based on your current color calibration samples:
+
+1. Click the auto-calibrate button
+2. System analyzes all color samples from the current calibration
+3. Hue ranges are automatically adjusted for optimal detection
+4. Sliders update to reflect the new values
+
+**Automatic Updates During Color Calibration:**
+- When you click "Set Color Profile" and click on a ball in the video feed
+- The system automatically updates the hue sliders for that specific ball color
+- No need to manually click the auto-calibrate button after each color sample
+- Changes are immediately reflected in both the UI and tracking system
+
+This is particularly useful after:
+- Adding new color calibration samples (sliders update automatically)
+- Changing lighting conditions
+- Switching to different balls
+
+#### Configuration File
+
+Ball profile settings are stored in [`ball_settings.json`](ball_settings.json):
+
+```json
+{
+  "blue": {
+    "enabled": true,
+    "max_hsv": [130.0, 255.0, 255.0],
+    "min_hsv": [100.0, 150.0, 100.0]
+  },
+  "red": {
+    "enabled": true,
+    "max_hsv": [10.0, 255.0, 255.0],
+    "min_hsv": [0.0, 150.0, 100.0]
+  }
+}
+```
+
+The `enabled` field controls whether each ball color is tracked, while `min_hsv` and `max_hsv` define the color detection ranges.
+
+#### Use Cases
+
+**Selective Tracking:**
+- Juggling with only 3 balls? Disable unused colors to reduce false positives
+- Practicing with specific ball combinations? Enable only those colors
+
+**Fine-Tuning Detection:**
+- Ball not being detected? Widen the hue range
+- Too many false positives? Narrow the hue range
+- Lighting changed? Adjust hue values or use auto-calibration
+
+**Multi-Ball Scenarios:**
+- Enable all ball colors for complex patterns
+- Disable similar colors to avoid confusion
+- Adjust ranges to maximize color separation
+
+#### Best Practices
+
+1. **Start with Auto-Calibration**: Use the auto-calibrate feature after setting up your color samples
+2. **Test Incrementally**: Enable one ball at a time to verify detection
+3. **Monitor Performance**: Disable unused colors to improve tracking performance
+4. **Save Configurations**: Settings are auto-saved, but you can also export via File → Save Settings
+5. **Lighting Consistency**: Recalibrate when lighting conditions change significantly
+
+#### Integration with Color Calibration
+
+The ball profile settings work seamlessly with the existing color calibration system:
+
+1. Use the color calibration button to add samples for each ball
+2. The system automatically calculates optimal HSV ranges
+3. Fine-tune using the hue sliders if needed
+4. Enable/disable tracking as needed for your juggling session
 
 ### Heuristic Intelligence Layer
 - **Robust Hand Tracking**: Enforces a two-hand limit and maintains persistent left/right identity.

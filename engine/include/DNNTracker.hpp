@@ -15,7 +15,6 @@
 #include "KalmanFilter3D.hpp"
 #include "PersistentTracker.hpp" // New persistent tracker data structure
 #include "ColorTracker.hpp" // Color-based ball tracking
-#include "BallRegistry.hpp" // Ball registry for new tracking system
 #include "ThrowCatchDetector.hpp" // Throw and catch event detection
 
 // Simple struct to hold camera intrinsics needed for deprojection
@@ -65,16 +64,6 @@ public:
     const std::vector<juggler::ColorTrackedBall>& get_color_tracked_balls() const { return color_tracked_balls_; }
     static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
     
-    // Ball Registry access methods
-    juggler::BallRegistry& getBallRegistry();
-    const juggler::BallRegistry& getBallRegistry() const;
-    
-    // New tracking system control
-    void setUseNewBallTracking(bool enable);
-    bool isUsingNewBallTracking() const;
-    
-    // Save ball registry
-    void saveBallRegistry();
 
 private:
     void reinitialize_tracker();

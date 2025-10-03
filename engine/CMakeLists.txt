@@ -43,9 +43,6 @@ add_executable(juggle_engine
     src/BallTracker.cpp
     src/ColorTracker.cpp
     src/ThrowCatchDetector.cpp
-    src/BallRegistry.cpp
-    src/SkinToneFilter.cpp
-    src/DetectionConfidence.cpp
     src/modules/UdpBallColorModule.cpp
     src/modules/PositionToRgbModule.cpp
     src/networking/UdpSender.cpp

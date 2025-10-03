@@ -36,10 +36,7 @@ from components.screen_controller import ScreenController
 import juggler_pb2
 from components.juggling_system_manager import JugglingSystemManager
 from apps.manager import AppManager
-from ball_manager import BallManager
-from api_routes import ball_api, init_ball_api
 import zmq
-from flask import Flask
 
 class JuggleHub:
     """Main JuggleHub application class."""
@@ -59,9 +56,6 @@ class JuggleHub:
         self.juggling_system_manager: Optional[JugglingSystemManager] = None
         self.app_manager: Optional[AppManager] = None
         self.zmq_context: Optional[zmq.Context] = None
-        self.ball_manager: Optional[BallManager] = None
-        self.flask_app: Optional[Flask] = None
-        self._api_thread: Optional[threading.Thread] = None
         
         self._data_thread: Optional[threading.Thread] = None
         
@@ -109,23 +103,6 @@ class JuggleHub:
                 self.imu_listener.start()
             
             self.juggling_system_manager = JugglingSystemManager(self.config)
-            
-            # Initialize Ball Manager and API
-            if self.config.get('enable_api', True):
-                self.ball_manager = BallManager(self.zmq_client)
-                self.flask_app = Flask(__name__)
-                init_ball_api(self.ball_manager)
-                self.flask_app.register_blueprint(ball_api)
-                
-                # Add CORS headers for development
-                @self.flask_app.after_request
-                def after_request(response):
-                    response.headers.add('Access-Control-Allow-Origin', '*')
-                    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-                    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-                    return response
-                
-                print(f"🌐 Ball Management API initialized on port {self.config.get('api_port', 5000)}")
             
             print("✅ JuggleHub initialized successfully")
             return True
@@ -194,19 +171,6 @@ class JuggleHub:
             except Exception as e:
                 logger.error(f"Error in data processing loop: {e}", exc_info=True)
                 time.sleep(1) # Avoid spamming errors if in a tight loop
-
-    def _run_flask_api(self):
-        """Run the Flask API server in a separate thread."""
-        if self.flask_app:
-            api_port = self.config.get('api_port', 5000)
-            logger.info(f"Starting Flask API server on port {api_port}")
-            self.flask_app.run(
-                host='0.0.0.0',
-                port=api_port,
-                debug=False,
-                use_reloader=False,
-                threaded=True
-            )
     
     def run(self):
         """Run the main application."""
@@ -219,12 +183,6 @@ class JuggleHub:
         # Start the data processing loop in a background thread
         self._data_thread = threading.Thread(target=self._data_processing_loop, daemon=True)
         self._data_thread.start()
-        
-        # Start the Flask API server in a background thread if enabled
-        if self.flask_app and self.config.get('enable_api', True):
-            self._api_thread = threading.Thread(target=self._run_flask_api, daemon=True)
-            self._api_thread.start()
-            print(f"🌐 Ball Management API running on http://localhost:{self.config.get('api_port', 5000)}/api")
 
         # Run the UI in the main thread (this will block until the UI is closed)
         if self.ui:
@@ -258,8 +216,6 @@ class JuggleHub:
         # Join the data processing thread
         if self._data_thread and self._data_thread.is_alive():
             self._data_thread.join(timeout=2.0)
-        
-        # API thread will terminate automatically as it's a daemon thread
         
         # Cleanup other components
         if self.database_logger:
@@ -318,12 +274,6 @@ def parse_arguments():
     parser.add_argument('--profile', action='store_true',
                        help='Enable performance profiling')
     
-    parser.add_argument('--no-api', action='store_true',
-                       help='Disable Ball Management API server')
-    
-    parser.add_argument('--api-port', type=int, default=5000,
-                       help='Port for Ball Management API server (default: 5000)')
-    
     return parser.parse_args()
 
 
@@ -341,9 +291,7 @@ def main():
         'database_path': args.database_path,
         'config_dir': args.config_dir or os.path.join(os.path.dirname(__file__), 'config'),
         'debug': args.debug,
-        'profile': args.profile,
-        'enable_api': not args.no_api,
-        'api_port': args.api_port
+        'profile': args.profile
     }
     
     # Ensure config directory exists

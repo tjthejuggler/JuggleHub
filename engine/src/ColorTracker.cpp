@@ -10,11 +10,7 @@
 namespace juggler {
 
 ColorTracker::ColorTracker(const std::string& settings_file)
-    : settings_file_(settings_file),
-      ball_registry_(),
-      skin_filter_(),
-      confidence_scorer_(ball_registry_, skin_filter_),
-      use_new_system_(false) {  // Start in legacy mode for safety
+    : settings_file_(settings_file) {
     
     // Initialize default color profiles (matching Python hub profiles)
     color_profiles_ = {
@@ -28,46 +24,20 @@ ColorTracker::ColorTracker(const std::string& settings_file)
         ColorProfile("white", cv::Scalar(0, 0, 200), cv::Scalar(180, 30, 255))
     };
     
-    // Initialize tracked balls (legacy system)
+    // Initialize tracked balls
     tracked_balls_.resize(NUM_BALLS);
     for (int i = 0; i < NUM_BALLS; ++i) {
         tracked_balls_[i].logical_id = i;
         tracked_balls_[i].is_active = false;
     }
     
-    // Try to load ball registry from file (new system)
-    std::string registry_file = "ball_registry.json";
-    if (ball_registry_.loadFromFile(registry_file)) {
-        INFO_LOG("ColorTracker: Loaded ball registry from ", registry_file);
-    } else {
-        INFO_LOG("ColorTracker: No existing ball registry found, starting fresh");
-    }
-    
-    // Try to load legacy settings from file
+    // Try to load settings from file
     loadSettings();
     
-    INFO_LOG("ColorTracker: Initialized in ",
-             (use_new_system_ ? "NEW" : "LEGACY"), " mode");
+    INFO_LOG("ColorTracker: Initialized with legacy color tracking");
 }
 
 std::vector<ColorTrackedBall> ColorTracker::update(
-    const cv::Mat& color_frame,
-    const cv::Mat& depth_frame,
-    const rs2_intrinsics& intrinsics,
-    const std::vector<TrackedObject>& bytetrack_objects,
-    const std::vector<TrackedHand>& tracked_hands) {
-    
-    // Mode switch: use new system or legacy system
-    if (use_new_system_) {
-        return updateWithNewSystem(color_frame, depth_frame, intrinsics,
-                                   bytetrack_objects, tracked_hands);
-    } else {
-        return updateWithLegacySystem(color_frame, depth_frame, intrinsics,
-                                      bytetrack_objects, tracked_hands);
-    }
-}
-
-std::vector<ColorTrackedBall> ColorTracker::updateWithLegacySystem(
     const cv::Mat& color_frame,
     const cv::Mat& depth_frame,
     const rs2_intrinsics& intrinsics,
@@ -626,23 +596,7 @@ void ColorTracker::calibrateColor(const std::string& color_name,
                                   const cv::Mat& hsv_image,
                                   const cv::Point& click_point) {
     
-    // Check which system mode we're in
-    if (use_new_system_) {
-        // New system: add color sample to ball registry
-        // The color_name should be a ball ID in the new system
-        if (ball_registry_.addColorSample(color_name, hsv_image, click_point, "manual_calibration")) {
-            INFO_LOG("ColorTracker: Added color sample to ball '", color_name, "' at (",
-                     click_point.x, ",", click_point.y, ")");
-            
-            // Save registry after calibration
-            ball_registry_.saveToFile("ball_registry.json");
-        } else {
-            ERROR_LOG("ColorTracker: Failed to add color sample to ball '", color_name, "'");
-        }
-        return;
-    }
-    
-    // Legacy system: update color profile
+    // Update color profile
     auto it = std::find_if(color_profiles_.begin(), color_profiles_.end(),
                           [&color_name](const ColorProfile& p) {
                               return p.name == color_name;
@@ -785,243 +739,5 @@ bool ColorTracker::updateSetting(const std::string& key, const std::string& valu
         return false;
     }
 }
-std::vector<ColorTrackedBall> ColorTracker::updateWithNewSystem(
-    const cv::Mat& color_frame,
-    const cv::Mat& depth_frame,
-    const rs2_intrinsics& intrinsics,
-    const std::vector<TrackedObject>& bytetrack_objects,
-    const std::vector<TrackedHand>& tracked_hands) {
-    
-    INFO_LOG("ColorTracker: updateWithNewSystem() called");
-    
-    // Convert to HSV once for all operations
-    cv::Mat hsv_frame;
-    cv::cvtColor(color_frame, hsv_frame, cv::COLOR_BGR2HSV);
-    
-    // Get active balls from registry
-    std::vector<ActiveBall*> active_balls = ball_registry_.getActiveBalls();
-    
-    if (active_balls.empty()) {
-        DEBUG_LOG("ColorTracker: No active balls in registry");
-        return tracked_balls_;  // Return empty/inactive trackers
-    }
-    
-    INFO_LOG("ColorTracker: Tracking ", active_balls.size(), " active balls against ",
-             bytetrack_objects.size(), " ByteTrack detections");
-    
-    // Track which detections have been assigned
-    std::set<int> assigned_detection_ids;
-    
-    // For each active ball, try to match with ByteTrack detections
-    for (auto* ball : active_balls) {
-        if (!ball || ball->logical_tracker_id < 0 || ball->logical_tracker_id >= NUM_BALLS) {
-            WARN_LOG("ColorTracker: Ball '", (ball ? ball->display_name : "null"),
-                     "' has invalid tracker ID: ", (ball ? ball->logical_tracker_id : -1));
-            continue;
-        }
-        
-        ColorTrackedBall& tracker = tracked_balls_[ball->logical_tracker_id];
-        
-        // Initialize tracker if needed
-        if (!tracker.is_active) {
-            tracker.logical_id = ball->logical_tracker_id;
-            tracker.color_name = ball->display_name;
-            tracker.is_active = true;
-            tracker.frames_since_seen = 0;
-            tracker.associated_wrist_id = -1;
-            INFO_LOG("ColorTracker: Initialized tracker ", tracker.logical_id,
-                     " for ball '", ball->display_name, "'");
-        }
-        
-        bool found_this_frame = false;
-        
-        // Step 1: Check if ball is near a wrist (for wrist association)
-        for (const auto& hand : tracked_hands) {
-            if (!tracker.is_active) break;
-            
-            cv::Point2f wrist_2d(hand.wrist_pos_3d.x * intrinsics.fx / hand.wrist_pos_3d.z + intrinsics.ppx,
-                                hand.wrist_pos_3d.y * intrinsics.fy / hand.wrist_pos_3d.z + intrinsics.ppy);
-            
-            // Calculate 3D distance between ball and wrist
-            float dist_3d = std::sqrt(
-                std::pow(tracker.world_pos.x - hand.wrist_pos_3d.x, 2) +
-                std::pow(tracker.world_pos.y - hand.wrist_pos_3d.y, 2) +
-                std::pow(tracker.world_pos.z - hand.wrist_pos_3d.z, 2)
-            );
-            
-            // If ball is close to wrist, associate it
-            if (dist_3d < WRIST_ASSOCIATION_DISTANCE) {
-                tracker.associated_wrist_id = hand.id;
-                
-                // Try to find color blob near wrist
-                // Create a temporary ColorProfile from ball's aggregate ranges
-                ColorProfile temp_profile;
-                temp_profile.name = ball->display_name;
-                temp_profile.min_hsv = ball->aggregate_min_hsv;
-                temp_profile.max_hsv = ball->aggregate_max_hsv;
-                temp_profile.min_hsv2 = ball->aggregate_min_hsv2;
-                temp_profile.max_hsv2 = ball->aggregate_max_hsv2;
-                
-                cv::Point2f close_blob = findClosestColorBlob(hsv_frame, temp_profile,
-                                                              wrist_2d, WRIST_SEARCH_RADIUS);
-                
-                if (close_blob.x >= 0 && close_blob.y >= 0) {
-                    tracker.pixel_pos = close_blob;
-                    tracker.frames_since_seen = 0;
-                    found_this_frame = true;
-                    
-                    // Update world position
-                    if (close_blob.x >= 0 && close_blob.x < depth_frame.cols &&
-                        close_blob.y >= 0 && close_blob.y < depth_frame.rows) {
-                        uint16_t depth_mm = depth_frame.at<uint16_t>(
-                            static_cast<int>(close_blob.y), static_cast<int>(close_blob.x));
-                        float depth_m = depth_mm / 1000.0f;
-                        
-                        if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                            tracker.world_pos = deprojectToWorld(close_blob, depth_m, intrinsics);
-                        }
-                    }
-                    
-                    DEBUG_LOG("ColorTracker: Ball '", ball->display_name,
-                             "' tracked via wrist association at (", close_blob.x, ",", close_blob.y, ")");
-                } else {
-                    // Fall back to wrist position
-                    tracker.pixel_pos = wrist_2d;
-                    tracker.world_pos = hand.wrist_pos_3d;
-                    tracker.frames_since_seen = 0;
-                    found_this_frame = true;
-                    
-                    DEBUG_LOG("ColorTracker: Ball '", ball->display_name,
-                             "' tracked via wrist position (no color visible)");
-                }
-                break;
-            }
-        }
-        
-        // Step 2: If not associated with wrist, try to match with ByteTrack detections
-        if (!found_this_frame && tracker.associated_wrist_id == -1) {
-            matchActiveBallWithConfidence(tracker, hsv_frame, depth_frame, intrinsics, bytetrack_objects);
-            
-            // Check if we found a match
-            if (tracker.frames_since_seen == 0) {
-                found_this_frame = true;
-            }
-        }
-        
-        // Step 3: Update tracking state
-        if (!found_this_frame) {
-            tracker.frames_since_seen++;
-            
-            // Deactivate if lost for too long
-            if (tracker.frames_since_seen > MAX_FRAMES_LOST) {
-                INFO_LOG("ColorTracker: Deactivating ball '", ball->display_name,
-                         "' after ", tracker.frames_since_seen, " frames lost");
-                tracker.is_active = false;
-                tracker.associated_wrist_id = -1;
-                ball->is_active = false;  // Also deactivate in registry
-            }
-        } else {
-            // Reset wrist association if ball moved away
-            if (tracker.associated_wrist_id >= 0) {
-                bool still_near_wrist = false;
-                for (const auto& hand : tracked_hands) {
-                    if (hand.id == tracker.associated_wrist_id) {
-                        float dist_3d = std::sqrt(
-                            std::pow(tracker.world_pos.x - hand.wrist_pos_3d.x, 2) +
-                            std::pow(tracker.world_pos.y - hand.wrist_pos_3d.y, 2) +
-                            std::pow(tracker.world_pos.z - hand.wrist_pos_3d.z, 2)
-                        );
-                        if (dist_3d < WRIST_ASSOCIATION_DISTANCE * 1.5f) {  // Hysteresis
-                            still_near_wrist = true;
-                        }
-                        break;
-                    }
-                }
-                if (!still_near_wrist) {
-                    tracker.associated_wrist_id = -1;
-                }
-            }
-        }
-    }
-    
-    return tracked_balls_;
-}
-
-void ColorTracker::matchActiveBallWithConfidence(
-    ColorTrackedBall& ball,
-    const cv::Mat& hsv_frame,
-    const cv::Mat& depth_frame,
-    const rs2_intrinsics& intrinsics,
-    const std::vector<TrackedObject>& bytetrack_objects) {
-    
-    // Get the ActiveBall from registry
-    ActiveBall* active_ball = ball_registry_.getBallByTrackerId(ball.logical_id);
-    if (!active_ball) {
-        WARN_LOG("ColorTracker: No active ball found for tracker ", ball.logical_id);
-        return;
-    }
-    
-    // Convert intrinsics to CameraIntrinsics struct (needed by ConfidenceScorer)
-    CameraIntrinsics cam_intrinsics;
-    cam_intrinsics.fx = intrinsics.fx;
-    cam_intrinsics.fy = intrinsics.fy;
-    cam_intrinsics.ppx = intrinsics.ppx;
-    cam_intrinsics.ppy = intrinsics.ppy;
-    
-    // Try to match against ByteTrack detections
-    float best_confidence = 0.0f;
-    cv::Point2f best_center(-1, -1);
-    int best_detection_id = -1;
-    
-    for (const auto& obj : bytetrack_objects) {
-        if (obj.class_name != "ball") continue;
-        
-        // Get center of detection
-        cv::Point2f center(obj.box.x + obj.box.width / 2.0f,
-                          obj.box.y + obj.box.height / 2.0f);
-        
-        // Compute confidence score
-        std::vector<TrackedHand> empty_hands;  // TODO: Pass actual hands for skin rejection
-        // Note: TrackedObject doesn't have confidence, so we use 0.5 as default DNN confidence
-        DetectionConfidence confidence = confidence_scorer_.computeConfidence(
-            hsv_frame, depth_frame, center, *active_ball, empty_hands, cam_intrinsics, 0.5f);
-        
-        float total_confidence = confidence.total();
-        
-        DEBUG_LOG("ColorTracker: Detection at (", center.x, ",", center.y, ") for ball '",
-                 active_ball->display_name, "': ", confidence.toString());
-        
-        // Check if this is the best match so far
-        if (total_confidence > best_confidence && total_confidence >= active_ball->min_confidence_threshold) {
-            best_confidence = total_confidence;
-            best_center = center;
-            best_detection_id = obj.id;
-        }
-    }
-    
-    // If we found a good match, update the ball
-    if (best_center.x >= 0 && best_center.y >= 0) {
-        ball.pixel_pos = best_center;
-        ball.frames_since_seen = 0;
-        
-        // Update world position
-        if (best_center.x >= 0 && best_center.x < depth_frame.cols &&
-            best_center.y >= 0 && best_center.y < depth_frame.rows) {
-            uint16_t depth_mm = depth_frame.at<uint16_t>(
-                static_cast<int>(best_center.y), static_cast<int>(best_center.x));
-            float depth_m = depth_mm / 1000.0f;
-            
-            if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                ball.world_pos = deprojectToWorld(best_center, depth_m, intrinsics);
-            }
-        }
-        
-        INFO_LOG("ColorTracker: Matched ball '", active_ball->display_name,
-                 "' at (", best_center.x, ",", best_center.y, ") with confidence ", best_confidence);
-    } else {
-        DEBUG_LOG("ColorTracker: No confident match found for ball '", active_ball->display_name, "'");
-    }
-}
-
 
 } // namespace juggler

@@ -2,9 +2,14 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-03 14:49:00 UTC
+**Last Updated:** 2025-10-03 15:43:00 UTC
 
 **Recent Changes (2025-10-03):**
+- **Added Kalman filtering to ColorTracker** - Integrated KalmanFilter3D into color-based ball tracking for improved robustness and smoothness
+  - Each ColorTrackedBall now has its own Kalman filter for temporal smoothing
+  - Predictions guide search to handle fast-moving balls
+  - Filtered positions reduce jitter and improve tracking consistency
+  - Uses ballistic motion model (predict_ball) with gravity for realistic trajectory prediction
 - Removed new color tracking system - now using legacy color tracking exclusively
 - The legacy color tracking system has proven more reliable and is now the only supported method
 - Removed Ball Management UI, API routes, and related components

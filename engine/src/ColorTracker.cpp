@@ -29,6 +29,7 @@ ColorTracker::ColorTracker(const std::string& settings_file)
     for (int i = 0; i < NUM_BALLS; ++i) {
         tracked_balls_[i].logical_id = i;
         tracked_balls_[i].is_active = false;
+        tracked_balls_[i].frames_since_deactivated = 999; // Start high to allow immediate activation
     }
     
     // Try to load settings from file
@@ -43,6 +44,19 @@ std::vector<ColorTrackedBall> ColorTracker::update(
     const rs2_intrinsics& intrinsics,
     const std::vector<TrackedObject>& bytetrack_objects,
     const std::vector<TrackedHand>& tracked_hands) {
+    
+    // Step 0: Kalman prediction for all active balls
+    const float dt = 1.0f / 30.0f; // Assume 30fps
+    for (auto& ball : tracked_balls_) {
+        if (ball.is_active) {
+            // Predict next state using ball physics (with gravity)
+            ball.kf.predict_ball(dt);
+            
+            // Store predicted position for search guidance
+            Eigen::Vector3f predicted_pos = ball.kf.get_position();
+            ball.predicted_world_pos = cv::Point3f(predicted_pos.x(), predicted_pos.y(), predicted_pos.z());
+        }
+    }
     
     // Convert to HSV once for all operations
     cv::Mat hsv_frame;
@@ -64,6 +78,16 @@ std::vector<ColorTrackedBall> ColorTracker::update(
     
     for (auto& ball : tracked_balls_) {
         if (!ball.is_active) {
+            // Increment frames_since_deactivated for inactive balls
+            ball.frames_since_deactivated++;
+            
+            // CRITICAL: Skip reactivation if ball was recently deactivated (within 10 frames)
+            if (ball.frames_since_deactivated < 10) {
+                DEBUG_LOG("ColorTracker: Skipping ball ", ball.logical_id,
+                         " - recently deactivated (", ball.frames_since_deactivated, " frames ago)");
+                continue;
+            }
+            
             INFO_LOG("ColorTracker: Attempting to reactivate ball ", ball.logical_id,
                      " (previous color: ", (ball.color_name.empty() ? "none" : ball.color_name), ")");
             
@@ -102,23 +126,32 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 // Check color profiles in priority order (skip disabled profiles)
                 for (const auto* profile : profiles_to_try) {
                     if (!profile->enabled) continue;
-                    bool matches = matchesColorProfile(hsv_frame, center, *profile);
+                    float confidence = matchesColorProfile(hsv_frame, center, *profile);
                     DEBUG_LOG("ColorTracker: Testing detection at (", center.x, ",", center.y,
-                              ") against ", profile->name, ": ", (matches ? "MATCH" : "no match"));
-                    if (matches) {
-                        // Check if another ball is already using this color
-                        bool color_already_used = false;
+                              ") against ", profile->name, ": confidence=", confidence);
+                    if (confidence > 0.10f) {
+                        // INLINE DEDUPLICATION: Check if another ball is already tracking this location
+                        bool location_already_tracked = false;
                         for (const auto& other_ball : tracked_balls_) {
-                            if (other_ball.is_active && other_ball.color_name == profile->name &&
-                                other_ball.logical_id != ball.logical_id) {
-                                color_already_used = true;
-                                DEBUG_LOG("ColorTracker: Color ", profile->name,
-                                         " already used by ball ", other_ball.logical_id);
-                                break;
+                            if (other_ball.is_active && other_ball.logical_id != ball.logical_id) {
+                                // Check 2D pixel distance
+                                float pixel_dist = std::sqrt(
+                                    std::pow(center.x - other_ball.pixel_pos.x, 2) +
+                                    std::pow(center.y - other_ball.pixel_pos.y, 2)
+                                );
+                                
+                                // If another ball is already tracking this location, skip it
+                                if (pixel_dist < 50.0f) { // 50 pixels threshold
+                                    location_already_tracked = true;
+                                    DEBUG_LOG("ColorTracker: Location already tracked by ball ",
+                                             other_ball.logical_id, " (", other_ball.color_name,
+                                             ") - pixel distance: ", pixel_dist);
+                                    break;
+                                }
                             }
                         }
                         
-                        if (!color_already_used) {
+                        if (!location_already_tracked) {
                             DEBUG_LOG("ColorTracker: Reactivating ball ", ball.logical_id,
                                      " with color ", profile->name, " at (", center.x, ",", center.y, ")");
                             // Found a match! Activate this tracker
@@ -126,6 +159,8 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                             ball.color_name = profile->name;
                             ball.pixel_pos = center;
                             ball.frames_since_seen = 0;
+                            ball.frames_since_deactivated = 999; // Reset since now active
+                            ball.color_match_confidence = confidence;
                             ball.associated_wrist_id = -1;
                             assigned_bytetrack_ids.insert(obj.id);
                             
@@ -138,6 +173,12 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                                 
                                 if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
                                     ball.world_pos = deprojectToWorld(center, depth_m, intrinsics);
+                                    
+                                    // Initialize Kalman filter with this measurement
+                                    KalmanFilter3D::MeasurementVector measurement(
+                                        ball.world_pos.x, ball.world_pos.y, ball.world_pos.z);
+                                    ball.kf.init(measurement);
+                                    ball.predicted_world_pos = ball.world_pos;
                                 }
                             }
                             
@@ -200,9 +241,10 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                     // Found a color blob near wrist - track that
                     ball.pixel_pos = close_blob;
                     ball.frames_since_seen = 0;
+                    ball.color_match_confidence = matchesColorProfile(hsv_frame, close_blob, *profile);
                     found_this_frame = true;
                     
-                    // Update world position
+                    // Update world position and Kalman filter
                     if (close_blob.x >= 0 && close_blob.x < depth_frame.cols &&
                         close_blob.y >= 0 && close_blob.y < depth_frame.rows) {
                         uint16_t depth_mm = depth_frame.at<uint16_t>(
@@ -210,13 +252,30 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                         float depth_m = depth_mm / 1000.0f;
                         
                         if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                            ball.world_pos = deprojectToWorld(close_blob, depth_m, intrinsics);
+                            cv::Point3f measured_pos = deprojectToWorld(close_blob, depth_m, intrinsics);
+                            
+                            // Update Kalman filter with measurement
+                            KalmanFilter3D::MeasurementVector measurement(
+                                measured_pos.x, measured_pos.y, measured_pos.z);
+                            ball.kf.update(measurement);
+                            
+                            // Use Kalman-filtered position as final position
+                            Eigen::Vector3f filtered_pos = ball.kf.get_position();
+                            ball.world_pos = cv::Point3f(filtered_pos.x(), filtered_pos.y(), filtered_pos.z());
                         }
                     }
                 } else {
                     // No color visible at all - fall back to wrist position as last resort
                     ball.pixel_pos = wrist_2d;
-                    ball.world_pos = hand.wrist_pos_3d;
+                    
+                    // Update Kalman filter with wrist measurement
+                    KalmanFilter3D::MeasurementVector measurement(
+                        hand.wrist_pos_3d.x, hand.wrist_pos_3d.y, hand.wrist_pos_3d.z);
+                    ball.kf.update(measurement);
+                    
+                    // Use Kalman-filtered position
+                    Eigen::Vector3f filtered_pos = ball.kf.get_position();
+                    ball.world_pos = cv::Point3f(filtered_pos.x(), filtered_pos.y(), filtered_pos.z());
                     ball.frames_since_seen = 0;  // Reset counter since we're tracking via wrist
                     found_this_frame = true;
                 }
@@ -237,7 +296,8 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                                   obj.box.y + obj.box.height / 2.0f);
                 
                 // Check if this detection matches our color profile
-                if (matchesColorProfile(hsv_frame, center, *profile)) {
+                float confidence = matchesColorProfile(hsv_frame, center, *profile);
+                if (confidence > 0.10f) {
                     float dist = std::sqrt(
                         std::pow(center.x - ball.pixel_pos.x, 2) +
                         std::pow(center.y - ball.pixel_pos.y, 2)
@@ -253,9 +313,10 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             if (best_match.x >= 0) {
                 ball.pixel_pos = best_match;
                 ball.frames_since_seen = 0;
+                ball.color_match_confidence = matchesColorProfile(hsv_frame, best_match, *profile);
                 found_this_frame = true;
                 
-                // Update world position
+                // Update world position and Kalman filter
                 if (best_match.x >= 0 && best_match.x < depth_frame.cols &&
                     best_match.y >= 0 && best_match.y < depth_frame.rows) {
                     uint16_t depth_mm = depth_frame.at<uint16_t>(
@@ -263,23 +324,41 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                     float depth_m = depth_mm / 1000.0f;
                     
                     if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                        ball.world_pos = deprojectToWorld(best_match, depth_m, intrinsics);
+                        cv::Point3f measured_pos = deprojectToWorld(best_match, depth_m, intrinsics);
+                        
+                        // Update Kalman filter with measurement
+                        KalmanFilter3D::MeasurementVector measurement(
+                            measured_pos.x, measured_pos.y, measured_pos.z);
+                        ball.kf.update(measurement);
+                        
+                        // Use Kalman-filtered position as final position
+                        Eigen::Vector3f filtered_pos = ball.kf.get_position();
+                        ball.world_pos = cv::Point3f(filtered_pos.x(), filtered_pos.y(), filtered_pos.z());
                     }
                 }
             }
         }
         
-        // Step 2c: If still not found, try simple color tracking around last position
+        // Step 2c: If still not found, try simple color tracking around predicted position
         if (!found_this_frame) {
+            // Use Kalman prediction to guide search - project predicted 3D position to 2D
+            cv::Point2f search_center = ball.pixel_pos; // Default to last known position
+            if (ball.predicted_world_pos.z > 0) {
+                // Project predicted 3D position to 2D pixel coordinates
+                search_center.x = ball.predicted_world_pos.x * intrinsics.fx / ball.predicted_world_pos.z + intrinsics.ppx;
+                search_center.y = ball.predicted_world_pos.y * intrinsics.fy / ball.predicted_world_pos.z + intrinsics.ppy;
+            }
+            
             cv::Point2f new_pos = findLargestColorBlob(hsv_frame, *profile,
-                                                      ball.pixel_pos, WRIST_SEARCH_RADIUS);
+                                                      search_center, WRIST_SEARCH_RADIUS);
             
             if (new_pos.x >= 0 && new_pos.y >= 0) {
                 ball.pixel_pos = new_pos;
                 ball.frames_since_seen = 0;
+                ball.color_match_confidence = matchesColorProfile(hsv_frame, new_pos, *profile);
                 found_this_frame = true;
                 
-                // Update world position
+                // Update world position and Kalman filter
                 if (new_pos.x >= 0 && new_pos.x < depth_frame.cols &&
                     new_pos.y >= 0 && new_pos.y < depth_frame.rows) {
                     uint16_t depth_mm = depth_frame.at<uint16_t>(
@@ -287,7 +366,16 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                     float depth_m = depth_mm / 1000.0f;
                     
                     if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                        ball.world_pos = deprojectToWorld(new_pos, depth_m, intrinsics);
+                        cv::Point3f measured_pos = deprojectToWorld(new_pos, depth_m, intrinsics);
+                        
+                        // Update Kalman filter with measurement
+                        KalmanFilter3D::MeasurementVector measurement(
+                            measured_pos.x, measured_pos.y, measured_pos.z);
+                        ball.kf.update(measurement);
+                        
+                        // Use Kalman-filtered position as final position
+                        Eigen::Vector3f filtered_pos = ball.kf.get_position();
+                        ball.world_pos = cv::Point3f(filtered_pos.x(), filtered_pos.y(), filtered_pos.z());
                     }
                 }
             }
@@ -303,6 +391,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                          " (color: ", ball.color_name, ") after ",
                          ball.frames_since_seen, " frames lost");
                 ball.is_active = false;
+                ball.frames_since_deactivated = 0; // Reset counter
                 ball.associated_wrist_id = -1;
                 // CRITICAL: Preserve color_name so ball can reactivate with same color
                 // ball.color_name is intentionally NOT cleared here
@@ -326,6 +415,69 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 }
                 if (!still_near_wrist) {
                     ball.associated_wrist_id = -1;
+                }
+            }
+        }
+    }
+    
+    // Step 3: Deduplicate - If two balls are at the same location, keep the one with better color match
+    INFO_LOG("ColorTracker: Starting deduplication check");
+    for (const auto& ball : tracked_balls_) {
+        if (ball.is_active) {
+            INFO_LOG("  Ball ", ball.logical_id, " (", ball.color_name,
+                    ") active at pixel(", ball.pixel_pos.x, ",", ball.pixel_pos.y,
+                    ") world(", ball.world_pos.x, ",", ball.world_pos.y, ",", ball.world_pos.z,
+                    ") confidence=", ball.color_match_confidence);
+        }
+    }
+    
+    for (size_t i = 0; i < tracked_balls_.size(); ++i) {
+        if (!tracked_balls_[i].is_active) continue;
+        
+        for (size_t j = i + 1; j < tracked_balls_.size(); ++j) {
+            if (!tracked_balls_[j].is_active) continue;
+            
+            // Calculate 2D pixel distance
+            float pixel_dist = std::sqrt(
+                std::pow(tracked_balls_[i].pixel_pos.x - tracked_balls_[j].pixel_pos.x, 2) +
+                std::pow(tracked_balls_[i].pixel_pos.y - tracked_balls_[j].pixel_pos.y, 2)
+            );
+            
+            // Calculate 3D distance between balls (only if both have valid depth)
+            float dist_3d = 999.0f;
+            if (tracked_balls_[i].world_pos.z > 0 && tracked_balls_[j].world_pos.z > 0) {
+                dist_3d = std::sqrt(
+                    std::pow(tracked_balls_[i].world_pos.x - tracked_balls_[j].world_pos.x, 2) +
+                    std::pow(tracked_balls_[i].world_pos.y - tracked_balls_[j].world_pos.y, 2) +
+                    std::pow(tracked_balls_[i].world_pos.z - tracked_balls_[j].world_pos.z, 2)
+                );
+            }
+            
+            DEBUG_LOG("ColorTracker: Checking balls ", tracked_balls_[i].logical_id, " and ",
+                     tracked_balls_[j].logical_id, " - pixel_dist=", pixel_dist,
+                     " 3d_dist=", dist_3d * 100, "cm");
+            
+            // If balls are too close (within 10cm in 3D OR 50 pixels in 2D), they're likely the same physical ball
+            if (dist_3d < 0.10f || pixel_dist < 50.0f) {
+                INFO_LOG("ColorTracker: Detected duplicate tracking - Ball ", tracked_balls_[i].logical_id,
+                         " (", tracked_balls_[i].color_name, ", confidence=", tracked_balls_[i].color_match_confidence,
+                         ") and Ball ", tracked_balls_[j].logical_id,
+                         " (", tracked_balls_[j].color_name, ", confidence=", tracked_balls_[j].color_match_confidence,
+                         ") are ", dist_3d * 100, "cm apart (", pixel_dist, " pixels)");
+                
+                // Deactivate the one with lower confidence
+                if (tracked_balls_[i].color_match_confidence < tracked_balls_[j].color_match_confidence) {
+                    INFO_LOG("ColorTracker: Deactivating ball ", tracked_balls_[i].logical_id,
+                             " (lower confidence: ", tracked_balls_[i].color_match_confidence, ")");
+                    tracked_balls_[i].is_active = false;
+                    tracked_balls_[i].frames_since_deactivated = 0; // Reset counter
+                    tracked_balls_[i].associated_wrist_id = -1;
+                } else {
+                    INFO_LOG("ColorTracker: Deactivating ball ", tracked_balls_[j].logical_id,
+                             " (lower confidence: ", tracked_balls_[j].color_match_confidence, ")");
+                    tracked_balls_[j].is_active = false;
+                    tracked_balls_[j].frames_since_deactivated = 0; // Reset counter
+                    tracked_balls_[j].associated_wrist_id = -1;
                 }
             }
         }
@@ -458,14 +610,14 @@ cv::Point2f ColorTracker::findClosestColorBlob(const cv::Mat& hsv_frame,
     return closest_center;
 }
 
-bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
-                                       const cv::Point2f& center,
-                                       const ColorProfile& profile,
-                                       int sample_radius) {
+float ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
+                                        const cv::Point2f& center,
+                                        const ColorProfile& profile,
+                                        int sample_radius) {
     // CRITICAL: Immediately reject if profile is disabled
     if (!profile.enabled) {
         DEBUG_LOG("ColorTracker: Rejecting disabled profile '", profile.name, "'");
-        return false;
+        return 0.0f;
     }
     
     // Sample area around center
@@ -475,7 +627,7 @@ bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
     int y_max = std::min(hsv_frame.rows - 1, static_cast<int>(center.y + sample_radius));
     
     if (x_max <= x_min || y_max <= y_min) {
-        return false;
+        return 0.0f;
     }
     
     cv::Rect sample_rect(x_min, y_min, x_max - x_min, y_max - y_min);
@@ -491,15 +643,15 @@ bool ColorTracker::matchesColorProfile(const cv::Mat& hsv_frame,
         cv::bitwise_or(mask, mask2, mask);
     }
     
-    // Check if enough pixels match the color
+    // Calculate match ratio as confidence score
     int matching_pixels = cv::countNonZero(mask);
     int total_pixels = sample_area.rows * sample_area.cols;
     float match_ratio = static_cast<float>(matching_pixels) / total_pixels;
     
     // Debug output (only when debug is enabled)
-    DEBUG_LOG("ColorTracker: Color match ratio: ", match_ratio, " (threshold: 0.10)");
+    DEBUG_LOG("ColorTracker: Color match confidence: ", match_ratio, " (threshold: 0.10)");
     
-    return match_ratio > 0.10f; // At least 10% of pixels should match (lowered for better reactivation)
+    return match_ratio; // Return confidence score (0.0-1.0)
 }
 
 cv::Point3f ColorTracker::deprojectToWorld(const cv::Point2f& pixel, float depth,

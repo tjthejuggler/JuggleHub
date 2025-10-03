@@ -203,9 +203,41 @@ void Engine::run() {
             // Populate Tracker Associations (Step 5)
             for (size_t i = 0; i < associations.size(); ++i) {
                 auto* assoc = frame_data.add_tracker_associations();
-                assoc->set_tracker_id(associations[i].first);
-                assoc->set_detection_index(associations[i].second);
+                int tracker_id = associations[i].first;
+                int detection_idx = associations[i].second;
+                
+                assoc->set_tracker_id(tracker_id);
+                assoc->set_detection_index(detection_idx);
                 assoc->set_distance_3d(assoc_distances[i]);
+                
+                // Find the tracker's predicted position
+                for (size_t j = 0; j < predicted_positions.size(); ++j) {
+                    // Extract logical_id from label (e.g., "Ball 0" -> 0)
+                    try {
+                        size_t space_pos = predicted_labels[j].find_last_of(' ');
+                        if (space_pos != std::string::npos) {
+                            int logical_id = std::stoi(predicted_labels[j].substr(space_pos + 1));
+                            if (logical_id == tracker_id) {
+                                auto* tracker_pos = assoc->mutable_tracker_pos();
+                                tracker_pos->set_x(predicted_positions[j].x);
+                                tracker_pos->set_y(predicted_positions[j].y);
+                                tracker_pos->set_z(predicted_positions[j].z);
+                                break;
+                            }
+                        }
+                    } catch (...) {
+                        // Skip if parsing fails
+                    }
+                }
+                
+                // Find the detection's 3D position
+                if (detection_idx >= 0 && detection_idx < static_cast<int>(last_raw_detections_.size())) {
+                    const auto& det = last_raw_detections_[detection_idx];
+                    auto* det_pos = assoc->mutable_detection_pos();
+                    det_pos->set_x(det.world_pos.x);
+                    det_pos->set_y(det.world_pos.y);
+                    det_pos->set_z(det.world_pos.z);
+                }
             }
             
             // Populate New Trackers (Step 6)

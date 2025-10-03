@@ -2215,14 +2215,62 @@ if PYQT_AVAILABLE:
             
             # --- Draw 3D Matching/Associations (Step 5) ---
             if self.show_associations_toggle.isChecked():
-                painter.setPen(QPen(QColor(0, 255, 0, 150), 2))  # Green lines
-                for ball in frame_data.balls:
-                    if hasattr(ball, 'matched_detection_2d') and ball.matched_detection_2d.x > 0:
-                        # Draw line from tracker position to matched detection
-                        painter.drawLine(
-                            int(ball.projected_pos_2d.x), int(ball.projected_pos_2d.y),
-                            int(ball.matched_detection_2d.x), int(ball.matched_detection_2d.y)
-                        )
+                painter.setPen(QPen(QColor(0, 255, 0, 200), 2))  # Green lines
+                painter.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+                
+                # Debug logging
+                if len(frame_data.tracker_associations) > 0:
+                    self.log_message(f"[3D MATCH VIZ] Rendering {len(frame_data.tracker_associations)} associations")
+                
+                for i, assoc in enumerate(frame_data.tracker_associations):
+                    # Project 3D positions to 2D for visualization
+                    # Get camera intrinsics
+                    fx = frame_data.intrinsics.fx if frame_data.HasField('intrinsics') else 385.0
+                    fy = frame_data.intrinsics.fy if frame_data.HasField('intrinsics') else 385.0
+                    ppx = frame_data.intrinsics.ppx if frame_data.HasField('intrinsics') else 320.0
+                    ppy = frame_data.intrinsics.ppy if frame_data.HasField('intrinsics') else 240.0
+                    
+                    # Project tracker position
+                    if assoc.tracker_pos.z > 0:
+                        tracker_x = int((assoc.tracker_pos.x * fx) / assoc.tracker_pos.z + ppx)
+                        tracker_y = int((assoc.tracker_pos.y * fy) / assoc.tracker_pos.z + ppy)
+                    else:
+                        continue
+                    
+                    # Project detection position
+                    if assoc.detection_pos.z > 0:
+                        det_x = int((assoc.detection_pos.x * fx) / assoc.detection_pos.z + ppx)
+                        det_y = int((assoc.detection_pos.y * fy) / assoc.detection_pos.z + ppy)
+                    else:
+                        continue
+                    
+                    if i == 0:  # Log first association for debugging
+                        self.log_message(f"[3D MATCH VIZ]   Assoc {i}: Tracker {assoc.tracker_id} -> Det {assoc.detection_index}, dist={assoc.distance_3d:.3f}m")
+                        self.log_message(f"[3D MATCH VIZ]   Tracker 2D: ({tracker_x}, {tracker_y}), Det 2D: ({det_x}, {det_y})")
+                    
+                    # Draw line from tracker to detection
+                    painter.drawLine(tracker_x, tracker_y, det_x, det_y)
+                    
+                    # Draw distance label at midpoint
+                    mid_x = (tracker_x + det_x) // 2
+                    mid_y = (tracker_y + det_y) // 2
+                    
+                    # Draw background for text
+                    distance_cm = assoc.distance_3d * 100  # Convert to cm
+                    label_text = f"T{assoc.tracker_id}→D{assoc.detection_index} ({distance_cm:.1f}cm)"
+                    
+                    painter.setPen(QPen(QColor(0, 0, 0, 200)))
+                    painter.setBrush(QBrush(QColor(0, 0, 0, 150)))
+                    text_width = 120
+                    text_height = 18
+                    painter.drawRect(mid_x - text_width//2, mid_y - text_height//2, text_width, text_height)
+                    
+                    # Draw text
+                    painter.setPen(QPen(QColor(0, 255, 0)))
+                    painter.drawText(mid_x - text_width//2 + 5, mid_y + 5, label_text)
+                    
+                    # Reset pen for next line
+                    painter.setPen(QPen(QColor(0, 255, 0, 200), 2))
             
             # --- Draw New Trackers/Auto-Init (Step 6) ---
             if self.show_new_trackers_toggle.isChecked():

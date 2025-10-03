@@ -214,23 +214,8 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         if (hand.status != TrackerStatus::LOST) hand.kf.predict(dt);
     }
     
-    // Store predicted positions for visualization (Step 2: Kalman Predictions)
-    for (auto& ball : logical_ball_trackers_) {
-        if (ball.status != TrackerStatus::LOST) {
-            ball.update_from_kf();  // CRITICAL: Sync position from Kalman filter state
-            predicted_positions_.push_back(cv::Point3f(
-                ball.position.x(), ball.position.y(), ball.position.z()));
-            predicted_tracker_labels_.push_back("Ball " + std::to_string(ball.logical_id));
-        }
-    }
-    for (auto& hand : logical_hand_trackers_) {
-        if (hand.status != TrackerStatus::LOST) {
-            hand.update_from_kf();  // CRITICAL: Sync position from Kalman filter state
-            predicted_positions_.push_back(cv::Point3f(
-                hand.position.x(), hand.position.y(), hand.position.z()));
-            predicted_tracker_labels_.push_back("Hand " + std::to_string(hand.logical_id));
-        }
-    }
+    // NOTE: Predicted positions for visualization are now stored AFTER the update step
+    // (see lines after 3D matching) to show FUTURE predictions instead of current state
 
     // --- 2. DETECT BALLS ---
     float scale_x, scale_y;
@@ -454,6 +439,45 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         
         debug_log << "[3D Matching] Unmatched detections: " << unmatched_detections_.size() << std::endl;
         debug_log.close();
+    }
+    
+    // --- STORE FUTURE PREDICTIONS FOR VISUALIZATION ---
+    // After updates are complete, predict where each tracker will be in the NEXT frame
+    // This shows the Kalman filter's trajectory prediction ahead of the current position
+    for (auto& ball : logical_ball_trackers_) {
+        if (ball.status == TrackerStatus::TRACKED) {
+            // Get current state after update
+            ball.update_from_kf();
+            
+            // Make a temporary prediction for next frame (for visualization only)
+            KalmanFilter3D temp_kf = ball.kf;  // Copy the filter
+            if (ball.is_in_freefall) {
+                temp_kf.predict_ball(dt);  // Predict with gravity
+            } else {
+                temp_kf.predict(dt);  // Predict with constant velocity
+            }
+            
+            // Store the FUTURE predicted position
+            Eigen::Vector3f future_pos = temp_kf.get_position();
+            predicted_positions_.push_back(cv::Point3f(future_pos.x(), future_pos.y(), future_pos.z()));
+            predicted_tracker_labels_.push_back("Ball " + std::to_string(ball.logical_id));
+        }
+    }
+    
+    for (auto& hand : logical_hand_trackers_) {
+        if (hand.status == TrackerStatus::TRACKED) {
+            // Get current state after update
+            hand.update_from_kf();
+            
+            // Make a temporary prediction for next frame (for visualization only)
+            KalmanFilter3D temp_kf = hand.kf;  // Copy the filter
+            temp_kf.predict(dt);  // Predict with constant velocity
+            
+            // Store the FUTURE predicted position
+            Eigen::Vector3f future_pos = temp_kf.get_position();
+            predicted_positions_.push_back(cv::Point3f(future_pos.x(), future_pos.y(), future_pos.z()));
+            predicted_tracker_labels_.push_back("Hand " + std::to_string(hand.logical_id));
+        }
     }
     
     // Auto-initialize trackers from unmatched detections if no active trackers (Step 6: Auto-Init)

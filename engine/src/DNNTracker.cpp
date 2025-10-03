@@ -1,10 +1,53 @@
 #include "DNNTracker.hpp"
 #include <iostream>
+#include <fstream>
 #include <algorithm> // Required for std::max and std::min
 #include <cmath>     // Required for std::sqrt
 #include <set>
+#include <limits>
+#include <vector>
 
 // --- HELPER FUNCTIONS ---
+
+// Improved depth filtering using median of 5x5 region
+static float get_filtered_depth(const cv::Mat& depth_frame, const cv::Point2f& pixel) {
+    const int SAMPLE_SIZE = 5;
+    const int half_size = SAMPLE_SIZE / 2;
+    
+    std::vector<float> depth_samples;
+    depth_samples.reserve(SAMPLE_SIZE * SAMPLE_SIZE);
+    
+    int center_x = static_cast<int>(pixel.x);
+    int center_y = static_cast<int>(pixel.y);
+    
+    // Sample 5x5 region around center
+    for (int dy = -half_size; dy <= half_size; ++dy) {
+        for (int dx = -half_size; dx <= half_size; ++dx) {
+            int x = center_x + dx;
+            int y = center_y + dy;
+            
+            // Check bounds
+            if (x >= 0 && x < depth_frame.cols && y >= 0 && y < depth_frame.rows) {
+                uint16_t depth_mm = depth_frame.at<uint16_t>(y, x);
+                float depth_m = depth_mm / 1000.0f;
+                
+                // Only include valid depths
+                if (depth_m > 0.1f && depth_m < 3.0f) {
+                    depth_samples.push_back(depth_m);
+                }
+            }
+        }
+    }
+    
+    // Return median depth
+    if (depth_samples.empty()) {
+        return 0.0f;
+    }
+    
+    std::sort(depth_samples.begin(), depth_samples.end());
+    return depth_samples[depth_samples.size() / 2];
+}
+
 static cv::Point3f deproject_2d_to_3d(const cv::Point2f& pixel, float depth, const CameraIntrinsics& intrinsics) {
     if (depth > 0) {
         float x = (pixel.x - intrinsics.ppx) * depth / intrinsics.fx;
@@ -23,10 +66,65 @@ cv::Point2f DNNTracker::project_3d_to_2d(const cv::Point3f& world_pos, const Cam
     return cv::Point2f(-1, -1); // Invalid point
 }
 
+static float calculate_distance(const Eigen::Vector3d& p1, const cv::Point3f& p2) {
+    return std::sqrt(std::pow(p1.x() - p2.x, 2) +
+                     std::pow(p1.y() - p2.y, 2) +
+                     std::pow(p1.z() - p2.z, 2));
+}
+
 static float calculate_distance(const cv::Point3f& p1, const cv::Point3f& p2) {
     return std::sqrt(std::pow(p1.x - p2.x, 2) +
                      std::pow(p1.y - p2.y, 2) +
                      std::pow(p1.z - p2.z, 2));
+}
+
+// Simple greedy assignment (can be upgraded to full Hungarian later)
+static std::vector<std::pair<int, int>> optimal_assignment(
+    const std::vector<std::vector<float>>& cost_matrix,
+    float max_cost_threshold
+) {
+    std::vector<std::pair<int, int>> assignments;
+    
+    if (cost_matrix.empty() || cost_matrix[0].empty()) {
+        return assignments;
+    }
+    
+    int n_trackers = cost_matrix.size();
+    int n_detections = cost_matrix[0].size();
+    
+    std::vector<bool> tracker_assigned(n_trackers, false);
+    std::vector<bool> detection_assigned(n_detections, false);
+    
+    // Greedy: repeatedly find minimum cost unassigned pair
+    for (int iter = 0; iter < std::min(n_trackers, n_detections); ++iter) {
+        float min_cost = max_cost_threshold;
+        int best_tracker = -1;
+        int best_detection = -1;
+        
+        for (int i = 0; i < n_trackers; ++i) {
+            if (tracker_assigned[i]) continue;
+            
+            for (int j = 0; j < n_detections; ++j) {
+                if (detection_assigned[j]) continue;
+                
+                if (cost_matrix[i][j] < min_cost) {
+                    min_cost = cost_matrix[i][j];
+                    best_tracker = i;
+                    best_detection = j;
+                }
+            }
+        }
+        
+        if (best_tracker >= 0 && best_detection >= 0) {
+            assignments.push_back({best_tracker, best_detection});
+            tracker_assigned[best_tracker] = true;
+            detection_assigned[best_detection] = true;
+        } else {
+            break;
+        }
+    }
+    
+    return assignments;
 }
 
 static float calculate_iou(const byte_track::Rect<float>& box1, const byte_track::Rect<float>& box2) {
@@ -84,6 +182,9 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     // Store color frame for calibration
     last_color_frame_ = color_frame.clone();
     
+    // Clear unmatched detections at the start of each frame
+    unmatched_detections_.clear();
+    
     auto current_time = std::chrono::steady_clock::now();
     float dt = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - last_update_time_).count();
     last_update_time_ = current_time;
@@ -112,177 +213,172 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     last_raw_detections_.clear();
     std::vector<byte_track::Object> detections_for_bytetrack = postprocess_ball_detection(color_frame, depth_frame, intrinsics, output_tensor, scale_x, scale_y, last_raw_detections_);
 
-    // --- 3. TRACK (ByteTrack) ---
-    std::vector<std::shared_ptr<byte_track::STrack>> byte_tracks = tracker->update(detections_for_bytetrack);
+    std::ofstream debug_log("engine_debug.log", std::ios::app);
+    debug_log << "\n========================================" << std::endl;
+    debug_log << "3D MATCHING CODE IS RUNNING!" << std::endl;
+    debug_log << "Raw detections: " << last_raw_detections_.size() << std::endl;
+    debug_log << "========================================\n" << std::endl;
     
-    // Log ByteTrack behavior for analysis
-    int high_conf_tracks = 0;
-    int low_conf_tracks = 0;
-    for (const auto& track : byte_tracks) {
-        if (track->getScore() >= high_thresh_) {
-            high_conf_tracks++;
-        } else {
-            low_conf_tracks++;
-        }
-    }
-    std::cout << "[ByteTrack] Total tracks: " << byte_tracks.size()
-              << " | High-conf: " << high_conf_tracks
-              << " | Low-conf: " << low_conf_tracks << std::endl;
-
-    // --- 4. ASSOCIATE Persistent Trackers with ByteTrack Tracks ---
-    std::set<int> matched_byte_track_ids;
-    
-    std::vector<PersistentTracker*> all_logical_trackers;
-    for(auto& ball : logical_ball_trackers_) all_logical_trackers.push_back(&ball);
-    for(auto& hand : logical_hand_trackers_) all_logical_trackers.push_back(&hand);
-
-    for(auto* tracker : all_logical_trackers) {
-        if (tracker->status == TrackerStatus::TRACKED) tracker->status = TrackerStatus::PREDICTED;
-        if (tracker->status != TrackerStatus::LOST) tracker->frames_since_seen++;
-    }
-
-    for (const auto& b_track : byte_tracks) {
-        int b_track_id = (int)b_track->getTrackId();
-        
-        const Detection* best_det = nullptr;
-        float best_iou = 0.0f;
-        for(const auto& det : last_raw_detections_){
-            byte_track::Rect<float> det_rect(det.box.x, det.box.y, det.box.width, det.box.height);
-            float iou = calculate_iou(b_track->getRect(), det_rect);
-            if(iou > best_iou){
-                best_iou = iou;
-                best_det = &det;
-            }
-        }
-        if (!best_det || best_det->world_pos.z < 0.2f || best_det->world_pos.z > 2.0f) continue;
-
-        PersistentTracker* best_match_tracker = nullptr;
-
-        for(auto* p_tracker : all_logical_trackers) {
-            if (p_tracker->last_seen_bytetrack_id == b_track_id && p_tracker->class_name == (best_det->class_id == 3 ? "hand" : "ball")) {
-                best_match_tracker = p_tracker;
-                break;
-            }
-        }
-        
-        if (!best_match_tracker) {
-            float min_dist = 0.5f; // Increased to 50 cm for more robust re-acquisition
-            for(auto* p_tracker : all_logical_trackers) {
-                if ((p_tracker->status == TrackerStatus::PREDICTED || p_tracker->status == TrackerStatus::OCCLUDED) && p_tracker->class_name == (best_det->class_id == 3 ? "hand" : "ball")) {
-                    p_tracker->update_from_kf();
-                    cv::Point3f predicted_pos(p_tracker->position.x(), p_tracker->position.y(), p_tracker->position.z());
-                    float dist = calculate_distance(predicted_pos, best_det->world_pos);
-                    if (dist < min_dist) {
-                        min_dist = dist;
-                        best_match_tracker = p_tracker;
-                    }
-                }
-            }
-            if(best_match_tracker) {
-                std::cout << "Re-acquired predicted tracker " << best_match_tracker->logical_id << " with new bytetrack_id " << b_track_id << std::endl;
-            }
-        }
-        
-        if (!best_match_tracker) {
-            for(auto* p_tracker : all_logical_trackers) {
-                 if (p_tracker->status == TrackerStatus::LOST && p_tracker->class_name == (best_det->class_id == 3 ? "hand" : "ball")) {
-                     best_match_tracker = p_tracker;
-                     best_match_tracker->kf.init(KalmanFilter3D::MeasurementVector(best_det->world_pos.x, best_det->world_pos.y, best_det->world_pos.z));
-                     break;
-                 }
-            }
-        }
-
-        if (best_match_tracker) {
-            best_match_tracker->kf.update(KalmanFilter3D::MeasurementVector(best_det->world_pos.x, best_det->world_pos.y, best_det->world_pos.z));
-            best_match_tracker->status = TrackerStatus::TRACKED;
-            best_match_tracker->box_2d = best_det->box;
-            best_match_tracker->frames_since_seen = 0;
-            best_match_tracker->last_seen_bytetrack_id = b_track_id;
-            best_match_tracker->parent_id = -1;
-            matched_byte_track_ids.insert(b_track_id);
+    // --- 3. DIRECT 3D DISTANCE-BASED ASSOCIATION ---
+    // Build cost matrix: [tracker][detection] = 3D distance
+    std::vector<PersistentTracker*> ball_trackers_list;
+    for (auto& ball : logical_ball_trackers_) {
+        if (ball.status != TrackerStatus::LOST) {
+            ball_trackers_list.push_back(&ball);
         }
     }
     
-    // --- 4b. 3D DISTANCE-BASED RE-ASSOCIATION (Fallback for fast-moving balls) ---
-    // This catches balls that ByteTrack's IoU matching missed due to fast motion
-    const float MAX_3D_DISTANCE = 0.30f; // 30cm threshold for 3D matching
-    int distance_matches = 0;
-    
-    // Find unmatched detections with valid 3D positions
-    std::vector<const Detection*> unmatched_detections;
+    // Filter valid ball detections
+    std::vector<const Detection*> valid_detections;
     for (const auto& det : last_raw_detections_) {
-        if (det.class_id == 3) continue; // Skip hands
-        if (det.world_pos.z < 0.2f || det.world_pos.z > 2.0f) continue; // Invalid depth
-        
-        // Check if this detection was already matched to a ByteTrack track
-        bool already_matched = false;
-        byte_track::Rect<float> det_rect(det.box.x, det.box.y, det.box.width, det.box.height);
-        for (const auto& b_track : byte_tracks) {
-            if (matched_byte_track_ids.count((int)b_track->getTrackId()) > 0) {
-                float iou = calculate_iou(b_track->getRect(), det_rect);
-                if (iou > 0.3f) { // If this detection has significant overlap with a matched track
-                    already_matched = true;
-                    break;
-                }
-            }
-        }
-        
-        if (!already_matched) {
-            unmatched_detections.push_back(&det);
-        }
+        // TEMPORARY: Accept ALL detections to diagnose class_id issue
+        valid_detections.push_back(&det);
     }
     
-    // Try to match unmatched detections to predicted ball trackers using 3D distance
-    for (const auto* det : unmatched_detections) {
-        PersistentTracker* best_match = nullptr;
-        float min_distance = MAX_3D_DISTANCE;
+    debug_log << "\n[DETECTION DEBUG] ==================" << std::endl;
+    debug_log << "[DETECTION DEBUG] Total raw detections: " << last_raw_detections_.size() << std::endl;
+    debug_log << "[DETECTION DEBUG] Valid detections after filtering: " << valid_detections.size() << std::endl;
+    
+    // Log each raw detection's status
+    for (size_t i = 0; i < last_raw_detections_.size(); ++i) {
+        const auto& det = last_raw_detections_[i];
+        bool passed_filter = (det.class_id != 3 && det.world_pos.z > 0.2f && det.world_pos.z < 2.0f);
+        debug_log << "[DETECTION DEBUG] Detection " << i
+                  << " - class_id: " << det.class_id
+                  << ", depth: " << det.world_pos.z << "m"
+                  << ", bbox: [" << det.box.x << "," << det.box.y << "," << det.box.width << "," << det.box.height << "]"
+                  << ", passed_filter: " << (passed_filter ? "YES" : "NO");
         
-        for (auto& ball : logical_ball_trackers_) {
-            if (ball.status == TrackerStatus::PREDICTED || ball.status == TrackerStatus::OCCLUDED) {
-                ball.update_from_kf();
-                cv::Point3f predicted_pos(ball.position.x(), ball.position.y(), ball.position.z());
-                float dist = calculate_distance(predicted_pos, det->world_pos);
-                
-                if (dist < min_distance) {
-                    min_distance = dist;
-                    best_match = &ball;
-                }
-            }
+        if (!passed_filter) {
+            debug_log << " (REJECTED: ";
+            if (det.class_id == 3) debug_log << "is_hand ";
+            if (det.world_pos.z <= 0.2f) debug_log << "depth_too_close ";
+            if (det.world_pos.z >= 2.0f) debug_log << "depth_too_far ";
+            if (det.world_pos.z == 0.0f) debug_log << "no_depth ";
+            debug_log << ")";
         }
+        debug_log << std::endl;
+    }
+    debug_log << "[DETECTION DEBUG] ==================\n" << std::endl;
+    
+    debug_log << "[3D Matching] " << ball_trackers_list.size() << " active trackers, "
+              << valid_detections.size() << " valid detections" << std::endl;
+    
+    // Mark all tracked as predicted initially
+    for (auto* tracker : ball_trackers_list) {
+        if (tracker->status == TrackerStatus::TRACKED) {
+            tracker->status = TrackerStatus::PREDICTED;
+        }
+        tracker->frames_since_seen++;
+    }
+    
+    if (!ball_trackers_list.empty() && !valid_detections.empty()) {
+        // Build cost matrix
+        std::vector<std::vector<float>> cost_matrix(
+            ball_trackers_list.size(),
+            std::vector<float>(valid_detections.size(), std::numeric_limits<float>::max())
+        );
         
-        if (best_match) {
-            // Manually associate this detection with the predicted tracker
-            best_match->kf.update(KalmanFilter3D::MeasurementVector(det->world_pos.x, det->world_pos.y, det->world_pos.z));
-            best_match->status = TrackerStatus::TRACKED;
-            best_match->box_2d = det->box;
-            best_match->frames_since_seen = 0;
-            best_match->parent_id = -1;
-            distance_matches++;
+        for (size_t i = 0; i < ball_trackers_list.size(); ++i) {
+            ball_trackers_list[i]->update_from_kf();
+            Eigen::Vector3d predicted_pos = ball_trackers_list[i]->position;
             
-            std::cout << "[3D Distance Match] Recovered ball " << best_match->logical_id
-                      << " at distance " << min_distance << "m (conf: " << det->confidence << ")" << std::endl;
+            for (size_t j = 0; j < valid_detections.size(); ++j) {
+                float dist = calculate_distance(predicted_pos, valid_detections[j]->world_pos);
+                cost_matrix[i][j] = dist;
+            }
         }
+        
+        // Optimal assignment with 30cm threshold
+        const float MAX_ASSOCIATION_DISTANCE = 0.30f;
+        auto assignments = optimal_assignment(cost_matrix, MAX_ASSOCIATION_DISTANCE);
+        
+        debug_log << "[3D Matching] Made " << assignments.size() << " assignments" << std::endl;
+        
+        // Apply assignments
+        std::set<int> matched_detection_indices;
+        for (const auto& [tracker_idx, detection_idx] : assignments) {
+            auto* tracker = ball_trackers_list[tracker_idx];
+            const auto* detection = valid_detections[detection_idx];
+            
+            // Track which detections were matched
+            matched_detection_indices.insert(detection_idx);
+            
+            // Update Kalman filter
+            tracker->kf.update(KalmanFilter3D::MeasurementVector(
+                detection->world_pos.x, detection->world_pos.y, detection->world_pos.z));
+            tracker->status = TrackerStatus::TRACKED;
+            tracker->box_2d = detection->box;
+            tracker->frames_since_seen = 0;
+            tracker->parent_id = -1;
+            
+            debug_log << "[3D Matching] Tracker " << tracker->logical_id
+                      << " matched to detection at distance "
+                      << cost_matrix[tracker_idx][detection_idx] << "m" << std::endl;
+        }
+        
+        // Store unmatched detections for visualization
+        for (size_t i = 0; i < valid_detections.size(); ++i) {
+            if (matched_detection_indices.find(i) == matched_detection_indices.end()) {
+                unmatched_detections_.push_back(*valid_detections[i]);
+            }
+        }
+        
+        debug_log << "[3D Matching] Unmatched detections: " << unmatched_detections_.size() << std::endl;
+        debug_log.close();
     }
     
-    if (distance_matches > 0) {
-        std::cout << "[3D Distance Match] Successfully matched " << distance_matches
-                  << " balls using 3D distance fallback" << std::endl;
+    // Auto-initialize trackers from unmatched detections if no active trackers
+    if (ball_trackers_list.empty() && !valid_detections.empty()) {
+        std::ofstream debug_log("engine_debug.log", std::ios::app);
+        debug_log << "[AUTO-INIT] No active trackers, initializing from detections..." << std::endl;
+        
+        size_t num_to_init = std::min(valid_detections.size(), logical_ball_trackers_.size());
+        for (size_t i = 0; i < num_to_init; ++i) {
+            auto& tracker = logical_ball_trackers_[i];
+            const auto* det = valid_detections[i];
+            
+            // Initialize Kalman filter with detection position
+            tracker.kf.init(KalmanFilter3D::MeasurementVector(
+                det->world_pos.x, det->world_pos.y, det->world_pos.z));
+            
+            tracker.status = TrackerStatus::TRACKED;
+            tracker.frames_since_seen = 0;
+            tracker.box_2d = det->box;
+            tracker.parent_id = -1;
+            
+            debug_log << "[AUTO-INIT] Initialized tracker " << tracker.logical_id
+                      << " at position (" << det->world_pos.x << ", "
+                      << det->world_pos.y << ", " << det->world_pos.z << ")" << std::endl;
+        }
+        
+        debug_log << "[AUTO-INIT] Initialized " << num_to_init << " trackers" << std::endl;
+        debug_log.close();
     }
+    
+    // Handle hand tracking (keep ByteTrack for hands as they move slower)
+    std::vector<Detection> hand_detections;
+    for (const auto& det : last_raw_detections_) {
+        if (det.class_id == 3) {
+            hand_detections.push_back(det);
+        }
+    }
+    manage_hand_tracks(hand_detections);
 
-    // --- 5. RUN THROW/CATCH DETECTION ---
+    // --- 4. RUN THROW/CATCH DETECTION ---
     detected_events_ = throw_catch_detector_->detectEvents(
         logical_ball_trackers_, logical_hand_trackers_, last_raw_detections_, dt);
     
-    // --- 6. MANAGE HEURISTICS (Legacy occlusion handling) ---
-    std::vector<Detection> hand_detections;
-    for(const auto& det : last_raw_detections_) if(det.class_id == 3) hand_detections.push_back(det);
-    manage_hand_tracks(hand_detections);
+    // --- 5. MANAGE HEURISTICS (Legacy occlusion handling) ---
     // Note: manage_ball_occlusion() is now largely replaced by ThrowCatchDetector
     // but we keep it for backward compatibility and edge cases
     manage_ball_occlusion();
 
-    // --- 7. COMPILE FINAL RESULTS ---
+    // --- 6. COMPILE FINAL RESULTS ---
+    std::vector<PersistentTracker*> all_logical_trackers;
+    for(auto& ball : logical_ball_trackers_) all_logical_trackers.push_back(&ball);
+    for(auto& hand : logical_hand_trackers_) all_logical_trackers.push_back(&hand);
+    
     std::vector<TrackedObject> final_tracked_objects;
     for(auto* tracker : all_logical_trackers) {
         if (tracker->status == TrackerStatus::LOST) continue;
@@ -302,13 +398,13 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         });
     }
 
-    // --- 8. RUN POSE ESTIMATION ---
+    // --- 7. RUN POSE ESTIMATION ---
     std::vector<TrackedHand> tracked_hands;
     if (pose_model_enabled_) {
         tracked_hands = run_pose_estimation(color_frame, depth_frame, intrinsics);
     }
 
-    // --- 9. RUN COLOR TRACKING ---
+    // --- 8. RUN COLOR TRACKING ---
     // Convert depth_frame cv::Mat to rs2_intrinsics for ColorTracker
     rs2_intrinsics rs_intrinsics;
     rs_intrinsics.fx = intrinsics.fx;
@@ -322,6 +418,31 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     
     color_tracked_balls_ = color_tracker_->update(color_frame, depth_frame, rs_intrinsics,
                                                    final_tracked_objects, tracked_hands);
+
+    // --- 9. FUSE COLOR TRACKING MEASUREMENTS INTO PERSISTENT TRACKERS ---
+    // Fuse color tracking measurements into persistent trackers
+    for (const auto& color_ball : color_tracked_balls_) {
+        if (!color_ball.is_active) continue;
+        
+        // Find corresponding persistent tracker
+        for (auto& ball : logical_ball_trackers_) {
+            if (ball.logical_id == color_ball.logical_id && ball.status != TrackerStatus::LOST) {
+                // Use color position as additional measurement
+                if (color_ball.world_pos.z > 0.2f && color_ball.world_pos.z < 2.0f) {
+                    ball.kf.update(KalmanFilter3D::MeasurementVector(
+                        color_ball.world_pos.x, color_ball.world_pos.y, color_ball.world_pos.z));
+                    std::ofstream debug_log("engine_debug.log", std::ios::app);
+                    debug_log << "[Color Fusion] Updated tracker " << ball.logical_id
+                              << " with color measurement at ("
+                              << color_ball.world_pos.x << ", "
+                              << color_ball.world_pos.y << ", "
+                              << color_ball.world_pos.z << ")" << std::endl;
+                    debug_log.close();
+                }
+                break;
+            }
+        }
+    }
 
     return {final_tracked_objects, tracked_hands};
 }
@@ -595,8 +716,7 @@ std::vector<byte_track::Object> DNNTracker::postprocess_ball_detection(const cv:
 
             if (center_pixel.x >= 0 && center_pixel.x < depth_frame.cols &&
                 center_pixel.y >= 0 && center_pixel.y < depth_frame.rows) {
-                uint16_t depth_value_mm = depth_frame.at<uint16_t>(center_pixel.y, center_pixel.x);
-                float depth_value_m = depth_value_mm / 1000.0f;
+                float depth_value_m = get_filtered_depth(depth_frame, center_pixel);
                 world_pos = deproject_2d_to_3d(center_pixel, depth_value_m, intrinsics);
             }
             raw_detections.push_back({cv::Rect_<float>(left, top, width, height), world_pos, confidence, class_id_point.x});
@@ -696,9 +816,7 @@ std::vector<TrackedHand> DNNTracker::run_pose_estimation(const cv::Mat& color_fr
                 if (pixel.x >= 0 && pixel.x < depth_frame.cols &&
                     pixel.y >= 0 && pixel.y < depth_frame.rows) {
                     
-                    uint16_t depth_value_mm = depth_frame.at<uint16_t>(static_cast<int>(pixel.y),
-                                                                        static_cast<int>(pixel.x));
-                    float depth_value_m = depth_value_mm / 1000.0f;
+                    float depth_value_m = get_filtered_depth(depth_frame, pixel);
                     
                     // Deproject to 3D
                     if (depth_value_m > 0.2f && depth_value_m < 3.0f) {

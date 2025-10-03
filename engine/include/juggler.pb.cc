@@ -255,6 +255,7 @@ PROTOBUF_CONSTEXPR FrameData::FrameData(
   , /*decltype(_impl_.raw_detections_)*/{}
   , /*decltype(_impl_.color_tracked_balls_)*/{}
   , /*decltype(_impl_.throw_catch_events_)*/{}
+  , /*decltype(_impl_.unmatched_detections_)*/{}
   , /*decltype(_impl_.color_image_b64_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.depth_image_b64_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.intrinsics_)*/nullptr
@@ -514,6 +515,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.frame_height_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.frame_number_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.raw_detections_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.unmatched_detections_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.color_image_b64_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.depth_image_b64_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::FrameData, _impl_.ir_projector_active_),
@@ -586,10 +588,10 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 123, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
   { 134, -1, -1, sizeof(::juggler::v1::SystemStatus)},
   { 147, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 168, 176, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 178, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 202, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 210, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 169, 177, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 179, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 203, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 211, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -663,7 +665,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   " \001(\010\022\026\n\016engine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001("
   "\001\022\023\n\013frame_count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\r"
   "error_message\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001("
-  "\004\"\235\004\n\tFrameData\022\024\n\014timestamp_us\030\001 \001(\004\022\037\n"
+  "\004\"\326\004\n\tFrameData\022\024\n\014timestamp_us\030\001 \001(\004\022\037\n"
   "\005balls\030\002 \003(\0132\020.juggler.v1.Ball\022\037\n\005hands\030"
   "\003 \003(\0132\020.juggler.v1.Hand\022%\n\010imu_data\030\004 \003("
   "\0132\023.juggler.v1.IMUData\0220\n\nintrinsics\030\005 \001"
@@ -671,45 +673,46 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "us\030\006 \001(\0132\030.juggler.v1.SystemStatus\022\023\n\013fr"
   "ame_width\030\007 \001(\r\022\024\n\014frame_height\030\010 \001(\r\022\024\n"
   "\014frame_number\030\t \001(\r\0221\n\016raw_detections\030\n "
-  "\003(\0132\031.juggler.v1.BoundingBox2D\022\027\n\017color_"
-  "image_b64\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014"
-  "\022\033\n\023ir_projector_active\030\r \001(\010\0229\n\023color_t"
-  "racked_balls\030\016 \003(\0132\034.juggler.v1.ColorTra"
-  "ckedBall\0227\n\022throw_catch_events\030\017 \003(\0132\033.j"
-  "uggler.v1.ThrowCatchEvent\"\346\007\n\016CommandReq"
-  "uest\0224\n\004type\030\001 \001(\0162&.juggler.v1.CommandR"
-  "equest.CommandType\022\023\n\013module_name\030\002 \001(\t\022"
-  "\024\n\014timestamp_us\030\003 \001(\004\022/\n\rcolor_command\030\004"
-  " \001(\0132\030.juggler.v1.ColorCommand\022\?\n\013module"
-  "_args\030\005 \003(\0132*.juggler.v1.CommandRequest."
-  "ModuleArgsEntry\022\034\n\024camera_settings_file\030"
-  "\006 \001(\t\022\024\n\014camera_width\030\007 \001(\r\022\025\n\rcamera_he"
-  "ight\030\010 \001(\r\022\022\n\ncamera_fps\030\t \001(\r\022\037\n\027logica"
-  "l_id_to_calibrate\030\n \001(\005\0222\n\025calibration_p"
-  "ixel_pos\030\013 \001(\0132\023.juggler.v1.Vector2\022\036\n\026r"
-  "ecord_with_yolo_boxes\030\014 \001(\010\022#\n\033record_wi"
-  "th_bytetrack_boxes\030\r \001(\010\022\032\n\022pose_model_e"
-  "nabled\030\016 \001(\010\022\022\n\ncolor_name\030\017 \001(\t\022\017\n\007clic"
-  "k_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014feature_na"
-  "me\030\022 \001(\t\0321\n\017ModuleArgsEntry\022\013\n\003key\030\001 \001(\t"
-  "\022\r\n\005value\030\002 \001(\t:\0028\001\"\354\002\n\013CommandType\022\013\n\007U"
-  "NKNOWN\020\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rUNLOAD_MODU"
-  "LE\020\002\022\026\n\022SEND_COLOR_COMMAND\020\003\022\024\n\020CONFIGUR"
-  "E_MODULE\020\004\022\020\n\014RECORD_START\020\005\022\033\n\027RECORD_C"
-  "ONTINUOUS_START\020\006\022\032\n\026RECORD_CONTINUOUS_S"
-  "TOP\020\007\022 \n\034RESTART_WITH_CAMERA_SETTINGS\020\010\022"
-  "\017\n\013CAMERA_STOP\020\t\022\020\n\014CAMERA_START\020\n\022\024\n\020CA"
-  "LIBRATE_OBJECT\020\013\022\032\n\026SET_POSE_MODEL_ENABL"
-  "ED\020\014\022\023\n\017CALIBRATE_COLOR\020\r\022\022\n\016ENABLE_FEAT"
-  "URE\020\016\022\023\n\017DISABLE_FEATURE\020\017\"A\n\014ColorComma"
-  "nd\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.jug"
-  "gler.v1.Color\"I\n\017CommandResponse\022\017\n\007succ"
-  "ess\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014timestamp_"
-  "us\030\003 \001(\004b\006proto3"
+  "\003(\0132\031.juggler.v1.BoundingBox2D\0227\n\024unmatc"
+  "hed_detections\030\020 \003(\0132\031.juggler.v1.Boundi"
+  "ngBox2D\022\027\n\017color_image_b64\030\013 \001(\014\022\027\n\017dept"
+  "h_image_b64\030\014 \001(\014\022\033\n\023ir_projector_active"
+  "\030\r \001(\010\0229\n\023color_tracked_balls\030\016 \003(\0132\034.ju"
+  "ggler.v1.ColorTrackedBall\0227\n\022throw_catch"
+  "_events\030\017 \003(\0132\033.juggler.v1.ThrowCatchEve"
+  "nt\"\346\007\n\016CommandRequest\0224\n\004type\030\001 \001(\0162&.ju"
+  "ggler.v1.CommandRequest.CommandType\022\023\n\013m"
+  "odule_name\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/"
+  "\n\rcolor_command\030\004 \001(\0132\030.juggler.v1.Color"
+  "Command\022\?\n\013module_args\030\005 \003(\0132*.juggler.v"
+  "1.CommandRequest.ModuleArgsEntry\022\034\n\024came"
+  "ra_settings_file\030\006 \001(\t\022\024\n\014camera_width\030\007"
+  " \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n\ncamera_fp"
+  "s\030\t \001(\r\022\037\n\027logical_id_to_calibrate\030\n \001(\005"
+  "\0222\n\025calibration_pixel_pos\030\013 \001(\0132\023.juggle"
+  "r.v1.Vector2\022\036\n\026record_with_yolo_boxes\030\014"
+  " \001(\010\022#\n\033record_with_bytetrack_boxes\030\r \001("
+  "\010\022\032\n\022pose_model_enabled\030\016 \001(\010\022\022\n\ncolor_n"
+  "ame\030\017 \001(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030\021 "
+  "\001(\005\022\024\n\014feature_name\030\022 \001(\t\0321\n\017ModuleArgsE"
+  "ntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\354\002\n"
+  "\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE"
+  "\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMM"
+  "AND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_ST"
+  "ART\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026RE"
+  "CORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WITH_C"
+  "AMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CAM"
+  "ERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026SET"
+  "_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COLOR"
+  "\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_FEATUR"
+  "E\020\017\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005"
+  "color\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017Comman"
+  "dResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 "
+  "\001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 3656, descriptor_table_protodef_juggler_2eproto,
+    false, false, 3713, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 18,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -5387,6 +5390,7 @@ FrameData::FrameData(const FrameData& from)
     , decltype(_impl_.raw_detections_){from._impl_.raw_detections_}
     , decltype(_impl_.color_tracked_balls_){from._impl_.color_tracked_balls_}
     , decltype(_impl_.throw_catch_events_){from._impl_.throw_catch_events_}
+    , decltype(_impl_.unmatched_detections_){from._impl_.unmatched_detections_}
     , decltype(_impl_.color_image_b64_){}
     , decltype(_impl_.depth_image_b64_){}
     , decltype(_impl_.intrinsics_){nullptr}
@@ -5438,6 +5442,7 @@ inline void FrameData::SharedCtor(
     , decltype(_impl_.raw_detections_){arena}
     , decltype(_impl_.color_tracked_balls_){arena}
     , decltype(_impl_.throw_catch_events_){arena}
+    , decltype(_impl_.unmatched_detections_){arena}
     , decltype(_impl_.color_image_b64_){}
     , decltype(_impl_.depth_image_b64_){}
     , decltype(_impl_.intrinsics_){nullptr}
@@ -5476,6 +5481,7 @@ inline void FrameData::SharedDtor() {
   _impl_.raw_detections_.~RepeatedPtrField();
   _impl_.color_tracked_balls_.~RepeatedPtrField();
   _impl_.throw_catch_events_.~RepeatedPtrField();
+  _impl_.unmatched_detections_.~RepeatedPtrField();
   _impl_.color_image_b64_.Destroy();
   _impl_.depth_image_b64_.Destroy();
   if (this != internal_default_instance()) delete _impl_.intrinsics_;
@@ -5498,6 +5504,7 @@ void FrameData::Clear() {
   _impl_.raw_detections_.Clear();
   _impl_.color_tracked_balls_.Clear();
   _impl_.throw_catch_events_.Clear();
+  _impl_.unmatched_detections_.Clear();
   _impl_.color_image_b64_.ClearToEmpty();
   _impl_.depth_image_b64_.ClearToEmpty();
   if (GetArenaForAllocation() == nullptr && _impl_.intrinsics_ != nullptr) {
@@ -5672,6 +5679,19 @@ const char* FrameData::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx
         } else
           goto handle_unusual;
         continue;
+      // repeated .juggler.v1.BoundingBox2D unmatched_detections = 16;
+      case 16:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 130)) {
+          ptr -= 2;
+          do {
+            ptr += 2;
+            ptr = ctx->ParseMessage(_internal_add_unmatched_detections(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<130>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
       default:
         goto handle_unusual;
     }  // switch
@@ -5805,6 +5825,14 @@ uint8_t* FrameData::_InternalSerialize(
         InternalWriteMessage(15, repfield, repfield.GetCachedSize(), target, stream);
   }
 
+  // repeated .juggler.v1.BoundingBox2D unmatched_detections = 16;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_unmatched_detections_size()); i < n; i++) {
+    const auto& repfield = this->_internal_unmatched_detections(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(16, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -5859,6 +5887,13 @@ size_t FrameData::ByteSizeLong() const {
   // repeated .juggler.v1.ThrowCatchEvent throw_catch_events = 15;
   total_size += 1UL * this->_internal_throw_catch_events_size();
   for (const auto& msg : this->_impl_.throw_catch_events_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.BoundingBox2D unmatched_detections = 16;
+  total_size += 2UL * this->_internal_unmatched_detections_size();
+  for (const auto& msg : this->_impl_.unmatched_detections_) {
     total_size +=
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
   }
@@ -5940,6 +5975,7 @@ void FrameData::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROT
   _this->_impl_.raw_detections_.MergeFrom(from._impl_.raw_detections_);
   _this->_impl_.color_tracked_balls_.MergeFrom(from._impl_.color_tracked_balls_);
   _this->_impl_.throw_catch_events_.MergeFrom(from._impl_.throw_catch_events_);
+  _this->_impl_.unmatched_detections_.MergeFrom(from._impl_.unmatched_detections_);
   if (!from._internal_color_image_b64().empty()) {
     _this->_internal_set_color_image_b64(from._internal_color_image_b64());
   }
@@ -5994,6 +6030,7 @@ void FrameData::InternalSwap(FrameData* other) {
   _impl_.raw_detections_.InternalSwap(&other->_impl_.raw_detections_);
   _impl_.color_tracked_balls_.InternalSwap(&other->_impl_.color_tracked_balls_);
   _impl_.throw_catch_events_.InternalSwap(&other->_impl_.throw_catch_events_);
+  _impl_.unmatched_detections_.InternalSwap(&other->_impl_.unmatched_detections_);
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.color_image_b64_, lhs_arena,
       &other->_impl_.color_image_b64_, rhs_arena

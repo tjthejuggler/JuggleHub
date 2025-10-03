@@ -45,19 +45,6 @@ std::vector<ColorTrackedBall> ColorTracker::update(
     const std::vector<TrackedObject>& bytetrack_objects,
     const std::vector<TrackedHand>& tracked_hands) {
     
-    // Step 0: Kalman prediction for all active balls
-    const float dt = 1.0f / 30.0f; // Assume 30fps
-    for (auto& ball : tracked_balls_) {
-        if (ball.is_active) {
-            // Predict next state using ball physics (with gravity)
-            ball.kf.predict_ball(dt);
-            
-            // Store predicted position for search guidance
-            Eigen::Vector3f predicted_pos = ball.kf.get_position();
-            ball.predicted_world_pos = cv::Point3f(predicted_pos.x(), predicted_pos.y(), predicted_pos.z());
-        }
-    }
-    
     // Convert to HSV once for all operations
     cv::Mat hsv_frame;
     cv::cvtColor(color_frame, hsv_frame, cv::COLOR_BGR2HSV);
@@ -246,7 +233,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                  " to detection at (", center.x, ",", center.y,
                  ") with color ", matched_color, " (confidence: ", matched_confidence, ")");
         
-        // Get depth and initialize Kalman filter
+        // Get depth and world position
         if (center.x >= 0 && center.x < depth_frame.cols &&
             center.y >= 0 && center.y < depth_frame.rows) {
             uint16_t depth_mm = depth_frame.at<uint16_t>(
@@ -255,9 +242,6 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             
             if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
                 ball.world_pos = deprojectToWorld(center, depth_m, intrinsics);
-                ball.kf.init(KalmanFilter3D::MeasurementVector(
-                    ball.world_pos.x, ball.world_pos.y, ball.world_pos.z));
-                ball.predicted_world_pos = ball.world_pos;
             }
         }
     }
@@ -318,7 +302,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                     ball.color_match_confidence = matchesColorProfile(hsv_frame, close_blob, *profile);
                     found_this_frame = true;
                     
-                    // Update world position and Kalman filter
+                    // Update world position
                     if (close_blob.x >= 0 && close_blob.x < depth_frame.cols &&
                         close_blob.y >= 0 && close_blob.y < depth_frame.rows) {
                         uint16_t depth_mm = depth_frame.at<uint16_t>(
@@ -326,30 +310,13 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                         float depth_m = depth_mm / 1000.0f;
                         
                         if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                            cv::Point3f measured_pos = deprojectToWorld(close_blob, depth_m, intrinsics);
-                            
-                            // Update Kalman filter with measurement
-                            KalmanFilter3D::MeasurementVector measurement(
-                                measured_pos.x, measured_pos.y, measured_pos.z);
-                            ball.kf.update(measurement);
-                            
-                            // Use Kalman-filtered position as final position
-                            Eigen::Vector3f filtered_pos = ball.kf.get_position();
-                            ball.world_pos = cv::Point3f(filtered_pos.x(), filtered_pos.y(), filtered_pos.z());
+                            ball.world_pos = deprojectToWorld(close_blob, depth_m, intrinsics);
                         }
                     }
                 } else {
                     // No color visible at all - fall back to wrist position as last resort
                     ball.pixel_pos = wrist_2d;
-                    
-                    // Update Kalman filter with wrist measurement
-                    KalmanFilter3D::MeasurementVector measurement(
-                        hand.wrist_pos_3d.x, hand.wrist_pos_3d.y, hand.wrist_pos_3d.z);
-                    ball.kf.update(measurement);
-                    
-                    // Use Kalman-filtered position
-                    Eigen::Vector3f filtered_pos = ball.kf.get_position();
-                    ball.world_pos = cv::Point3f(filtered_pos.x(), filtered_pos.y(), filtered_pos.z());
+                    ball.world_pos = hand.wrist_pos_3d;
                     ball.frames_since_seen = 0;  // Reset counter since we're tracking via wrist
                     found_this_frame = true;
                 }
@@ -390,7 +357,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 ball.color_match_confidence = matchesColorProfile(hsv_frame, best_match, *profile);
                 found_this_frame = true;
                 
-                // Update world position and Kalman filter
+                // Update world position
                 if (best_match.x >= 0 && best_match.x < depth_frame.cols &&
                     best_match.y >= 0 && best_match.y < depth_frame.rows) {
                     uint16_t depth_mm = depth_frame.at<uint16_t>(
@@ -398,30 +365,15 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                     float depth_m = depth_mm / 1000.0f;
                     
                     if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                        cv::Point3f measured_pos = deprojectToWorld(best_match, depth_m, intrinsics);
-                        
-                        // Update Kalman filter with measurement
-                        KalmanFilter3D::MeasurementVector measurement(
-                            measured_pos.x, measured_pos.y, measured_pos.z);
-                        ball.kf.update(measurement);
-                        
-                        // Use Kalman-filtered position as final position
-                        Eigen::Vector3f filtered_pos = ball.kf.get_position();
-                        ball.world_pos = cv::Point3f(filtered_pos.x(), filtered_pos.y(), filtered_pos.z());
+                        ball.world_pos = deprojectToWorld(best_match, depth_m, intrinsics);
                     }
                 }
             }
         }
         
-        // Step 2c: If still not found, try simple color tracking around predicted position
+        // Step 2c: If still not found, try simple color tracking around last known position
         if (!found_this_frame) {
-            // Use Kalman prediction to guide search - project predicted 3D position to 2D
-            cv::Point2f search_center = ball.pixel_pos; // Default to last known position
-            if (ball.predicted_world_pos.z > 0) {
-                // Project predicted 3D position to 2D pixel coordinates
-                search_center.x = ball.predicted_world_pos.x * intrinsics.fx / ball.predicted_world_pos.z + intrinsics.ppx;
-                search_center.y = ball.predicted_world_pos.y * intrinsics.fy / ball.predicted_world_pos.z + intrinsics.ppy;
-            }
+            cv::Point2f search_center = ball.pixel_pos; // Use last known position
             
             cv::Point2f new_pos = findLargestColorBlob(hsv_frame, *profile,
                                                       search_center, WRIST_SEARCH_RADIUS);
@@ -432,7 +384,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 ball.color_match_confidence = matchesColorProfile(hsv_frame, new_pos, *profile);
                 found_this_frame = true;
                 
-                // Update world position and Kalman filter
+                // Update world position
                 if (new_pos.x >= 0 && new_pos.x < depth_frame.cols &&
                     new_pos.y >= 0 && new_pos.y < depth_frame.rows) {
                     uint16_t depth_mm = depth_frame.at<uint16_t>(
@@ -440,16 +392,7 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                     float depth_m = depth_mm / 1000.0f;
                     
                     if (depth_m > MIN_DEPTH && depth_m < MAX_DEPTH) {
-                        cv::Point3f measured_pos = deprojectToWorld(new_pos, depth_m, intrinsics);
-                        
-                        // Update Kalman filter with measurement
-                        KalmanFilter3D::MeasurementVector measurement(
-                            measured_pos.x, measured_pos.y, measured_pos.z);
-                        ball.kf.update(measurement);
-                        
-                        // Use Kalman-filtered position as final position
-                        Eigen::Vector3f filtered_pos = ball.kf.get_position();
-                        ball.world_pos = cv::Point3f(filtered_pos.x(), filtered_pos.y(), filtered_pos.z());
+                        ball.world_pos = deprojectToWorld(new_pos, depth_m, intrinsics);
                     }
                 }
             }

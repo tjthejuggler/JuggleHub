@@ -148,7 +148,8 @@ message FrameData {
   uint32 frame_number = 9;          // Sequential frame number
   
   // Optional image data (base64 encoded for streaming)
-  repeated BoundingBox2D raw_detections = 10; // New field
+  repeated BoundingBox2D raw_detections = 10; // All raw YOLO detections
+  repeated BoundingBox2D unmatched_detections = 16; // Detections that passed filtering but weren't matched
   bytes color_image_b64 = 11;      // Base64 encoded color image
   bytes depth_image_b64 = 12;      // Base64 encoded depth image
   bool ir_projector_active = 13;   // Status of the IR projector

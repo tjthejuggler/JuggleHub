@@ -3143,6 +3143,7 @@ class FrameData final :
     kRawDetectionsFieldNumber = 10,
     kColorTrackedBallsFieldNumber = 14,
     kThrowCatchEventsFieldNumber = 15,
+    kUnmatchedDetectionsFieldNumber = 16,
     kColorImageB64FieldNumber = 11,
     kDepthImageB64FieldNumber = 12,
     kIntrinsicsFieldNumber = 5,
@@ -3260,6 +3261,24 @@ class FrameData final :
   ::juggler::v1::ThrowCatchEvent* add_throw_catch_events();
   const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent >&
       throw_catch_events() const;
+
+  // repeated .juggler.v1.BoundingBox2D unmatched_detections = 16;
+  int unmatched_detections_size() const;
+  private:
+  int _internal_unmatched_detections_size() const;
+  public:
+  void clear_unmatched_detections();
+  ::juggler::v1::BoundingBox2D* mutable_unmatched_detections(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D >*
+      mutable_unmatched_detections();
+  private:
+  const ::juggler::v1::BoundingBox2D& _internal_unmatched_detections(int index) const;
+  ::juggler::v1::BoundingBox2D* _internal_add_unmatched_detections();
+  public:
+  const ::juggler::v1::BoundingBox2D& unmatched_detections(int index) const;
+  ::juggler::v1::BoundingBox2D* add_unmatched_detections();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D >&
+      unmatched_detections() const;
 
   // bytes color_image_b64 = 11;
   void clear_color_image_b64();
@@ -3384,6 +3403,7 @@ class FrameData final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D > raw_detections_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall > color_tracked_balls_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent > throw_catch_events_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D > unmatched_detections_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_image_b64_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr depth_image_b64_;
     ::juggler::v1::CameraIntrinsics* intrinsics_;
@@ -7461,6 +7481,46 @@ inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingB
 FrameData::raw_detections() const {
   // @@protoc_insertion_point(field_list:juggler.v1.FrameData.raw_detections)
   return _impl_.raw_detections_;
+}
+
+// repeated .juggler.v1.BoundingBox2D unmatched_detections = 16;
+inline int FrameData::_internal_unmatched_detections_size() const {
+  return _impl_.unmatched_detections_.size();
+}
+inline int FrameData::unmatched_detections_size() const {
+  return _internal_unmatched_detections_size();
+}
+inline void FrameData::clear_unmatched_detections() {
+  _impl_.unmatched_detections_.Clear();
+}
+inline ::juggler::v1::BoundingBox2D* FrameData::mutable_unmatched_detections(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.unmatched_detections)
+  return _impl_.unmatched_detections_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D >*
+FrameData::mutable_unmatched_detections() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.unmatched_detections)
+  return &_impl_.unmatched_detections_;
+}
+inline const ::juggler::v1::BoundingBox2D& FrameData::_internal_unmatched_detections(int index) const {
+  return _impl_.unmatched_detections_.Get(index);
+}
+inline const ::juggler::v1::BoundingBox2D& FrameData::unmatched_detections(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.unmatched_detections)
+  return _internal_unmatched_detections(index);
+}
+inline ::juggler::v1::BoundingBox2D* FrameData::_internal_add_unmatched_detections() {
+  return _impl_.unmatched_detections_.Add();
+}
+inline ::juggler::v1::BoundingBox2D* FrameData::add_unmatched_detections() {
+  ::juggler::v1::BoundingBox2D* _add = _internal_add_unmatched_detections();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.unmatched_detections)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D >&
+FrameData::unmatched_detections() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.unmatched_detections)
+  return _impl_.unmatched_detections_;
 }
 
 // bytes color_image_b64 = 11;

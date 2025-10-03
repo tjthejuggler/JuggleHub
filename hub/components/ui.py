@@ -1530,6 +1530,12 @@ if PYQT_AVAILABLE:
             self.show_raw_detections_toggle.clicked.connect(self.toggle_overlays)
             toggles_layout.addWidget(self.show_raw_detections_toggle)
 
+            self.show_unmatched_detections_toggle = QPushButton("Unmatched Detections")
+            self.show_unmatched_detections_toggle.setCheckable(True)
+            self.show_unmatched_detections_toggle.setChecked(True)
+            self.show_unmatched_detections_toggle.clicked.connect(self.toggle_overlays)
+            toggles_layout.addWidget(self.show_unmatched_detections_toggle)
+
             self.show_tracked_boxes_toggle = QPushButton("ByteTrack Boxes")
             self.show_tracked_boxes_toggle.setCheckable(True)
             self.show_tracked_boxes_toggle.setChecked(False)
@@ -2008,6 +2014,12 @@ if PYQT_AVAILABLE:
             if self.show_raw_detections_toggle.isChecked():
                 painter.setPen(QPen(QColor(255, 0, 0, 100), 2)) # Semi-transparent red
                 for det in frame_data.raw_detections:
+                    painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
+
+            # --- Draw Unmatched Detections ---
+            if self.show_unmatched_detections_toggle.isChecked():
+                painter.setPen(QPen(QColor(255, 255, 0, 150), 2)) # Yellow
+                for det in frame_data.unmatched_detections:
                     painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
 
             # --- Draw ByteTrack Boxes ---

@@ -1,14 +1,25 @@
 #include "Engine.hpp"
 #include <iostream>
+#include <fstream>
 
 int main(int argc, char* argv[]) {
+    // Create debug log file at startup
+    std::ofstream debug_log("engine_debug.log", std::ios::out | std::ios::trunc);
+    debug_log << "=== ENGINE STARTED ===" << std::endl;
+    debug_log << "Build: 3D MATCHING - 2025-10-03" << std::endl;
+    debug_log << "╔════════════════════════════════════════╗" << std::endl;
+    debug_log << "║  ENGINE WITH 3D MATCHING - BUILD 2025 ║" << std::endl;
+    debug_log << "║  If you see this, new code is loaded  ║" << std::endl;
+    debug_log << "╚════════════════════════════════════════╝" << std::endl;
+    debug_log.close();
+
     Engine::OutputFormat format = Engine::OutputFormat::DEFAULT;
     bool use_dnn_tracker = false;
     bool verbose = false;
     std::string device_name = "CPU"; // Default to CPU
     std::string camera_settings_path = ""; // Path to camera settings JSON file
     std::string model_name = "yolo11n"; // Default to yolo11n
-    std::string pose_model_name = "yolo-pose"; // Default to yolo-pose
+    std::string pose_model_name = "yolo11n-pose"; // Default to yolo11n-pose
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];

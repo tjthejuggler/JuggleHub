@@ -39,18 +39,16 @@ struct ColorTrackedBall {
     int logical_id;                    // Persistent ID (0, 1, 2 for 3 balls)
     std::string color_name;            // Associated color profile name
     cv::Point2f pixel_pos;             // Current 2D position
-    cv::Point3f world_pos;             // Current 3D position (Kalman-filtered)
-    cv::Point3f predicted_world_pos;   // Kalman prediction for next frame
+    cv::Point3f world_pos;             // Current 3D position (from depth measurement)
     bool is_active;                    // Whether this tracker is currently tracking
     int associated_wrist_id;           // -1 if not associated, 0=left, 1=right if associated
     int frames_since_seen;             // Counter for tracking loss
     int frames_since_deactivated;      // Counter for preventing immediate reactivation
     float color_match_confidence;      // Color match confidence (0.0-1.0)
-    KalmanFilter3D kf;                 // Kalman filter for position smoothing
     
     ColorTrackedBall()
         : logical_id(-1), color_name(""), pixel_pos(-1, -1), world_pos(0, 0, 0),
-          predicted_world_pos(0, 0, 0), is_active(false), associated_wrist_id(-1),
+          is_active(false), associated_wrist_id(-1),
           frames_since_seen(0), frames_since_deactivated(999), color_match_confidence(0.0f) {}
 };
 

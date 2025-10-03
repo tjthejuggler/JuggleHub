@@ -142,13 +142,15 @@ void Engine::run() {
             auto [tracker_results, tracked_hands] = dnn_tracker_->update(color_image, depth_image, camera_intrinsics_);
             tracked_objects = tracker_results;
             
-            // Get the raw detections and color-tracked balls from DNNTracker
+            // Get the raw detections, unmatched detections, and color-tracked balls from DNNTracker
             last_raw_detections_ = dnn_tracker_->get_last_raw_detections();
+            auto unmatched_detections = dnn_tracker_->get_unmatched_detections();
             color_tracked_balls = dnn_tracker_->get_color_tracked_balls();
             
             DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": DNNTracker returned ",
-                      tracked_objects.size(), " tracked objects and ",
-                      last_raw_detections_.size(), " raw detections.");
+                      tracked_objects.size(), " tracked objects, ",
+                      last_raw_detections_.size(), " raw detections, and ",
+                      unmatched_detections.size(), " unmatched detections.");
 
             for (const auto& hand_obj : tracked_hands) {
                 auto* hand = frame_data.add_hands();
@@ -211,6 +213,17 @@ void Engine::run() {
                 raw_det_pb->set_height(det.box.height);
                 raw_det_pb->set_confidence(det.confidence);
                 raw_det_pb->set_class_id(det.class_id);
+            }
+
+            // Populate unmatched detections in protobuf
+            for (const auto& det : unmatched_detections) {
+                auto* unmatched_det_pb = frame_data.add_unmatched_detections();
+                unmatched_det_pb->set_x(det.box.x);
+                unmatched_det_pb->set_y(det.box.y);
+                unmatched_det_pb->set_width(det.box.width);
+                unmatched_det_pb->set_height(det.box.height);
+                unmatched_det_pb->set_confidence(det.confidence);
+                unmatched_det_pb->set_class_id(det.class_id);
             }
 
             last_tracked_objects_ = tracked_objects;

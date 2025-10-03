@@ -61,6 +61,7 @@ public:
     void calibrate_color(const std::string& color_name, const cv::Point& click_point);
     const std::vector<PersistentTracker>& get_ball_trackers() const { return logical_ball_trackers_; }
     const std::vector<Detection>& get_last_raw_detections() const { return last_raw_detections_; }
+    const std::vector<Detection>& get_unmatched_detections() const { return unmatched_detections_; }
     const std::vector<juggler::ColorTrackedBall>& get_color_tracked_balls() const { return color_tracked_balls_; }
     static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
     
@@ -99,6 +100,7 @@ private:
 
     // --- State Caching ---
     std::vector<Detection> last_raw_detections_;
+    std::vector<Detection> unmatched_detections_;
     cv::Mat last_color_frame_; // For color calibration
 
     // Model & Preprocessing Parameters

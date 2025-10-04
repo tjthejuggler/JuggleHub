@@ -80,14 +80,19 @@ static float calculate_distance(const cv::Point3f& p1, const cv::Point3f& p2) {
 }
 
 // Helper function to compute color channel dominance for relative matching
-// Returns scores for how "green", "pink", and "orange" a detection is
+// Returns scores for ALL colors to determine which detection is "most" of each color
 struct ColorScores {
     float green_score = 0.0f;
     float pink_score = 0.0f;
     float orange_score = 0.0f;
+    float yellow_score = 0.0f;
+    float red_score = 0.0f;
+    float blue_score = 0.0f;
+    float purple_score = 0.0f;
+    float white_score = 0.0f;
 };
 
-static ColorScores compute_color_scores(const cv::Mat& color_frame, const Detection& detection) {
+static ColorScores compute_color_dominance(const cv::Mat& color_frame, const Detection& detection) {
     ColorScores scores;
     
     // Get detection center
@@ -106,8 +111,8 @@ static ColorScores compute_color_scores(const cv::Mat& color_frame, const Detect
     cv::Mat hsv_frame;
     cv::cvtColor(color_frame, hsv_frame, cv::COLOR_BGR2HSV);
     
-    // Sample a 5x5 region around the center
-    const int sample_radius = 5;
+    // Sample a 7x7 region around the center for better averaging
+    const int sample_radius = 7;
     std::vector<cv::Vec3b> samples;
     
     for (int dy = -sample_radius; dy <= sample_radius; dy++) {
@@ -134,26 +139,68 @@ static ColorScores compute_color_scores(const cv::Mat& color_frame, const Detect
     avg_s /= samples.size();
     avg_v /= samples.size();
     
-    // Compute color scores based on HSV characteristics
-    // Green: Hue ~60-90, high saturation
-    if (avg_h >= 60 && avg_h <= 90) {
-        scores.green_score = (avg_s / 255.0f) * (avg_v / 255.0f);
+    // Color strength = saturation * value (normalized)
+    // Higher saturation and value = stronger, more vibrant color
+    float color_strength = (avg_s / 255.0f) * (avg_v / 255.0f);
+    
+    // Compute dominance scores based on HSV hue ranges
+    // Each color gets a score if the hue falls in its range
+    
+    // Green: Hue 45-75 (centered at 60)
+    if (avg_h >= 45 && avg_h <= 75) {
+        scores.green_score = color_strength;
     }
     
-    // Pink: Hue ~160-180 or 0-10 (wraps around), medium-high saturation
-    if ((avg_h >= 160 && avg_h <= 180) || (avg_h >= 0 && avg_h <= 10)) {
-        scores.pink_score = (avg_s / 255.0f) * (avg_v / 255.0f);
+    // Yellow: Hue 20-40 (centered at 30)
+    if (avg_h >= 20 && avg_h <= 40) {
+        scores.yellow_score = color_strength;
     }
     
-    // Orange: Hue ~5-20, high saturation
+    // Orange: Hue 5-20 (centered at 12)
     if (avg_h >= 5 && avg_h <= 20) {
-        scores.orange_score = (avg_s / 255.0f) * (avg_v / 255.0f);
+        scores.orange_score = color_strength;
     }
     
-    // Yellow: Hue ~20-40
-    // (Not currently used but could be added)
+    // Red: Hue 0-10 or 170-180 (wraps around at 0/180)
+    if ((avg_h >= 0 && avg_h <= 10) || (avg_h >= 170 && avg_h <= 180)) {
+        scores.red_score = color_strength;
+    }
+    
+    // Pink: Hue 140-175 (wider range to catch various pink shades)
+    // Pink can vary significantly, so we use a broader range
+    if (avg_h >= 140 && avg_h <= 175) {
+        scores.pink_score = color_strength;
+    }
+    
+    // Purple: Hue 130-150 (centered at 140)
+    if (avg_h >= 130 && avg_h <= 150) {
+        scores.purple_score = color_strength;
+    }
+    
+    // Blue: Hue 100-130 (centered at 115)
+    if (avg_h >= 100 && avg_h <= 130) {
+        scores.blue_score = color_strength;
+    }
+    
+    // White: Low saturation, high value
+    if (avg_s < 30 && avg_v > 200) {
+        scores.white_score = avg_v / 255.0f;
+    }
     
     return scores;
+}
+
+// Helper function to get the score for a specific color name
+static float get_score_for_color(const ColorScores& scores, const std::string& color_name) {
+    if (color_name == "green") return scores.green_score;
+    if (color_name == "orange") return scores.orange_score;
+    if (color_name == "pink") return scores.pink_score;
+    if (color_name == "yellow") return scores.yellow_score;
+    if (color_name == "red") return scores.red_score;
+    if (color_name == "blue") return scores.blue_score;
+    if (color_name == "purple") return scores.purple_score;
+    if (color_name == "white") return scores.white_score;
+    return 0.0f;
 }
 
 // Helper function to check if a detection matches a tracker's color profile
@@ -501,172 +548,97 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
                   << " status=" << static_cast<int>(ball_trackers_list[i]->status) << std::endl;
     }
     
+    // --- NEW: COLOR-DOMINATED ASSIGNMENT ---
+    // Instead of using Kalman predictions for matching, use color dominance as PRIMARY identity
     if (!ball_trackers_list.empty() && !valid_detections.empty()) {
-        // Build cost matrix with COLOR-CONSTRAINED matching
-        // Trackers can ONLY match detections of their assigned color (HARD CONSTRAINT)
-        std::vector<std::vector<float>> cost_matrix(
-            ball_trackers_list.size(),
-            std::vector<float>(valid_detections.size(), std::numeric_limits<float>::max())
-        );
+        std::ofstream color_log("engine_debug.log", std::ios::app);
+        color_log << "\n[COLOR-DOMINATED] Starting color-based assignment" << std::endl;
+        color_log << "[COLOR-DOMINATED] " << ball_trackers_list.size() << " active trackers, "
+                  << valid_detections.size() << " valid detections" << std::endl;
         
-        std::ofstream cost_log("engine_debug.log", std::ios::app);
-        cost_log << "\n[COLOR-CONSTRAINED] Building cost matrix with HARD color constraints" << std::endl;
-        
-        // First, compute color scores for ALL detections (do this once)
+        // Step 1: Compute color dominance scores for ALL detections (do this once)
         std::vector<ColorScores> detection_color_scores;
         for (size_t j = 0; j < valid_detections.size(); ++j) {
-            detection_color_scores.push_back(compute_color_scores(last_color_frame_, *valid_detections[j]));
+            ColorScores scores = compute_color_dominance(last_color_frame_, *valid_detections[j]);
+            detection_color_scores.push_back(scores);
+            
+            color_log << "[COLOR-DOMINATED] Detection " << j << " color scores: "
+                      << "green=" << scores.green_score << " "
+                      << "orange=" << scores.orange_score << " "
+                      << "pink=" << scores.pink_score << " "
+                      << "yellow=" << scores.yellow_score << " "
+                      << "red=" << scores.red_score << " "
+                      << "blue=" << scores.blue_score << std::endl;
         }
         
-        for (size_t i = 0; i < ball_trackers_list.size(); ++i) {
-            ball_trackers_list[i]->update_from_kf();
-            Eigen::Vector3d predicted_pos = ball_trackers_list[i]->position;
-            auto* tracker = ball_trackers_list[i];
-            
-            cost_log << "[COLOR-CONSTRAINED] Tracker " << tracker->logical_id
-                     << " has_color=" << tracker->has_color_assignment
-                     << " color=" << tracker->assigned_color_name << std::endl;
-            
-            // If tracker has no color assignment, it can match any detection
+        // Step 2: For each tracker with a color assignment, find the detection with HIGHEST score for that color
+        std::set<int> matched_detection_indices;
+        
+        for (auto* tracker : ball_trackers_list) {
             if (!tracker->has_color_assignment || tracker->assigned_color_name.empty()) {
-                cost_log << "[COLOR-CONSTRAINED]   WARNING: Tracker has no color assignment!" << std::endl;
-                for (size_t j = 0; j < valid_detections.size(); ++j) {
-                    float spatial_dist = calculate_distance(predicted_pos, valid_detections[j]->world_pos);
-                    cost_matrix[i][j] = spatial_dist;
-                }
+                color_log << "[COLOR-DOMINATED] Tracker " << tracker->logical_id
+                          << " has no color assignment - skipping" << std::endl;
                 continue;
             }
             
-            // HARD CONSTRAINT: Only consider detections that score HIGHEST for tracker's color
+            color_log << "[COLOR-DOMINATED] Tracker " << tracker->logical_id
+                      << " looking for color '" << tracker->assigned_color_name << "'" << std::endl;
+            
+            // Find detection with HIGHEST score for this tracker's color
+            int best_detection_idx = -1;
+            float best_score = 0.1f; // Minimum threshold
+            
             for (size_t j = 0; j < valid_detections.size(); ++j) {
+                // Skip already matched detections
+                if (matched_detection_indices.count(j) > 0) continue;
+                
                 const ColorScores& scores = detection_color_scores[j];
+                float score = get_score_for_color(scores, tracker->assigned_color_name);
                 
-                // Get the score for the tracker's assigned color
-                float tracker_color_score = 0.0f;
-                if (tracker->assigned_color_name == "green") tracker_color_score = scores.green_score;
-                else if (tracker->assigned_color_name == "pink") tracker_color_score = scores.pink_score;
-                else if (tracker->assigned_color_name == "orange") tracker_color_score = scores.orange_score;
-                else if (tracker->assigned_color_name == "yellow") tracker_color_score = 0.0f;
+                color_log << "[COLOR-DOMINATED]   Detection " << j << " score for "
+                          << tracker->assigned_color_name << ": " << score << std::endl;
                 
-                // Check if this detection scores HIGHEST for the tracker's color
-                float max_score = std::max({scores.green_score, scores.pink_score, scores.orange_score});
-                bool is_correct_color = false;
-                
-                if (tracker->assigned_color_name == "green" && scores.green_score >= max_score && scores.green_score > 0.1f) {
-                    is_correct_color = true;
-                } else if (tracker->assigned_color_name == "pink" && scores.pink_score >= max_score && scores.pink_score > 0.1f) {
-                    is_correct_color = true;
-                } else if (tracker->assigned_color_name == "orange" && scores.orange_score >= max_score && scores.orange_score > 0.1f) {
-                    is_correct_color = true;
+                if (score > best_score) {
+                    best_score = score;
+                    best_detection_idx = j;
                 }
-                
-                cost_log << "[COLOR-CONSTRAINED]   Detection " << j << ": "
-                         << "green=" << scores.green_score << " "
-                         << "pink=" << scores.pink_score << " "
-                         << "orange=" << scores.orange_score << " "
-                         << "max=" << max_score << " "
-                         << "tracker_wants=" << tracker->assigned_color_name << " "
-                         << "is_match=" << (is_correct_color ? "YES" : "NO") << std::endl;
-                
-                // HARD CONSTRAINT: If detection is NOT the tracker's color, REJECT IT ENTIRELY
-                if (!is_correct_color) {
-                    cost_matrix[i][j] = std::numeric_limits<float>::max(); // INFINITE cost = impossible match
-                    cost_log << "[COLOR-CONSTRAINED]     -> REJECTED (wrong color)" << std::endl;
-                    continue;
-                }
-                
-                // If we get here, detection IS the correct color
-                // Now compute cost based on spatial distance + temporal consistency
-                float spatial_dist = calculate_distance(predicted_pos, valid_detections[j]->world_pos);
-                float cost = spatial_dist;
-                
-                // Temporal consistency bonus
-                if (tracker->last_matched_detection_index == static_cast<int>(j)) {
-                    const float TEMPORAL_BONUS = 0.05f; // 5cm bonus
-                    cost -= TEMPORAL_BONUS;
-                    cost_log << "[COLOR-CONSTRAINED]     -> temporal bonus -" << TEMPORAL_BONUS << "m" << std::endl;
-                }
-                
-                // Color confidence bonus (stronger color = lower cost)
-                if (tracker_color_score > 0.5f) {
-                    const float STRONG_COLOR_BONUS = 0.10f; // 10cm bonus for very strong color
-                    cost -= STRONG_COLOR_BONUS;
-                    cost_log << "[COLOR-CONSTRAINED]     -> strong color bonus -" << STRONG_COLOR_BONUS << "m" << std::endl;
-                }
-                
-                cost_matrix[i][j] = cost;
-                cost_log << "[COLOR-CONSTRAINED]   Final cost[" << i << "][" << j << "] = "
-                         << cost << "m (spatial=" << spatial_dist << "m)" << std::endl;
             }
-        }
-        cost_log.close();
-        
-        // Optimal assignment with 30cm threshold
-        const float MAX_ASSOCIATION_DISTANCE = 0.30f;
-        
-        // Log the complete cost matrix
-        debug_log << "[3D MATCH] Cost Matrix (" << ball_trackers_list.size()
-                  << " trackers x " << valid_detections.size() << " detections):" << std::endl;
-        for (size_t i = 0; i < ball_trackers_list.size(); ++i) {
-            debug_log << "[3D MATCH]   Tracker " << ball_trackers_list[i]->logical_id << ": ";
-            for (size_t j = 0; j < valid_detections.size(); ++j) {
-                debug_log << std::fixed << std::setprecision(3) << cost_matrix[i][j] << "m ";
+            
+            // If we found a match, assign it
+            if (best_detection_idx >= 0) {
+                const auto* detection = valid_detections[best_detection_idx];
+                
+                color_log << "[COLOR-DOMINATED] ✓ Tracker " << tracker->logical_id
+                          << " matched to detection " << best_detection_idx
+                          << " with score " << best_score << std::endl;
+                
+                // Store association for visualization
+                tracker_associations_.push_back({tracker->logical_id, best_detection_idx});
+                association_distances_.push_back(0.0f); // Not using distance anymore
+                
+                // Mark detection as matched
+                matched_detection_indices.insert(best_detection_idx);
+                
+                // Update Kalman filter with detection position (for smoothing only)
+                tracker->kf.update(KalmanFilter3D::MeasurementVector(
+                    detection->world_pos.x, detection->world_pos.y, detection->world_pos.z));
+                tracker->update_from_kf();  // Sync position field with updated Kalman state
+                tracker->status = TrackerStatus::TRACKED;
+                tracker->box_2d = detection->box;
+                tracker->frames_since_seen = 0;
+                tracker->parent_id = -1;
+                
+                debug_log << "[COLOR-DOMINATED] Tracker " << tracker->logical_id
+                          << " (" << tracker->assigned_color_name << ") matched to detection "
+                          << best_detection_idx << " with color score " << best_score << std::endl;
+            } else {
+                // No detection found for this color - tracker goes LOST immediately
+                color_log << "[COLOR-DOMINATED] ✗ Tracker " << tracker->logical_id
+                          << " (" << tracker->assigned_color_name << ") NOT MATCHED (no detection with sufficient score)" << std::endl;
+                
+                debug_log << "[COLOR-DOMINATED] Tracker " << tracker->logical_id
+                          << " NOT MATCHED (best score: " << best_score << ")" << std::endl;
             }
-            debug_log << std::endl;
-        }
-        debug_log << "[3D MATCH] Distance threshold: " << MAX_ASSOCIATION_DISTANCE << "m" << std::endl;
-        auto assignments = optimal_assignment(cost_matrix, MAX_ASSOCIATION_DISTANCE);
-        
-        debug_log << "[3D Matching] Made " << assignments.size() << " assignments" << std::endl;
-        
-        // Log assignment details
-        debug_log << "[3D MATCH] Assignments made: " << assignments.size() << std::endl;
-        for (const auto& [tracker_idx, detection_idx] : assignments) {
-            debug_log << "[3D MATCH]   Tracker " << ball_trackers_list[tracker_idx]->logical_id
-                      << " <- Detection " << detection_idx
-                      << " (distance: " << cost_matrix[tracker_idx][detection_idx] << "m)" << std::endl;
-        }
-        
-        // Log which trackers were NOT matched
-        for (size_t i = 0; i < ball_trackers_list.size(); ++i) {
-            bool matched = false;
-            for (const auto& [t_idx, d_idx] : assignments) {
-                if (t_idx == i) { matched = true; break; }
-            }
-            if (!matched) {
-                debug_log << "[3D MATCH]   Tracker " << ball_trackers_list[i]->logical_id
-                          << " NOT MATCHED (all distances > threshold)" << std::endl;
-            }
-        }
-        
-        // Apply assignments and store for visualization (Step 5: 3D Matching)
-        std::set<int> matched_detection_indices;
-        for (const auto& [tracker_idx, detection_idx] : assignments) {
-            auto* tracker = ball_trackers_list[tracker_idx];
-            const auto* detection = valid_detections[detection_idx];
-            
-            // Store association for visualization
-            tracker_associations_.push_back({tracker->logical_id, detection_idx});
-            association_distances_.push_back(cost_matrix[tracker_idx][detection_idx]);
-            
-            // Track which detections were matched
-            matched_detection_indices.insert(detection_idx);
-            
-            // Update Kalman filter
-            tracker->kf.update(KalmanFilter3D::MeasurementVector(
-                detection->world_pos.x, detection->world_pos.y, detection->world_pos.z));
-            tracker->update_from_kf();  // Sync position field with updated Kalman state
-            tracker->status = TrackerStatus::TRACKED;
-            tracker->box_2d = detection->box;
-            tracker->frames_since_seen = 0;
-            tracker->parent_id = -1;
-            
-            // ENHANCEMENT: Store last matched detection index for temporal consistency
-            tracker->last_matched_detection_index = detection_idx;
-            
-            debug_log << "[3D Matching] Tracker " << tracker->logical_id
-                      << " matched to detection at distance "
-                      << cost_matrix[tracker_idx][detection_idx] << "m" << std::endl;
         }
         
         // Store unmatched detections for visualization
@@ -676,7 +648,9 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             }
         }
         
-        debug_log << "[3D Matching] Unmatched detections: " << unmatched_detections_.size() << std::endl;
+        color_log << "[COLOR-DOMINATED] Assignment complete: " << matched_detection_indices.size()
+                  << " detections matched, " << unmatched_detections_.size() << " unmatched" << std::endl;
+        color_log.close();
         debug_log.close();
     }
     
@@ -790,7 +764,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             DetectionWithScores dws;
             dws.detection = valid_detections[j];
             dws.index = j;
-            dws.scores = compute_color_scores(last_color_frame_, *valid_detections[j]);
+            dws.scores = compute_color_dominance(last_color_frame_, *valid_detections[j]);
             
             // Check if already matched to an active tracker
             dws.already_matched = false;
@@ -815,11 +789,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             for (const auto& dws : detection_scores) {
                 if (dws.already_matched) continue;
                 
-                float score = 0.0f;
-                if (color == "green") score = dws.scores.green_score;
-                else if (color == "pink") score = dws.scores.pink_score;
-                else if (color == "orange") score = dws.scores.orange_score;
-                // Add more colors as needed
+                float score = get_score_for_color(dws.scores, color);
                 
                 if (score > best_score) {
                     best_score = score;
@@ -866,7 +836,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
                     new_tracker_positions_.push_back(best_detection->world_pos);
                     
                     auto_init_log << "[AUTO-INIT] ✅ Initialized tracker " << available_tracker->logical_id
-                              << " for color '" << color << "' with RELATIVE score " << best_score
+                              << " for color '" << color << "' with dominance score " << best_score
                               << " at position (" << best_detection->world_pos.x << ", "
                               << best_detection->world_pos.y << ", " << best_detection->world_pos.z << ")"
                               << std::endl;

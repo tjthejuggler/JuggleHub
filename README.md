@@ -2,28 +2,21 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-03 22:24:00 UTC
+**Last Updated:** 2025-01-04 14:42:00 UTC
 
-**Recent Changes (2025-10-03):**
+**Recent Changes (2025-01-04):**
+- **🎨 Color-Dominated Ball Tracking System** - Complete redesign of ball tracking to use color as the PRIMARY identity mechanism
+  - **Color Dominance Matching**: Balls are identified by which detection is "most" green, orange, pink, etc.
+  - **Simplified Algorithm**: Removed complex 3D distance-based cost matrices in favor of direct color scoring
+  - **No Kalman Predictions for Matching**: Kalman filters now used ONLY for position smoothing and velocity estimation
+  - **Enabled Color Profiles**: Only track balls for colors that are enabled in settings
+  - **Automatic Initialization**: Trackers initialize automatically based on enabled color profiles
+  - **Robust Identity**: Color-based identity prevents ID switching when balls cross paths
+  - See [`BALL_TRACKING_REDESIGN_COLORDOMINATED.md`](BALL_TRACKING_REDESIGN_COLORDOMINATED.md) for complete documentation
 - **UI Improvements:**
   - Added activity log controls - pause/resume and clear buttons to manage log output
   - Reorganized visualization toggle buttons into two rows for better space utilization
   - Reduced black space around video feed for more efficient screen usage
-- **Hybrid Color-Enhanced Kalman Tracking** - Integrated color information into Kalman-based tracking for robust ball identity tracking
-  - Color matching bonus/penalty in cost function prevents ID swaps between different colored balls
-  - Temporal consistency bonus reduces tracker flickering
-  - Automatic color assignment during tracker initialization
-  - Graceful fallback when color detection fails
-  - See [`HYBRID_COLOR_KALMAN_TRACKING.md`](HYBRID_COLOR_KALMAN_TRACKING.md) for complete documentation
-- **Added Kalman filtering to ColorTracker** - Integrated KalmanFilter3D into color-based ball tracking for improved robustness and smoothness
-  - Each ColorTrackedBall now has its own Kalman filter for temporal smoothing
-  - Predictions guide search to handle fast-moving balls
-  - Filtered positions reduce jitter and improve tracking consistency
-  - Uses ballistic motion model (predict_ball) with gravity for realistic trajectory prediction
-- Removed new color tracking system - now using legacy color tracking exclusively
-- The legacy color tracking system has proven more reliable and is now the only supported method
-- Removed Ball Management UI, API routes, and related components
-- Simplified codebase for better maintainability
 
 ## 🎯 Overview
 

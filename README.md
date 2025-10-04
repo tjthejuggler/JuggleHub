@@ -2,9 +2,16 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-01-04 14:42:00 UTC
+**Last Updated:** 2025-01-04 16:59:00 UTC
 
 **Recent Changes (2025-01-04):**
+- **🎨 Adaptive Color Range Adjustment System** - NEW! Automatic real-time color range optimization
+  - **Dynamic Range Adjustment**: HSV color ranges automatically expand/contract based on tracking success
+  - **Conflict Resolution**: Well-tracked colors move away from poorly-tracked ones to give them more space
+  - **Real-Time Adaptation**: System converges to optimal ranges within 3-5 seconds
+  - **Zero Manual Tuning**: No need to manually adjust color ranges - system learns automatically
+  - **Goal-Oriented**: Minimizes unmatched detections by finding optimal ranges for your specific balls
+  - See [`ADAPTIVE_COLOR_RANGE_SYSTEM.md`](ADAPTIVE_COLOR_RANGE_SYSTEM.md) for complete documentation
 - **🎨 Color-Dominated Ball Tracking System** - Complete redesign of ball tracking to use color as the PRIMARY identity mechanism
   - **Color Dominance Matching**: Balls are identified by which detection is "most" green, orange, pink, etc.
   - **Simplified Algorithm**: Removed complex 3D distance-based cost matrices in favor of direct color scoring

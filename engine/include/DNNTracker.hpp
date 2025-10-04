@@ -16,6 +16,7 @@
 #include "PersistentTracker.hpp" // New persistent tracker data structure
 #include "ColorTracker.hpp" // Color-based ball tracking
 #include "ThrowCatchDetector.hpp" // Throw and catch event detection
+#include "AdaptiveColorManager.hpp" // Adaptive color range adjustment
 
 // Simple struct to hold camera intrinsics needed for deprojection
 struct CameraIntrinsics {
@@ -102,6 +103,9 @@ private:
     // --- Color Tracker ---
     std::unique_ptr<juggler::ColorTracker> color_tracker_;
     std::vector<juggler::ColorTrackedBall> color_tracked_balls_;
+    
+    // --- Adaptive Color Manager ---
+    std::unique_ptr<juggler::AdaptiveColorManager> adaptive_color_manager_;
     
     // --- Throw/Catch Detector ---
     std::unique_ptr<juggler::ThrowCatchDetector> throw_catch_detector_;

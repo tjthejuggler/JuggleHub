@@ -42,6 +42,7 @@ add_executable(juggle_engine
     src/KalmanFilter3D.cpp
     src/BallTracker.cpp
     src/ColorTracker.cpp
+    src/AdaptiveColorManager.cpp
     src/ThrowCatchDetector.cpp
     src/modules/UdpBallColorModule.cpp
     src/modules/PositionToRgbModule.cpp

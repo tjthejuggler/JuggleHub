@@ -101,7 +101,7 @@ public:
     std::vector<DetectedEvent> detectEvents(
         std::vector<PersistentTracker>& balls,
         std::vector<PersistentTracker>& hands,
-        const std::vector<Detection>& raw_detections,
+        const std::vector<::Detection>& raw_detections,
         float dt
     );
     
@@ -120,7 +120,7 @@ private:
     EventEvidence evaluateCatchEvidence(
         const PersistentTracker& ball,
         const PersistentTracker& hand,
-        const Detection* detection,
+        const ::Detection* detection,
         float dt
     );
     
@@ -151,9 +151,9 @@ private:
     /**
      * @brief Find the detection that best matches a tracker
      */
-    const Detection* findMatchingDetection(
+    const ::Detection* findMatchingDetection(
         const PersistentTracker& tracker,
-        const std::vector<Detection>& detections
+        const std::vector<::Detection>& detections
     ) const;
     
     /**

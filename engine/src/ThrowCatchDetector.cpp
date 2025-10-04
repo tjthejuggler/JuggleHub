@@ -14,7 +14,7 @@ ThrowCatchDetector::ThrowCatchDetector(const Config& config) : config_(config) {
 std::vector<ThrowCatchDetector::DetectedEvent> ThrowCatchDetector::detectEvents(
     std::vector<PersistentTracker>& balls,
     std::vector<PersistentTracker>& hands,
-    const std::vector<Detection>& raw_detections,
+    const std::vector<::Detection>& raw_detections,
     float dt
 ) {
     std::vector<DetectedEvent> events;
@@ -36,7 +36,7 @@ std::vector<ThrowCatchDetector::DetectedEvent> ThrowCatchDetector::detectEvents(
         if (ball.status == TrackerStatus::LOST) continue;
         
         // Find matching detection for this ball (to get ML classification)
-        const Detection* ball_detection = findMatchingDetection(ball, raw_detections);
+        const ::Detection* ball_detection = findMatchingDetection(ball, raw_detections);
         
         // Update ML confidence if we have a detection
         if (ball_detection) {
@@ -142,7 +142,7 @@ std::vector<ThrowCatchDetector::DetectedEvent> ThrowCatchDetector::detectEvents(
 ThrowCatchDetector::EventEvidence ThrowCatchDetector::evaluateCatchEvidence(
     const PersistentTracker& ball,
     const PersistentTracker& hand,
-    const Detection* detection,
+    const ::Detection* detection,
     float dt
 ) {
     EventEvidence evidence;
@@ -270,11 +270,11 @@ float ThrowCatchDetector::calculateVelocityMagnitude(
     return velocity.norm();
 }
 
-const Detection* ThrowCatchDetector::findMatchingDetection(
+const ::Detection* ThrowCatchDetector::findMatchingDetection(
     const PersistentTracker& tracker,
-    const std::vector<Detection>& detections
+    const std::vector<::Detection>& detections
 ) const {
-    const Detection* best_match = nullptr;
+    const ::Detection* best_match = nullptr;
     float min_distance = 0.3f; // 30cm max distance for matching
     
     for (const auto& det : detections) {

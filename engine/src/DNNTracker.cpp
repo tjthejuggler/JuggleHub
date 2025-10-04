@@ -92,7 +92,8 @@ struct ColorScores {
     float white_score = 0.0f;
 };
 
-static ColorScores compute_color_dominance(const cv::Mat& color_frame, const Detection& detection) {
+static ColorScores compute_color_dominance(const cv::Mat& color_frame, const Detection& detection,
+                                           const juggler::AdaptiveColorManager* adaptive_manager = nullptr) {
     ColorScores scores;
     
     // Get detection center
@@ -143,48 +144,80 @@ static ColorScores compute_color_dominance(const cv::Mat& color_frame, const Det
     // Higher saturation and value = stronger, more vibrant color
     float color_strength = (avg_s / 255.0f) * (avg_v / 255.0f);
     
-    // Compute dominance scores based on HSV hue ranges
-    // Each color gets a score if the hue falls in its range
-    
-    // Green: Hue 45-75 (centered at 60)
-    if (avg_h >= 45 && avg_h <= 75) {
-        scores.green_score = color_strength;
-    }
-    
-    // Yellow: Hue 20-40 (centered at 30)
-    if (avg_h >= 20 && avg_h <= 40) {
-        scores.yellow_score = color_strength;
-    }
-    
-    // Orange: Hue 5-20 (centered at 12)
-    if (avg_h >= 5 && avg_h <= 20) {
-        scores.orange_score = color_strength;
-    }
-    
-    // Red: Hue 0-10 or 170-180 (wraps around at 0/180)
-    if ((avg_h >= 0 && avg_h <= 10) || (avg_h >= 170 && avg_h <= 180)) {
-        scores.red_score = color_strength;
-    }
-    
-    // Pink: Hue 140-175 (wider range to catch various pink shades)
-    // Pink can vary significantly, so we use a broader range
-    if (avg_h >= 140 && avg_h <= 175) {
-        scores.pink_score = color_strength;
-    }
-    
-    // Purple: Hue 130-150 (centered at 140)
-    if (avg_h >= 130 && avg_h <= 150) {
-        scores.purple_score = color_strength;
-    }
-    
-    // Blue: Hue 100-130 (centered at 115)
-    if (avg_h >= 100 && avg_h <= 130) {
-        scores.blue_score = color_strength;
-    }
-    
-    // White: Low saturation, high value
-    if (avg_s < 30 && avg_v > 200) {
-        scores.white_score = avg_v / 255.0f;
+    // Use adaptive ranges if available, otherwise use default ranges
+    if (adaptive_manager) {
+        const auto& profiles = adaptive_manager->getProfiles();
+        
+        for (const auto& profile : profiles) {
+            if (!profile.enabled) continue;
+            
+            // Check if hue falls within this color's adaptive range
+            bool in_range = false;
+            
+            // Check primary range
+            if (avg_h >= profile.min_hsv[0] && avg_h <= profile.max_hsv[0]) {
+                in_range = true;
+            }
+            
+            // Check secondary range (for wrap-around colors like red)
+            if (profile.min_hsv2[0] >= 0 &&
+                avg_h >= profile.min_hsv2[0] && avg_h <= profile.max_hsv2[0]) {
+                in_range = true;
+            }
+            
+            if (in_range) {
+                // Assign score based on color name
+                if (profile.name == "green") scores.green_score = color_strength;
+                else if (profile.name == "pink") scores.pink_score = color_strength;
+                else if (profile.name == "orange") scores.orange_score = color_strength;
+                else if (profile.name == "yellow") scores.yellow_score = color_strength;
+                else if (profile.name == "red") scores.red_score = color_strength;
+                else if (profile.name == "blue") scores.blue_score = color_strength;
+                else if (profile.name == "purple") scores.purple_score = color_strength;
+                else if (profile.name == "white") scores.white_score = color_strength;
+            }
+        }
+    } else {
+        // Fallback to default fixed ranges if no adaptive manager
+        // Green: Hue 45-75 (centered at 60)
+        if (avg_h >= 45 && avg_h <= 75) {
+            scores.green_score = color_strength;
+        }
+        
+        // Yellow: Hue 20-40 (centered at 30)
+        if (avg_h >= 20 && avg_h <= 40) {
+            scores.yellow_score = color_strength;
+        }
+        
+        // Orange: Hue 5-20 (centered at 12)
+        if (avg_h >= 5 && avg_h <= 20) {
+            scores.orange_score = color_strength;
+        }
+        
+        // Red: Hue 0-10 or 170-180 (wraps around at 0/180)
+        if ((avg_h >= 0 && avg_h <= 10) || (avg_h >= 170 && avg_h <= 180)) {
+            scores.red_score = color_strength;
+        }
+        
+        // Pink: Hue 140-175 (wider range to catch various pink shades)
+        if (avg_h >= 140 && avg_h <= 175) {
+            scores.pink_score = color_strength;
+        }
+        
+        // Purple: Hue 130-150 (centered at 140)
+        if (avg_h >= 130 && avg_h <= 150) {
+            scores.purple_score = color_strength;
+        }
+        
+        // Blue: Hue 100-130 (centered at 115)
+        if (avg_h >= 100 && avg_h <= 130) {
+            scores.blue_score = color_strength;
+        }
+        
+        // White: Low saturation, high value
+        if (avg_s < 30 && avg_v > 200) {
+            scores.white_score = avg_v / 255.0f;
+        }
     }
     
     return scores;
@@ -354,6 +387,27 @@ DNNTracker::DNNTracker(const std::string& ball_model_path, const std::string& po
     
     // Initialize color tracker
     color_tracker_ = std::make_unique<juggler::ColorTracker>("ball_settings.json");
+    
+    // Initialize adaptive color manager
+    juggler::AdaptationConfig adaptive_config;
+    adaptive_config.enabled = true;
+    adaptive_color_manager_ = std::make_unique<juggler::AdaptiveColorManager>(adaptive_config);
+    
+    // Initialize adaptive profiles from color tracker profiles
+    const auto& color_profiles = color_tracker_->getColorProfiles();
+    std::vector<cv::Scalar> min_hsv_values, max_hsv_values;
+    std::vector<std::string> color_names;
+    std::vector<bool> enabled_states;
+    
+    for (const auto& profile : color_profiles) {
+        min_hsv_values.push_back(profile.min_hsv);
+        max_hsv_values.push_back(profile.max_hsv);
+        color_names.push_back(profile.name);
+        enabled_states.push_back(profile.enabled);
+    }
+    
+    adaptive_color_manager_->initializeFromProfiles(min_hsv_values, max_hsv_values,
+                                                     color_names, enabled_states);
     
     // Initialize throw/catch detector
     throw_catch_detector_ = std::make_unique<juggler::ThrowCatchDetector>();
@@ -558,9 +612,29 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         
         // Step 1: Compute color dominance scores for ALL detections (do this once)
         std::vector<ColorScores> detection_color_scores;
+        std::vector<float> detection_hues;  // Store hue values for adaptive monitoring
+        
         for (size_t j = 0; j < valid_detections.size(); ++j) {
-            ColorScores scores = compute_color_dominance(last_color_frame_, *valid_detections[j]);
+            ColorScores scores = compute_color_dominance(last_color_frame_, *valid_detections[j],
+                                                         adaptive_color_manager_.get());
             detection_color_scores.push_back(scores);
+            
+            // Extract hue value for this detection
+            cv::Point2f center(
+                valid_detections[j]->box.x + valid_detections[j]->box.width / 2.0f,
+                valid_detections[j]->box.y + valid_detections[j]->box.height / 2.0f
+            );
+            
+            if (center.x >= 0 && center.x < last_color_frame_.cols &&
+                center.y >= 0 && center.y < last_color_frame_.rows) {
+                cv::Mat hsv_frame;
+                cv::cvtColor(last_color_frame_, hsv_frame, cv::COLOR_BGR2HSV);
+                cv::Vec3b hsv_pixel = hsv_frame.at<cv::Vec3b>(static_cast<int>(center.y),
+                                                               static_cast<int>(center.x));
+                detection_hues.push_back(static_cast<float>(hsv_pixel[0]));
+            } else {
+                detection_hues.push_back(0.0f);
+            }
             
             color_log << "[COLOR-DOMINATED] Detection " << j << " color scores: "
                       << "green=" << scores.green_score << " "
@@ -584,25 +658,44 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             color_log << "[COLOR-DOMINATED] Tracker " << tracker->logical_id
                       << " looking for color '" << tracker->assigned_color_name << "'" << std::endl;
             
-            // Find detection with HIGHEST score for this tracker's color
+            // Find detection with HIGHEST RELATIVE score for this tracker's color
+            // Key change: We look for the detection that is MOST of this color compared to other colors
             int best_detection_idx = -1;
-            float best_score = 0.1f; // Minimum threshold
+            float best_relative_score = -1.0f; // Can be negative if color is weak
             
             for (size_t j = 0; j < valid_detections.size(); ++j) {
                 // Skip already matched detections
                 if (matched_detection_indices.count(j) > 0) continue;
                 
                 const ColorScores& scores = detection_color_scores[j];
-                float score = get_score_for_color(scores, tracker->assigned_color_name);
+                float target_score = get_score_for_color(scores, tracker->assigned_color_name);
                 
-                color_log << "[COLOR-DOMINATED]   Detection " << j << " score for "
-                          << tracker->assigned_color_name << ": " << score << std::endl;
+                // Calculate how much MORE this detection is of the target color vs other colors
+                // This is the key: we want the detection that is MOST pink, not just has SOME pink
+                float max_other_score = 0.0f;
+                std::vector<std::string> other_colors = {"green", "orange", "pink", "yellow", "red", "blue", "purple", "white"};
+                for (const auto& other_color : other_colors) {
+                    if (other_color != tracker->assigned_color_name) {
+                        float other_score = get_score_for_color(scores, other_color);
+                        max_other_score = std::max(max_other_score, other_score);
+                    }
+                }
                 
-                if (score > best_score) {
-                    best_score = score;
+                // Relative score = how much more of target color than any other color
+                float relative_score = target_score - max_other_score;
+                
+                color_log << "[COLOR-DOMINATED]   Detection " << j << " for " << tracker->assigned_color_name
+                          << ": target=" << target_score << ", max_other=" << max_other_score
+                          << ", relative=" << relative_score << std::endl;
+                
+                if (relative_score > best_relative_score) {
+                    best_relative_score = relative_score;
                     best_detection_idx = j;
                 }
             }
+            
+            // Lower threshold for relative scoring - even slightly more pink is enough
+            float best_score = best_relative_score; // For compatibility with existing code
             
             // If we found a match, assign it
             if (best_detection_idx >= 0) {
@@ -610,7 +703,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
                 
                 color_log << "[COLOR-DOMINATED] ✓ Tracker " << tracker->logical_id
                           << " matched to detection " << best_detection_idx
-                          << " with score " << best_score << std::endl;
+                          << " with relative score " << best_relative_score << std::endl;
                 
                 // Store association for visualization
                 tracker_associations_.push_back({tracker->logical_id, best_detection_idx});
@@ -637,7 +730,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
                           << " (" << tracker->assigned_color_name << ") NOT MATCHED (no detection with sufficient score)" << std::endl;
                 
                 debug_log << "[COLOR-DOMINATED] Tracker " << tracker->logical_id
-                          << " NOT MATCHED (best score: " << best_score << ")" << std::endl;
+                          << " NOT MATCHED (best relative score: " << best_relative_score << ")" << std::endl;
             }
         }
         
@@ -650,6 +743,37 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         
         color_log << "[COLOR-DOMINATED] Assignment complete: " << matched_detection_indices.size()
                   << " detections matched, " << unmatched_detections_.size() << " unmatched" << std::endl;
+        
+        // --- ADAPTIVE COLOR MONITORING ---
+        // Build map of matched colors for monitoring
+        std::map<std::string, int> matched_colors;
+        for (auto* tracker : ball_trackers_list) {
+            if (tracker->status == TrackerStatus::TRACKED && tracker->has_color_assignment) {
+                // Find which detection was matched to this tracker
+                for (const auto& assoc : tracker_associations_) {
+                    if (assoc.first == tracker->logical_id) {
+                        matched_colors[tracker->assigned_color_name] = assoc.second;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Monitor this frame's tracking results
+        if (adaptive_color_manager_) {
+            adaptive_color_manager_->monitorFrame(matched_colors, detection_hues);
+            
+            // Periodically adjust ranges based on tracking success
+            adaptive_color_manager_->adjustRanges();
+            
+            // Log success rates for debugging
+            auto success_rates = adaptive_color_manager_->getSuccessRates();
+            color_log << "[ADAPTIVE] Current success rates:" << std::endl;
+            for (const auto& pair : success_rates) {
+                color_log << "  " << pair.first << ": " << (pair.second * 100) << "%" << std::endl;
+            }
+        }
+        
         color_log.close();
         debug_log.close();
     }
@@ -764,7 +888,8 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             DetectionWithScores dws;
             dws.detection = valid_detections[j];
             dws.index = j;
-            dws.scores = compute_color_dominance(last_color_frame_, *valid_detections[j]);
+            dws.scores = compute_color_dominance(last_color_frame_, *valid_detections[j],
+                                                 adaptive_color_manager_.get());
             
             // Check if already matched to an active tracker
             dws.already_matched = false;
@@ -781,24 +906,37 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             detection_scores.push_back(dws);
         }
         
-        // For each color that needs a tracker, find the detection with highest score for that color
+        // For each color that needs a tracker, find the detection with highest RELATIVE score
         for (const auto& color : colors_needing_trackers) {
             const Detection* best_detection = nullptr;
-            float best_score = 0.0f;
+            float best_relative_score = -999.0f;
             
             for (const auto& dws : detection_scores) {
                 if (dws.already_matched) continue;
                 
-                float score = get_score_for_color(dws.scores, color);
+                float target_score = get_score_for_color(dws.scores, color);
                 
-                if (score > best_score) {
-                    best_score = score;
+                // Calculate relative dominance
+                float max_other_score = 0.0f;
+                std::vector<std::string> other_colors = {"green", "orange", "pink", "yellow", "red", "blue", "purple", "white"};
+                for (const auto& other_color : other_colors) {
+                    if (other_color != color) {
+                        float other_score = get_score_for_color(dws.scores, other_color);
+                        max_other_score = std::max(max_other_score, other_score);
+                    }
+                }
+                
+                float relative_score = target_score - max_other_score;
+                
+                if (relative_score > best_relative_score) {
+                    best_relative_score = relative_score;
                     best_detection = dws.detection;
                 }
             }
             
-            // If we found a detection with any positive score, initialize a tracker
-            if (best_detection && best_score > 0.1f) {
+            // Initialize if this detection is more of the target color than any other color
+            // Even a small positive relative score means it's the "most" of that color
+            if (best_detection && best_relative_score > -0.5f) {
                 // Find an available (LOST) tracker slot
                 PersistentTracker* available_tracker = nullptr;
                 for (auto& ball : logical_ball_trackers_) {
@@ -836,7 +974,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
                     new_tracker_positions_.push_back(best_detection->world_pos);
                     
                     auto_init_log << "[AUTO-INIT] ✅ Initialized tracker " << available_tracker->logical_id
-                              << " for color '" << color << "' with dominance score " << best_score
+                              << " for color '" << color << "' with relative dominance score " << best_relative_score
                               << " at position (" << best_detection->world_pos.x << ", "
                               << best_detection->world_pos.y << ", " << best_detection->world_pos.z << ")"
                               << std::endl;
@@ -845,7 +983,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
                 }
             } else {
                 auto_init_log << "[AUTO-INIT] ⚠️ No detection found for color '" << color
-                          << "' (best score: " << best_score << ")" << std::endl;
+                          << "' (best relative score: " << best_relative_score << ")" << std::endl;
             }
         }
     }
@@ -1141,6 +1279,55 @@ void DNNTracker::update_setting(const std::string& key, const std::string& value
             auto config = throw_catch_detector_->getConfig();
             config.min_frames_for_event = std::stoi(value);
             throw_catch_detector_->setConfig(config);
+        }
+        // Adaptive Color Tracking Settings
+        else if (key == "adaptive_enabled") {
+            if (adaptive_color_manager_) {
+                auto config = adaptive_color_manager_->getConfig();
+                config.enabled = (value == "true" || value == "1");
+                adaptive_color_manager_->setConfig(config);
+                std::cout << "Adaptive color tracking " << (config.enabled ? "enabled" : "disabled") << std::endl;
+            }
+        }
+        else if (key == "adaptive_success_threshold") {
+            if (adaptive_color_manager_) {
+                auto config = adaptive_color_manager_->getConfig();
+                config.success_threshold = std::stof(value);
+                adaptive_color_manager_->setConfig(config);
+                std::cout << "Adaptive success threshold set to " << config.success_threshold << std::endl;
+            }
+        }
+        else if (key == "adaptive_failure_threshold") {
+            if (adaptive_color_manager_) {
+                auto config = adaptive_color_manager_->getConfig();
+                config.failure_threshold = std::stof(value);
+                adaptive_color_manager_->setConfig(config);
+                std::cout << "Adaptive failure threshold set to " << config.failure_threshold << std::endl;
+            }
+        }
+        else if (key == "adaptive_expansion_step") {
+            if (adaptive_color_manager_) {
+                auto config = adaptive_color_manager_->getConfig();
+                config.expansion_step = std::stof(value);
+                adaptive_color_manager_->setConfig(config);
+                std::cout << "Adaptive expansion step set to " << config.expansion_step << std::endl;
+            }
+        }
+        else if (key == "adaptive_contraction_step") {
+            if (adaptive_color_manager_) {
+                auto config = adaptive_color_manager_->getConfig();
+                config.contraction_step = std::stof(value);
+                adaptive_color_manager_->setConfig(config);
+                std::cout << "Adaptive contraction step set to " << config.contraction_step << std::endl;
+            }
+        }
+        else if (key == "adaptive_history_window") {
+            if (adaptive_color_manager_) {
+                auto config = adaptive_color_manager_->getConfig();
+                config.history_window_size = std::stoi(value);
+                adaptive_color_manager_->setConfig(config);
+                std::cout << "Adaptive history window set to " << config.history_window_size << " frames" << std::endl;
+            }
         }
         // Forward color tracker settings (track_*, color hue settings)
         else if (key.find("track_") == 0 || key.find("_min_hue") != std::string::npos || key.find("_max_hue") != std::string::npos) {

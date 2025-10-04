@@ -67,6 +67,7 @@ struct SimpleBall {
     bool previous_is_held;           // Previous frame state
     int held_by_hand_id;             // -1 if not held, 0=left, 1=right
     int state_change_counter;        // For debouncing state changes
+    float distance_to_nearest_wrist; // Distance to nearest wrist in meters
     
     // Tracking
     bool has_yolo_detection;         // True if YOLO sees it this frame
@@ -80,6 +81,7 @@ struct SimpleBall {
     
     SimpleBall() : id(-1), is_held(false), previous_is_held(false),
                    held_by_hand_id(-1), state_change_counter(0),
+                   distance_to_nearest_wrist(-1.0f),
                    has_yolo_detection(false), frames_without_yolo(0),
                    yolo_confidence(0.0f), color_match_score(0.0f),
                    yolo_class_id(0) {}

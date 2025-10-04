@@ -54,6 +54,7 @@ message Ball {
 
   Vector2 projected_pos_2d = 6;
   int32 logical_id = 7; // The persistent, logical ID of the ball (e.g., 0, 1, 2)
+  float distance_to_nearest_wrist = 8; // Distance to nearest wrist in meters (-1 if no hands visible)
 }
 
 // Color-tracked ball (new simplified tracking system)

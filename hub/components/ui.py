@@ -572,7 +572,7 @@ if PYQT_AVAILABLE:
                 range_max=30,
                 initial_value=15,
                 update_func=lambda v: self.update_setting('wrist_proximity_threshold', v / 100.0),  # Convert cm to m
-                is_float=True
+                is_float=False  # Display as integer cm
             )
             row += 1
             
@@ -588,7 +588,7 @@ if PYQT_AVAILABLE:
                 range_max=40,
                 initial_value=20,
                 update_func=lambda v: self.update_setting('undetected_near_hand_threshold', v / 100.0),  # Convert cm to m
-                is_float=True
+                is_float=False  # Display as integer cm
             )
             row += 1
             
@@ -1673,13 +1673,14 @@ if PYQT_AVAILABLE:
             
             # Left panel - Ball tracking
             ball_group = QGroupBox("🏀 Ball Tracking")
+            ball_group.setMinimumHeight(500)  # Set minimum height for the entire group
             ball_layout = QVBoxLayout(ball_group)
             
             self.ball_count_label = QLabel("Balls detected: 0")
             ball_layout.addWidget(self.ball_count_label)
             
             self.ball_list = QTextEdit()
-            self.ball_list.setMaximumHeight(200)
+            self.ball_list.setMinimumHeight(400)  # Set minimum height to make it taller
             self.ball_list.setReadOnly(True)
             ball_layout.addWidget(self.ball_list)
             
@@ -1805,8 +1806,17 @@ if PYQT_AVAILABLE:
             main_layout.addLayout(content_layout)
             
             # Calibration Controls Section (above activity log)
+            # Wrap in a container to align to the right
+            calibration_container = QWidget()
+            calibration_container_layout = QHBoxLayout(calibration_container)
+            calibration_container_layout.setContentsMargins(0, 0, 0, 0)
+            
             calibration_group = QGroupBox("🎨 Calibration & Visualization")
+            calibration_group.setMaximumWidth(800)  # Limit width
             calibration_layout = QVBoxLayout(calibration_group)
+            
+            calibration_container_layout.addStretch()  # Push to right
+            calibration_container_layout.addWidget(calibration_group)
             
             # --- Color Profile Controls ---
             color_profile_layout = QHBoxLayout()
@@ -2008,7 +2018,7 @@ if PYQT_AVAILABLE:
             tail_layout.addWidget(self.tail_length_label)
             calibration_layout.addLayout(tail_layout)
             
-            main_layout.addWidget(calibration_group)
+            main_layout.addWidget(calibration_container)  # Add container instead of group directly
             
             # Bottom panel - Log
             log_group = QGroupBox("📝 Activity Log")
@@ -2339,6 +2349,13 @@ if PYQT_AVAILABLE:
                     ml_status = "gone"
                 
                 ball_text += f"  ML Detection: {ml_status}\n"
+                
+                # Add distance to nearest wrist
+                if hasattr(ball, 'distance_to_nearest_wrist') and ball.distance_to_nearest_wrist >= 0:
+                    dist_cm = ball.distance_to_nearest_wrist * 100  # Convert m to cm
+                    ball_text += f"  Distance to Wrist: {dist_cm:.1f}cm\n"
+                else:
+                    ball_text += f"  Distance to Wrist: N/A\n"
                 
                 # Update tracker history using logical_id
                 if ball.logical_id not in self.tracker_history:

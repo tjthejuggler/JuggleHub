@@ -186,6 +186,43 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         }
     }
     
+    // Handle tracking settings
+    try {
+        if (key == "ml_ball_weight") {
+            tracking_settings_.ml_ball_weight = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated ml_ball_weight to " << value << std::endl;
+            return true;
+        }
+        else if (key == "ml_ball_held_weight") {
+            tracking_settings_.ml_ball_held_weight = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated ml_ball_held_weight to " << value << std::endl;
+            return true;
+        }
+        else if (key == "wrist_proximity_weight") {
+            tracking_settings_.wrist_proximity_weight = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated wrist_proximity_weight to " << value << std::endl;
+            return true;
+        }
+        else if (key == "wrist_proximity_threshold") {
+            tracking_settings_.wrist_proximity_threshold = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated wrist_proximity_threshold to " << value << "m" << std::endl;
+            return true;
+        }
+        else if (key == "undetected_near_hand_threshold") {
+            tracking_settings_.undetected_near_hand_threshold = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated undetected_near_hand_threshold to " << value << "m" << std::endl;
+            return true;
+        }
+        else if (key == "min_frames_for_state_change") {
+            tracking_settings_.min_frames_for_state_change = std::stoi(value);
+            std::cout << "[SimpleBallTracker] Updated min_frames_for_state_change to " << value << std::endl;
+            return true;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[SimpleBallTracker] Error parsing setting " << key << "=" << value << ": " << e.what() << std::endl;
+        return false;
+    }
+    
     return false;
 }
 
@@ -267,9 +304,9 @@ const Detection* SimpleBallTracker::findBestColorMatch(
 }
 
 cv::Point2f SimpleBallTracker::searchForColorBlob(const cv::Mat& hsv_frame,
-                                                 const ColorProfile& profile,
-                                                 const cv::Point2f& search_center,
-                                                 int radius) {
+                                                  const ColorProfile& profile,
+                                                  const cv::Point2f& search_center,
+                                                  int radius) {
     // Create mask for color
     cv::Mat mask1, mask2, mask;
     cv::inRange(hsv_frame, profile.min_hsv, profile.max_hsv, mask1);
@@ -285,7 +322,7 @@ cv::Point2f SimpleBallTracker::searchForColorBlob(const cv::Mat& hsv_frame,
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     
-    // Find largest contour within search radius
+    // Find largest contour (prioritize size over proximity when near hands)
     double max_area = 0;
     cv::Point2f best_center(-1, -1);
     
@@ -302,6 +339,8 @@ cv::Point2f SimpleBallTracker::searchForColorBlob(const cv::Mat& hsv_frame,
         float dist = cv::norm(center - search_center);
         if (dist > radius) continue;
         
+        // Prefer larger blobs - this helps when ball is occluded by hand
+        // The largest blob is most likely the actual ball
         if (area > max_area) {
             max_area = area;
             best_center = center;
@@ -375,7 +414,7 @@ bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHan
         in_air_score += tracking_settings_.ml_ball_weight;
     }
     
-    // 2. Wrist Proximity Evidence
+    // 2. Wrist Proximity Evidence - also store distance for UI display
     float min_dist = std::numeric_limits<float>::max();
     int closest_hand = -1;
     
@@ -387,6 +426,9 @@ bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHan
             closest_hand = hand.id;
         }
     }
+    
+    // Store distance for UI display
+    ball.distance_to_nearest_wrist = (min_dist < std::numeric_limits<float>::max()) ? min_dist : -1.0f;
     
     if (min_dist < tracking_settings_.wrist_proximity_threshold) {
         held_score += tracking_settings_.wrist_proximity_weight;
@@ -406,45 +448,47 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
     std::vector<BallEvent> events;
     
     for (auto& ball : balls) {
-        bool was_held = ball.previous_is_held;
+        // Get current held state based on detection
         bool now_held = isBallHeld(ball, hands);
         
-        // Debounce state changes (require MIN_FRAMES_FOR_STATE_CHANGE consecutive frames)
+        // Debounce state changes (require min_frames_for_state_change consecutive frames)
         if (now_held != ball.is_held) {
             ball.state_change_counter++;
-            if (ball.state_change_counter >= MIN_FRAMES_FOR_STATE_CHANGE) {
-                ball.is_held = now_held;
+            if (ball.state_change_counter >= tracking_settings_.min_frames_for_state_change) {
+                // State change confirmed - generate event based on OLD state → NEW state
+                bool old_state_was_held = ball.is_held;  // Current state before change
+                ball.is_held = now_held;  // Update to new state
                 ball.state_change_counter = 0;
                 
-                // Generate event
-                if (was_held && !now_held) {
+                // Generate event based on transition
+                if (old_state_was_held && !now_held) {
+                    // Was held, now in air = THROW
                     events.push_back({
                         BallEvent::THROW,
                         ball.id,
                         ball.held_by_hand_id,
                         getCurrentTimestamp()
                     });
-                    std::cout << "[SimpleBallTracker] THROW detected: Ball " << ball.id 
+                    std::cout << "[SimpleBallTracker] THROW detected: Ball " << ball.id
                              << " from hand " << ball.held_by_hand_id << std::endl;
                 }
-                else if (!was_held && now_held) {
+                else if (!old_state_was_held && now_held) {
+                    // Was in air, now held = CATCH
                     events.push_back({
                         BallEvent::CATCH,
                         ball.id,
                         ball.held_by_hand_id,
                         getCurrentTimestamp()
                     });
-                    std::cout << "[SimpleBallTracker] CATCH detected: Ball " << ball.id 
+                    std::cout << "[SimpleBallTracker] CATCH detected: Ball " << ball.id
                              << " by hand " << ball.held_by_hand_id << std::endl;
                 }
             }
         }
         else {
+            // State is stable, reset counter
             ball.state_change_counter = 0;
         }
-        
-        // Update previous state
-        ball.previous_is_held = ball.is_held;
     }
     
     return events;

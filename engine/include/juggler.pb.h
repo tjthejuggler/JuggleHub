@@ -1330,6 +1330,7 @@ class Ball final :
     kIdFieldNumber = 1,
     kStatusFieldNumber = 5,
     kLogicalIdFieldNumber = 7,
+    kDistanceToNearestWristFieldNumber = 8,
   };
   // string class_name = 4;
   void clear_class_name();
@@ -1426,6 +1427,15 @@ class Ball final :
   void _internal_set_logical_id(int32_t value);
   public:
 
+  // float distance_to_nearest_wrist = 8;
+  void clear_distance_to_nearest_wrist();
+  float distance_to_nearest_wrist() const;
+  void set_distance_to_nearest_wrist(float value);
+  private:
+  float _internal_distance_to_nearest_wrist() const;
+  void _internal_set_distance_to_nearest_wrist(float value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.Ball)
  private:
   class _Internal;
@@ -1441,6 +1451,7 @@ class Ball final :
     int32_t id_;
     int status_;
     int32_t logical_id_;
+    float distance_to_nearest_wrist_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -6787,6 +6798,26 @@ inline void Ball::_internal_set_logical_id(int32_t value) {
 inline void Ball::set_logical_id(int32_t value) {
   _internal_set_logical_id(value);
   // @@protoc_insertion_point(field_set:juggler.v1.Ball.logical_id)
+}
+
+// float distance_to_nearest_wrist = 8;
+inline void Ball::clear_distance_to_nearest_wrist() {
+  _impl_.distance_to_nearest_wrist_ = 0;
+}
+inline float Ball::_internal_distance_to_nearest_wrist() const {
+  return _impl_.distance_to_nearest_wrist_;
+}
+inline float Ball::distance_to_nearest_wrist() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.Ball.distance_to_nearest_wrist)
+  return _internal_distance_to_nearest_wrist();
+}
+inline void Ball::_internal_set_distance_to_nearest_wrist(float value) {
+  
+  _impl_.distance_to_nearest_wrist_ = value;
+}
+inline void Ball::set_distance_to_nearest_wrist(float value) {
+  _internal_set_distance_to_nearest_wrist(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.Ball.distance_to_nearest_wrist)
 }
 
 // -------------------------------------------------------------------

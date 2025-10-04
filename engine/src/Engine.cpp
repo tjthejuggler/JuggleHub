@@ -277,6 +277,7 @@ void Engine::run() {
             bbox->set_height(ball.bbox.height);
 
             ball_pb->set_class_name(ball.is_held ? "ball_held" : "ball");
+            ball_pb->set_distance_to_nearest_wrist(ball.distance_to_nearest_wrist);
             
             cv::Point2f projected_pos = SimpleBallTracker::project_3d_to_2d(ball.position, camera_intrinsics_);
             auto* proj_pos_2d = ball_pb->mutable_projected_pos_2d();
@@ -310,14 +311,39 @@ void Engine::run() {
                 ball_state->set_associated_hand_id(-1);
             }
             ball_state->set_frames_in_state(ball.state_change_counter);
+        }
+        
+        // Populate throw/catch events in protobuf
+        for (const auto& event : ball_events) {
+            auto* event_pb = frame_data.add_throw_catch_events();
+            event_pb->set_type(event.type == BallEvent::THROW ?
+                              juggler::v1::ThrowCatchEvent::THROW :
+                              juggler::v1::ThrowCatchEvent::CATCH);
+            event_pb->set_ball_id(event.ball_id);
+            event_pb->set_hand_id(event.hand_id);
+            event_pb->set_timestamp_us(event.timestamp);
             
-            // Log events to console (protobuf doesn't have ball_events field yet)
-            for (const auto& event : ball_events) {
-                if (event.ball_id == ball.id) {
-                    DEBUG_LOG("[EVENT] ", (event.type == BallEvent::THROW ? "THROW" : "CATCH"),
-                             " - Ball ", event.ball_id, " Hand ", event.hand_id);
+            // Find the ball to get its position
+            cv::Point3f ball_position(0, 0, 0);
+            float confidence = 0.8f;  // Default confidence for events
+            for (const auto& ball : tracked_balls) {
+                if (ball.id == event.ball_id) {
+                    ball_position = ball.position;
+                    confidence = ball.yolo_confidence;
+                    break;
                 }
             }
+            
+            auto* pos = event_pb->mutable_position();
+            pos->set_x(ball_position.x);
+            pos->set_y(ball_position.y);
+            pos->set_z(ball_position.z);
+            
+            event_pb->set_confidence(confidence);
+            
+            DEBUG_LOG("[EVENT] ", (event.type == BallEvent::THROW ? "THROW" : "CATCH"),
+                     " - Ball ", event.ball_id, " Hand ", event.hand_id,
+                     " at (", ball_position.x, ", ", ball_position.y, ", ", ball_position.z, ")");
         }
 
         if (active_module_) {

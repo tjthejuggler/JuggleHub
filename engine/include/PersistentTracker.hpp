@@ -51,6 +51,11 @@ struct PersistentTracker {
     int frames_in_current_state = 0;              // How many frames ball has been in current state
     std::vector<Eigen::Vector3d> velocity_history; // Recent velocity history for kinematic analysis
     static constexpr int MAX_VELOCITY_HISTORY = 5; // Keep last 5 frames
+    
+    // --- Color Tracking Integration ---
+    std::string assigned_color_name = "";         // Color profile name assigned to this tracker
+    bool has_color_assignment = false;            // Whether this tracker has a color assignment
+    int last_matched_detection_index = -1;        // Index of last matched detection (for temporal consistency)
 
     // Constructor
     PersistentTracker(int id, std::string name) : logical_id(id), class_name(std::move(name)) {}

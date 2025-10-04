@@ -9,6 +9,12 @@ A high-performance monorepo combining C++ real-time ball tracking with Python-ba
   - Added activity log controls - pause/resume and clear buttons to manage log output
   - Reorganized visualization toggle buttons into two rows for better space utilization
   - Reduced black space around video feed for more efficient screen usage
+- **Hybrid Color-Enhanced Kalman Tracking** - Integrated color information into Kalman-based tracking for robust ball identity tracking
+  - Color matching bonus/penalty in cost function prevents ID swaps between different colored balls
+  - Temporal consistency bonus reduces tracker flickering
+  - Automatic color assignment during tracker initialization
+  - Graceful fallback when color detection fails
+  - See [`HYBRID_COLOR_KALMAN_TRACKING.md`](HYBRID_COLOR_KALMAN_TRACKING.md) for complete documentation
 - **Added Kalman filtering to ColorTracker** - Integrated KalmanFilter3D into color-based ball tracking for improved robustness and smoothness
   - Each ColorTrackedBall now has its own Kalman filter for temporal smoothing
   - Predictions guide search to handle fast-moving balls

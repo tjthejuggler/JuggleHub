@@ -2292,6 +2292,18 @@ if PYQT_AVAILABLE:
             self.frame_count += 1
             self.log_message(f"UI received frame {frame_data.frame_number} with {len(frame_data.balls)} balls.")
             
+            # Check for throw/catch events and play sounds if enabled
+            if hasattr(frame_data, 'throw_catch_events'):
+                for event in frame_data.throw_catch_events:
+                    if event.type == juggler_pb2.ThrowCatchEvent.CATCH:
+                        if self.settings_widget.tc_sound_on_catch_toggle.isChecked():
+                            self.settings_widget.play_system_sound(frequency=800, duration=100)
+                            self.log_message(f"🔊 CATCH sound played for Ball {event.ball_id} by Hand {event.hand_id}")
+                    elif event.type == juggler_pb2.ThrowCatchEvent.THROW:
+                        if self.settings_widget.tc_sound_on_throw_toggle.isChecked():
+                            self.settings_widget.play_system_sound(frequency=1200, duration=100)
+                            self.log_message(f"🔊 THROW sound played for Ball {event.ball_id} by Hand {event.hand_id}")
+            
             ball_count = len(frame_data.balls)
             self.ball_count_label.setText(f"Balls detected: {ball_count}")
             ball_text = ""

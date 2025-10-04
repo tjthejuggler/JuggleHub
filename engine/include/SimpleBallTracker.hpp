@@ -99,16 +99,16 @@ struct BallEvent {
 // Tracking settings for state detection
 struct TrackingSettings {
     // Weights for held/in-air detection (when YOLO detects the ball)
-    float ml_ball_weight = 0.4f;           // Weight for ML "ball" (in-air) classification
-    float ml_ball_held_weight = 0.4f;      // Weight for ML "ball_held" classification
-    float wrist_proximity_weight = 0.2f;   // Weight for wrist proximity detection
+    float ml_ball_weight = 0.3f;           // Weight for ML "ball" (in-air) classification
+    float ml_ball_held_weight = 0.3f;      // Weight for ML "ball_held" classification
+    float wrist_proximity_weight = 0.4f;   // Weight for wrist proximity detection (INCREASED - proximity is more reliable)
     
     // Distance thresholds
     float wrist_proximity_threshold = 0.15f;      // 15cm - distance to consider detected ball as held
     float undetected_near_hand_threshold = 0.20f; // 20cm - distance to consider undetected ball as held (occluded)
     
     // State change parameters
-    int min_frames_for_state_change = 3;   // Frames needed to confirm state change
+    int min_frames_for_state_change = 2;   // Frames needed to confirm state change (REDUCED from 3 to 2)
     
     TrackingSettings() = default;
 };

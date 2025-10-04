@@ -444,7 +444,13 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     // --- STORE FUTURE PREDICTIONS FOR VISUALIZATION ---
     // After updates are complete, predict where each tracker will be in the NEXT frame
     // This shows the Kalman filter's trajectory prediction ahead of the current position
+    std::ofstream pred_log("engine_debug.log", std::ios::app);
+    pred_log << "[PRED VIZ] Checking " << logical_ball_trackers_.size() << " ball trackers for predictions" << std::endl;
+    
     for (auto& ball : logical_ball_trackers_) {
+        pred_log << "[PRED VIZ]   Ball " << ball.logical_id << " status=" << static_cast<int>(ball.status)
+                 << " (0=TRACKED, 1=PREDICTED, 2=OCCLUDED, 3=LOST)" << std::endl;
+        
         if (ball.status == TrackerStatus::TRACKED || ball.status == TrackerStatus::PREDICTED) {
             // Get current state after update
             ball.update_from_kf();
@@ -461,8 +467,14 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
             Eigen::Vector3f future_pos = temp_kf.get_position();
             predicted_positions_.push_back(cv::Point3f(future_pos.x(), future_pos.y(), future_pos.z()));
             predicted_tracker_labels_.push_back("Ball " + std::to_string(ball.logical_id));
+            
+            pred_log << "[PRED VIZ]     -> Added prediction for Ball " << ball.logical_id
+                     << " at (" << future_pos.x() << ", " << future_pos.y() << ", " << future_pos.z() << ")" << std::endl;
         }
     }
+    
+    pred_log << "[PRED VIZ] Total predictions added: " << predicted_positions_.size() << std::endl;
+    pred_log.close();
     
     for (auto& hand : logical_hand_trackers_) {
         if (hand.status == TrackerStatus::TRACKED || hand.status == TrackerStatus::PREDICTED) {

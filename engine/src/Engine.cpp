@@ -162,6 +162,7 @@ void Engine::run() {
             // Populate Kalman Predictions (Step 2)
             std::ofstream debug_log("engine_debug.log", std::ios::app);
             debug_log << "[KALMAN VIZ] Sending " << predicted_positions.size() << " Kalman predictions to UI" << std::endl;
+            debug_log << "[KALMAN VIZ] Predicted labels size: " << predicted_labels.size() << std::endl;
             
             for (size_t i = 0; i < predicted_positions.size(); ++i) {
                 auto* pred = frame_data.add_kalman_predictions();
@@ -187,6 +188,7 @@ void Engine::run() {
                     debug_log << "[KALMAN VIZ]     -> Failed to parse logical_id from label" << std::endl;
                 }
             }
+            debug_log << "[KALMAN VIZ] Total kalman_predictions added to frame_data: " << frame_data.kalman_predictions_size() << std::endl;
             debug_log.close();
             
             // Populate Filtered Detections (Step 4)

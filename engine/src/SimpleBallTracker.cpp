@@ -364,38 +364,39 @@ uint64_t SimpleBallTracker::getCurrentTimestamp() {
 }
 
 bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands) {
-    // Check ML model classification first
-    if (ball.has_yolo_detection && ball.yolo_class_id == 1) {  // ball_held class
-        // Find closest hand
-        float min_dist = std::numeric_limits<float>::max();
-        int closest_hand = -1;
-        
-        for (const auto& hand : hands) {
-            if (!hand.is_visible) continue;
-            float dist = cv::norm(ball.position - hand.wrist_pos_3d);
-            if (dist < min_dist) {
-                min_dist = dist;
-                closest_hand = hand.id;
-            }
-        }
-        
-        ball.held_by_hand_id = closest_hand;
-        return true;
+    // Use weighted scoring system based on tracking settings
+    float held_score = 0.0f;
+    float in_air_score = 0.0f;
+    
+    // 1. ML Classification Evidence
+    if (ball.yolo_class_id == 1) {  // ball_held class
+        held_score += tracking_settings_.ml_ball_held_weight;
+    } else if (ball.yolo_class_id == 0) {  // ball (in-air) class
+        in_air_score += tracking_settings_.ml_ball_weight;
     }
     
-    // Check proximity to wrists
+    // 2. Wrist Proximity Evidence
+    float min_dist = std::numeric_limits<float>::max();
+    int closest_hand = -1;
+    
     for (const auto& hand : hands) {
         if (!hand.is_visible) continue;
-        
         float dist = cv::norm(ball.position - hand.wrist_pos_3d);
-        if (dist < WRIST_PROXIMITY_THRESHOLD) {
-            ball.held_by_hand_id = hand.id;
-            return true;
+        if (dist < min_dist) {
+            min_dist = dist;
+            closest_hand = hand.id;
         }
     }
     
-    ball.held_by_hand_id = -1;
-    return false;
+    if (min_dist < tracking_settings_.wrist_proximity_threshold) {
+        held_score += tracking_settings_.wrist_proximity_weight;
+        ball.held_by_hand_id = closest_hand;
+    } else {
+        ball.held_by_hand_id = -1;
+    }
+    
+    // Decision: held if held_score is higher
+    return held_score > in_air_score;
 }
 
 std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
@@ -521,14 +522,17 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 ball.position = cv::Point3f(state(0), state(1), state(2));
             }
             else if (ball.frames_without_yolo < MAX_FRAMES_WITHOUT_YOLO) {
-                // Check if near a hand
+                // Check if near a hand - if so, ball is held even without YOLO detection
+                // Use the undetected_near_hand_threshold for this check
                 bool near_hand = false;
                 for (const auto& hand : hands) {
                     if (!hand.is_visible) continue;
                     float dist = cv::norm(ball.position - hand.wrist_pos_3d);
-                    if (dist < WRIST_PROXIMITY_THRESHOLD) {
+                    if (dist < tracking_settings_.undetected_near_hand_threshold) {
                         ball.position = hand.wrist_pos_3d;
                         ball.held_by_hand_id = hand.id;
+                        // Treat as ball_held class when near hand without YOLO detection
+                        ball.yolo_class_id = 1;  // ball_held
                         near_hand = true;
                         break;
                     }
@@ -537,17 +541,44 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 if (!near_hand) {
                     // Search for color blob
                     cv::Point2f blob_pos = searchForColorBlob(hsv_frame, *profile,
-                                                              ball.pixel_pos, 
+                                                              ball.pixel_pos,
                                                               COLOR_SEARCH_RADIUS);
                     if (blob_pos.x >= 0) {
                         float depth = getDepthAtPoint(depth_frame, blob_pos);
                         if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
-                            ball.position = deprojectToWorld(blob_pos, depth, intrinsics);
-                            ball.pixel_pos = blob_pos;
+                            cv::Point3f new_position = deprojectToWorld(blob_pos, depth, intrinsics);
                             
-                            // Update Kalman with color blob measurement
-                            ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                                ball.position.x, ball.position.y, ball.position.z));
+                            // Check if color blob is near a hand
+                            // Use undetected_near_hand_threshold since this is a color-tracked (undetected by YOLO) ball
+                            bool blob_near_hand = false;
+                            for (const auto& hand : hands) {
+                                if (!hand.is_visible) continue;
+                                float dist = cv::norm(new_position - hand.wrist_pos_3d);
+                                if (dist < tracking_settings_.undetected_near_hand_threshold) {
+                                    // Color blob detected near hand - ball is held
+                                    ball.position = new_position;
+                                    ball.pixel_pos = blob_pos;
+                                    ball.held_by_hand_id = hand.id;
+                                    ball.yolo_class_id = 1;  // ball_held
+                                    blob_near_hand = true;
+                                    
+                                    // Update Kalman with color blob measurement
+                                    ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                                        ball.position.x, ball.position.y, ball.position.z));
+                                    break;
+                                }
+                            }
+                            
+                            if (!blob_near_hand) {
+                                // Color blob found but not near hand - ball is in flight
+                                ball.position = new_position;
+                                ball.pixel_pos = blob_pos;
+                                ball.yolo_class_id = 0;  // ball (in flight)
+                                
+                                // Update Kalman with color blob measurement
+                                ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                                    ball.position.x, ball.position.y, ball.position.z));
+                            }
                         }
                     }
                 }

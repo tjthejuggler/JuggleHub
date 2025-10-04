@@ -1,7 +1,7 @@
 # SimpleBallTracker Implementation Status
 
-**Date:** 2025-10-04  
-**Status:** Partial Implementation - Requires Completion
+**Date:** 2025-10-04 16:57 UTC
+**Status:** Fully Implemented and Bug Fixed
 
 ## What Has Been Completed
 
@@ -176,3 +176,37 @@ Once implementation is complete:
 - ✅ No ByteTrack complexity
 - ✅ Clear, understandable logic
 - ✅ Easier to debug and tune
+
+## Recent Bug Fixes
+
+### Ball State Persistence Fix (2025-10-04 16:57 UTC)
+
+**Issue:** When a ball was held in a hand and YOLO couldn't detect it due to occlusion, the system would incorrectly change the ball's state from "held" to "in flight" even though the ball never left the hand. This was because color blob detection near a hand wasn't properly setting the ball's classification state.
+
+**Root Cause:**
+1. In [`SimpleBallTracker::update()`](engine/src/SimpleBallTracker.cpp:512-555), when YOLO didn't detect a ball (`frames_without_yolo >= 5`), the fallback logic would:
+   - Check if ball is near a hand and snap position to hand
+   - Search for color blobs
+   - BUT it never set `yolo_class_id = 1` (ball_held) to indicate the ball should be considered held
+
+2. In [`SimpleBallTracker::isBallHeld()`](engine/src/SimpleBallTracker.cpp:366), it checked `ball.has_yolo_detection && ball.yolo_class_id == 1`, which would fail when YOLO wasn't detecting the ball.
+
+3. In [`ThrowCatchDetector::detectEvents()`](engine/src/ThrowCatchDetector.cpp:34-70), when no YOLO detection was found, `ml_held_confidence` wasn't updated, potentially causing incorrect state transitions.
+
+**Solution:**
+1. **SimpleBallTracker.cpp (lines 512-575):** Modified fallback tracking to set `yolo_class_id = 1` (ball_held) when:
+   - Ball position is near a hand (within `WRIST_PROXIMITY_THRESHOLD`)
+   - Color blob is detected near a hand
+   
+2. **SimpleBallTracker.cpp (line 368):** Changed [`isBallHeld()`](engine/src/SimpleBallTracker.cpp:366) to check `ball.yolo_class_id == 1` without requiring `has_yolo_detection`, allowing color-tracked balls near hands to be properly recognized as held.
+
+3. **ThrowCatchDetector.cpp (lines 47-68):** Added fallback logic to maintain `ml_held_confidence = 0.9f` when:
+   - No YOLO detection exists
+   - Ball is in a held state (HELD_LEFT or HELD_RIGHT)
+   - Ball is still within 1.5x catch distance of the holding hand
+
+**Result:** Balls now correctly maintain their "held" state when near a hand, even when YOLO cannot detect them due to occlusion. The system recognizes that a ball cannot simply vanish when it's near a hand - it must still be held.
+
+**Files Modified:**
+- [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp) - Lines 366-399, 512-575
+- [`engine/src/ThrowCatchDetector.cpp`](engine/src/ThrowCatchDetector.cpp) - Lines 34-70

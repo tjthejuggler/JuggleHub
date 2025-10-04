@@ -41,8 +41,33 @@ std::vector<ThrowCatchDetector::DetectedEvent> ThrowCatchDetector::detectEvents(
         // Update ML confidence if we have a detection
         if (ball_detection) {
             // class_id 0 = ball (in flight), class_id 1 = ball_held
-            ball.ml_held_confidence = (ball_detection->class_id == 1) ? 
+            ball.ml_held_confidence = (ball_detection->class_id == 1) ?
                 ball_detection->confidence : 0.0f;
+        } else {
+            // No YOLO detection - check if ball is near a hand (color tracking fallback)
+            // If ball is in a held state and near a hand, maintain high held confidence
+            if ((ball.ball_state == BallState::HELD_LEFT || ball.ball_state == BallState::HELD_RIGHT)) {
+                // Check if still near the holding hand
+                for (const auto& hand : hands) {
+                    if (hand.status != TrackerStatus::TRACKED) continue;
+                    int hand_id = hand.is_left_hand ? 0 : 1;
+                    
+                    // Check if this is the hand that was holding the ball
+                    if ((ball.ball_state == BallState::HELD_LEFT && hand_id == 0) ||
+                        (ball.ball_state == BallState::HELD_RIGHT && hand_id == 1)) {
+                        
+                        float distance = calculateDistance(ball.position, hand.position);
+                        if (distance < config_.catch_distance * 1.5f) {  // Use 1.5x catch distance for held state
+                            // Ball is still near the hand - maintain held confidence
+                            ball.ml_held_confidence = 0.9f;  // High confidence for color-tracked held ball
+                        } else {
+                            // Ball moved away from hand
+                            ball.ml_held_confidence = 0.0f;
+                        }
+                        break;
+                    }
+                }
+            }
         }
         
         // Increment frames in current state

@@ -94,6 +94,23 @@ struct BallEvent {
     uint64_t timestamp;
 };
 
+// Tracking settings for state detection
+struct TrackingSettings {
+    // Weights for held/in-air detection (when YOLO detects the ball)
+    float ml_ball_weight = 0.4f;           // Weight for ML "ball" (in-air) classification
+    float ml_ball_held_weight = 0.4f;      // Weight for ML "ball_held" classification
+    float wrist_proximity_weight = 0.2f;   // Weight for wrist proximity detection
+    
+    // Distance thresholds
+    float wrist_proximity_threshold = 0.15f;      // 15cm - distance to consider detected ball as held
+    float undetected_near_hand_threshold = 0.20f; // 20cm - distance to consider undetected ball as held (occluded)
+    
+    // State change parameters
+    int min_frames_for_state_change = 3;   // Frames needed to confirm state change
+    
+    TrackingSettings() = default;
+};
+
 class SimpleBallTracker {
 public:
     SimpleBallTracker(const std::string& ball_model_path,
@@ -125,6 +142,10 @@ public:
     const std::vector<SimpleBall>& getBalls() const { return balls_; }
     const std::vector<SimpleHand>& getHands() const { return hands_; }
     const std::vector<Detection>& getLastRawDetections() const { return last_raw_detections_; }
+    
+    // Tracking settings
+    const TrackingSettings& getTrackingSettings() const { return tracking_settings_; }
+    void setTrackingSettings(const TrackingSettings& settings) { tracking_settings_ = settings; }
     
     // Utility for projection
     static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
@@ -177,6 +198,7 @@ private:
     std::vector<Detection> last_raw_detections_;
     std::string settings_file_;
     cv::Mat last_color_frame_;  // For calibration
+    TrackingSettings tracking_settings_;  // Tracking configuration
     
     // Timing
     std::chrono::steady_clock::time_point last_update_time_;

@@ -18,6 +18,8 @@ import numpy as np
 import json
 from datetime import datetime
 from .color_profile_manager import ColorProfileManager, ColorProfileDialog
+import subprocess
+import platform
 
 # Ball management components removed - using legacy color tracking only
 BALL_MANAGEMENT_AVAILABLE = False
@@ -489,102 +491,67 @@ if PYQT_AVAILABLE:
 
         def create_throw_catch_section(self):
             """Create the Throw/Catch Detection settings section"""
-            section = CollapsibleGroupBox("🎯 Throw/Catch Detection", collapsed=False)
+            section = CollapsibleGroupBox("🎯 Ball State Detection", collapsed=False)
             layout = QGridLayout()
             section.get_content_layout().addLayout(layout)
             
             row = 0
             
-            # Weight sliders (must sum to 100%)
-            layout.addWidget(QLabel("Evidence Weights:"), row, 0, 1, 3)
+            # Info label
+            info_label = QLabel("ℹ️ Configure how ball state (held/in-air) is determined")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label, row, 0, 1, 3)
             row += 1
             
-            self.tc_ml_weight_slider, self.tc_ml_weight_label = self._create_slider_widget(
+            # Detection weights section (for YOLO-detected balls)
+            layout.addWidget(QLabel("YOLO Detection Weights:"), row, 0, 1, 3)
+            row += 1
+            
+            # ML ball (in-air) weight
+            self.tc_ml_ball_weight_slider, self.tc_ml_ball_weight_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="ML Weight",
-                tooltip_text="Weight given to ML model classification (ball vs ball_held).\n"
-                             "Range: 0-100%. Default: 35%.\n"
-                             "All weights should sum to 100%.",
+                label_text="ML 'Ball' Weight",
+                tooltip_text="Weight for ML model detecting ball as 'in-air'.\n"
+                             "Range: 0.0-1.0. Default: 0.4.\n"
+                             "Higher = trust ML more for in-air detection.",
                 range_min=0,
                 range_max=100,
-                initial_value=35,
-                update_func=lambda v: self.update_setting('tc_ml_weight', v / 100.0),
+                initial_value=40,
+                update_func=lambda v: self.update_setting('ml_ball_weight', v / 100.0),
                 is_float=True
             )
             row += 1
             
-            self.tc_proximity_weight_slider, self.tc_proximity_weight_label = self._create_slider_widget(
+            # ML ball_held weight
+            self.tc_ml_ball_held_weight_slider, self.tc_ml_ball_held_weight_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Proximity Weight",
-                tooltip_text="Weight given to distance between ball and hand.\n"
-                             "Range: 0-100%. Default: 25%.",
+                label_text="ML 'Ball Held' Weight",
+                tooltip_text="Weight for ML model detecting ball as 'held'.\n"
+                             "Range: 0.0-1.0. Default: 0.4.\n"
+                             "Higher = trust ML more for held detection.",
                 range_min=0,
                 range_max=100,
-                initial_value=25,
-                update_func=lambda v: self.update_setting('tc_proximity_weight', v / 100.0),
+                initial_value=40,
+                update_func=lambda v: self.update_setting('ml_ball_held_weight', v / 100.0),
                 is_float=True
             )
             row += 1
             
-            self.tc_kinematic_weight_slider, self.tc_kinematic_weight_label = self._create_slider_widget(
+            # Wrist proximity weight
+            self.tc_wrist_proximity_weight_slider, self.tc_wrist_proximity_weight_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Kinematic Weight",
-                tooltip_text="Weight given to velocity changes (acceleration/deceleration).\n"
-                             "Range: 0-100%. Default: 25%.",
+                label_text="Wrist Proximity Weight",
+                tooltip_text="Weight for wrist proximity detection.\n"
+                             "Range: 0.0-1.0. Default: 0.2.\n"
+                             "Higher = trust proximity more.",
                 range_min=0,
                 range_max=100,
-                initial_value=25,
-                update_func=lambda v: self.update_setting('tc_kinematic_weight', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            self.tc_rel_velocity_weight_slider, self.tc_rel_velocity_weight_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Relative Velocity Weight",
-                tooltip_text="Weight given to velocity difference between ball and hand.\n"
-                             "Range: 0-100%. Default: 15%.",
-                range_min=0,
-                range_max=100,
-                initial_value=15,
-                update_func=lambda v: self.update_setting('tc_relative_velocity_weight', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Separator
-            layout.addWidget(QLabel("Detection Thresholds:"), row, 0, 1, 3)
-            row += 1
-            
-            self.tc_catch_threshold_slider, self.tc_catch_threshold_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Catch Threshold",
-                tooltip_text="Minimum total score required to detect a catch event.\n"
-                             "Range: 0-100%. Default: 75%.\n"
-                             "Higher values = fewer false positives, may miss real catches.",
-                range_min=0,
-                range_max=100,
-                initial_value=75,
-                update_func=lambda v: self.update_setting('tc_catch_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            self.tc_throw_threshold_slider, self.tc_throw_threshold_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Throw Threshold",
-                tooltip_text="Minimum total score required to detect a throw event.\n"
-                             "Range: 0-100%. Default: 75%.",
-                range_min=0,
-                range_max=100,
-                initial_value=75,
-                update_func=lambda v: self.update_setting('tc_throw_threshold', v / 100.0),
+                initial_value=20,
+                update_func=lambda v: self.update_setting('wrist_proximity_weight', v / 100.0),
                 is_float=True
             )
             row += 1
@@ -593,51 +560,110 @@ if PYQT_AVAILABLE:
             layout.addWidget(QLabel("Distance Thresholds:"), row, 0, 1, 3)
             row += 1
             
-            self.tc_catch_distance_slider, self.tc_catch_distance_label = self._create_slider_widget(
+            # Wrist proximity threshold (for YOLO-detected balls)
+            self.tc_wrist_proximity_slider, self.tc_wrist_proximity_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Catch Distance (cm)",
-                tooltip_text="Maximum distance between ball and hand for catch detection.\n"
-                             "Range: 0-50cm. Default: 15cm.",
-                range_min=0,
-                range_max=50,
+                label_text="Detected Ball Proximity (cm)",
+                tooltip_text="Distance between YOLO-detected ball and wrist to consider as held.\n"
+                             "Range: 5-30cm. Default: 15cm.\n"
+                             "Lower = stricter, Higher = more lenient.",
+                range_min=5,
+                range_max=30,
                 initial_value=15,
-                update_func=lambda v: self.update_setting('tc_catch_distance', v / 100.0),  # Convert cm to m
+                update_func=lambda v: self.update_setting('wrist_proximity_threshold', v / 100.0),  # Convert cm to m
                 is_float=True
             )
             row += 1
             
-            self.tc_throw_distance_slider, self.tc_throw_distance_label = self._create_slider_widget(
+            # Undetected near hand threshold (for occluded balls)
+            self.tc_undetected_near_hand_slider, self.tc_undetected_near_hand_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Throw Distance (cm)",
-                tooltip_text="Minimum distance ball must travel from hand for throw detection.\n"
-                             "Range: 0-50cm. Default: 20cm.",
-                range_min=0,
-                range_max=50,
+                label_text="Undetected Near Hand (cm)",
+                tooltip_text="Distance from hand where undetected ball is considered held (occluded).\n"
+                             "Range: 10-40cm. Default: 20cm.\n"
+                             "Larger threshold accounts for balls hidden by hands.",
+                range_min=10,
+                range_max=40,
                 initial_value=20,
-                update_func=lambda v: self.update_setting('tc_throw_distance', v / 100.0),  # Convert cm to m
+                update_func=lambda v: self.update_setting('undetected_near_hand_threshold', v / 100.0),  # Convert cm to m
                 is_float=True
             )
             row += 1
             
             # Separator
-            layout.addWidget(QLabel("Temporal Filtering:"), row, 0, 1, 3)
+            layout.addWidget(QLabel("State Change:"), row, 0, 1, 3)
             row += 1
             
+            # State change debouncing
             self.tc_min_frames_slider, self.tc_min_frames_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Min Frames for Event",
-                tooltip_text="Number of consecutive frames an event must persist to be confirmed.\n"
-                             "Range: 1-10 frames. Default: 2.\n"
+                label_text="State Change Frames",
+                tooltip_text="Number of consecutive frames required to confirm state change (held/in-air).\n"
+                             "Range: 1-10 frames. Default: 3.\n"
                              "Higher values = more stable detection, slower response.",
                 range_min=1,
                 range_max=10,
-                initial_value=2,
-                update_func=lambda v: self.update_setting('tc_min_frames', v),
+                initial_value=3,
+                update_func=lambda v: self.update_setting('min_frames_for_state_change', v),
                 is_float=False
             )
+            row += 1
+            
+            # Separator
+            layout.addWidget(QLabel("Sound Effects:"), row, 0, 1, 3)
+            row += 1
+            
+            # Sound on catches toggle with test button
+            self.tc_sound_on_catch_toggle = QPushButton("Sound on Catches")
+            self.tc_sound_on_catch_toggle.setCheckable(True)
+            self.tc_sound_on_catch_toggle.setChecked(False)
+            self.tc_sound_on_catch_toggle.clicked.connect(lambda: self.update_setting('tc_sound_on_catch', 1 if self.tc_sound_on_catch_toggle.isChecked() else 0))
+            layout.addWidget(self.tc_sound_on_catch_toggle, row, 0, 1, 2)
+            
+            # Test catch sound button
+            self.tc_test_catch_sound_button = QPushButton("🔊 Test")
+            self.tc_test_catch_sound_button.setMaximumWidth(80)
+            self.tc_test_catch_sound_button.clicked.connect(self.test_catch_sound)
+            self.tc_test_catch_sound_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 5px;
+                    border-radius: 3px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #45a049; }
+                QPushButton:pressed { background-color: #2e7d32; }
+            """)
+            layout.addWidget(self.tc_test_catch_sound_button, row, 2)
+            row += 1
+            
+            # Sound on throws toggle with test button
+            self.tc_sound_on_throw_toggle = QPushButton("Sound on Throws")
+            self.tc_sound_on_throw_toggle.setCheckable(True)
+            self.tc_sound_on_throw_toggle.setChecked(False)
+            self.tc_sound_on_throw_toggle.clicked.connect(lambda: self.update_setting('tc_sound_on_throw', 1 if self.tc_sound_on_throw_toggle.isChecked() else 0))
+            layout.addWidget(self.tc_sound_on_throw_toggle, row, 0, 1, 2)
+            
+            # Test throw sound button
+            self.tc_test_throw_sound_button = QPushButton("🔊 Test")
+            self.tc_test_throw_sound_button.setMaximumWidth(80)
+            self.tc_test_throw_sound_button.clicked.connect(self.test_throw_sound)
+            self.tc_test_throw_sound_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 5px;
+                    border-radius: 3px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #45a049; }
+                QPushButton:pressed { background-color: #2e7d32; }
+            """)
+            layout.addWidget(self.tc_test_throw_sound_button, row, 2)
             
             return section
         
@@ -1276,12 +1302,13 @@ if PYQT_AVAILABLE:
                 'confidence_slider', 'nms_slider', 'track_buffer_slider',
                 'track_thresh_slider', 'high_thresh_slider', 'match_thresh_slider',
                 'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo',
-                # Throw/catch sliders
-                'tc_ml_weight_slider', 'tc_proximity_weight_slider',
-                'tc_kinematic_weight_slider', 'tc_rel_velocity_weight_slider',
-                'tc_catch_threshold_slider', 'tc_throw_threshold_slider',
-                'tc_catch_distance_slider', 'tc_throw_distance_slider',
-                'tc_min_frames_slider'
+                # Tracking weight sliders
+                'tc_ml_ball_weight_slider', 'tc_ml_ball_held_weight_slider',
+                'tc_wrist_proximity_weight_slider',
+                # Distance and state sliders
+                'tc_wrist_proximity_slider', 'tc_undetected_near_hand_slider', 'tc_min_frames_slider',
+                # Throw/catch sound toggles
+                'tc_sound_on_catch_toggle', 'tc_sound_on_throw_toggle'
             ]
             
             for attr in required_attrs:
@@ -1300,16 +1327,15 @@ if PYQT_AVAILABLE:
                 'match_thresh': self.match_thresh_slider.value() / 100.0,
                 'pose_model_enabled': self.pose_model_toggle.isChecked(),
                 
-                # Throw/Catch Detection settings
-                'tc_ml_weight': self.tc_ml_weight_slider.value() / 100.0,
-                'tc_proximity_weight': self.tc_proximity_weight_slider.value() / 100.0,
-                'tc_kinematic_weight': self.tc_kinematic_weight_slider.value() / 100.0,
-                'tc_relative_velocity_weight': self.tc_rel_velocity_weight_slider.value() / 100.0,
-                'tc_catch_threshold': self.tc_catch_threshold_slider.value() / 100.0,
-                'tc_throw_threshold': self.tc_throw_threshold_slider.value() / 100.0,
-                'tc_catch_distance': self.tc_catch_distance_slider.value() / 100.0,  # cm to m
-                'tc_throw_distance': self.tc_throw_distance_slider.value() / 100.0,  # cm to m
-                'tc_min_frames': self.tc_min_frames_slider.value(),
+                # Tracking Detection settings
+                'ml_ball_weight': self.tc_ml_ball_weight_slider.value() / 100.0,
+                'ml_ball_held_weight': self.tc_ml_ball_held_weight_slider.value() / 100.0,
+                'wrist_proximity_weight': self.tc_wrist_proximity_weight_slider.value() / 100.0,
+                'wrist_proximity_threshold': self.tc_wrist_proximity_slider.value() / 100.0,  # cm to m
+                'undetected_near_hand_threshold': self.tc_undetected_near_hand_slider.value() / 100.0,  # cm to m
+                'min_frames_for_state_change': self.tc_min_frames_slider.value(),
+                'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked(),
+                'tc_sound_on_throw': self.tc_sound_on_throw_toggle.isChecked(),
                 
                 # Collapsed states for UI persistence
                 'collapsed_camera': self.camera_section.is_collapsed,
@@ -1391,33 +1417,30 @@ if PYQT_AVAILABLE:
             if 'pose_model_enabled' in settings:
                 self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
             
-            # Throw/Catch Detection settings
-            if 'tc_ml_weight' in settings:
-                self.tc_ml_weight_slider.setValue(int(settings['tc_ml_weight'] * 100))
+            # Tracking Detection settings
+            if 'ml_ball_weight' in settings:
+                self.tc_ml_ball_weight_slider.setValue(int(settings['ml_ball_weight'] * 100))
             
-            if 'tc_proximity_weight' in settings:
-                self.tc_proximity_weight_slider.setValue(int(settings['tc_proximity_weight'] * 100))
+            if 'ml_ball_held_weight' in settings:
+                self.tc_ml_ball_held_weight_slider.setValue(int(settings['ml_ball_held_weight'] * 100))
             
-            if 'tc_kinematic_weight' in settings:
-                self.tc_kinematic_weight_slider.setValue(int(settings['tc_kinematic_weight'] * 100))
+            if 'wrist_proximity_weight' in settings:
+                self.tc_wrist_proximity_weight_slider.setValue(int(settings['wrist_proximity_weight'] * 100))
             
-            if 'tc_relative_velocity_weight' in settings:
-                self.tc_rel_velocity_weight_slider.setValue(int(settings['tc_relative_velocity_weight'] * 100))
+            if 'wrist_proximity_threshold' in settings:
+                self.tc_wrist_proximity_slider.setValue(int(settings['wrist_proximity_threshold'] * 100))  # m to cm
             
-            if 'tc_catch_threshold' in settings:
-                self.tc_catch_threshold_slider.setValue(int(settings['tc_catch_threshold'] * 100))
+            if 'undetected_near_hand_threshold' in settings:
+                self.tc_undetected_near_hand_slider.setValue(int(settings['undetected_near_hand_threshold'] * 100))  # m to cm
             
-            if 'tc_throw_threshold' in settings:
-                self.tc_throw_threshold_slider.setValue(int(settings['tc_throw_threshold'] * 100))
+            if 'min_frames_for_state_change' in settings:
+                self.tc_min_frames_slider.setValue(settings['min_frames_for_state_change'])
             
-            if 'tc_catch_distance' in settings:
-                self.tc_catch_distance_slider.setValue(int(settings['tc_catch_distance'] * 100))  # m to cm
+            if 'tc_sound_on_catch' in settings:
+                self.tc_sound_on_catch_toggle.setChecked(settings['tc_sound_on_catch'])
             
-            if 'tc_throw_distance' in settings:
-                self.tc_throw_distance_slider.setValue(int(settings['tc_throw_distance'] * 100))  # m to cm
-            
-            if 'tc_min_frames' in settings:
-                self.tc_min_frames_slider.setValue(settings['tc_min_frames'])
+            if 'tc_sound_on_throw' in settings:
+                self.tc_sound_on_throw_toggle.setChecked(settings['tc_sound_on_throw'])
             
             # Restore collapsed states
             if 'collapsed_camera' in settings:
@@ -1533,6 +1556,58 @@ if PYQT_AVAILABLE:
             finally:
                 # Always reset the flag
                 self._loading_settings = False
+        
+        def test_catch_sound(self):
+            """Play a test sound for catch events"""
+            self.play_system_sound(frequency=800, duration=100)
+            # Also send to engine
+            self.update_setting('tc_test_catch_sound', 1)
+            print("🔊 Playing catch test sound (800 Hz)")
+        
+        def test_throw_sound(self):
+            """Play a test sound for throw events"""
+            self.play_system_sound(frequency=1200, duration=100)
+            # Also send to engine
+            self.update_setting('tc_test_throw_sound', 1)
+            print("🔊 Playing throw test sound (1200 Hz)")
+        
+        def play_system_sound(self, frequency=1000, duration=100):
+            """Play a simple beep sound using system commands"""
+            def play_in_thread():
+                try:
+                    system = platform.system()
+                    if system == "Linux":
+                        # Use paplay with a generated sine wave
+                        subprocess.run([
+                            'paplay', '--raw',
+                            '/dev/stdin'
+                        ], input=self.generate_sine_wave(frequency, duration),
+                        timeout=1, check=False)
+                    elif system == "Darwin":  # macOS
+                        # Use afplay with a generated audio file
+                        subprocess.run(['afplay', '/System/Library/Sounds/Pop.aiff'],
+                                     timeout=1, check=False)
+                    elif system == "Windows":
+                        # Use winsound
+                        import winsound
+                        winsound.Beep(frequency, duration)
+                except Exception as e:
+                    print(f"⚠️ Could not play sound: {e}")
+                    # Fallback: print to console
+                    print(f"\a")  # Terminal bell
+            
+            # Play sound in background thread to avoid blocking UI
+            threading.Thread(target=play_in_thread, daemon=True).start()
+        
+        def generate_sine_wave(self, frequency=1000, duration=100):
+            """Generate a sine wave for audio playback"""
+            sample_rate = 44100
+            num_samples = int(sample_rate * duration / 1000)
+            t = np.linspace(0, duration / 1000, num_samples, False)
+            wave = np.sin(2 * np.pi * frequency * t)
+            # Convert to 16-bit PCM
+            audio = (wave * 32767).astype(np.int16)
+            return audio.tobytes()
 
     class JuggleHubMainWindow(QMainWindow):
         """Main window for JuggleHub UI."""
@@ -2220,6 +2295,50 @@ if PYQT_AVAILABLE:
             for ball in frame_data.balls:
                 status_str = status_map.get(ball.status, "Unknown")
                 ball_text += f"Ball {ball.logical_id} ({status_str}): 3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
+                
+                # Add color and state information from color_tracked_balls
+                color_ball = next((cb for cb in frame_data.color_tracked_balls if cb.logical_id == ball.logical_id), None)
+                if color_ball:
+                    state_str = "HELD" if color_ball.associated_wrist_id >= 0 else "IN AIR"
+                    hand_str = f" by {'LEFT' if color_ball.associated_wrist_id == 0 else 'RIGHT'}" if color_ball.associated_wrist_id >= 0 else ""
+                    ball_text += f"  Color: {color_ball.color_name.upper()}, State: {state_str}{hand_str}\n"
+                else:
+                    ball_text += f"  Color: Unknown, State: Unknown\n"
+                
+                # Determine ML detection status - check if there's an actual YOLO detection box
+                # by looking for a matching raw_detection near this ball's position
+                has_yolo_detection = False
+                yolo_class_id = -1
+                
+                # Check if any raw_detection is close to this ball's 2D position
+                if ball.projected_pos_2d and ball.projected_pos_2d.x > 0 and ball.projected_pos_2d.y > 0:
+                    for raw_det in frame_data.raw_detections:
+                        # Check if detection box contains the ball's projected position
+                        det_center_x = raw_det.x + raw_det.width / 2
+                        det_center_y = raw_det.y + raw_det.height / 2
+                        ball_x = ball.projected_pos_2d.x
+                        ball_y = ball.projected_pos_2d.y
+                        
+                        # Check if ball position is within detection box
+                        if (raw_det.x <= ball_x <= raw_det.x + raw_det.width and
+                            raw_det.y <= ball_y <= raw_det.y + raw_det.height):
+                            has_yolo_detection = True
+                            yolo_class_id = raw_det.class_id
+                            break
+                
+                # Display ML detection status based on whether YOLO actually sees it
+                if has_yolo_detection:
+                    if yolo_class_id == 0:
+                        ml_status = "ball (in-air)"
+                    elif yolo_class_id == 1:
+                        ml_status = "ball_held"
+                    else:
+                        ml_status = f"class_{yolo_class_id}"
+                else:
+                    # No YOLO detection box found
+                    ml_status = "gone"
+                
+                ball_text += f"  ML Detection: {ml_status}\n"
                 
                 # Update tracker history using logical_id
                 if ball.logical_id not in self.tracker_history:

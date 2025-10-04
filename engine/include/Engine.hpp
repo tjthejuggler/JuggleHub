@@ -4,7 +4,7 @@
 #include "../src/modules/ModuleBase.hpp"
 #include "../src/modules/UdpBallColorModule.hpp"
 #include "../src/modules/UdpBallSettingsModule.hpp"
-#include "DNNTracker.hpp" // Include the new DNNTracker
+#include "SimpleBallTracker.hpp" // Include the simplified ball tracker
 #include "json.hpp" // Include nlohmann/json
 #include <memory>
 #include <queue>
@@ -14,6 +14,31 @@
 #include <atomic>
 #include <zmq.hpp>
 #include <librealsense2/rs.hpp>
+
+// Legacy types for recording compatibility
+enum class TrackerStatus {
+    TRACKED,
+    LOST,
+    REMOVED
+};
+
+struct TrackedObject {
+    cv::Rect_<float> box;
+    cv::Point3f world_pos;
+    int id;
+    int class_id;
+    std::string class_name;
+    TrackerStatus status;
+    int logical_id;
+    bool is_left;
+};
+
+struct TrackedHand {
+    cv::Point3f wrist_pos_3d;
+    float confidence;
+    int id;
+    std::vector<cv::Point3f> keypoints;
+};
 
 class Engine {
 public:
@@ -57,8 +82,8 @@ private:
     std::unique_ptr<UdpBallColorModule> color_module_;
     std::unique_ptr<juggler::modules::UdpBallSettingsModule> settings_module_;
     std::shared_ptr<juggler::BallTracker> ball_tracker_;
-    std::shared_ptr<DNNTracker> dnn_tracker_; // Use shared_ptr to pass to other modules
-    bool use_dnn_tracker_; // Flag to switch between old/new tracker
+    std::shared_ptr<SimpleBallTracker> simple_tracker_; // Simplified ball tracker
+    bool use_dnn_tracker_; // Flag to switch between old/new tracker (kept for compatibility)
     bool verbose_;
 
     // ZMQ

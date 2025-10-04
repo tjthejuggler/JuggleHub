@@ -1,0 +1,199 @@
+#pragma once
+
+#include <opencv2/opencv.hpp>
+#include <openvino/openvino.hpp>
+#include <vector>
+#include <string>
+#include <memory>
+#include <set>
+#include "json.hpp"
+#include "KalmanFilter3D.hpp"
+
+using json = nlohmann::json;
+
+// Simple struct to hold camera intrinsics
+struct CameraIntrinsics {
+    float fx, fy;
+    float ppx, ppy;
+};
+
+// Color profile for ball identification
+struct ColorProfile {
+    std::string name;
+    bool enabled;
+    cv::Scalar min_hsv;
+    cv::Scalar max_hsv;
+    cv::Scalar min_hsv2;  // For wrap-around colors like red
+    cv::Scalar max_hsv2;
+    
+    ColorProfile(const std::string& n = "",
+                 const cv::Scalar& min = cv::Scalar(0, 0, 0),
+                 const cv::Scalar& max = cv::Scalar(180, 255, 255),
+                 const cv::Scalar& min2 = cv::Scalar(-1, -1, -1),
+                 const cv::Scalar& max2 = cv::Scalar(-1, -1, -1),
+                 bool en = true)
+        : name(n), enabled(en), min_hsv(min), max_hsv(max), 
+          min_hsv2(min2), max_hsv2(max2) {}
+};
+
+// Detection from YOLO
+struct Detection {
+    cv::Rect_<float> box;
+    cv::Point3f world_pos;
+    float confidence;
+    int class_id;
+    int index;  // Index in detection array
+};
+
+// Simple hand state
+struct SimpleHand {
+    int id;                    // 0=left, 1=right
+    cv::Point3f wrist_pos_3d;  // Wrist position from pose model (named for compatibility)
+    bool is_visible;           // Detected this frame
+    float confidence;          // Detection confidence
+    std::vector<cv::Point3f> keypoints;  // All pose keypoints
+};
+
+// Simple ball state
+struct SimpleBall {
+    int id;                          // 0, 1, 2 (based on color order)
+    std::string color_name;          // "green", "pink", "orange", etc.
+    cv::Point3f position;            // Current 3D position
+    cv::Point2f pixel_pos;           // Current 2D position
+    cv::Rect_<float> bbox;           // Bounding box
+    
+    // State
+    bool is_held;                    // In hand or in flight
+    bool previous_is_held;           // Previous frame state
+    int held_by_hand_id;             // -1 if not held, 0=left, 1=right
+    int state_change_counter;        // For debouncing state changes
+    
+    // Tracking
+    bool has_yolo_detection;         // True if YOLO sees it this frame
+    int frames_without_yolo;         // Counter for fallback logic
+    KalmanFilter3D kalman;           // Only used when YOLO fails
+    
+    // Confidence
+    float yolo_confidence;           // YOLO detection confidence
+    float color_match_score;         // How well it matches assigned color
+    int yolo_class_id;               // 0=ball, 1=ball_held
+    
+    SimpleBall() : id(-1), is_held(false), previous_is_held(false),
+                   held_by_hand_id(-1), state_change_counter(0),
+                   has_yolo_detection(false), frames_without_yolo(0),
+                   yolo_confidence(0.0f), color_match_score(0.0f),
+                   yolo_class_id(0) {}
+};
+
+// Ball event (throw/catch)
+struct BallEvent {
+    enum Type { THROW, CATCH };
+    Type type;
+    int ball_id;
+    int hand_id;
+    uint64_t timestamp;
+};
+
+class SimpleBallTracker {
+public:
+    SimpleBallTracker(const std::string& ball_model_path,
+                     const std::string& pose_model_path,
+                     const std::string& device_name,
+                     const std::string& settings_file = "ball_settings.json");
+    ~SimpleBallTracker() = default;
+    
+    // Main update function - now includes YOLO detection internally
+    std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> update(
+        const cv::Mat& color_frame,
+        const cv::Mat& depth_frame,
+        const CameraIntrinsics& intrinsics
+    );
+    
+    // Settings management
+    bool loadSettings();
+    void saveSettings();
+    bool updateSetting(const std::string& key, const std::string& value);
+    
+    // Color calibration
+    bool calibrateColor(const std::string& color_name, 
+                       const cv::Point& click_point,
+                       std::string& error_message);
+    
+    // Getters
+    const std::vector<ColorProfile>& getColorProfiles() const { return color_profiles_; }
+    std::vector<ColorProfile>& getColorProfiles() { return color_profiles_; }
+    const std::vector<SimpleBall>& getBalls() const { return balls_; }
+    const std::vector<SimpleHand>& getHands() const { return hands_; }
+    const std::vector<Detection>& getLastRawDetections() const { return last_raw_detections_; }
+    
+    // Utility for projection
+    static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
+
+private:
+    // YOLO detection
+    cv::Mat preprocess(const cv::Mat& frame, float& scale_x, float& scale_y);
+    std::vector<Detection> runBallDetection(const cv::Mat& color_frame, 
+                                           const cv::Mat& depth_frame,
+                                           const CameraIntrinsics& intrinsics);
+    std::vector<SimpleHand> runPoseEstimation(const cv::Mat& color_frame,
+                                             const cv::Mat& depth_frame,
+                                             const CameraIntrinsics& intrinsics);
+    
+    // Color matching
+    float matchColor(const Detection& det, const ColorProfile& profile, const cv::Mat& hsv_frame);
+    const Detection* findBestColorMatch(const std::vector<Detection>& detections, 
+                                       const ColorProfile& profile, 
+                                       const cv::Mat& hsv_frame,
+                                       const std::set<int>& used_indices);
+    
+    // State detection
+    bool isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands);
+    std::vector<BallEvent> detectStatesAndEvents(std::vector<SimpleBall>& balls, 
+                                                 const std::vector<SimpleHand>& hands);
+    
+    // Fallback tracking
+    cv::Point2f searchForColorBlob(const cv::Mat& hsv_frame, 
+                                   const ColorProfile& profile,
+                                   const cv::Point2f& search_center, 
+                                   int radius);
+    
+    // Utility
+    float getDepthAtPoint(const cv::Mat& depth_frame, const cv::Point2f& point);
+    cv::Point3f deprojectToWorld(const cv::Point2f& pixel, float depth, 
+                                const CameraIntrinsics& intrinsics);
+    uint64_t getCurrentTimestamp();
+    
+    // OpenVINO models
+    ov::Core core_;
+    ov::CompiledModel ball_model_;
+    ov::InferRequest ball_infer_;
+    ov::CompiledModel pose_model_;
+    ov::InferRequest pose_infer_;
+    
+    // State
+    std::vector<ColorProfile> color_profiles_;
+    std::vector<SimpleBall> balls_;
+    std::vector<SimpleHand> hands_;
+    std::vector<Detection> last_raw_detections_;
+    std::string settings_file_;
+    cv::Mat last_color_frame_;  // For calibration
+    
+    // Timing
+    std::chrono::steady_clock::time_point last_update_time_;
+    
+    // Model parameters
+    int input_width_ = 640;
+    int input_height_ = 640;
+    float confidence_threshold_ = 0.25f;
+    float nms_threshold_ = 0.5f;
+    const int num_classes_ = 2;  // ball, ball_held
+    
+    // Parameters
+    static constexpr float WRIST_PROXIMITY_THRESHOLD = 0.15f;  // 15cm
+    static constexpr int COLOR_SEARCH_RADIUS = 100;            // pixels
+    static constexpr int MAX_FRAMES_WITHOUT_YOLO = 30;         // ~1 second at 30fps
+    static constexpr int MIN_FRAMES_FOR_STATE_CHANGE = 3;      // Debounce state changes
+    static constexpr float MIN_COLOR_MATCH_SCORE = 0.5f;       // 50% match required
+    static constexpr float MIN_DEPTH = 0.2f;
+    static constexpr float MAX_DEPTH = 2.0f;
+};

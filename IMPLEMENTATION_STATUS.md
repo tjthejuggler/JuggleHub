@@ -1,90 +1,178 @@
-# Implementation Status
+# SimpleBallTracker Implementation Status
 
-**Last Updated:** 2025-10-03 14:53:00 UTC
+**Date:** 2025-10-04  
+**Status:** Partial Implementation - Requires Completion
 
-## Recent Changes
+## What Has Been Completed
 
-### 2025-10-03: Removed New Color Tracking System
-- Removed BallRegistry, SkinToneFilter, and DetectionConfidence components
-- Removed Ball Management UI tab and API
-- Reverted to legacy color tracking only
-- Updated documentation to reflect simplified architecture
+### 1. Architecture Design ✅
+- Complete architectural design in `SIMPLIFIED_TRACKING_ARCHITECTURE.md`
+- Detailed implementation plan in `SIMPLIFIED_TRACKING_IMPLEMENTATION_PLAN.md`
+- Clear simplification strategy (from ~2500 lines to ~900 lines)
 
-## Current System Architecture
+### 2. Core Files Created ✅
+- `engine/include/SimpleBallTracker.hpp` - Header with all data structures
+- `engine/src/SimpleBallTracker.cpp` - Core tracking implementation (643 lines)
 
-### Ball Tracking
-- **Status:** Using legacy color tracking only
-- **Implementation:** HSV-based color filtering with blob detection
-- **Configuration:** `ball_settings.json`
+### 3. Key Features Implemented ✅
+- Color-based ball identification
+- Color matching algorithm
+- State detection (held vs flight)
+- Event detection (throw/catch)
+- Kalman filter fallback tracking
+- Color blob search
+- Settings management (load/save JSON)
+- Color calibration
 
-### DNN Tracking
-- **Status:** Active
-- **Models:** YOLO11n for ball detection, YOLO11n-pose for hand tracking
-- **Features:** ByteTrack integration, Kalman filtering, throw/catch detection
+## What Needs To Be Completed
 
-### Color Tracking
-- **Status:** Active (Legacy mode only)
-- **Method:** Single HSV range per ball
-- **Calibration:** Click-based color sampling
+### 1. YOLO Detection Integration ⚠️
+The SimpleBallTracker needs YOLO detection methods added. Currently the header declares them but the implementation is missing:
 
-## Removed Components
+**Required Methods:**
+```cpp
+std::vector<Detection> runBallDetection(const cv::Mat& color_frame, 
+                                       const cv::Mat& depth_frame,
+                                       const CameraIntrinsics& intrinsics);
 
-The following components were part of the new tracking system and have been removed:
+std::vector<SimpleHand> runPoseEstimation(const cv::Mat& color_frame,
+                                         const cv::Mat& depth_frame,
+                                         const CameraIntrinsics& intrinsics);
+```
 
-### C++ Components
-- `engine/include/BallRegistry.hpp` (283 lines)
-- `engine/src/BallRegistry.cpp` (565 lines)
-- `engine/include/SkinToneFilter.hpp` (113 lines)
-- `engine/src/SkinToneFilter.cpp` (175 lines)
-- `engine/include/DetectionConfidence.hpp` (197 lines)
-- `engine/src/DetectionConfidence.cpp` (318 lines)
+**Solution:** Copy the YOLO detection code from `DNNTracker::postprocess_ball_detection()` and `DNNTracker::run_pose_estimation()` into SimpleBallTracker.
 
-### Python Components
-- `hub/ui/ball_management_widget.py` (592 lines)
-- `hub/ball_manager.py`
-- `hub/api_routes.py`
-- `hub/test_ball_api.py`
+### 2. Engine.cpp Integration ⚠️
+The Engine.cpp file has been partially updated but needs complete integration:
 
-### Features Removed
-- Multi-sample color calibration
-- Ball registry management
-- Confidence-based detection
-- Skin tone filtering
-- REST API for ball management
-- Ball Management UI tab
+**Issues:**
+- Old DNNTracker references still exist
+- Protobuf message population needs updating for SimpleBall/SimpleHand
+- Recording frame structure needs updating
+- Calibration commands need updating
 
-## Active Features
+**Required Changes:**
+1. Remove all `dnn_tracker_` references
+2. Update constructor to initialize SimpleBallTracker with model paths
+3. Update main loop to use SimpleBallTracker::update()
+4. Update protobuf population for SimpleBall and BallEvent
+5. Update calibration command handling
+6. Remove visualization data that's no longer needed
 
-### Core Tracking
-- ✅ DNN-based ball detection (YOLO11n)
-- ✅ Hand pose estimation (YOLO11n-pose)
-- ✅ ByteTrack multi-object tracking
-- ✅ Kalman filtering for smooth trajectories
-- ✅ Throw/catch event detection
-- ✅ Legacy color tracking
+### 3. SimpleBallTracker.cpp Completion ⚠️
+Need to add YOLO detection implementation:
 
-### UI Features
-- ✅ Real-time video display
-- ✅ Camera settings management
-- ✅ Recording functionality
-- ✅ Color calibration (legacy mode)
-- ✅ Tracker settings adjustment
+```cpp
+// Add to SimpleBallTracker constructor
+SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
+                                    const std::string& pose_model_path,
+                                    const std::string& device_name,
+                                    const std::string& settings_file)
+    : settings_file_(settings_file) {
+    
+    // Load OpenVINO models
+    ball_model_ = core_.compile_model(ball_model_path, device_name);
+    ball_infer_ = ball_model_.create_infer_request();
+    
+    pose_model_ = core_.compile_model(pose_model_path, device_name);
+    pose_infer_ = pose_model_.create_infer_request();
+    
+    // ... rest of initialization
+}
 
-### Data Pipeline
-- ✅ ZeroMQ communication
-- ✅ Protocol Buffers serialization
-- ✅ Frame buffering
-- ✅ Continuous recording
+// Add YOLO detection methods (copy from DNNTracker)
+std::vector<Detection> SimpleBallTracker::runBallDetection(...) {
+    // Copy from DNNTracker::postprocess_ball_detection
+}
 
-## Future Work
+std::vector<SimpleHand> SimpleBallTracker::runPoseEstimation(...) {
+    // Copy from DNNTracker::run_pose_estimation
+}
+```
 
-### Potential Improvements
-- Better lighting compensation in color tracking
-- More robust color range tuning
-- Alternative color spaces (LAB, YCrCb)
-- Improved hand-ball association logic
+### 4. CMakeLists.txt Update ⚠️
+Add SimpleBallTracker.cpp to build:
 
-### Known Limitations
-- Color tracking sensitive to lighting changes
-- Single color range per ball may not handle all conditions
-- Manual calibration required for each lighting setup
+```cmake
+set(SOURCES
+    src/main.cpp
+    src/Engine.cpp
+    src/SimpleBallTracker.cpp  # ADD THIS
+    src/KalmanFilter3D.cpp
+    # ... other files
+)
+```
+
+## Recommended Next Steps
+
+### Option 1: Complete the Implementation (Recommended)
+1. Copy YOLO detection code from DNNTracker to SimpleBallTracker
+2. Complete Engine.cpp integration
+3. Update CMakeLists.txt
+4. Build and test
+
+### Option 2: Hybrid Approach (Faster)
+1. Keep DNNTracker for YOLO detection only
+2. Use SimpleBallTracker for tracking logic
+3. Create adapter layer between them
+
+### Option 3: Incremental Migration
+1. Add feature flag to switch between systems
+2. Test SimpleBallTracker alongside DNNTracker
+3. Gradually migrate functionality
+4. Remove DNNTracker when stable
+
+## Files Modified So Far
+
+### Created:
+- `engine/include/SimpleBallTracker.hpp` (210 lines)
+- `engine/src/SimpleBallTracker.cpp` (643 lines)
+- `SIMPLIFIED_TRACKING_ARCHITECTURE.md` (438 lines)
+- `SIMPLIFIED_TRACKING_IMPLEMENTATION_PLAN.md` (638 lines)
+
+### Modified:
+- `engine/include/Engine.hpp` - Updated to use SimpleBallTracker
+- `engine/src/Engine.cpp` - Partially updated (has compilation errors)
+
+## Current Compilation Errors
+
+The main issues are:
+1. `dnn_tracker_` references need to be replaced with `simple_tracker_`
+2. YOLO detection methods not implemented in SimpleBallTracker
+3. Protobuf message population needs updating
+4. Some data structure mismatches (TrackedObject vs SimpleBall)
+
+## Estimated Work Remaining
+
+- **YOLO Integration:** ~2-3 hours (copy and adapt existing code)
+- **Engine.cpp Completion:** ~1-2 hours (fix all references and protobuf)
+- **Testing & Debugging:** ~2-4 hours
+- **Total:** ~5-9 hours of development work
+
+## Testing Plan
+
+Once implementation is complete:
+
+1. **Unit Tests:**
+   - Color matching algorithm
+   - State detection logic
+   - Event detection
+
+2. **Integration Tests:**
+   - Single ball tracking
+   - Multiple balls simultaneously
+   - Throw/catch detection
+
+3. **Real-World Tests:**
+   - 3-ball cascade
+   - Fast throws
+   - Varying lighting
+
+## Benefits When Complete
+
+- ✅ ~64% code reduction (2500 → 900 lines)
+- ✅ Simpler, more maintainable codebase
+- ✅ Color-based stable ball identity
+- ✅ No ByteTrack complexity
+- ✅ Clear, understandable logic
+- ✅ Easier to debug and tune

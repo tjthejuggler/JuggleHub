@@ -2888,7 +2888,7 @@ if PYQT_AVAILABLE:
                         try:
                             response = self.zmq_client.send_command(command)
                             if response.success:
-                                self.log_message(f"✅ Color profile '{color_name}' updated successfully")
+                                self.log_message(f"✅ Color profile '{color_name}' updated successfully from YOLO detection box")
                                 self.color_profile_status_label.setText(f"✅ '{color_name}' profile set! Click 'Set Color Profile' again to calibrate another color.")
                                 
                                 # Reload ball profiles to update the hue sliders in Ball Profiles section
@@ -2897,8 +2897,17 @@ if PYQT_AVAILABLE:
                                     # Use QTimer to delay the reload slightly
                                     QTimer.singleShot(200, lambda: self._reload_ball_profiles_after_calibration(color_name))
                             else:
-                                self.log_message(f"❌ Failed to update color profile: {response.message}")
-                                self.color_profile_status_label.setText(f"❌ Failed to set '{color_name}' profile")
+                                # Check if the error is about no YOLO box found
+                                if "No YOLO detection box found" in response.message:
+                                    self.log_message(f"❌ No ball detected at click location. Please click directly on a detected ball.")
+                                    self.color_profile_status_label.setText(f"❌ No ball detected! Click on a ball with a YOLO detection box.")
+                                    QMessageBox.warning(self, "No Ball Detected",
+                                                       "No YOLO detection box found at the click location.\n\n"
+                                                       "Please click directly on a detected ball (one with a red box around it).\n\n"
+                                                       "Tip: Enable 'YOLO Detections' visualization to see where balls are detected.")
+                                else:
+                                    self.log_message(f"❌ Failed to update color profile: {response.message}")
+                                    self.color_profile_status_label.setText(f"❌ Failed to set '{color_name}' profile: {response.message}")
                         except Exception as e:
                             self.log_message(f"❌ Error sending calibration command: {e}")
                             self.color_profile_status_label.setText(f"❌ Error: {e}")

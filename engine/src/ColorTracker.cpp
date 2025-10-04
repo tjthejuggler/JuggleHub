@@ -896,6 +896,33 @@ void ColorTracker::calibrateColor(const std::string& color_name,
              " V:", static_cast<int>(mean[2]));
 }
 
+void ColorTracker::calibrateColorFromRange(const std::string& color_name,
+                                           const cv::Scalar& min_hsv,
+                                           const cv::Scalar& max_hsv) {
+    // Find the color profile
+    auto it = std::find_if(color_profiles_.begin(), color_profiles_.end(),
+                          [&color_name](const ColorProfile& p) {
+                              return p.name == color_name;
+                          });
+    
+    if (it == color_profiles_.end()) {
+        ERROR_LOG("ColorTracker: Color '", color_name, "' not found");
+        return;
+    }
+    
+    // Update the color profile with the provided range
+    it->min_hsv = min_hsv;
+    it->max_hsv = max_hsv;
+    
+    // Clear secondary range (no wrap-around for now)
+    it->min_hsv2 = cv::Scalar(-1, -1, -1);
+    it->max_hsv2 = cv::Scalar(-1, -1, -1);
+    
+    INFO_LOG("ColorTracker: Calibrated ", color_name, " from range");
+    INFO_LOG("  Min HSV: [", min_hsv[0], ", ", min_hsv[1], ", ", min_hsv[2], "]");
+    INFO_LOG("  Max HSV: [", max_hsv[0], ", ", max_hsv[1], ", ", max_hsv[2], "]");
+}
+
 bool ColorTracker::updateSetting(const std::string& key, const std::string& value) {
     try {
         // Check if this is an enabled/disabled setting (format: "track_colorname")

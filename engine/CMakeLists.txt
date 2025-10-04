@@ -38,12 +38,9 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ../api/v1/juggler.proto)
 add_executable(juggle_engine
     src/main.cpp
     src/Engine.cpp
-    src/DNNTracker.cpp
+    src/SimpleBallTracker.cpp
     src/KalmanFilter3D.cpp
     src/BallTracker.cpp
-    src/ColorTracker.cpp
-    src/AdaptiveColorManager.cpp
-    src/ThrowCatchDetector.cpp
     src/modules/UdpBallColorModule.cpp
     src/modules/PositionToRgbModule.cpp
     src/networking/UdpSender.cpp

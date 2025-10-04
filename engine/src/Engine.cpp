@@ -3,8 +3,7 @@
 #include "BallTracker.hpp"
 #include "modules/UdpBallColorModule.hpp"
 #include "modules/PositionToRgbModule.hpp"
-#include "BallTracker.hpp"
-#include "DNNTracker.hpp" // Include the DNNTracker header
+#include "SimpleBallTracker.hpp" // Include the SimpleBallTracker header
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -44,17 +43,16 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
    zmq_publisher_.bind("tcp://127.0.0.1:5555");
     zmq_commander_.bind("tcp://127.0.0.1:5565");
 
-    // Initialize DNNTracker if enabled
-    // In your Engine's setup/initialization function
+    // Initialize SimpleBallTracker with model paths
     try {
-        // This assumes your models are in JuggleHub/engine/models/
         const std::string ball_model_path = "engine/models/" + model_name + ".xml";
         const std::string pose_model_path = "engine/models/" + pose_model_name + ".xml";
-        dnn_tracker_ = std::make_shared<DNNTracker>(ball_model_path, pose_model_path, device_name);
+        simple_tracker_ = std::make_shared<SimpleBallTracker>(
+            ball_model_path, pose_model_path, device_name, "ball_settings.json");
+        DEBUG_LOG("[LOG] SimpleBallTracker initialized successfully");
     } catch (const std::exception& e) {
-        ERROR_LOG("FATAL ERROR: Failed to initialize DNNTracker: ", e.what());
-        // Exit or handle the critical failure appropriately
-        return; // or exit(1);
+        ERROR_LOG("FATAL ERROR: Failed to initialize SimpleBallTracker: ", e.what());
+        return;
     }
 
     // Setup the default color module
@@ -78,9 +76,9 @@ void Engine::run() {
     DEBUG_LOG("[LOG] Performing initial camera start from run().");
     startCamera();
 
-    // Initialize the old BallTracker only if DNN tracking is not enabled
+    // Initialize settings module with SimpleBallTracker
     if (use_dnn_tracker_) {
-        settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(dnn_tracker_);
+        settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_);
     } else {
         ball_tracker_ = std::make_shared<juggler::BallTracker>("ball_settings.json");
         settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(ball_tracker_);
@@ -133,201 +131,66 @@ void Engine::run() {
         frame_data.set_ir_projector_active(ir_projector_active_);
 
         // --- BALL TRACKING CODE ---
-        std::vector<TrackedObject> tracked_objects;
-        std::vector<juggler::ColorTrackedBall> color_tracked_balls;
+        std::vector<SimpleBall> tracked_balls;
+        std::vector<BallEvent> ball_events;
+        std::vector<SimpleHand> tracked_hands;
         
         if (use_dnn_tracker_) {
-            if (!dnn_tracker_) return; // Safety check
+            if (!simple_tracker_) return; // Safety check
+            
+            // Update SimpleBallTracker (includes YOLO detection and pose estimation internally)
+            auto [balls, events] = simple_tracker_->update(color_image, depth_image, camera_intrinsics_);
+            tracked_balls = balls;
+            ball_events = events;
+            tracked_hands = simple_tracker_->getHands();
+            
+            // Get the raw detections for recording/visualization
+            last_raw_detections_ = simple_tracker_->getLastRawDetections();
+            
+            DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": SimpleBallTracker returned ",
+                      tracked_balls.size(), " balls, ",
+                      ball_events.size(), " events, and ",
+                      tracked_hands.size(), " hands.");
 
-            auto [tracker_results, tracked_hands] = dnn_tracker_->update(color_image, depth_image, camera_intrinsics_);
-            tracked_objects = tracker_results;
-            
-            // Get the raw detections, unmatched detections, and color-tracked balls from DNNTracker
-            last_raw_detections_ = dnn_tracker_->get_last_raw_detections();
-            auto unmatched_detections = dnn_tracker_->get_unmatched_detections();
-            color_tracked_balls = dnn_tracker_->get_color_tracked_balls();
-            
-            // Get visualization data from DNNTracker
-            auto predicted_positions = dnn_tracker_->get_predicted_positions();
-            auto predicted_labels = dnn_tracker_->get_predicted_labels();
-            auto filtered_dets = dnn_tracker_->get_filtered_detections();
-            auto filter_reasons = dnn_tracker_->get_filter_reasons();
-            auto associations = dnn_tracker_->get_tracker_associations();
-            auto assoc_distances = dnn_tracker_->get_association_distances();
-            auto new_trackers = dnn_tracker_->get_newly_initialized_trackers();
-            auto new_positions = dnn_tracker_->get_new_tracker_positions();
-            auto logical_ball_trackers = dnn_tracker_->get_logical_ball_trackers();
-            auto logical_hand_trackers = dnn_tracker_->get_logical_hand_trackers();
-            
-            // Populate Kalman Predictions (Step 2)
-            std::ofstream debug_log("engine_debug.log", std::ios::app);
-            debug_log << "[KALMAN VIZ] Sending " << predicted_positions.size() << " Kalman predictions to UI" << std::endl;
-            debug_log << "[KALMAN VIZ] Predicted labels size: " << predicted_labels.size() << std::endl;
-            
-            for (size_t i = 0; i < predicted_positions.size(); ++i) {
-                auto* pred = frame_data.add_kalman_predictions();
-                auto* pos = pred->mutable_predicted_pos();
-                pos->set_x(predicted_positions[i].x);
-                pos->set_y(predicted_positions[i].y);
-                pos->set_z(predicted_positions[i].z);
-                
-                debug_log << "[KALMAN VIZ]   Prediction " << i << ": ("
-                          << predicted_positions[i].x << ", "
-                          << predicted_positions[i].y << ", "
-                          << predicted_positions[i].z << ") label=" << predicted_labels[i] << std::endl;
-                
-                // Convert label string (e.g., "Ball 0") to logical_id integer
-                try {
-                    size_t space_pos = predicted_labels[i].find_last_of(' ');
-                    if (space_pos != std::string::npos) {
-                        int logical_id = std::stoi(predicted_labels[i].substr(space_pos + 1));
-                        pred->set_logical_id(logical_id);
-                        debug_log << "[KALMAN VIZ]     -> logical_id=" << logical_id << std::endl;
-                    }
-                } catch (...) {
-                    debug_log << "[KALMAN VIZ]     -> Failed to parse logical_id from label" << std::endl;
-                }
-            }
-            debug_log << "[KALMAN VIZ] Total kalman_predictions added to frame_data: " << frame_data.kalman_predictions_size() << std::endl;
-            debug_log.close();
-            
-            // Populate Filtered Detections (Step 4)
-            for (size_t i = 0; i < filtered_dets.size(); ++i) {
-                auto* filt = frame_data.add_filtered_detections();
-                auto* bbox = filt->mutable_box();
-                bbox->set_x(filtered_dets[i].box.x);
-                bbox->set_y(filtered_dets[i].box.y);
-                bbox->set_width(filtered_dets[i].box.width);
-                bbox->set_height(filtered_dets[i].box.height);
-                filt->set_reason(filter_reasons[i]);
-            }
-            
-            // Populate Tracker Associations (Step 5)
-            for (size_t i = 0; i < associations.size(); ++i) {
-                auto* assoc = frame_data.add_tracker_associations();
-                int tracker_id = associations[i].first;
-                int detection_idx = associations[i].second;
-                
-                assoc->set_tracker_id(tracker_id);
-                assoc->set_detection_index(detection_idx);
-                assoc->set_distance_3d(assoc_distances[i]);
-                
-                // Find the tracker's predicted position
-                for (size_t j = 0; j < predicted_positions.size(); ++j) {
-                    // Extract logical_id from label (e.g., "Ball 0" -> 0)
-                    try {
-                        size_t space_pos = predicted_labels[j].find_last_of(' ');
-                        if (space_pos != std::string::npos) {
-                            int logical_id = std::stoi(predicted_labels[j].substr(space_pos + 1));
-                            if (logical_id == tracker_id) {
-                                auto* tracker_pos = assoc->mutable_tracker_pos();
-                                tracker_pos->set_x(predicted_positions[j].x);
-                                tracker_pos->set_y(predicted_positions[j].y);
-                                tracker_pos->set_z(predicted_positions[j].z);
-                                break;
-                            }
-                        }
-                    } catch (...) {
-                        // Skip if parsing fails
-                    }
-                }
-                
-                // Find the detection's 3D position
-                if (detection_idx >= 0 && detection_idx < static_cast<int>(last_raw_detections_.size())) {
-                    const auto& det = last_raw_detections_[detection_idx];
-                    auto* det_pos = assoc->mutable_detection_pos();
-                    det_pos->set_x(det.world_pos.x);
-                    det_pos->set_y(det.world_pos.y);
-                    det_pos->set_z(det.world_pos.z);
-                }
-            }
-            
-            // Populate New Trackers (Step 6)
-            for (size_t i = 0; i < new_trackers.size(); ++i) {
-                auto* nt = frame_data.add_new_trackers();
-                nt->set_logical_id(new_trackers[i]);
-                auto* pos = nt->mutable_initial_pos();
-                pos->set_x(new_positions[i].x);
-                pos->set_y(new_positions[i].y);
-                pos->set_z(new_positions[i].z);
-            }
-            
-            // Populate Occlusion States (Step 9)
-            for (const auto& tracker : logical_ball_trackers) {
-                if (tracker.status == TrackerStatus::OCCLUDED) {
-                    auto* occ = frame_data.add_occlusion_states();
-                    occ->set_logical_id(tracker.logical_id);
-                    occ->set_occluding_hand_id(tracker.parent_id);
-                }
-            }
-            
-            // Populate Color Search Regions (Step 11)
-            if (dnn_tracker_->get_color_tracker()) {
-                auto search_regions = dnn_tracker_->get_color_tracker()->get_search_regions();
-                for (const auto& [center, radius] : search_regions) {
-                    auto* region = frame_data.add_color_search_regions();
-                    auto* c = region->mutable_search_center();
-                    c->set_x(center.x);
-                    c->set_y(center.y);
-                    region->set_search_radius(radius);
-                }
-            }
-            
-            DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": DNNTracker returned ",
-                      tracked_objects.size(), " tracked objects, ",
-                      last_raw_detections_.size(), " raw detections, and ",
-                      unmatched_detections.size(), " unmatched detections.");
-
+            // Populate hands
             for (const auto& hand_obj : tracked_hands) {
                 auto* hand = frame_data.add_hands();
                 hand->set_id(hand_obj.id);
-                
-                // Set side field for Python compatibility
                 hand->set_side(hand_obj.id == 0 ? "left" : "right");
                 
-                // Set wrist_pos_3d
                 auto* pos = hand->mutable_wrist_pos_3d();
                 pos->set_x(hand_obj.wrist_pos_3d.x);
                 pos->set_y(hand_obj.wrist_pos_3d.y);
                 pos->set_z(hand_obj.wrist_pos_3d.z);
                 
-                // Set position_3d (alias for compatibility)
                 auto* pos_3d = hand->mutable_position_3d();
                 pos_3d->set_x(hand_obj.wrist_pos_3d.x);
                 pos_3d->set_y(hand_obj.wrist_pos_3d.y);
                 pos_3d->set_z(hand_obj.wrist_pos_3d.z);
                 
                 hand->set_confidence(hand_obj.confidence);
-                hand->set_is_visible(true);
+                hand->set_is_visible(hand_obj.is_visible);
 
-                // Project wrist position to 2D for hand circle rendering
-                cv::Point2f wrist_2d = DNNTracker::project_3d_to_2d(hand_obj.wrist_pos_3d, camera_intrinsics_);
+                cv::Point2f wrist_2d = SimpleBallTracker::project_3d_to_2d(hand_obj.wrist_pos_3d, camera_intrinsics_);
                 auto* hand_pos_2d = hand->mutable_position_2d();
                 hand_pos_2d->set_x(wrist_2d.x);
                 hand_pos_2d->set_y(wrist_2d.y);
 
-                // Add keypoints with proper 2D projection
                 for (const auto& kp : hand_obj.keypoints) {
                     auto* keypoint = hand->add_keypoints();
                     
-                    // Project 3D keypoint to 2D screen coordinates
-                    cv::Point2f kp_2d = DNNTracker::project_3d_to_2d(kp, camera_intrinsics_);
+                    cv::Point2f kp_2d = SimpleBallTracker::project_3d_to_2d(kp, camera_intrinsics_);
                     auto* pos_2d = keypoint->mutable_pos_2d();
                     pos_2d->set_x(kp_2d.x);
                     pos_2d->set_y(kp_2d.y);
                     
-                    // Also store 3D position
-                    auto* pos_3d = keypoint->mutable_pos_3d();
-                    pos_3d->set_x(kp.x);
-                    pos_3d->set_y(kp.y);
-                    pos_3d->set_z(kp.z);
+                    auto* kp_pos_3d = keypoint->mutable_pos_3d();
+                    kp_pos_3d->set_x(kp.x);
+                    kp_pos_3d->set_y(kp.y);
+                    kp_pos_3d->set_z(kp.z);
                     
-                    // Set confidence (assuming all keypoints have same confidence as hand for now)
                     keypoint->set_confidence(hand_obj.confidence);
                 }
-                
-                DEBUG_LOG("[LOG] Hand ", hand_obj.id, " with ", hand_obj.keypoints.size(),
-                          " keypoints added to frame_data");
             }
 
             // Populate raw detections in protobuf
@@ -341,21 +204,40 @@ void Engine::run() {
                 raw_det_pb->set_class_id(det.class_id);
             }
 
-            // Populate unmatched detections in protobuf
-            for (const auto& det : unmatched_detections) {
-                auto* unmatched_det_pb = frame_data.add_unmatched_detections();
-                unmatched_det_pb->set_x(det.box.x);
-                unmatched_det_pb->set_y(det.box.y);
-                unmatched_det_pb->set_width(det.box.width);
-                unmatched_det_pb->set_height(det.box.height);
-                unmatched_det_pb->set_confidence(det.confidence);
-                unmatched_det_pb->set_class_id(det.class_id);
-            }
+            // Note: We no longer have "unmatched detections" in the simplified system
+            // All detections are either matched to a ball or ignored
 
-            last_tracked_objects_ = tracked_objects;
+            // Convert SimpleBall to TrackedObject for recording (temporary compatibility)
+            std::vector<TrackedObject> tracked_objects_compat;
+            for (const auto& ball : tracked_balls) {
+                TrackedObject obj;
+                obj.box = ball.bbox;
+                obj.world_pos = ball.position;
+                obj.id = ball.id;
+                obj.class_id = ball.yolo_class_id;
+                obj.class_name = ball.is_held ? "ball_held" : "ball";
+                obj.status = TrackerStatus::TRACKED;  // Simplified - always tracked if in list
+                obj.logical_id = ball.id;
+                obj.is_left = false;
+                tracked_objects_compat.push_back(obj);
+            }
+            
+            // Convert SimpleHand to TrackedHand for recording (temporary compatibility)
+            std::vector<TrackedHand> tracked_hands_compat;
+            for (const auto& hand : tracked_hands) {
+                TrackedHand th;
+                th.wrist_pos_3d = hand.wrist_pos_3d;
+                th.confidence = hand.confidence;
+                th.id = hand.id;
+                th.keypoints = hand.keypoints;
+                tracked_hands_compat.push_back(th);
+            }
+            
+            last_tracked_objects_ = tracked_objects_compat;
 
             // Add to frame buffers
-            RecordingFrame rec_frame = {color_image.clone(), last_raw_detections_, tracked_objects, tracked_hands};
+            RecordingFrame rec_frame = {color_image.clone(), last_raw_detections_,
+                                       tracked_objects_compat, tracked_hands_compat};
             {
                 std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
                 frame_buffer_.push_back(rec_frame);
@@ -368,96 +250,74 @@ void Engine::run() {
                 continuous_frame_buffer_.push_back(rec_frame);
             }
  
-             DEBUG_LOG("DNNTracker update returned ", tracked_objects.size(), " objects and ", last_raw_detections_.size(), " raw detections.");
         } else {
-             auto rs_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
-             auto detections = ball_tracker_->detectBalls(color_image, depth_frame, rs_intrinsics);
-            // ... (code to populate frame_data from detections)
+            // Old BallTracker path (not used when use_dnn_tracker_ is true)
+            auto rs_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
+            auto detections = ball_tracker_->detectBalls(color_image, depth_frame, rs_intrinsics);
         }
 
-        // Helper to map our internal status to the protobuf enum
-        auto to_proto_status = [](TrackerStatus status) {
-            switch (status) {
-                case TrackerStatus::TRACKED: return juggler::v1::Ball::Status::Ball_Status_TRACKED;
-                case TrackerStatus::PREDICTED: return juggler::v1::Ball::Status::Ball_Status_PREDICTED;
-                case TrackerStatus::OCCLUDED: return juggler::v1::Ball::Status::Ball_Status_OCCLUDED;
-                default: return juggler::v1::Ball::Status::Ball_Status_PREDICTED; // Default case
+        // Populate balls from SimpleBall
+        for (const auto& ball : tracked_balls) {
+            if (ball.position.z <= 0) continue;  // Skip invalid depth
+
+            auto* ball_pb = frame_data.add_balls();
+            ball_pb->set_id(ball.id);
+            ball_pb->set_logical_id(ball.id);
+            ball_pb->set_status(juggler::v1::Ball::Status::Ball_Status_TRACKED);
+
+            auto* pos = ball_pb->mutable_position();
+            pos->set_x(ball.position.x);
+            pos->set_y(ball.position.y);
+            pos->set_z(ball.position.z);
+
+            auto* bbox = ball_pb->mutable_bounding_box_2d();
+            bbox->set_x(ball.bbox.x);
+            bbox->set_y(ball.bbox.y);
+            bbox->set_width(ball.bbox.width);
+            bbox->set_height(ball.bbox.height);
+
+            ball_pb->set_class_name(ball.is_held ? "ball_held" : "ball");
+            
+            cv::Point2f projected_pos = SimpleBallTracker::project_3d_to_2d(ball.position, camera_intrinsics_);
+            auto* proj_pos_2d = ball_pb->mutable_projected_pos_2d();
+            proj_pos_2d->set_x(projected_pos.x);
+            proj_pos_2d->set_y(projected_pos.y);
+            
+            // Add color tracked ball for UI visualization
+            auto* color_ball = frame_data.add_color_tracked_balls();
+            color_ball->set_logical_id(ball.id);
+            color_ball->set_color_name(ball.color_name);
+            auto* pixel_pos = color_ball->mutable_pixel_pos();
+            pixel_pos->set_x(ball.pixel_pos.x);
+            pixel_pos->set_y(ball.pixel_pos.y);
+            auto* world_pos = color_ball->mutable_world_pos();
+            world_pos->set_x(ball.position.x);
+            world_pos->set_y(ball.position.y);
+            world_pos->set_z(ball.position.z);
+            color_ball->set_is_active(ball.has_yolo_detection);
+            color_ball->set_associated_wrist_id(ball.held_by_hand_id);
+            color_ball->set_frames_since_seen(ball.frames_without_yolo);
+            
+            // Add ball state
+            auto* ball_state = frame_data.add_ball_states();
+            ball_state->set_logical_id(ball.id);
+            // Map is_held to ball state enum
+            if (ball.is_held) {
+                ball_state->set_state(juggler::v1::BallState::HELD);
+                ball_state->set_associated_hand_id(ball.held_by_hand_id);
+            } else {
+                ball_state->set_state(juggler::v1::BallState::IN_FLIGHT);
+                ball_state->set_associated_hand_id(-1);
             }
-        };
-
-        for (const auto& obj : tracked_objects) {
-             if (obj.world_pos.z <= 0 && obj.status != TrackerStatus::OCCLUDED) continue;
-
-            if (obj.class_name == "ball") {
-                auto* ball = frame_data.add_balls();
-                ball->set_id(obj.id);
-                ball->set_logical_id(obj.logical_id);
-                ball->set_status(to_proto_status(obj.status));
-
-                auto* pos = ball->mutable_position();
-                pos->set_x(obj.world_pos.x);
-                pos->set_y(obj.world_pos.y);
-                pos->set_z(obj.world_pos.z);
-
-                auto* bbox = ball->mutable_bounding_box_2d();
-                bbox->set_x(obj.box.x);
-                bbox->set_y(obj.box.y);
-                bbox->set_width(obj.box.width);
-                bbox->set_height(obj.box.height);
-
-                ball->set_class_name(obj.class_name);
-                
-                cv::Point2f projected_pos = DNNTracker::project_3d_to_2d(obj.world_pos, camera_intrinsics_);
-                auto* proj_pos_2d = ball->mutable_projected_pos_2d();
-                proj_pos_2d->set_x(projected_pos.x);
-                proj_pos_2d->set_y(projected_pos.y);
-                
-                // Add ball state (Step 8) - find corresponding logical tracker to get state
-                if (use_dnn_tracker_) {
-                    auto logical_ball_trackers = dnn_tracker_->get_logical_ball_trackers();
-                    for (const auto& tracker : logical_ball_trackers) {
-                        if (tracker.logical_id == obj.logical_id) {
-                            auto* ball_state = frame_data.add_ball_states();
-                            ball_state->set_logical_id(obj.logical_id);
-                            ball_state->set_state(static_cast<juggler::v1::BallState::State>(tracker.ball_state));
-                            ball_state->set_frames_in_state(tracker.frames_in_current_state);
-                            break;
-                        }
-                    }
+            ball_state->set_frames_in_state(ball.state_change_counter);
+            
+            // Log events to console (protobuf doesn't have ball_events field yet)
+            for (const auto& event : ball_events) {
+                if (event.ball_id == ball.id) {
+                    DEBUG_LOG("[EVENT] ", (event.type == BallEvent::THROW ? "THROW" : "CATCH"),
+                             " - Ball ", event.ball_id, " Hand ", event.hand_id);
                 }
-
-            } else if (obj.class_name == "hand") {
-                auto* hand = frame_data.add_hands();
-                // For now, just sending position and side.
-                auto* pos = hand->mutable_wrist_pos_3d();
-                pos->set_x(obj.world_pos.x);
-                pos->set_y(obj.world_pos.y);
-                pos->set_z(obj.world_pos.z);
-                hand->set_is_visible(obj.status == TrackerStatus::TRACKED);
-                hand->set_id(obj.is_left ? 0 : 1);
             }
-        }
-
-        // Add color-tracked balls to frame data
-        for (const auto& color_ball : color_tracked_balls) {
-            if (!color_ball.is_active) continue;
-            
-            auto* ct_ball = frame_data.add_color_tracked_balls();
-            ct_ball->set_logical_id(color_ball.logical_id);
-            ct_ball->set_color_name(color_ball.color_name);
-            
-            auto* pixel_pos = ct_ball->mutable_pixel_pos();
-            pixel_pos->set_x(color_ball.pixel_pos.x);
-            pixel_pos->set_y(color_ball.pixel_pos.y);
-            
-            auto* world_pos = ct_ball->mutable_world_pos();
-            world_pos->set_x(color_ball.world_pos.x);
-            world_pos->set_y(color_ball.world_pos.y);
-            world_pos->set_z(color_ball.world_pos.z);
-            
-            ct_ball->set_is_active(color_ball.is_active);
-            ct_ball->set_associated_wrist_id(color_ball.associated_wrist_id);
-            ct_ball->set_frames_since_seen(color_ball.frames_since_seen);
         }
 
         if (active_module_) {
@@ -577,29 +437,27 @@ void Engine::processCommands() {
                     }
                     break;
                 case juggler::v1::CommandRequest::CALIBRATE_OBJECT:
-                    if (dnn_tracker_ && !last_depth_frame_.empty()) {
-                        cv::Point2f pixel_coords(command.calibration_pixel_pos().x(), command.calibration_pixel_pos().y());
-                        dnn_tracker_->calibrate_object(command.logical_id_to_calibrate(), pixel_coords, last_depth_frame_, camera_intrinsics_);
-                        response.set_message("Calibration command sent to tracker.");
-                    } else {
-                        response.set_success(false);
-                        response.set_message("Tracker not ready for calibration.");
-                    }
+                    // Note: SimpleBallTracker doesn't support manual object calibration
+                    // Balls are automatically identified by color
+                    response.set_success(false);
+                    response.set_message("Manual object calibration not supported in SimpleBallTracker. Use color calibration instead.");
                     break;
                 case juggler::v1::CommandRequest::SET_POSE_MODEL_ENABLED:
-                    if (dnn_tracker_) {
-                        dnn_tracker_->update_setting("pose_model_enabled", command.pose_model_enabled() ? "true" : "false");
-                        response.set_message("Pose model enabled set to " + std::string(command.pose_model_enabled() ? "true" : "false"));
-                    } else {
-                        response.set_success(false);
-                        response.set_message("DNNTracker not initialized.");
-                    }
+                    // Note: Pose model is always enabled in SimpleBallTracker
+                    response.set_message("Pose model is always enabled in SimpleBallTracker");
                     break;
                 case juggler::v1::CommandRequest::CALIBRATE_COLOR:
-                    if (dnn_tracker_ && !last_color_frame_.empty()) {
+                    if (simple_tracker_) {
                         cv::Point click_point(command.click_x(), command.click_y());
-                        dnn_tracker_->calibrate_color(command.color_name(), click_point);
-                        response.set_message("Color profile '" + command.color_name() + "' calibrated successfully");
+                        std::string error_message;
+                        bool success = simple_tracker_->calibrateColor(command.color_name(), click_point, error_message);
+                        
+                        if (success) {
+                            response.set_message("Color profile '" + command.color_name() + "' calibrated successfully");
+                        } else {
+                            response.set_success(false);
+                            response.set_message(error_message);
+                        }
                     } else {
                         response.set_success(false);
                         response.set_message("Tracker not ready for color calibration");

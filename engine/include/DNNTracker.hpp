@@ -59,7 +59,7 @@ public:
 
     void update_setting(const std::string& key, const std::string& value);
     void calibrate_object(int logical_id, const cv::Point2f& pixel_coords, const cv::Mat& depth_frame, const CameraIntrinsics& intrinsics);
-    void calibrate_color(const std::string& color_name, const cv::Point& click_point);
+    bool calibrate_color(const std::string& color_name, const cv::Point& click_point, std::string& error_message);
     const std::vector<PersistentTracker>& get_ball_trackers() const { return logical_ball_trackers_; }
     const std::vector<Detection>& get_last_raw_detections() const { return last_raw_detections_; }
     const std::vector<Detection>& get_unmatched_detections() const { return unmatched_detections_; }

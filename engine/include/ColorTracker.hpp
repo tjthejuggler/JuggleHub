@@ -75,6 +75,8 @@ public:
     // Color calibration
     void calibrateColor(const std::string& color_name, const cv::Mat& hsv_image,
                        const cv::Point& click_point);
+    void calibrateColorFromRange(const std::string& color_name,
+                                 const cv::Scalar& min_hsv, const cv::Scalar& max_hsv);
     
     // Getters
     const std::vector<ColorProfile>& getColorProfiles() const { return color_profiles_; }

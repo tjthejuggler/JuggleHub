@@ -1205,23 +1205,145 @@ void DNNTracker::calibrate_object(int logical_id, const cv::Point2f& pixel_coord
     }
 }
 
-void DNNTracker::calibrate_color(const std::string& color_name, const cv::Point& click_point) {
+bool DNNTracker::calibrate_color(const std::string& color_name, const cv::Point& click_point, std::string& error_message) {
     if (!color_tracker_) {
-        std::cerr << "DNNTracker: Color tracker not initialized" << std::endl;
-        return;
+        error_message = "Color tracker not initialized";
+        std::cerr << "DNNTracker: " << error_message << std::endl;
+        return false;
     }
+    
+    if (last_color_frame_.empty()) {
+        error_message = "No color frame available for calibration";
+        std::cerr << "DNNTracker: " << error_message << std::endl;
+        return false;
+    }
+    
+    // Find the YOLO detection box that contains the click point
+    const Detection* clicked_detection = nullptr;
+    for (const auto& det : last_raw_detections_) {
+        // Check if click point is inside this detection box
+        if (click_point.x >= det.box.x &&
+            click_point.x <= (det.box.x + det.box.width) &&
+            click_point.y >= det.box.y &&
+            click_point.y <= (det.box.y + det.box.height)) {
+            clicked_detection = &det;
+            break;
+        }
+    }
+    
+    if (!clicked_detection) {
+        error_message = "No YOLO detection box found at click location (" +
+                       std::to_string(click_point.x) + "," + std::to_string(click_point.y) + "). " +
+                       "Please click directly on a detected ball.";
+        std::cerr << "DNNTracker: " << error_message << std::endl;
+        return false;
+    }
+    
+    std::cout << "DNNTracker: Found YOLO detection box at click location: "
+              << "x=" << clicked_detection->box.x << ", y=" << clicked_detection->box.y
+              << ", w=" << clicked_detection->box.width << ", h=" << clicked_detection->box.height
+              << std::endl;
     
     // Convert current frame to HSV
     cv::Mat hsv_frame;
-    if (!last_color_frame_.empty()) {
-        cv::cvtColor(last_color_frame_, hsv_frame, cv::COLOR_BGR2HSV);
-        color_tracker_->calibrateColor(color_name, hsv_frame, click_point);
-        color_tracker_->saveSettings();
-        std::cout << "DNNTracker: Calibrated color profile '" << color_name << "' at ("
-                  << click_point.x << "," << click_point.y << ")" << std::endl;
-    } else {
-        std::cerr << "DNNTracker: No color frame available for calibration" << std::endl;
+    cv::cvtColor(last_color_frame_, hsv_frame, cv::COLOR_BGR2HSV);
+    
+    // Sample colors from the entire YOLO detection box
+    // Extract the region of interest (ROI) from the detection box
+    cv::Rect roi_rect(
+        std::max(0, static_cast<int>(clicked_detection->box.x)),
+        std::max(0, static_cast<int>(clicked_detection->box.y)),
+        std::min(static_cast<int>(clicked_detection->box.width),
+                 hsv_frame.cols - static_cast<int>(clicked_detection->box.x)),
+        std::min(static_cast<int>(clicked_detection->box.height),
+                 hsv_frame.rows - static_cast<int>(clicked_detection->box.y))
+    );
+    
+    // Ensure ROI is valid
+    if (roi_rect.width <= 0 || roi_rect.height <= 0) {
+        error_message = "Invalid detection box dimensions";
+        std::cerr << "DNNTracker: " << error_message << std::endl;
+        return false;
     }
+    
+    cv::Mat roi = hsv_frame(roi_rect);
+    
+    // Calculate statistics from the ROI
+    std::vector<float> hue_values;
+    std::vector<float> sat_values;
+    std::vector<float> val_values;
+    
+    // Sample pixels from the ROI (use every pixel for better accuracy)
+    for (int y = 0; y < roi.rows; y++) {
+        for (int x = 0; x < roi.cols; x++) {
+            cv::Vec3b hsv_pixel = roi.at<cv::Vec3b>(y, x);
+            hue_values.push_back(static_cast<float>(hsv_pixel[0]));
+            sat_values.push_back(static_cast<float>(hsv_pixel[1]));
+            val_values.push_back(static_cast<float>(hsv_pixel[2]));
+        }
+    }
+    
+    if (hue_values.empty()) {
+        error_message = "No valid pixels found in detection box";
+        std::cerr << "DNNTracker: " << error_message << std::endl;
+        return false;
+    }
+    
+    // Calculate mean and standard deviation for each channel
+    auto calc_stats = [](const std::vector<float>& values) -> std::pair<float, float> {
+        float sum = std::accumulate(values.begin(), values.end(), 0.0f);
+        float mean = sum / values.size();
+        
+        float sq_sum = 0.0f;
+        for (float val : values) {
+            sq_sum += (val - mean) * (val - mean);
+        }
+        float stddev = std::sqrt(sq_sum / values.size());
+        
+        return {mean, stddev};
+    };
+    
+    auto [mean_h, stddev_h] = calc_stats(hue_values);
+    auto [mean_s, stddev_s] = calc_stats(sat_values);
+    auto [mean_v, stddev_v] = calc_stats(val_values);
+    
+    std::cout << "DNNTracker: Sampled " << hue_values.size() << " pixels from detection box" << std::endl;
+    std::cout << "  Hue: mean=" << mean_h << ", stddev=" << stddev_h << std::endl;
+    std::cout << "  Sat: mean=" << mean_s << ", stddev=" << stddev_s << std::endl;
+    std::cout << "  Val: mean=" << mean_v << ", stddev=" << stddev_v << std::endl;
+    
+    // Define range based on mean ± 2*stddev (covers ~95% of values)
+    // Use a minimum range to avoid too-narrow ranges
+    float hue_tolerance = std::max(15.0f, stddev_h * 2.0f);
+    float sat_tolerance = std::max(50.0f, stddev_s * 2.0f);
+    float val_tolerance = std::max(50.0f, stddev_v * 2.0f);
+    
+    float min_hue = std::max(0.0f, mean_h - hue_tolerance);
+    float max_hue = std::min(180.0f, mean_h + hue_tolerance);
+    float min_sat = std::max(0.0f, mean_s - sat_tolerance);
+    float max_sat = std::min(255.0f, mean_s + sat_tolerance);
+    float min_val = std::max(0.0f, mean_v - val_tolerance);
+    float max_val = std::min(255.0f, mean_v + val_tolerance);
+    
+    std::cout << "DNNTracker: Calculated HSV range for '" << color_name << "':" << std::endl;
+    std::cout << "  H: [" << min_hue << ", " << max_hue << "]" << std::endl;
+    std::cout << "  S: [" << min_sat << ", " << max_sat << "]" << std::endl;
+    std::cout << "  V: [" << min_val << ", " << max_val << "]" << std::endl;
+    
+    // Update the color profile with the calculated range
+    color_tracker_->calibrateColorFromRange(
+        color_name,
+        cv::Scalar(min_hue, min_sat, min_val),
+        cv::Scalar(max_hue, max_sat, max_val)
+    );
+    
+    color_tracker_->saveSettings();
+    
+    std::cout << "DNNTracker: Successfully calibrated color profile '" << color_name
+              << "' from YOLO detection box" << std::endl;
+    
+    error_message = ""; // Clear error message on success
+    return true;
 }
 
 

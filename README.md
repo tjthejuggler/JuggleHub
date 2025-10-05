@@ -2,9 +2,19 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-04 18:17 CET
+**Last Updated:** 2025-10-05 23:26 UTC
 
-**Recent Changes (2025-10-04):**
+**Recent Changes (2025-10-05):**
+- **🎯 FREE-FLIGHT TRACKING FIX - Eliminated Hand Confusion**
+  - **Issue**: Ball tracker was flickering to hands during free flight (frames 171-175)
+  - **Root Cause**: Color blob fallback was active for all balls, detecting pink/red hands
+  - **Solution**: Color blob search now ONLY used when ball is held or near hand
+  - **Free Flight Mode**: Relies exclusively on Kalman prediction, no color fallback
+  - **In-Hand Mode**: Color blob search refines position when ball is near wrist
+  - **Result**: Stable tracking during juggling, no more hand confusion
+  - See [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp) lines 686-730 for implementation
+
+**Previous Changes (2025-10-04):**
 - **🎯 MAJOR SIMPLIFICATION - Simplified Ball Tracking System** - Complete overhaul of tracking architecture
   - **Removed Complexity**: Eliminated ~2,500 lines of complex ByteTrack-based tracking code (64% reduction)
   - **Color-Based Identity**: Balls are now identified purely by color - no temporal tracking needed

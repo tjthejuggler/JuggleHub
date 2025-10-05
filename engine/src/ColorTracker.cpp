@@ -328,10 +328,11 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             }
         }
         
-        // Step 2b: If not associated with wrist, check ByteTrack detections
+        // Step 2b: If not associated with wrist, PRIORITIZE ByteTrack detections
         if (!found_this_frame && ball.associated_wrist_id == -1) {
-            // Look for ByteTrack detection near last known position
-            float min_dist = 100.0f; // pixels
+            // PRIORITY: Find best YOLO detection that matches our color
+            // Score based on: color confidence (primary) and proximity (secondary)
+            float best_score = 0.0f;
             cv::Point2f best_match(-1, -1);
             
             for (const auto& obj : bytetrack_objects) {
@@ -341,16 +342,27 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                                   obj.box.y + obj.box.height / 2.0f);
                 
                 // Check if this detection matches our color profile
-                float confidence = matchesColorProfile(hsv_frame, center, *profile);
-                if (confidence > 0.10f) {
+                float color_confidence = matchesColorProfile(hsv_frame, center, *profile);
+                
+                // CRITICAL: Only consider detections with reasonable color match
+                if (color_confidence > 0.05f) {
+                    // Calculate distance to last known position
                     float dist = std::sqrt(
                         std::pow(center.x - ball.pixel_pos.x, 2) +
                         std::pow(center.y - ball.pixel_pos.y, 2)
                     );
                     
-                    if (dist < min_dist) {
-                        min_dist = dist;
-                        best_match = center;
+                    // Within reasonable distance (200 pixels for free flight)
+                    if (dist < 200.0f) {
+                        // Score: Heavily weight color confidence, with distance penalty
+                        // Color confidence is 0-1, distance penalty reduces score for far detections
+                        float distance_factor = 1.0f - (dist / 200.0f); // 1.0 at 0 pixels, 0.0 at 200 pixels
+                        float score = color_confidence * (0.7f + 0.3f * distance_factor);
+                        
+                        if (score > best_score) {
+                            best_score = score;
+                            best_match = center;
+                        }
                     }
                 }
             }
@@ -360,6 +372,9 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 ball.frames_since_seen = 0;
                 ball.color_match_confidence = matchesColorProfile(hsv_frame, best_match, *profile);
                 found_this_frame = true;
+                
+                DEBUG_LOG("ColorTracker: Ball ", ball.logical_id, " tracked via YOLO - ",
+                         "Score: ", best_score, ", Color conf: ", ball.color_match_confidence);
                 
                 // Update world position
                 if (best_match.x >= 0 && best_match.x < depth_frame.cols &&
@@ -375,8 +390,9 @@ std::vector<ColorTrackedBall> ColorTracker::update(
             }
         }
         
-        // Step 2c: If still not found, try simple color tracking around last known position
-        if (!found_this_frame) {
+        // Step 2c: ONLY use color tracking fallback when ball is associated with wrist
+        // For free-flight balls, rely ONLY on YOLO detections to avoid tracking hands
+        if (!found_this_frame && ball.associated_wrist_id >= 0) {
             cv::Point2f search_center = ball.pixel_pos; // Use last known position
             
             search_regions_.push_back({search_center, static_cast<float>(WRIST_SEARCH_RADIUS)});
@@ -388,6 +404,8 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                 ball.frames_since_seen = 0;
                 ball.color_match_confidence = matchesColorProfile(hsv_frame, new_pos, *profile);
                 found_this_frame = true;
+                
+                DEBUG_LOG("ColorTracker: Ball ", ball.logical_id, " tracked via color fallback (in hand)");
                 
                 // Update world position
                 if (new_pos.x >= 0 && new_pos.x < depth_frame.cols &&
@@ -401,6 +419,10 @@ std::vector<ColorTrackedBall> ColorTracker::update(
                     }
                 }
             }
+        } else if (!found_this_frame && ball.associated_wrist_id == -1) {
+            // For free-flight balls without YOLO detection, just increment lost counter
+            // DO NOT fall back to color tracking - it will track hands!
+            DEBUG_LOG("ColorTracker: Ball ", ball.logical_id, " lost (no YOLO detection in free flight)");
         }
         
         // Update tracking state

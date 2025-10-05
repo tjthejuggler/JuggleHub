@@ -1026,6 +1026,14 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 cv::putText(result, wrist_label, cv::Point(center_x + 15, center_y + 30),
                            cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
             }
+            
+            // Show tracking reason for debugging
+            if (!ball.tracking_reason.empty()) {
+                cv::putText(result, ball.tracking_reason, cv::Point(center_x + 15, center_y + 45),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+                cv::putText(result, ball.tracking_reason, cv::Point(center_x + 15, center_y + 45),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 0), 1, cv::LINE_AA);
+            }
         }
     }
     

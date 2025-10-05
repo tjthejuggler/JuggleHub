@@ -281,7 +281,7 @@ const Detection* SimpleBallTracker::findBestColorMatch(
     const std::set<int>& used_indices) {
     
     const Detection* best_det = nullptr;
-    float best_score = MIN_COLOR_MATCH_SCORE;
+    float best_combined_score = 0.0f;
     
     for (const auto& det : detections) {
         // Skip if already used
@@ -294,10 +294,22 @@ const Detection* SimpleBallTracker::findBestColorMatch(
             continue;
         }
         
-        float score = matchColor(det, profile, hsv_frame);
+        float color_score = matchColor(det, profile, hsv_frame);
         
-        if (score > best_score) {
-            best_score = score;
+        // Only consider detections with reasonable color match
+        if (color_score < MIN_COLOR_MATCH_SCORE) {
+            continue;
+        }
+        
+        // PRIORITY SCORING:
+        // 1. YOLO class 'ball' (class_id=0) gets 3x weight - prioritize free-flight balls
+        // 2. YOLO confidence gets 2x weight - trust high-confidence detections
+        // 3. Color match gets 1x weight - ensure it's the right color
+        float class_weight = (det.class_id == 0) ? 3.0f : 1.0f;  // Prefer 'ball' over 'ball_held'
+        float combined_score = (class_weight * det.confidence * 2.0f) + color_score;
+        
+        if (combined_score > best_combined_score) {
+            best_combined_score = combined_score;
             best_det = &det;
         }
     }
@@ -666,6 +678,12 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             ball.yolo_class_id = best_det->class_id;
             ball.color_match_score = matchColor(*best_det, *profile, hsv_frame);
             
+            // Set tracking reason for debug visualization
+            char reason[128];
+            snprintf(reason, sizeof(reason), "YOLO: cls=%d conf=%.2f col=%.2f",
+                     best_det->class_id, best_det->confidence, ball.color_match_score);
+            ball.tracking_reason = reason;
+            
             // Update Kalman filter
             ball.kalman.update(KalmanFilter3D::MeasurementVector(
                 ball.position.x, ball.position.y, ball.position.z));
@@ -682,74 +700,85 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 ball.kalman.predict(dt);
                 auto state = ball.kalman.get_state();
                 ball.position = cv::Point3f(state(0), state(1), state(2));
-            }
-            else if (ball.frames_without_yolo < MAX_FRAMES_WITHOUT_YOLO) {
-                // Check if near a hand - if so, ball is held even without YOLO detection
-                // Use the undetected_near_hand_threshold for this check
-                bool near_hand = false;
+                
+                // CRITICAL: Update yolo_class_id based on proximity to hands
+                // Don't let old class_id persist and cause wrong state detection
+                bool near_any_hand = false;
+                int nearest_hand_id = -1;
+                float nearest_dist = 999.0f;
                 for (const auto& hand : hands) {
                     if (!hand.is_visible) continue;
                     float dist = cv::norm(ball.position - hand.wrist_pos_3d);
-                    if (dist < tracking_settings_.undetected_near_hand_threshold) {
-                        ball.position = hand.wrist_pos_3d;
-                        ball.held_by_hand_id = hand.id;
-                        // Update class_id to ball_held since it's near hand
-                        ball.yolo_class_id = 1;
-                        near_hand = true;
-                        break;
+                    if (dist < tracking_settings_.wrist_proximity_threshold && dist < nearest_dist) {
+                        near_any_hand = true;
+                        nearest_hand_id = hand.id;
+                        nearest_dist = dist;
                     }
                 }
                 
-                // If not near any hand, update class_id to ball (in-air)
-                if (!near_hand) {
+                if (near_any_hand) {
+                    ball.held_by_hand_id = nearest_hand_id;
+                    ball.yolo_class_id = 1;
+                    char reason[128];
+                    snprintf(reason, sizeof(reason), "Kalman+Near[%c] d=%.2fm",
+                             nearest_hand_id == 0 ? 'L' : 'R', nearest_dist);
+                    ball.tracking_reason = reason;
+                } else {
                     ball.yolo_class_id = 0;
+                    ball.tracking_reason = "Kalman pred";
                 }
+            }
+            else if (ball.frames_without_yolo < MAX_FRAMES_WITHOUT_YOLO) {
+                // TRAJECTORY-BASED VALIDATION:
+                // Only allow hand association if ball's trajectory could reasonably reach that hand
                 
-                if (!near_hand) {
-                    // Search for color blob
-                    cv::Point2f blob_pos = searchForColorBlob(hsv_frame, *profile,
-                                                              ball.pixel_pos,
-                                                              COLOR_SEARCH_RADIUS);
-                    if (blob_pos.x >= 0) {
-                        float depth = getDepthAtPoint(depth_frame, blob_pos);
-                        if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
-                            cv::Point3f new_position = deprojectToWorld(blob_pos, depth, intrinsics);
-                            
-                            // Check if color blob is near a hand
-                            // Use undetected_near_hand_threshold since this is a color-tracked (undetected by YOLO) ball
-                            bool blob_near_hand = false;
-                            for (const auto& hand : hands) {
-                                if (!hand.is_visible) continue;
-                                float dist = cv::norm(new_position - hand.wrist_pos_3d);
-                                if (dist < tracking_settings_.undetected_near_hand_threshold) {
-                                    // Color blob detected near hand - ball is held
-                                    ball.position = new_position;
-                                    ball.pixel_pos = blob_pos;
-                                    ball.held_by_hand_id = hand.id;
-                                    // Update class_id to ball_held since it's near hand
-                                    ball.yolo_class_id = 1;
-                                    blob_near_hand = true;
-                                    
-                                    // Update Kalman with color blob measurement
-                                    ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                                        ball.position.x, ball.position.y, ball.position.z));
-                                    break;
-                                }
-                            }
-                            
-                            if (!blob_near_hand) {
-                                // Color blob found but not near hand - ball is in flight
-                                ball.position = new_position;
-                                ball.pixel_pos = blob_pos;
-                                // Update class_id to ball (in-air) since it's not near hand
-                                ball.yolo_class_id = 0;
-                                
-                                // Update Kalman with color blob measurement
-                                ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                                    ball.position.x, ball.position.y, ball.position.z));
-                            }
+                // Get Kalman predicted position (already computed above in line 682)
+                auto predicted_state = ball.kalman.get_state();
+                cv::Point3f predicted_pos(predicted_state(0), predicted_state(1), predicted_state(2));
+                
+                // Check if predicted position is near any hand
+                bool trajectory_near_hand = false;
+                int closest_hand_id = -1;
+                float closest_predicted_dist = std::numeric_limits<float>::max();
+                
+                for (const auto& hand : hands) {
+                    if (!hand.is_visible) continue;
+                    
+                    // Check distance from PREDICTED position to hand (not current position)
+                    float dist_to_predicted = cv::norm(predicted_pos - hand.wrist_pos_3d);
+                    
+                    // Only consider this hand if trajectory is heading toward it
+                    if (dist_to_predicted < tracking_settings_.undetected_near_hand_threshold) {
+                        if (dist_to_predicted < closest_predicted_dist) {
+                            closest_predicted_dist = dist_to_predicted;
+                            closest_hand_id = hand.id;
+                            trajectory_near_hand = true;
                         }
                     }
+                }
+                
+                if (trajectory_near_hand) {
+                    // Trajectory indicates ball is approaching/at this hand
+                    // Snap to hand position
+                    for (const auto& hand : hands) {
+                        if (hand.id == closest_hand_id) {
+                            ball.position = hand.wrist_pos_3d;
+                            ball.held_by_hand_id = hand.id;
+                            ball.yolo_class_id = 1;  // Mark as held
+                            char reason[128];
+                            snprintf(reason, sizeof(reason), "Traj→[%c] d=%.2fm",
+                                     hand.id == 0 ? 'L' : 'R', closest_predicted_dist);
+                            ball.tracking_reason = reason;
+                            break;
+                        }
+                    }
+                } else {
+                    // Trajectory does NOT lead to any hand - ball is in free flight
+                    // Use Kalman prediction, do NOT snap to hands
+                    ball.position = predicted_pos;
+                    ball.yolo_class_id = 0;  // Mark as in-air
+                    ball.held_by_hand_id = -1;
+                    ball.tracking_reason = "Traj→Flight";
                 }
             }
         }

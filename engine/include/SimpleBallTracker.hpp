@@ -79,12 +79,15 @@ struct SimpleBall {
     float color_match_score;         // How well it matches assigned color
     int yolo_class_id;               // 0=ball, 1=ball_held
     
+    // Debug info for visualization
+    std::string tracking_reason;     // Why this position was chosen (for debugging)
+    
     SimpleBall() : id(-1), is_held(false), previous_is_held(false),
                    held_by_hand_id(-1), state_change_counter(0),
                    distance_to_nearest_wrist(-1.0f),
                    has_yolo_detection(false), frames_without_yolo(0),
                    yolo_confidence(0.0f), color_match_score(0.0f),
-                   yolo_class_id(0) {}
+                   yolo_class_id(0), tracking_reason("") {}
 };
 
 // Ball event (throw/catch)

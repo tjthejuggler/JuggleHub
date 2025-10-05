@@ -17,9 +17,13 @@ import cv2
 import numpy as np
 import json
 from datetime import datetime
-from .color_profile_manager import ColorProfileManager, ColorProfileDialog
 import subprocess
 import platform
+
+# Import extracted components
+from .ui_network import UdpClient
+from .ui_console import ConsoleUI
+from .color_profile_manager import ColorProfileManager, ColorProfileDialog
 
 # Ball management components removed - using legacy color tracking only
 BALL_MANAGEMENT_AVAILABLE = False
@@ -46,75 +50,15 @@ except ImportError:
     print("⚠️ PyQt6 not available. Using console UI.")
     PYQT_AVAILABLE = False
 
-
-class UdpClient:
-    def __init__(self, host="127.0.0.1", port=12346):
-        self.host = host
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    def send_setting(self, key: str, value: Any):
-        message = f"{key}={value}"
-        self.sock.sendto(message.encode('utf-8'), (self.host, self.port))
-        print(f"Sent UDP setting: {message}")
-
-class ConsoleUI:
-    """Simple console-based UI for systems without PyQt6."""
-    
-    def __init__(self, config: dict):
-        self.config = config
-        self.running = False
-        self.last_frame_data: Optional[juggler_pb2.FrameData] = None
-        self.frame_count = 0
-        self.start_time = time.time()
-        
-    def update_frame_data(self, frame_data: juggler_pb2.FrameData):
-        """Update with new frame data."""
-        self.last_frame_data = frame_data
-        self.frame_count += 1
-        
-        # Print periodic updates
-        if self.frame_count % 30 == 0:  # Every 30 frames (~1 second at 30 FPS)
-            elapsed = time.time() - self.start_time
-            fps = self.frame_count / elapsed if elapsed > 0 else 0
-            
-            print(f"\n📊 Frame {frame_data.frame_number} | FPS: {fps:.1f} | Balls: {len(frame_data.balls)}")
-            
-            for i, ball in enumerate(frame_data.balls):
-                print(f"  🏀 ID {ball.id}: "
-                      f"3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})")
-            
-            if frame_data.hands:
-                print(f"  👋 Hands: {len(frame_data.hands)}")
-                for hand in frame_data.hands:
-                    print(f"    {hand.side}: 2D({hand.position_2d.x:.0f}, {hand.position_2d.y:.0f})")
-            
-            if frame_data.imu_data:
-                print(f"  📱 IMU: {len(frame_data.imu_data)} sensors")
-    
-    def run(self):
-        """Run the console UI."""
-        self.running = True
-        print("🖥️ Console UI started. Press Ctrl+C to stop.")
-        
-        try:
-            while self.running:
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            print("\n🛑 Console UI stopped by user")
-        finally:
-            self.cleanup()
-    
-    def cleanup(self):
-        """Clean up console UI."""
-        self.running = False
-        print("✅ Console UI cleanup completed")
+# Import PyQt-dependent components
+if PYQT_AVAILABLE:
+    from .ui_widgets import FrameDataSignal, CollapsibleGroupBox
+    from .ui_settings import CalibrationSettingsWidget
 
 
 if PYQT_AVAILABLE:
-    class FrameDataSignal(QObject):
-        """Signal emitter for thread-safe UI updates."""
-        frame_received = pyqtSignal(object)
+    # Note: CollapsibleGroupBox and FrameDataSignal are now imported from ui_widgets
+    # Note: CalibrationSettingsWidget is now imported from ui_settings
 
     class CollapsibleGroupBox(QWidget):
         """

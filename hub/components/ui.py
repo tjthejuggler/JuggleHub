@@ -1644,6 +1644,8 @@ if PYQT_AVAILABLE:
             """Initialize the user interface."""
             self.setWindowTitle("JuggleHub - Juggling Analysis")
             self.setGeometry(100, 100, 1000, 700)
+            # Maximize window on startup
+            self.showMaximized()
             
             # Create menu bar
             self.create_menu_bar()
@@ -1671,16 +1673,16 @@ if PYQT_AVAILABLE:
             # Content area
             content_layout = QHBoxLayout()
             
-            # Left panel - Ball tracking
+            # Left panel - Ball tracking (will extend down to activity log)
+            left_panel_layout = QVBoxLayout()
+            
             ball_group = QGroupBox("🏀 Ball Tracking")
-            ball_group.setMinimumHeight(500)  # Set minimum height for the entire group
             ball_layout = QVBoxLayout(ball_group)
             
             self.ball_count_label = QLabel("Balls detected: 0")
             ball_layout.addWidget(self.ball_count_label)
             
             self.ball_list = QTextEdit()
-            self.ball_list.setMinimumHeight(400)  # Set minimum height to make it taller
             self.ball_list.setReadOnly(True)
             ball_layout.addWidget(self.ball_list)
             
@@ -1721,9 +1723,11 @@ if PYQT_AVAILABLE:
             self.recording_status.setStyleSheet("color: #666666; font-weight: bold;")
             ball_layout.addWidget(self.recording_status)
 
-            content_layout.addWidget(ball_group)
+            left_panel_layout.addWidget(ball_group)
 
-            # Center panel - Video Feed
+            # Center panel - Video Feed and Calibration Visualization
+            center_panel_layout = QVBoxLayout()
+            
             self.video_group = QGroupBox("📹 Camera Feed")
             self.video_layout = QVBoxLayout(self.video_group)
             self.video_scene = QGraphicsScene()
@@ -1733,90 +1737,23 @@ if PYQT_AVAILABLE:
             self.video_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             self.video_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             self.video_view.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.video_view.setMaximumHeight(400)  # Limit height to about 2/3
             
             self.video_pixmap_item = QGraphicsPixmapItem()
             self.video_scene.addItem(self.video_pixmap_item)
             self.video_view.mousePressEvent = self.video_view_clicked
             self.video_layout.addWidget(self.video_view)
             
-            content_layout.addWidget(self.video_group, 2)
-            
-            # Create settings panel - always visible now
-            self.settings_tabs = QTabWidget()
-            self.settings_tabs.setVisible(True)  # Always visible
-            self.settings_tabs.setMinimumWidth(400)  # Ensure enough width to avoid horizontal scroll
-            
-            # Calibration settings tab
-            self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance)
-            self.settings_tabs.addTab(self.settings_widget, "⚙️ Tracking Settings")
-            
-            content_layout.addWidget(self.settings_tabs, 2)  # Increased stretch factor from 1 to 2
+            center_panel_layout.addWidget(self.video_group)
             
             # Set calibration mode to always on
             self.calibration_mode = True
             
-            # Right panel - System info
-            system_group = QGroupBox("⚙️ System Status")
-            system_layout = QVBoxLayout(system_group)
-            
-            self.camera_status = QLabel("📷 Camera: Unknown")
-            self.engine_status = QLabel("🔧 Engine: Unknown")
-            self.mode_status = QLabel("🎯 Mode: Unknown")
-            
-            system_layout.addWidget(self.camera_status)
-            system_layout.addWidget(self.engine_status)
-            system_layout.addWidget(self.mode_status)
-            
-            # Hand tracking
-            self.hand_status = QLabel("👋 Hands: 0")
-            system_layout.addWidget(self.hand_status)
-            
-            # IMU status
-            self.imu_status = QLabel("📱 IMU: 0 sensors")
-
-            # Web UI controls
-            web_ui_layout = QHBoxLayout()
-            self.web_ui_button = QPushButton("Start Web UI")
-            self.web_ui_button.clicked.connect(self.toggle_web_ui)
-            web_ui_layout.addWidget(self.web_ui_button)
-
-            # Screen control buttons
-            screen_control_layout = QHBoxLayout()
-            self.disable_top_button = QPushButton("Disable Top Screen")
-            self.disable_top_button.clicked.connect(self.disable_top_screen)
-            screen_control_layout.addWidget(self.disable_top_button)
-
-            self.disable_bottom_button = QPushButton("Disable Bottom Screen")
-            self.disable_bottom_button.clicked.connect(self.disable_bottom_screen)
-            screen_control_layout.addWidget(self.disable_bottom_button)
-            
-            system_layout.addLayout(web_ui_layout)
-            system_layout.addLayout(screen_control_layout)
-            system_layout.addWidget(self.imu_status)
-
-            self.imu_list = QTextEdit()
-            self.imu_list.setMaximumHeight(200)
-            self.imu_list.setReadOnly(True)
-            system_layout.addWidget(self.imu_list)
-            
-            system_layout.addStretch()
-            
-            content_layout.addWidget(system_group)
-            
-            main_layout.addLayout(content_layout)
-            
-            # Calibration Controls Section (above activity log)
-            # Wrap in a container to align to the right
-            calibration_container = QWidget()
-            calibration_container_layout = QHBoxLayout(calibration_container)
-            calibration_container_layout.setContentsMargins(0, 0, 0, 0)
+            # Right panel - Calibration Visualization (extends to right of Ball Tracking)
+            right_panel_layout = QVBoxLayout()
             
             calibration_group = QGroupBox("🎨 Calibration & Visualization")
-            calibration_group.setMaximumWidth(800)  # Limit width
             calibration_layout = QVBoxLayout(calibration_group)
-            
-            calibration_container_layout.addStretch()  # Push to right
-            calibration_container_layout.addWidget(calibration_group)
             
             # --- Color Profile Controls ---
             color_profile_layout = QHBoxLayout()
@@ -2018,7 +1955,75 @@ if PYQT_AVAILABLE:
             tail_layout.addWidget(self.tail_length_label)
             calibration_layout.addLayout(tail_layout)
             
-            main_layout.addWidget(calibration_container)  # Add container instead of group directly
+            # Add Calibration Visualization under Camera Feed
+            center_panel_layout.addWidget(calibration_group)
+            
+            content_layout.addLayout(center_panel_layout, 2)
+            
+            # Right panel - Tracking Settings and System Status
+            # Add Tracking Settings directly (no tab wrapper)
+            settings_group = QGroupBox("⚙️ Tracking Settings")
+            settings_layout = QVBoxLayout(settings_group)
+            
+            # Create settings widget and add it directly
+            self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance)
+            settings_layout.addWidget(self.settings_widget)
+            
+            right_panel_layout.addWidget(settings_group)
+            
+            # System Status section
+            system_group = QGroupBox("⚙️ System Status")
+            system_layout = QVBoxLayout(system_group)
+            
+            self.camera_status = QLabel("📷 Camera: Unknown")
+            self.engine_status = QLabel("🔧 Engine: Unknown")
+            self.mode_status = QLabel("🎯 Mode: Unknown")
+            
+            system_layout.addWidget(self.camera_status)
+            system_layout.addWidget(self.engine_status)
+            system_layout.addWidget(self.mode_status)
+            
+            # Hand tracking
+            self.hand_status = QLabel("👋 Hands: 0")
+            system_layout.addWidget(self.hand_status)
+            
+            # IMU status
+            self.imu_status = QLabel("📱 IMU: 0 sensors")
+
+            # Web UI controls
+            web_ui_layout = QHBoxLayout()
+            self.web_ui_button = QPushButton("Start Web UI")
+            self.web_ui_button.clicked.connect(self.toggle_web_ui)
+            web_ui_layout.addWidget(self.web_ui_button)
+
+            # Screen control buttons
+            screen_control_layout = QHBoxLayout()
+            self.disable_top_button = QPushButton("Disable Top Screen")
+            self.disable_top_button.clicked.connect(self.disable_top_screen)
+            screen_control_layout.addWidget(self.disable_top_button)
+
+            self.disable_bottom_button = QPushButton("Disable Bottom Screen")
+            self.disable_bottom_button.clicked.connect(self.disable_bottom_screen)
+            screen_control_layout.addWidget(self.disable_bottom_button)
+            
+            system_layout.addLayout(web_ui_layout)
+            system_layout.addLayout(screen_control_layout)
+            system_layout.addWidget(self.imu_status)
+
+            self.imu_list = QTextEdit()
+            self.imu_list.setMaximumHeight(200)
+            self.imu_list.setReadOnly(True)
+            system_layout.addWidget(self.imu_list)
+            
+            system_layout.addStretch()
+            
+            right_panel_layout.addWidget(system_group)
+            
+            # Add all panels to content layout
+            content_layout.addLayout(left_panel_layout)
+            content_layout.addLayout(right_panel_layout)
+            
+            main_layout.addLayout(content_layout)
             
             # Bottom panel - Log
             log_group = QGroupBox("📝 Activity Log")
@@ -2027,9 +2032,10 @@ if PYQT_AVAILABLE:
             # Add control buttons for the log
             log_controls_layout = QHBoxLayout()
             
-            self.log_paused = False
-            self.pause_log_button = QPushButton("⏸ Pause Log")
+            self.log_paused = True  # Start paused by default
+            self.pause_log_button = QPushButton("▶ Resume Log")
             self.pause_log_button.setCheckable(True)
+            self.pause_log_button.setChecked(True)  # Start checked (paused)
             self.pause_log_button.clicked.connect(self.toggle_log_pause)
             self.pause_log_button.setStyleSheet("""
                 QPushButton {
@@ -2306,7 +2312,12 @@ if PYQT_AVAILABLE:
             
             ball_count = len(frame_data.balls)
             self.ball_count_label.setText(f"Balls detected: {ball_count}")
-            ball_text = ""
+            
+            # Get color map from profile manager for text coloring
+            color_name_map = self.color_profile_manager.get_color_map()
+            
+            # Build HTML formatted text with colored ball information
+            ball_html = ""
             # Define a mapping from enum to string for display
             status_map = {
                 juggler_pb2.Ball.TRACKED: "Tracked",
@@ -2316,16 +2327,26 @@ if PYQT_AVAILABLE:
 
             for ball in frame_data.balls:
                 status_str = status_map.get(ball.status, "Unknown")
-                ball_text += f"Ball {ball.logical_id} ({status_str}): 3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})\n"
                 
-                # Add color and state information from color_tracked_balls
+                # Get color information from color_tracked_balls
                 color_ball = next((cb for cb in frame_data.color_tracked_balls if cb.logical_id == ball.logical_id), None)
-                if color_ball:
+                
+                # Determine the color for this ball's text
+                if color_ball and color_ball.color_name:
+                    qcolor = color_name_map.get(color_ball.color_name.lower(), QColor(255, 255, 255))
+                    # Convert QColor to hex for HTML
+                    color_hex = qcolor.name()
                     state_str = "HELD" if color_ball.associated_wrist_id >= 0 else "IN AIR"
                     hand_str = f" by {'LEFT' if color_ball.associated_wrist_id == 0 else 'RIGHT'}" if color_ball.associated_wrist_id >= 0 else ""
-                    ball_text += f"  Color: {color_ball.color_name.upper()}, State: {state_str}{hand_str}\n"
+                    color_info = f"Color: {color_ball.color_name.upper()}, State: {state_str}{hand_str}"
                 else:
-                    ball_text += f"  Color: Unknown, State: Unknown\n"
+                    color_hex = "#ffffff"
+                    color_info = "Color: Unknown, State: Unknown"
+                
+                # Create HTML formatted text with color
+                ball_html += f'<span style="color: {color_hex};">'
+                ball_html += f'Ball {ball.logical_id} ({status_str}): 3D({ball.position.x:.3f}, {ball.position.y:.3f}, {ball.position.z:.3f})<br>'
+                ball_html += f'&nbsp;&nbsp;{color_info}<br>'
                 
                 # Determine ML detection status - check if there's an actual YOLO detection box
                 # by looking for a matching raw_detection near this ball's position
@@ -2360,14 +2381,16 @@ if PYQT_AVAILABLE:
                     # No YOLO detection box found
                     ml_status = "gone"
                 
-                ball_text += f"  ML Detection: {ml_status}\n"
+                ball_html += f'&nbsp;&nbsp;ML Detection: {ml_status}<br>'
                 
                 # Add distance to nearest wrist
                 if hasattr(ball, 'distance_to_nearest_wrist') and ball.distance_to_nearest_wrist >= 0:
                     dist_cm = ball.distance_to_nearest_wrist * 100  # Convert m to cm
-                    ball_text += f"  Distance to Wrist: {dist_cm:.1f}cm\n"
+                    ball_html += f'&nbsp;&nbsp;Distance to Wrist: {dist_cm:.1f}cm<br>'
                 else:
-                    ball_text += f"  Distance to Wrist: N/A\n"
+                    ball_html += f'&nbsp;&nbsp;Distance to Wrist: N/A<br>'
+                
+                ball_html += '</span>'
                 
                 # Update tracker history using logical_id
                 if ball.logical_id not in self.tracker_history:
@@ -2382,7 +2405,7 @@ if PYQT_AVAILABLE:
                 while len(self.tracker_history[ball.logical_id]) > max_len:
                     self.tracker_history[ball.logical_id].pop(0)
 
-            self.ball_list.setPlainText(ball_text)
+            self.ball_list.setHtml(ball_html)
 
             # Always try to update the video feed if the widget is visible
             if self.video_group.isVisible() and frame_data.color_image_b64:

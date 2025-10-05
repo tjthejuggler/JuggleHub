@@ -125,6 +125,9 @@ extern Vector2DefaultTypeInternal _Vector2_default_instance_;
 class Vector3;
 struct Vector3DefaultTypeInternal;
 extern Vector3DefaultTypeInternal _Vector3_default_instance_;
+class VisualizationStates;
+struct VisualizationStatesDefaultTypeInternal;
+extern VisualizationStatesDefaultTypeInternal _VisualizationStates_default_instance_;
 }  // namespace v1
 }  // namespace juggler
 PROTOBUF_NAMESPACE_OPEN
@@ -153,6 +156,7 @@ template<> ::juggler::v1::ThrowCatchEvent* Arena::CreateMaybeMessage<::juggler::
 template<> ::juggler::v1::TrackerAssociation* Arena::CreateMaybeMessage<::juggler::v1::TrackerAssociation>(Arena*);
 template<> ::juggler::v1::Vector2* Arena::CreateMaybeMessage<::juggler::v1::Vector2>(Arena*);
 template<> ::juggler::v1::Vector3* Arena::CreateMaybeMessage<::juggler::v1::Vector3>(Arena*);
+template<> ::juggler::v1::VisualizationStates* Arena::CreateMaybeMessage<::juggler::v1::VisualizationStates>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 namespace juggler {
 namespace v1 {
@@ -5276,6 +5280,7 @@ class CommandRequest final :
     kFeatureNameFieldNumber = 18,
     kColorCommandFieldNumber = 4,
     kCalibrationPixelPosFieldNumber = 11,
+    kVisualizationStatesFieldNumber = 19,
     kTimestampUsFieldNumber = 3,
     kTypeFieldNumber = 1,
     kCameraWidthFieldNumber = 7,
@@ -5397,6 +5402,24 @@ class CommandRequest final :
       ::juggler::v1::Vector2* calibration_pixel_pos);
   ::juggler::v1::Vector2* unsafe_arena_release_calibration_pixel_pos();
 
+  // .juggler.v1.VisualizationStates visualization_states = 19;
+  bool has_visualization_states() const;
+  private:
+  bool _internal_has_visualization_states() const;
+  public:
+  void clear_visualization_states();
+  const ::juggler::v1::VisualizationStates& visualization_states() const;
+  PROTOBUF_NODISCARD ::juggler::v1::VisualizationStates* release_visualization_states();
+  ::juggler::v1::VisualizationStates* mutable_visualization_states();
+  void set_allocated_visualization_states(::juggler::v1::VisualizationStates* visualization_states);
+  private:
+  const ::juggler::v1::VisualizationStates& _internal_visualization_states() const;
+  ::juggler::v1::VisualizationStates* _internal_mutable_visualization_states();
+  public:
+  void unsafe_arena_set_allocated_visualization_states(
+      ::juggler::v1::VisualizationStates* visualization_states);
+  ::juggler::v1::VisualizationStates* unsafe_arena_release_visualization_states();
+
   // uint64 timestamp_us = 3;
   void clear_timestamp_us();
   uint64_t timestamp_us() const;
@@ -5515,6 +5538,7 @@ class CommandRequest final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr feature_name_;
     ::juggler::v1::ColorCommand* color_command_;
     ::juggler::v1::Vector2* calibration_pixel_pos_;
+    ::juggler::v1::VisualizationStates* visualization_states_;
     uint64_t timestamp_us_;
     int type_;
     uint32_t camera_width_;
@@ -5526,6 +5550,297 @@ class CommandRequest final :
     bool pose_model_enabled_;
     int32_t click_x_;
     int32_t click_y_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_juggler_2eproto;
+};
+// -------------------------------------------------------------------
+
+class VisualizationStates final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.VisualizationStates) */ {
+ public:
+  inline VisualizationStates() : VisualizationStates(nullptr) {}
+  ~VisualizationStates() override;
+  explicit PROTOBUF_CONSTEXPR VisualizationStates(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  VisualizationStates(const VisualizationStates& from);
+  VisualizationStates(VisualizationStates&& from) noexcept
+    : VisualizationStates() {
+    *this = ::std::move(from);
+  }
+
+  inline VisualizationStates& operator=(const VisualizationStates& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline VisualizationStates& operator=(VisualizationStates&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const VisualizationStates& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const VisualizationStates* internal_default_instance() {
+    return reinterpret_cast<const VisualizationStates*>(
+               &_VisualizationStates_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    23;
+
+  friend void swap(VisualizationStates& a, VisualizationStates& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(VisualizationStates* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(VisualizationStates* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  VisualizationStates* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<VisualizationStates>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const VisualizationStates& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const VisualizationStates& from) {
+    VisualizationStates::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(VisualizationStates* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "juggler.v1.VisualizationStates";
+  }
+  protected:
+  explicit VisualizationStates(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kShowKalmanPredictionsFieldNumber = 1,
+    kShowRawDetectionsFieldNumber = 2,
+    kShowFilteredDetectionsFieldNumber = 3,
+    kShowAssociationsFieldNumber = 4,
+    kShowNewTrackersFieldNumber = 5,
+    kShowHandTrackingFieldNumber = 6,
+    kShowBallStatesFieldNumber = 7,
+    kShowOcclusionFieldNumber = 8,
+    kShowSkeletonFieldNumber = 9,
+    kShowColorSearchFieldNumber = 10,
+    kShowColorTrackerFieldNumber = 11,
+    kShowTrackedBoxesFieldNumber = 12,
+    kShowUnmatchedDetectionsFieldNumber = 13,
+    kShowTailsFieldNumber = 14,
+  };
+  // bool show_kalman_predictions = 1;
+  void clear_show_kalman_predictions();
+  bool show_kalman_predictions() const;
+  void set_show_kalman_predictions(bool value);
+  private:
+  bool _internal_show_kalman_predictions() const;
+  void _internal_set_show_kalman_predictions(bool value);
+  public:
+
+  // bool show_raw_detections = 2;
+  void clear_show_raw_detections();
+  bool show_raw_detections() const;
+  void set_show_raw_detections(bool value);
+  private:
+  bool _internal_show_raw_detections() const;
+  void _internal_set_show_raw_detections(bool value);
+  public:
+
+  // bool show_filtered_detections = 3;
+  void clear_show_filtered_detections();
+  bool show_filtered_detections() const;
+  void set_show_filtered_detections(bool value);
+  private:
+  bool _internal_show_filtered_detections() const;
+  void _internal_set_show_filtered_detections(bool value);
+  public:
+
+  // bool show_associations = 4;
+  void clear_show_associations();
+  bool show_associations() const;
+  void set_show_associations(bool value);
+  private:
+  bool _internal_show_associations() const;
+  void _internal_set_show_associations(bool value);
+  public:
+
+  // bool show_new_trackers = 5;
+  void clear_show_new_trackers();
+  bool show_new_trackers() const;
+  void set_show_new_trackers(bool value);
+  private:
+  bool _internal_show_new_trackers() const;
+  void _internal_set_show_new_trackers(bool value);
+  public:
+
+  // bool show_hand_tracking = 6;
+  void clear_show_hand_tracking();
+  bool show_hand_tracking() const;
+  void set_show_hand_tracking(bool value);
+  private:
+  bool _internal_show_hand_tracking() const;
+  void _internal_set_show_hand_tracking(bool value);
+  public:
+
+  // bool show_ball_states = 7;
+  void clear_show_ball_states();
+  bool show_ball_states() const;
+  void set_show_ball_states(bool value);
+  private:
+  bool _internal_show_ball_states() const;
+  void _internal_set_show_ball_states(bool value);
+  public:
+
+  // bool show_occlusion = 8;
+  void clear_show_occlusion();
+  bool show_occlusion() const;
+  void set_show_occlusion(bool value);
+  private:
+  bool _internal_show_occlusion() const;
+  void _internal_set_show_occlusion(bool value);
+  public:
+
+  // bool show_skeleton = 9;
+  void clear_show_skeleton();
+  bool show_skeleton() const;
+  void set_show_skeleton(bool value);
+  private:
+  bool _internal_show_skeleton() const;
+  void _internal_set_show_skeleton(bool value);
+  public:
+
+  // bool show_color_search = 10;
+  void clear_show_color_search();
+  bool show_color_search() const;
+  void set_show_color_search(bool value);
+  private:
+  bool _internal_show_color_search() const;
+  void _internal_set_show_color_search(bool value);
+  public:
+
+  // bool show_color_tracker = 11;
+  void clear_show_color_tracker();
+  bool show_color_tracker() const;
+  void set_show_color_tracker(bool value);
+  private:
+  bool _internal_show_color_tracker() const;
+  void _internal_set_show_color_tracker(bool value);
+  public:
+
+  // bool show_tracked_boxes = 12;
+  void clear_show_tracked_boxes();
+  bool show_tracked_boxes() const;
+  void set_show_tracked_boxes(bool value);
+  private:
+  bool _internal_show_tracked_boxes() const;
+  void _internal_set_show_tracked_boxes(bool value);
+  public:
+
+  // bool show_unmatched_detections = 13;
+  void clear_show_unmatched_detections();
+  bool show_unmatched_detections() const;
+  void set_show_unmatched_detections(bool value);
+  private:
+  bool _internal_show_unmatched_detections() const;
+  void _internal_set_show_unmatched_detections(bool value);
+  public:
+
+  // bool show_tails = 14;
+  void clear_show_tails();
+  bool show_tails() const;
+  void set_show_tails(bool value);
+  private:
+  bool _internal_show_tails() const;
+  void _internal_set_show_tails(bool value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:juggler.v1.VisualizationStates)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    bool show_kalman_predictions_;
+    bool show_raw_detections_;
+    bool show_filtered_detections_;
+    bool show_associations_;
+    bool show_new_trackers_;
+    bool show_hand_tracking_;
+    bool show_ball_states_;
+    bool show_occlusion_;
+    bool show_skeleton_;
+    bool show_color_search_;
+    bool show_color_tracker_;
+    bool show_tracked_boxes_;
+    bool show_unmatched_detections_;
+    bool show_tails_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -5581,7 +5896,7 @@ class ColorCommand final :
                &_ColorCommand_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    23;
+    24;
 
   friend void swap(ColorCommand& a, ColorCommand& b) {
     a.Swap(&b);
@@ -5754,7 +6069,7 @@ class CommandResponse final :
                &_CommandResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    24;
+    25;
 
   friend void swap(CommandResponse& a, CommandResponse& b) {
     a.Swap(&b);
@@ -11515,6 +11830,96 @@ inline void CommandRequest::set_pose_model_enabled(bool value) {
   // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.pose_model_enabled)
 }
 
+// .juggler.v1.VisualizationStates visualization_states = 19;
+inline bool CommandRequest::_internal_has_visualization_states() const {
+  return this != internal_default_instance() && _impl_.visualization_states_ != nullptr;
+}
+inline bool CommandRequest::has_visualization_states() const {
+  return _internal_has_visualization_states();
+}
+inline void CommandRequest::clear_visualization_states() {
+  if (GetArenaForAllocation() == nullptr && _impl_.visualization_states_ != nullptr) {
+    delete _impl_.visualization_states_;
+  }
+  _impl_.visualization_states_ = nullptr;
+}
+inline const ::juggler::v1::VisualizationStates& CommandRequest::_internal_visualization_states() const {
+  const ::juggler::v1::VisualizationStates* p = _impl_.visualization_states_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::VisualizationStates&>(
+      ::juggler::v1::_VisualizationStates_default_instance_);
+}
+inline const ::juggler::v1::VisualizationStates& CommandRequest::visualization_states() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.visualization_states)
+  return _internal_visualization_states();
+}
+inline void CommandRequest::unsafe_arena_set_allocated_visualization_states(
+    ::juggler::v1::VisualizationStates* visualization_states) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.visualization_states_);
+  }
+  _impl_.visualization_states_ = visualization_states;
+  if (visualization_states) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.CommandRequest.visualization_states)
+}
+inline ::juggler::v1::VisualizationStates* CommandRequest::release_visualization_states() {
+  
+  ::juggler::v1::VisualizationStates* temp = _impl_.visualization_states_;
+  _impl_.visualization_states_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::VisualizationStates* CommandRequest::unsafe_arena_release_visualization_states() {
+  // @@protoc_insertion_point(field_release:juggler.v1.CommandRequest.visualization_states)
+  
+  ::juggler::v1::VisualizationStates* temp = _impl_.visualization_states_;
+  _impl_.visualization_states_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::VisualizationStates* CommandRequest::_internal_mutable_visualization_states() {
+  
+  if (_impl_.visualization_states_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::VisualizationStates>(GetArenaForAllocation());
+    _impl_.visualization_states_ = p;
+  }
+  return _impl_.visualization_states_;
+}
+inline ::juggler::v1::VisualizationStates* CommandRequest::mutable_visualization_states() {
+  ::juggler::v1::VisualizationStates* _msg = _internal_mutable_visualization_states();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.CommandRequest.visualization_states)
+  return _msg;
+}
+inline void CommandRequest::set_allocated_visualization_states(::juggler::v1::VisualizationStates* visualization_states) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.visualization_states_;
+  }
+  if (visualization_states) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(visualization_states);
+    if (message_arena != submessage_arena) {
+      visualization_states = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, visualization_states, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.visualization_states_ = visualization_states;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.visualization_states)
+}
+
 // string color_name = 15;
 inline void CommandRequest::clear_color_name() {
   _impl_.color_name_.ClearToEmpty();
@@ -11653,6 +12058,290 @@ inline void CommandRequest::set_allocated_feature_name(std::string* feature_name
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.feature_name)
+}
+
+// -------------------------------------------------------------------
+
+// VisualizationStates
+
+// bool show_kalman_predictions = 1;
+inline void VisualizationStates::clear_show_kalman_predictions() {
+  _impl_.show_kalman_predictions_ = false;
+}
+inline bool VisualizationStates::_internal_show_kalman_predictions() const {
+  return _impl_.show_kalman_predictions_;
+}
+inline bool VisualizationStates::show_kalman_predictions() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_kalman_predictions)
+  return _internal_show_kalman_predictions();
+}
+inline void VisualizationStates::_internal_set_show_kalman_predictions(bool value) {
+  
+  _impl_.show_kalman_predictions_ = value;
+}
+inline void VisualizationStates::set_show_kalman_predictions(bool value) {
+  _internal_set_show_kalman_predictions(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_kalman_predictions)
+}
+
+// bool show_raw_detections = 2;
+inline void VisualizationStates::clear_show_raw_detections() {
+  _impl_.show_raw_detections_ = false;
+}
+inline bool VisualizationStates::_internal_show_raw_detections() const {
+  return _impl_.show_raw_detections_;
+}
+inline bool VisualizationStates::show_raw_detections() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_raw_detections)
+  return _internal_show_raw_detections();
+}
+inline void VisualizationStates::_internal_set_show_raw_detections(bool value) {
+  
+  _impl_.show_raw_detections_ = value;
+}
+inline void VisualizationStates::set_show_raw_detections(bool value) {
+  _internal_set_show_raw_detections(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_raw_detections)
+}
+
+// bool show_filtered_detections = 3;
+inline void VisualizationStates::clear_show_filtered_detections() {
+  _impl_.show_filtered_detections_ = false;
+}
+inline bool VisualizationStates::_internal_show_filtered_detections() const {
+  return _impl_.show_filtered_detections_;
+}
+inline bool VisualizationStates::show_filtered_detections() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_filtered_detections)
+  return _internal_show_filtered_detections();
+}
+inline void VisualizationStates::_internal_set_show_filtered_detections(bool value) {
+  
+  _impl_.show_filtered_detections_ = value;
+}
+inline void VisualizationStates::set_show_filtered_detections(bool value) {
+  _internal_set_show_filtered_detections(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_filtered_detections)
+}
+
+// bool show_associations = 4;
+inline void VisualizationStates::clear_show_associations() {
+  _impl_.show_associations_ = false;
+}
+inline bool VisualizationStates::_internal_show_associations() const {
+  return _impl_.show_associations_;
+}
+inline bool VisualizationStates::show_associations() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_associations)
+  return _internal_show_associations();
+}
+inline void VisualizationStates::_internal_set_show_associations(bool value) {
+  
+  _impl_.show_associations_ = value;
+}
+inline void VisualizationStates::set_show_associations(bool value) {
+  _internal_set_show_associations(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_associations)
+}
+
+// bool show_new_trackers = 5;
+inline void VisualizationStates::clear_show_new_trackers() {
+  _impl_.show_new_trackers_ = false;
+}
+inline bool VisualizationStates::_internal_show_new_trackers() const {
+  return _impl_.show_new_trackers_;
+}
+inline bool VisualizationStates::show_new_trackers() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_new_trackers)
+  return _internal_show_new_trackers();
+}
+inline void VisualizationStates::_internal_set_show_new_trackers(bool value) {
+  
+  _impl_.show_new_trackers_ = value;
+}
+inline void VisualizationStates::set_show_new_trackers(bool value) {
+  _internal_set_show_new_trackers(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_new_trackers)
+}
+
+// bool show_hand_tracking = 6;
+inline void VisualizationStates::clear_show_hand_tracking() {
+  _impl_.show_hand_tracking_ = false;
+}
+inline bool VisualizationStates::_internal_show_hand_tracking() const {
+  return _impl_.show_hand_tracking_;
+}
+inline bool VisualizationStates::show_hand_tracking() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_hand_tracking)
+  return _internal_show_hand_tracking();
+}
+inline void VisualizationStates::_internal_set_show_hand_tracking(bool value) {
+  
+  _impl_.show_hand_tracking_ = value;
+}
+inline void VisualizationStates::set_show_hand_tracking(bool value) {
+  _internal_set_show_hand_tracking(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_hand_tracking)
+}
+
+// bool show_ball_states = 7;
+inline void VisualizationStates::clear_show_ball_states() {
+  _impl_.show_ball_states_ = false;
+}
+inline bool VisualizationStates::_internal_show_ball_states() const {
+  return _impl_.show_ball_states_;
+}
+inline bool VisualizationStates::show_ball_states() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_ball_states)
+  return _internal_show_ball_states();
+}
+inline void VisualizationStates::_internal_set_show_ball_states(bool value) {
+  
+  _impl_.show_ball_states_ = value;
+}
+inline void VisualizationStates::set_show_ball_states(bool value) {
+  _internal_set_show_ball_states(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_ball_states)
+}
+
+// bool show_occlusion = 8;
+inline void VisualizationStates::clear_show_occlusion() {
+  _impl_.show_occlusion_ = false;
+}
+inline bool VisualizationStates::_internal_show_occlusion() const {
+  return _impl_.show_occlusion_;
+}
+inline bool VisualizationStates::show_occlusion() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_occlusion)
+  return _internal_show_occlusion();
+}
+inline void VisualizationStates::_internal_set_show_occlusion(bool value) {
+  
+  _impl_.show_occlusion_ = value;
+}
+inline void VisualizationStates::set_show_occlusion(bool value) {
+  _internal_set_show_occlusion(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_occlusion)
+}
+
+// bool show_skeleton = 9;
+inline void VisualizationStates::clear_show_skeleton() {
+  _impl_.show_skeleton_ = false;
+}
+inline bool VisualizationStates::_internal_show_skeleton() const {
+  return _impl_.show_skeleton_;
+}
+inline bool VisualizationStates::show_skeleton() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_skeleton)
+  return _internal_show_skeleton();
+}
+inline void VisualizationStates::_internal_set_show_skeleton(bool value) {
+  
+  _impl_.show_skeleton_ = value;
+}
+inline void VisualizationStates::set_show_skeleton(bool value) {
+  _internal_set_show_skeleton(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_skeleton)
+}
+
+// bool show_color_search = 10;
+inline void VisualizationStates::clear_show_color_search() {
+  _impl_.show_color_search_ = false;
+}
+inline bool VisualizationStates::_internal_show_color_search() const {
+  return _impl_.show_color_search_;
+}
+inline bool VisualizationStates::show_color_search() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_color_search)
+  return _internal_show_color_search();
+}
+inline void VisualizationStates::_internal_set_show_color_search(bool value) {
+  
+  _impl_.show_color_search_ = value;
+}
+inline void VisualizationStates::set_show_color_search(bool value) {
+  _internal_set_show_color_search(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_color_search)
+}
+
+// bool show_color_tracker = 11;
+inline void VisualizationStates::clear_show_color_tracker() {
+  _impl_.show_color_tracker_ = false;
+}
+inline bool VisualizationStates::_internal_show_color_tracker() const {
+  return _impl_.show_color_tracker_;
+}
+inline bool VisualizationStates::show_color_tracker() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_color_tracker)
+  return _internal_show_color_tracker();
+}
+inline void VisualizationStates::_internal_set_show_color_tracker(bool value) {
+  
+  _impl_.show_color_tracker_ = value;
+}
+inline void VisualizationStates::set_show_color_tracker(bool value) {
+  _internal_set_show_color_tracker(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_color_tracker)
+}
+
+// bool show_tracked_boxes = 12;
+inline void VisualizationStates::clear_show_tracked_boxes() {
+  _impl_.show_tracked_boxes_ = false;
+}
+inline bool VisualizationStates::_internal_show_tracked_boxes() const {
+  return _impl_.show_tracked_boxes_;
+}
+inline bool VisualizationStates::show_tracked_boxes() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_tracked_boxes)
+  return _internal_show_tracked_boxes();
+}
+inline void VisualizationStates::_internal_set_show_tracked_boxes(bool value) {
+  
+  _impl_.show_tracked_boxes_ = value;
+}
+inline void VisualizationStates::set_show_tracked_boxes(bool value) {
+  _internal_set_show_tracked_boxes(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_tracked_boxes)
+}
+
+// bool show_unmatched_detections = 13;
+inline void VisualizationStates::clear_show_unmatched_detections() {
+  _impl_.show_unmatched_detections_ = false;
+}
+inline bool VisualizationStates::_internal_show_unmatched_detections() const {
+  return _impl_.show_unmatched_detections_;
+}
+inline bool VisualizationStates::show_unmatched_detections() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_unmatched_detections)
+  return _internal_show_unmatched_detections();
+}
+inline void VisualizationStates::_internal_set_show_unmatched_detections(bool value) {
+  
+  _impl_.show_unmatched_detections_ = value;
+}
+inline void VisualizationStates::set_show_unmatched_detections(bool value) {
+  _internal_set_show_unmatched_detections(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_unmatched_detections)
+}
+
+// bool show_tails = 14;
+inline void VisualizationStates::clear_show_tails() {
+  _impl_.show_tails_ = false;
+}
+inline bool VisualizationStates::_internal_show_tails() const {
+  return _impl_.show_tails_;
+}
+inline bool VisualizationStates::show_tails() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_tails)
+  return _internal_show_tails();
+}
+inline void VisualizationStates::_internal_set_show_tails(bool value) {
+  
+  _impl_.show_tails_ = value;
+}
+inline void VisualizationStates::set_show_tails(bool value) {
+  _internal_set_show_tails(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_tails)
 }
 
 // -------------------------------------------------------------------
@@ -11896,6 +12585,8 @@ inline void CommandResponse::set_timestamp_us(uint64_t value) {
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------

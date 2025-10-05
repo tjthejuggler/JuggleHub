@@ -112,6 +112,8 @@ private:
         std::vector<Detection> raw_detections;
         std::vector<TrackedObject> tracked_objects;
         std::vector<TrackedHand> tracked_hands;
+        std::vector<SimpleBall> tracked_balls;  // Store SimpleBall data for color visualization
+        juggler::v1::VisualizationStates viz_states;  // Store visualization states
     };
     std::deque<RecordingFrame> frame_buffer_;
     std::mutex frame_buffer_mutex_;
@@ -126,6 +128,10 @@ private:
     // Recording with bounding boxes state
     std::atomic<bool> record_with_yolo_boxes_;
     std::atomic<bool> record_with_bytetrack_boxes_;
+    juggler::v1::VisualizationStates visualization_states_;  // Store current visualization states
     std::vector<Detection> last_raw_detections_; // Keep for calibration
     std::vector<TrackedObject> last_tracked_objects_; // Keep for calibration
+    
+    // Helper function to render visualizations on a frame
+    cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame, const RecordingFrame& rec_frame);
 };

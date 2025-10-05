@@ -419,6 +419,7 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.feature_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.color_command_)*/nullptr
   , /*decltype(_impl_.calibration_pixel_pos_)*/nullptr
+  , /*decltype(_impl_.visualization_states_)*/nullptr
   , /*decltype(_impl_.timestamp_us_)*/uint64_t{0u}
   , /*decltype(_impl_.type_)*/0
   , /*decltype(_impl_.camera_width_)*/0u
@@ -440,6 +441,32 @@ struct CommandRequestDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 CommandRequestDefaultTypeInternal _CommandRequest_default_instance_;
+PROTOBUF_CONSTEXPR VisualizationStates::VisualizationStates(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.show_kalman_predictions_)*/false
+  , /*decltype(_impl_.show_raw_detections_)*/false
+  , /*decltype(_impl_.show_filtered_detections_)*/false
+  , /*decltype(_impl_.show_associations_)*/false
+  , /*decltype(_impl_.show_new_trackers_)*/false
+  , /*decltype(_impl_.show_hand_tracking_)*/false
+  , /*decltype(_impl_.show_ball_states_)*/false
+  , /*decltype(_impl_.show_occlusion_)*/false
+  , /*decltype(_impl_.show_skeleton_)*/false
+  , /*decltype(_impl_.show_color_search_)*/false
+  , /*decltype(_impl_.show_color_tracker_)*/false
+  , /*decltype(_impl_.show_tracked_boxes_)*/false
+  , /*decltype(_impl_.show_unmatched_detections_)*/false
+  , /*decltype(_impl_.show_tails_)*/false
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct VisualizationStatesDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR VisualizationStatesDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~VisualizationStatesDefaultTypeInternal() {}
+  union {
+    VisualizationStates _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 VisualizationStatesDefaultTypeInternal _VisualizationStates_default_instance_;
 PROTOBUF_CONSTEXPR ColorCommand::ColorCommand(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.ball_id_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
@@ -471,7 +498,7 @@ struct CommandResponseDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 CommandResponseDefaultTypeInternal _CommandResponse_default_instance_;
 }  // namespace v1
 }  // namespace juggler
-static ::_pb::Metadata file_level_metadata_juggler_2eproto[25];
+static ::_pb::Metadata file_level_metadata_juggler_2eproto[26];
 static const ::_pb::EnumDescriptor* file_level_enum_descriptors_juggler_2eproto[4];
 static constexpr ::_pb::ServiceDescriptor const** file_level_service_descriptors_juggler_2eproto = nullptr;
 
@@ -757,10 +784,31 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.record_with_yolo_boxes_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.record_with_bytetrack_boxes_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.pose_model_enabled_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.visualization_states_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.color_name_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.click_x_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.click_y_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.feature_name_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_kalman_predictions_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_raw_detections_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_filtered_detections_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_associations_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_new_trackers_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_hand_tracking_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_ball_states_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_occlusion_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_skeleton_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_color_search_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_color_tracker_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_tracked_boxes_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_unmatched_detections_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_tails_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorCommand, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -803,8 +851,9 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 222, -1, -1, sizeof(::juggler::v1::FrameData)},
   { 251, 259, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
   { 261, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 285, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 293, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 286, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
+  { 306, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 314, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -831,6 +880,7 @@ static const ::_pb::Message* const file_default_instances[] = {
   &::juggler::v1::_FrameData_default_instance_._instance,
   &::juggler::v1::_CommandRequest_ModuleArgsEntry_DoNotUse_default_instance_._instance,
   &::juggler::v1::_CommandRequest_default_instance_._instance,
+  &::juggler::v1::_VisualizationStates_default_instance_._instance,
   &::juggler::v1::_ColorCommand_default_instance_._instance,
   &::juggler::v1::_CommandResponse_default_instance_._instance,
 };
@@ -938,7 +988,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "tate\0224\n\020occlusion_states\030\026 \003(\0132\032.juggler"
   ".v1.OcclusionState\022;\n\024color_search_regio"
   "ns\030\027 \003(\0132\035.juggler.v1.ColorSearchRegion\""
-  "\346\007\n\016CommandRequest\0224\n\004type\030\001 \001(\0162&.juggl"
+  "\245\010\n\016CommandRequest\0224\n\004type\030\001 \001(\0162&.juggl"
   "er.v1.CommandRequest.CommandType\022\023\n\013modu"
   "le_name\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/\n\rc"
   "olor_command\030\004 \001(\0132\030.juggler.v1.ColorCom"
@@ -950,29 +1000,41 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "\025calibration_pixel_pos\030\013 \001(\0132\023.juggler.v"
   "1.Vector2\022\036\n\026record_with_yolo_boxes\030\014 \001("
   "\010\022#\n\033record_with_bytetrack_boxes\030\r \001(\010\022\032"
-  "\n\022pose_model_enabled\030\016 \001(\010\022\022\n\ncolor_name"
-  "\030\017 \001(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005"
-  "\022\024\n\014feature_name\030\022 \001(\t\0321\n\017ModuleArgsEntr"
-  "y\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\354\002\n\013Co"
-  "mmandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE\020\001\022"
-  "\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMMAND"
-  "\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_START"
-  "\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026RECOR"
-  "D_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WITH_CAME"
-  "RA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CAMERA"
-  "_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026SET_PO"
-  "SE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COLOR\020\r\022"
-  "\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_FEATURE\020\017"
-  "\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005col"
-  "or\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017CommandRe"
-  "sponse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t"
-  "\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
+  "\n\022pose_model_enabled\030\016 \001(\010\022=\n\024visualizat"
+  "ion_states\030\023 \001(\0132\037.juggler.v1.Visualizat"
+  "ionStates\022\022\n\ncolor_name\030\017 \001(\t\022\017\n\007click_x"
+  "\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014feature_name\030"
+  "\022 \001(\t\0321\n\017ModuleArgsEntry\022\013\n\003key\030\001 \001(\t\022\r\n"
+  "\005value\030\002 \001(\t:\0028\001\"\354\002\n\013CommandType\022\013\n\007UNKN"
+  "OWN\020\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rUNLOAD_MODULE\020"
+  "\002\022\026\n\022SEND_COLOR_COMMAND\020\003\022\024\n\020CONFIGURE_M"
+  "ODULE\020\004\022\020\n\014RECORD_START\020\005\022\033\n\027RECORD_CONT"
+  "INUOUS_START\020\006\022\032\n\026RECORD_CONTINUOUS_STOP"
+  "\020\007\022 \n\034RESTART_WITH_CAMERA_SETTINGS\020\010\022\017\n\013"
+  "CAMERA_STOP\020\t\022\020\n\014CAMERA_START\020\n\022\024\n\020CALIB"
+  "RATE_OBJECT\020\013\022\032\n\026SET_POSE_MODEL_ENABLED\020"
+  "\014\022\023\n\017CALIBRATE_COLOR\020\r\022\022\n\016ENABLE_FEATURE"
+  "\020\016\022\023\n\017DISABLE_FEATURE\020\017\"\232\003\n\023Visualizatio"
+  "nStates\022\037\n\027show_kalman_predictions\030\001 \001(\010"
+  "\022\033\n\023show_raw_detections\030\002 \001(\010\022 \n\030show_fi"
+  "ltered_detections\030\003 \001(\010\022\031\n\021show_associat"
+  "ions\030\004 \001(\010\022\031\n\021show_new_trackers\030\005 \001(\010\022\032\n"
+  "\022show_hand_tracking\030\006 \001(\010\022\030\n\020show_ball_s"
+  "tates\030\007 \001(\010\022\026\n\016show_occlusion\030\010 \001(\010\022\025\n\rs"
+  "how_skeleton\030\t \001(\010\022\031\n\021show_color_search\030"
+  "\n \001(\010\022\032\n\022show_color_tracker\030\013 \001(\010\022\032\n\022sho"
+  "w_tracked_boxes\030\014 \001(\010\022!\n\031show_unmatched_"
+  "detections\030\r \001(\010\022\022\n\nshow_tails\030\016 \001(\010\"A\n\014"
+  "ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030\002"
+  " \001(\0132\021.juggler.v1.Color\"I\n\017CommandRespon"
+  "se\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014"
+  "timestamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 5230, descriptor_table_protodef_juggler_2eproto,
+    false, false, 5706, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
-    &descriptor_table_juggler_2eproto_once, nullptr, 0, 25,
+    &descriptor_table_juggler_2eproto_once, nullptr, 0, 26,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
     file_level_metadata_juggler_2eproto, file_level_enum_descriptors_juggler_2eproto,
     file_level_service_descriptors_juggler_2eproto,
@@ -8817,6 +8879,7 @@ class CommandRequest::_Internal {
  public:
   static const ::juggler::v1::ColorCommand& color_command(const CommandRequest* msg);
   static const ::juggler::v1::Vector2& calibration_pixel_pos(const CommandRequest* msg);
+  static const ::juggler::v1::VisualizationStates& visualization_states(const CommandRequest* msg);
 };
 
 const ::juggler::v1::ColorCommand&
@@ -8826,6 +8889,10 @@ CommandRequest::_Internal::color_command(const CommandRequest* msg) {
 const ::juggler::v1::Vector2&
 CommandRequest::_Internal::calibration_pixel_pos(const CommandRequest* msg) {
   return *msg->_impl_.calibration_pixel_pos_;
+}
+const ::juggler::v1::VisualizationStates&
+CommandRequest::_Internal::visualization_states(const CommandRequest* msg) {
+  return *msg->_impl_.visualization_states_;
 }
 CommandRequest::CommandRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                          bool is_message_owned)
@@ -8847,6 +8914,7 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.feature_name_){}
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.calibration_pixel_pos_){nullptr}
+    , decltype(_impl_.visualization_states_){nullptr}
     , decltype(_impl_.timestamp_us_){}
     , decltype(_impl_.type_){}
     , decltype(_impl_.camera_width_){}
@@ -8900,6 +8968,9 @@ CommandRequest::CommandRequest(const CommandRequest& from)
   if (from._internal_has_calibration_pixel_pos()) {
     _this->_impl_.calibration_pixel_pos_ = new ::juggler::v1::Vector2(*from._impl_.calibration_pixel_pos_);
   }
+  if (from._internal_has_visualization_states()) {
+    _this->_impl_.visualization_states_ = new ::juggler::v1::VisualizationStates(*from._impl_.visualization_states_);
+  }
   ::memcpy(&_impl_.timestamp_us_, &from._impl_.timestamp_us_,
     static_cast<size_t>(reinterpret_cast<char*>(&_impl_.click_y_) -
     reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.click_y_));
@@ -8918,6 +8989,7 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.feature_name_){}
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.calibration_pixel_pos_){nullptr}
+    , decltype(_impl_.visualization_states_){nullptr}
     , decltype(_impl_.timestamp_us_){uint64_t{0u}}
     , decltype(_impl_.type_){0}
     , decltype(_impl_.camera_width_){0u}
@@ -8969,6 +9041,7 @@ inline void CommandRequest::SharedDtor() {
   _impl_.feature_name_.Destroy();
   if (this != internal_default_instance()) delete _impl_.color_command_;
   if (this != internal_default_instance()) delete _impl_.calibration_pixel_pos_;
+  if (this != internal_default_instance()) delete _impl_.visualization_states_;
 }
 
 void CommandRequest::ArenaDtor(void* object) {
@@ -8998,6 +9071,10 @@ void CommandRequest::Clear() {
     delete _impl_.calibration_pixel_pos_;
   }
   _impl_.calibration_pixel_pos_ = nullptr;
+  if (GetArenaForAllocation() == nullptr && _impl_.visualization_states_ != nullptr) {
+    delete _impl_.visualization_states_;
+  }
+  _impl_.visualization_states_ = nullptr;
   ::memset(&_impl_.timestamp_us_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.click_y_) -
       reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.click_y_));
@@ -9165,6 +9242,14 @@ const char* CommandRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.CommandRequest.feature_name"));
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.VisualizationStates visualization_states = 19;
+      case 19:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 154)) {
+          ptr = ctx->ParseMessage(_internal_mutable_visualization_states(), ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -9348,6 +9433,13 @@ uint8_t* CommandRequest::_InternalSerialize(
         18, this->_internal_feature_name(), target);
   }
 
+  // .juggler.v1.VisualizationStates visualization_states = 19;
+  if (this->_internal_has_visualization_states()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(19, _Internal::visualization_states(this),
+        _Internal::visualization_states(this).GetCachedSize(), target, stream);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -9413,6 +9505,13 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
         *_impl_.calibration_pixel_pos_);
+  }
+
+  // .juggler.v1.VisualizationStates visualization_states = 19;
+  if (this->_internal_has_visualization_states()) {
+    total_size += 2 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.visualization_states_);
   }
 
   // uint64 timestamp_us = 3;
@@ -9514,6 +9613,10 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
     _this->_internal_mutable_calibration_pixel_pos()->::juggler::v1::Vector2::MergeFrom(
         from._internal_calibration_pixel_pos());
   }
+  if (from._internal_has_visualization_states()) {
+    _this->_internal_mutable_visualization_states()->::juggler::v1::VisualizationStates::MergeFrom(
+        from._internal_visualization_states());
+  }
   if (from._internal_timestamp_us() != 0) {
     _this->_internal_set_timestamp_us(from._internal_timestamp_us());
   }
@@ -9595,6 +9698,505 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
       file_level_metadata_juggler_2eproto[22]);
+}
+
+// ===================================================================
+
+class VisualizationStates::_Internal {
+ public:
+};
+
+VisualizationStates::VisualizationStates(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.VisualizationStates)
+}
+VisualizationStates::VisualizationStates(const VisualizationStates& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  VisualizationStates* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.show_kalman_predictions_){}
+    , decltype(_impl_.show_raw_detections_){}
+    , decltype(_impl_.show_filtered_detections_){}
+    , decltype(_impl_.show_associations_){}
+    , decltype(_impl_.show_new_trackers_){}
+    , decltype(_impl_.show_hand_tracking_){}
+    , decltype(_impl_.show_ball_states_){}
+    , decltype(_impl_.show_occlusion_){}
+    , decltype(_impl_.show_skeleton_){}
+    , decltype(_impl_.show_color_search_){}
+    , decltype(_impl_.show_color_tracker_){}
+    , decltype(_impl_.show_tracked_boxes_){}
+    , decltype(_impl_.show_unmatched_detections_){}
+    , decltype(_impl_.show_tails_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  ::memcpy(&_impl_.show_kalman_predictions_, &from._impl_.show_kalman_predictions_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.show_tails_) -
+    reinterpret_cast<char*>(&_impl_.show_kalman_predictions_)) + sizeof(_impl_.show_tails_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.VisualizationStates)
+}
+
+inline void VisualizationStates::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.show_kalman_predictions_){false}
+    , decltype(_impl_.show_raw_detections_){false}
+    , decltype(_impl_.show_filtered_detections_){false}
+    , decltype(_impl_.show_associations_){false}
+    , decltype(_impl_.show_new_trackers_){false}
+    , decltype(_impl_.show_hand_tracking_){false}
+    , decltype(_impl_.show_ball_states_){false}
+    , decltype(_impl_.show_occlusion_){false}
+    , decltype(_impl_.show_skeleton_){false}
+    , decltype(_impl_.show_color_search_){false}
+    , decltype(_impl_.show_color_tracker_){false}
+    , decltype(_impl_.show_tracked_boxes_){false}
+    , decltype(_impl_.show_unmatched_detections_){false}
+    , decltype(_impl_.show_tails_){false}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+VisualizationStates::~VisualizationStates() {
+  // @@protoc_insertion_point(destructor:juggler.v1.VisualizationStates)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void VisualizationStates::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+}
+
+void VisualizationStates::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void VisualizationStates::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.VisualizationStates)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  ::memset(&_impl_.show_kalman_predictions_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.show_tails_) -
+      reinterpret_cast<char*>(&_impl_.show_kalman_predictions_)) + sizeof(_impl_.show_tails_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* VisualizationStates::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // bool show_kalman_predictions = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.show_kalman_predictions_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_raw_detections = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          _impl_.show_raw_detections_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_filtered_detections = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.show_filtered_detections_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_associations = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
+          _impl_.show_associations_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_new_trackers = 5;
+      case 5:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
+          _impl_.show_new_trackers_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_hand_tracking = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 48)) {
+          _impl_.show_hand_tracking_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_ball_states = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 56)) {
+          _impl_.show_ball_states_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_occlusion = 8;
+      case 8:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 64)) {
+          _impl_.show_occlusion_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_skeleton = 9;
+      case 9:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 72)) {
+          _impl_.show_skeleton_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_color_search = 10;
+      case 10:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 80)) {
+          _impl_.show_color_search_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_color_tracker = 11;
+      case 11:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 88)) {
+          _impl_.show_color_tracker_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_tracked_boxes = 12;
+      case 12:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 96)) {
+          _impl_.show_tracked_boxes_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_unmatched_detections = 13;
+      case 13:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 104)) {
+          _impl_.show_unmatched_detections_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool show_tails = 14;
+      case 14:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 112)) {
+          _impl_.show_tails_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* VisualizationStates::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.VisualizationStates)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // bool show_kalman_predictions = 1;
+  if (this->_internal_show_kalman_predictions() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(1, this->_internal_show_kalman_predictions(), target);
+  }
+
+  // bool show_raw_detections = 2;
+  if (this->_internal_show_raw_detections() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(2, this->_internal_show_raw_detections(), target);
+  }
+
+  // bool show_filtered_detections = 3;
+  if (this->_internal_show_filtered_detections() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(3, this->_internal_show_filtered_detections(), target);
+  }
+
+  // bool show_associations = 4;
+  if (this->_internal_show_associations() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(4, this->_internal_show_associations(), target);
+  }
+
+  // bool show_new_trackers = 5;
+  if (this->_internal_show_new_trackers() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(5, this->_internal_show_new_trackers(), target);
+  }
+
+  // bool show_hand_tracking = 6;
+  if (this->_internal_show_hand_tracking() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(6, this->_internal_show_hand_tracking(), target);
+  }
+
+  // bool show_ball_states = 7;
+  if (this->_internal_show_ball_states() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(7, this->_internal_show_ball_states(), target);
+  }
+
+  // bool show_occlusion = 8;
+  if (this->_internal_show_occlusion() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(8, this->_internal_show_occlusion(), target);
+  }
+
+  // bool show_skeleton = 9;
+  if (this->_internal_show_skeleton() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(9, this->_internal_show_skeleton(), target);
+  }
+
+  // bool show_color_search = 10;
+  if (this->_internal_show_color_search() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(10, this->_internal_show_color_search(), target);
+  }
+
+  // bool show_color_tracker = 11;
+  if (this->_internal_show_color_tracker() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(11, this->_internal_show_color_tracker(), target);
+  }
+
+  // bool show_tracked_boxes = 12;
+  if (this->_internal_show_tracked_boxes() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(12, this->_internal_show_tracked_boxes(), target);
+  }
+
+  // bool show_unmatched_detections = 13;
+  if (this->_internal_show_unmatched_detections() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(13, this->_internal_show_unmatched_detections(), target);
+  }
+
+  // bool show_tails = 14;
+  if (this->_internal_show_tails() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(14, this->_internal_show_tails(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.VisualizationStates)
+  return target;
+}
+
+size_t VisualizationStates::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.VisualizationStates)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // bool show_kalman_predictions = 1;
+  if (this->_internal_show_kalman_predictions() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_raw_detections = 2;
+  if (this->_internal_show_raw_detections() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_filtered_detections = 3;
+  if (this->_internal_show_filtered_detections() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_associations = 4;
+  if (this->_internal_show_associations() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_new_trackers = 5;
+  if (this->_internal_show_new_trackers() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_hand_tracking = 6;
+  if (this->_internal_show_hand_tracking() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_ball_states = 7;
+  if (this->_internal_show_ball_states() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_occlusion = 8;
+  if (this->_internal_show_occlusion() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_skeleton = 9;
+  if (this->_internal_show_skeleton() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_color_search = 10;
+  if (this->_internal_show_color_search() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_color_tracker = 11;
+  if (this->_internal_show_color_tracker() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_tracked_boxes = 12;
+  if (this->_internal_show_tracked_boxes() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_unmatched_detections = 13;
+  if (this->_internal_show_unmatched_detections() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool show_tails = 14;
+  if (this->_internal_show_tails() != 0) {
+    total_size += 1 + 1;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData VisualizationStates::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    VisualizationStates::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*VisualizationStates::GetClassData() const { return &_class_data_; }
+
+
+void VisualizationStates::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<VisualizationStates*>(&to_msg);
+  auto& from = static_cast<const VisualizationStates&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.VisualizationStates)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_show_kalman_predictions() != 0) {
+    _this->_internal_set_show_kalman_predictions(from._internal_show_kalman_predictions());
+  }
+  if (from._internal_show_raw_detections() != 0) {
+    _this->_internal_set_show_raw_detections(from._internal_show_raw_detections());
+  }
+  if (from._internal_show_filtered_detections() != 0) {
+    _this->_internal_set_show_filtered_detections(from._internal_show_filtered_detections());
+  }
+  if (from._internal_show_associations() != 0) {
+    _this->_internal_set_show_associations(from._internal_show_associations());
+  }
+  if (from._internal_show_new_trackers() != 0) {
+    _this->_internal_set_show_new_trackers(from._internal_show_new_trackers());
+  }
+  if (from._internal_show_hand_tracking() != 0) {
+    _this->_internal_set_show_hand_tracking(from._internal_show_hand_tracking());
+  }
+  if (from._internal_show_ball_states() != 0) {
+    _this->_internal_set_show_ball_states(from._internal_show_ball_states());
+  }
+  if (from._internal_show_occlusion() != 0) {
+    _this->_internal_set_show_occlusion(from._internal_show_occlusion());
+  }
+  if (from._internal_show_skeleton() != 0) {
+    _this->_internal_set_show_skeleton(from._internal_show_skeleton());
+  }
+  if (from._internal_show_color_search() != 0) {
+    _this->_internal_set_show_color_search(from._internal_show_color_search());
+  }
+  if (from._internal_show_color_tracker() != 0) {
+    _this->_internal_set_show_color_tracker(from._internal_show_color_tracker());
+  }
+  if (from._internal_show_tracked_boxes() != 0) {
+    _this->_internal_set_show_tracked_boxes(from._internal_show_tracked_boxes());
+  }
+  if (from._internal_show_unmatched_detections() != 0) {
+    _this->_internal_set_show_unmatched_detections(from._internal_show_unmatched_detections());
+  }
+  if (from._internal_show_tails() != 0) {
+    _this->_internal_set_show_tails(from._internal_show_tails());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void VisualizationStates::CopyFrom(const VisualizationStates& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.VisualizationStates)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool VisualizationStates::IsInitialized() const {
+  return true;
+}
+
+void VisualizationStates::InternalSwap(VisualizationStates* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_tails_)
+      + sizeof(VisualizationStates::_impl_.show_tails_)
+      - PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_kalman_predictions_)>(
+          reinterpret_cast<char*>(&_impl_.show_kalman_predictions_),
+          reinterpret_cast<char*>(&other->_impl_.show_kalman_predictions_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata VisualizationStates::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[23]);
 }
 
 // ===================================================================
@@ -9839,7 +10441,7 @@ void ColorCommand::InternalSwap(ColorCommand* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata ColorCommand::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[23]);
+      file_level_metadata_juggler_2eproto[24]);
 }
 
 // ===================================================================
@@ -10102,7 +10704,7 @@ void CommandResponse::InternalSwap(CommandResponse* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandResponse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[24]);
+      file_level_metadata_juggler_2eproto[25]);
 }
 
 // @@protoc_insertion_point(namespace_scope)
@@ -10200,6 +10802,10 @@ Arena::CreateMaybeMessage< ::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUs
 template<> PROTOBUF_NOINLINE ::juggler::v1::CommandRequest*
 Arena::CreateMaybeMessage< ::juggler::v1::CommandRequest >(Arena* arena) {
   return Arena::CreateMessageInternal< ::juggler::v1::CommandRequest >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::VisualizationStates*
+Arena::CreateMaybeMessage< ::juggler::v1::VisualizationStates >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::VisualizationStates >(arena);
 }
 template<> PROTOBUF_NOINLINE ::juggler::v1::ColorCommand*
 Arena::CreateMaybeMessage< ::juggler::v1::ColorCommand >(Arena* arena) {

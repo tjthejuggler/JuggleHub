@@ -270,6 +270,9 @@ message CommandRequest {
   bool record_with_bytetrack_boxes = 13;
   bool pose_model_enabled = 14;
   
+  // Visualization states for recording
+  VisualizationStates visualization_states = 19;
+  
   // For CALIBRATE_COLOR
   string color_name = 15;           // Name of the color profile to calibrate
   int32 click_x = 16;               // X coordinate of the click
@@ -277,6 +280,24 @@ message CommandRequest {
   
   // For ENABLE_FEATURE / DISABLE_FEATURE
   string feature_name = 18;         // Name of the feature to enable/disable
+}
+
+// Visualization states for recording with overlays
+message VisualizationStates {
+  bool show_kalman_predictions = 1;
+  bool show_raw_detections = 2;
+  bool show_filtered_detections = 3;
+  bool show_associations = 4;
+  bool show_new_trackers = 5;
+  bool show_hand_tracking = 6;
+  bool show_ball_states = 7;
+  bool show_occlusion = 8;
+  bool show_skeleton = 9;
+  bool show_color_search = 10;
+  bool show_color_tracker = 11;
+  bool show_tracked_boxes = 12;
+  bool show_unmatched_detections = 13;
+  bool show_tails = 14;
 }
 
 message ColorCommand {

@@ -2866,11 +2866,29 @@ if PYQT_AVAILABLE:
         def record_clip(self):
             self.log_message("Sending record command to engine...")
             
+            # Create visualization states from current toggle states
+            viz_states = juggler_pb2.VisualizationStates()
+            viz_states.show_kalman_predictions = self.show_kalman_predictions_toggle.isChecked()
+            viz_states.show_raw_detections = self.show_raw_detections_toggle.isChecked()
+            viz_states.show_filtered_detections = self.show_filtered_detections_toggle.isChecked()
+            viz_states.show_associations = self.show_associations_toggle.isChecked()
+            viz_states.show_new_trackers = self.show_new_trackers_toggle.isChecked()
+            viz_states.show_hand_tracking = self.show_hand_tracking_toggle.isChecked()
+            viz_states.show_ball_states = self.show_ball_states_toggle.isChecked()
+            viz_states.show_occlusion = self.show_occlusion_toggle.isChecked()
+            viz_states.show_skeleton = self.show_skeleton_toggle.isChecked()
+            viz_states.show_color_search = self.show_color_search_toggle.isChecked()
+            viz_states.show_color_tracker = self.show_color_tracker_toggle.isChecked()
+            viz_states.show_tracked_boxes = self.show_tracked_boxes_toggle.isChecked()
+            viz_states.show_unmatched_detections = self.show_unmatched_detections_toggle.isChecked()
+            viz_states.show_tails = self.show_tails_toggle.isChecked()
+            
             command = juggler_pb2.CommandRequest(
                 type=juggler_pb2.CommandRequest.CommandType.RECORD_START,
                 record_with_yolo_boxes=self.show_raw_detections_toggle.isChecked(),
                 record_with_bytetrack_boxes=self.show_tracked_boxes_toggle.isChecked()
             )
+            command.visualization_states.CopyFrom(viz_states)
             
             try:
                 response = self.zmq_client.send_command(command)
@@ -2888,6 +2906,25 @@ if PYQT_AVAILABLE:
                 record_with_yolo_boxes=self.show_raw_detections_toggle.isChecked(),
                 record_with_bytetrack_boxes=self.show_tracked_boxes_toggle.isChecked()
             )
+            
+            # Add visualization states if starting recording
+            if is_starting:
+                viz_states = juggler_pb2.VisualizationStates()
+                viz_states.show_kalman_predictions = self.show_kalman_predictions_toggle.isChecked()
+                viz_states.show_raw_detections = self.show_raw_detections_toggle.isChecked()
+                viz_states.show_filtered_detections = self.show_filtered_detections_toggle.isChecked()
+                viz_states.show_associations = self.show_associations_toggle.isChecked()
+                viz_states.show_new_trackers = self.show_new_trackers_toggle.isChecked()
+                viz_states.show_hand_tracking = self.show_hand_tracking_toggle.isChecked()
+                viz_states.show_ball_states = self.show_ball_states_toggle.isChecked()
+                viz_states.show_occlusion = self.show_occlusion_toggle.isChecked()
+                viz_states.show_skeleton = self.show_skeleton_toggle.isChecked()
+                viz_states.show_color_search = self.show_color_search_toggle.isChecked()
+                viz_states.show_color_tracker = self.show_color_tracker_toggle.isChecked()
+                viz_states.show_tracked_boxes = self.show_tracked_boxes_toggle.isChecked()
+                viz_states.show_unmatched_detections = self.show_unmatched_detections_toggle.isChecked()
+                viz_states.show_tails = self.show_tails_toggle.isChecked()
+                command.visualization_states.CopyFrom(viz_states)
             
             try:
                 response = self.zmq_client.send_command(command)

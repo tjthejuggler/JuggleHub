@@ -237,7 +237,7 @@ void Engine::run() {
 
             // Add to frame buffers
             RecordingFrame rec_frame = {color_image.clone(), last_raw_detections_,
-                                       tracked_objects_compat, tracked_hands_compat};
+                                       tracked_objects_compat, tracked_hands_compat, tracked_balls, visualization_states_};
             {
                 std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
                 frame_buffer_.push_back(rec_frame);
@@ -422,12 +422,18 @@ void Engine::processCommands() {
                 case juggler::v1::CommandRequest::RECORD_START:
                     record_with_yolo_boxes_ = command.record_with_yolo_boxes();
                     record_with_bytetrack_boxes_ = command.record_with_bytetrack_boxes();
+                    if (command.has_visualization_states()) {
+                        visualization_states_ = command.visualization_states();
+                    }
                     saveRecording();
                     response.set_message("Recording saved");
                     break;
                 case juggler::v1::CommandRequest::RECORD_CONTINUOUS_START:
                     record_with_yolo_boxes_ = command.record_with_yolo_boxes();
                     record_with_bytetrack_boxes_ = command.record_with_bytetrack_boxes();
+                    if (command.has_visualization_states()) {
+                        visualization_states_ = command.visualization_states();
+                    }
                     startContinuousRecording();
                     response.set_message("Continuous recording started");
                     break;
@@ -586,28 +592,35 @@ void Engine::saveRecording() {
         
         INFO_LOG("Saved ", frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
 
-        if (record_with_yolo_boxes_ || record_with_bytetrack_boxes_) {
-            fs::path recording_dir_with_boxes = recording_dir / "with_boxes";
-            fs::create_directories(recording_dir_with_boxes);
+        // Check if any visualizations are enabled
+        bool has_visualizations = record_with_yolo_boxes_ || record_with_bytetrack_boxes_ ||
+                                 visualization_states_.show_kalman_predictions() ||
+                                 visualization_states_.show_raw_detections() ||
+                                 visualization_states_.show_filtered_detections() ||
+                                 visualization_states_.show_associations() ||
+                                 visualization_states_.show_new_trackers() ||
+                                 visualization_states_.show_hand_tracking() ||
+                                 visualization_states_.show_ball_states() ||
+                                 visualization_states_.show_occlusion() ||
+                                 visualization_states_.show_skeleton() ||
+                                 visualization_states_.show_color_search() ||
+                                 visualization_states_.show_color_tracker() ||
+                                 visualization_states_.show_tracked_boxes() ||
+                                 visualization_states_.show_unmatched_detections() ||
+                                 visualization_states_.show_tails();
 
-            int frame_num_boxes = 0;
+        if (has_visualizations) {
+            fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
+            fs::create_directories(recording_dir_with_viz);
+
+            int frame_num_viz = 0;
             for (const auto& rec_frame : frame_buffer_) {
-                cv::Mat frame_with_boxes = rec_frame.frame.clone();
-                if (record_with_yolo_boxes_) {
-                    for (const auto& det : rec_frame.raw_detections) {
-                        cv::rectangle(frame_with_boxes, det.box, cv::Scalar(0, 0, 255), 2); // Red for YOLO
-                    }
-                }
-                if (record_with_bytetrack_boxes_) {
-                    for (const auto& obj : rec_frame.tracked_objects) {
-                        cv::rectangle(frame_with_boxes, obj.box, cv::Scalar(0, 165, 255), 2); // Orange for ByteTrack
-                    }
-                }
-                std::string filename = ss.str() + "_frame_" + std::to_string(frame_num_boxes++) + "_boxes.jpg";
-                fs::path filepath = recording_dir_with_boxes / filename;
-                cv::imwrite(filepath.string(), frame_with_boxes);
+                cv::Mat frame_with_viz = renderVisualizationsOnFrame(rec_frame.frame, rec_frame);
+                std::string filename = ss.str() + "_frame_" + std::to_string(frame_num_viz++) + "_viz.jpg";
+                fs::path filepath = recording_dir_with_viz / filename;
+                cv::imwrite(filepath.string(), frame_with_viz);
             }
-            INFO_LOG("Saved ", frame_buffer_.size(), " frames with bounding boxes to ", recording_dir_with_boxes.string());
+            INFO_LOG("Saved ", frame_buffer_.size(), " frames with visualizations to ", recording_dir_with_viz.string());
         }
 
     } catch (const fs::filesystem_error& e) {
@@ -677,28 +690,35 @@ void Engine::stopContinuousRecording() {
         
         INFO_LOG("Saved ", continuous_frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
 
-        if (record_with_yolo_boxes_ || record_with_bytetrack_boxes_) {
-            fs::path recording_dir_with_boxes = recording_dir / "with_boxes";
-            fs::create_directories(recording_dir_with_boxes);
+        // Check if any visualizations are enabled
+        bool has_visualizations = record_with_yolo_boxes_ || record_with_bytetrack_boxes_ ||
+                                 visualization_states_.show_kalman_predictions() ||
+                                 visualization_states_.show_raw_detections() ||
+                                 visualization_states_.show_filtered_detections() ||
+                                 visualization_states_.show_associations() ||
+                                 visualization_states_.show_new_trackers() ||
+                                 visualization_states_.show_hand_tracking() ||
+                                 visualization_states_.show_ball_states() ||
+                                 visualization_states_.show_occlusion() ||
+                                 visualization_states_.show_skeleton() ||
+                                 visualization_states_.show_color_search() ||
+                                 visualization_states_.show_color_tracker() ||
+                                 visualization_states_.show_tracked_boxes() ||
+                                 visualization_states_.show_unmatched_detections() ||
+                                 visualization_states_.show_tails();
 
-            int frame_num_boxes = 0;
+        if (has_visualizations) {
+            fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
+            fs::create_directories(recording_dir_with_viz);
+
+            int frame_num_viz = 0;
             for (const auto& rec_frame : continuous_frame_buffer_) {
-                cv::Mat frame_with_boxes = rec_frame.frame.clone();
-                if (record_with_yolo_boxes_) {
-                    for (const auto& det : rec_frame.raw_detections) {
-                        cv::rectangle(frame_with_boxes, det.box, cv::Scalar(0, 0, 255), 2); // Red for YOLO
-                    }
-                }
-                if (record_with_bytetrack_boxes_) {
-                    for (const auto& obj : rec_frame.tracked_objects) {
-                        cv::rectangle(frame_with_boxes, obj.box, cv::Scalar(0, 165, 255), 2); // Orange for ByteTrack
-                    }
-                }
-                std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num_boxes++) + "_boxes.jpg";
-                fs::path filepath = recording_dir_with_boxes / filename;
-                cv::imwrite(filepath.string(), frame_with_boxes);
+                cv::Mat frame_with_viz = renderVisualizationsOnFrame(rec_frame.frame, rec_frame);
+                std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num_viz++) + "_viz.jpg";
+                fs::path filepath = recording_dir_with_viz / filename;
+                cv::imwrite(filepath.string(), frame_with_viz);
             }
-            INFO_LOG("Saved ", continuous_frame_buffer_.size(), " frames with bounding boxes to ", recording_dir_with_boxes.string());
+            INFO_LOG("Saved ", continuous_frame_buffer_.size(), " frames with visualizations to ", recording_dir_with_viz.string());
         }
 
         continuous_frame_buffer_.clear();
@@ -884,4 +904,130 @@ void Engine::startCameraWithSettings(const std::string& settings_file, uint32_t 
 
     // Start the camera with the new, fully-formed configuration.
     startCamera();
+}
+cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const RecordingFrame& rec_frame) {
+    cv::Mat result = frame.clone();
+    const auto& viz = rec_frame.viz_states;
+    
+    // Draw YOLO detections (legacy support)
+    if (record_with_yolo_boxes_ || viz.show_raw_detections()) {
+        for (const auto& det : rec_frame.raw_detections) {
+            cv::rectangle(result, det.box, cv::Scalar(0, 0, 255), 2); // Red for YOLO
+        }
+    }
+    
+    // Draw ByteTrack boxes (legacy support)
+    if (record_with_bytetrack_boxes_ || viz.show_tracked_boxes()) {
+        for (const auto& obj : rec_frame.tracked_objects) {
+            cv::rectangle(result, obj.box, cv::Scalar(0, 165, 255), 3); // Orange for ByteTrack, thicker
+        }
+    }
+    
+    // Draw hand tracking
+    if (viz.show_hand_tracking() || viz.show_skeleton()) {
+        for (const auto& hand : rec_frame.tracked_hands) {
+            // Project 3D wrist position to 2D
+            if (hand.wrist_pos_3d.z > 0) {
+                int wrist_x = static_cast<int>((hand.wrist_pos_3d.x * camera_intrinsics_.fx) / hand.wrist_pos_3d.z + camera_intrinsics_.ppx);
+                int wrist_y = static_cast<int>((hand.wrist_pos_3d.y * camera_intrinsics_.fy) / hand.wrist_pos_3d.z + camera_intrinsics_.ppy);
+                
+                // Draw wrist circle
+                cv::circle(result, cv::Point(wrist_x, wrist_y), 20, cv::Scalar(255, 255, 0), 4); // Cyan
+                
+                // Draw hand label
+                std::string label = hand.id == 0 ? "L" : "R";
+                cv::putText(result, label, cv::Point(wrist_x - 5, wrist_y + 5),
+                           cv::FONT_HERSHEY_SIMPLEX, 1.2, cv::Scalar(255, 255, 255), 2);
+                
+                // Draw skeleton if enabled
+                if (viz.show_skeleton()) {
+                    for (const auto& kp : hand.keypoints) {
+                        if (kp.z > 0) {
+                            int kp_x = static_cast<int>((kp.x * camera_intrinsics_.fx) / kp.z + camera_intrinsics_.ppx);
+                            int kp_y = static_cast<int>((kp.y * camera_intrinsics_.fy) / kp.z + camera_intrinsics_.ppy);
+                            cv::circle(result, cv::Point(kp_x, kp_y), 4, cv::Scalar(255, 255, 0), -1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Draw color-tracked balls
+    if (viz.show_color_tracker()) {
+        // Load color profiles to get RGB colors for each ball
+        std::map<std::string, cv::Scalar> color_map;
+        try {
+            std::ifstream color_file("hub/color_profiles.json");
+            if (color_file.is_open()) {
+                nlohmann::json color_profiles;
+                color_file >> color_profiles;
+                
+                for (const auto& profile : color_profiles) {
+                    std::string name = profile["name"];
+                    std::vector<int> rgb = profile["rgb"];
+                    // Convert RGB to BGR for OpenCV
+                    color_map[name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
+                }
+            }
+        } catch (...) {
+            // If loading fails, use default colors
+        }
+        
+        for (const auto& ball : rec_frame.tracked_balls) {
+            if (!ball.has_yolo_detection) continue;  // Only draw active balls
+            
+            int center_x = static_cast<int>(ball.pixel_pos.x);
+            int center_y = static_cast<int>(ball.pixel_pos.y);
+            int radius = 12;
+            
+            // Get color for this ball
+            cv::Scalar color = cv::Scalar(255, 255, 255);  // Default white
+            auto it = color_map.find(ball.color_name);
+            if (it != color_map.end()) {
+                color = it->second;
+            }
+            
+            // Draw based on whether ball is held
+            if (ball.is_held) {
+                // Dashed circle for held balls (draw as regular circle with thicker line)
+                cv::circle(result, cv::Point(center_x, center_y), radius, color, 3, cv::LINE_AA);
+            } else {
+                // Filled circle for in-air balls
+                cv::circle(result, cv::Point(center_x, center_y), radius, color, -1, cv::LINE_AA);
+                // Black border for visibility
+                if (ball.color_name == "white") {
+                    cv::circle(result, cv::Point(center_x, center_y), radius, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+                } else {
+                    cv::circle(result, cv::Point(center_x, center_y), radius, cv::Scalar(0, 0, 0), 1, cv::LINE_AA);
+                }
+            }
+            
+            // Draw label with background for better visibility
+            std::string label = ball.color_name + " (" + std::to_string(ball.id) + ")";
+            std::string pos_label = "(" + std::to_string(static_cast<int>(ball.position.z * 100)) + "cm)";
+            
+            // Use white text with black outline for visibility
+            cv::putText(result, label, cv::Point(center_x + 15, center_y),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+            cv::putText(result, label, cv::Point(center_x + 15, center_y),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+            
+            cv::putText(result, pos_label, cv::Point(center_x + 15, center_y + 15),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+            cv::putText(result, pos_label, cv::Point(center_x + 15, center_y + 15),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+            
+            // Show wrist association if held
+            if (ball.is_held && ball.held_by_hand_id >= 0) {
+                std::string wrist_label = "[" + std::string(ball.held_by_hand_id == 0 ? "L" : "R") + "]";
+                cv::putText(result, wrist_label, cv::Point(center_x + 15, center_y + 30),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+                cv::putText(result, wrist_label, cv::Point(center_x + 15, center_y + 30),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+            }
+        }
+    }
+    
+    return result;
 }

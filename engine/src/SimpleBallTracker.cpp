@@ -371,7 +371,7 @@ const Detection* SimpleBallTracker::findBestColorMatch(
     
     // Open debug log
     std::ofstream debug_log("engine_debug.log", std::ios::app);
-    debug_log << "\n  >> findBestColorMatch() for " << profile.name << " <<" << std::endl;
+    debug_log << "\n  >> FRAME " << frame_counter_ << " - findBestColorMatch() for " << profile.name << " <<" << std::endl;
     debug_log << "  Has Kalman prediction: " << (has_kalman_prediction ? "YES" : "NO") << std::endl;
     if (has_kalman_prediction) {
         debug_log << "  Kalman pred pos: (" << kalman_prediction.x << ", " << kalman_prediction.y << ", " << kalman_prediction.z << ")" << std::endl;
@@ -645,7 +645,7 @@ uint64_t SimpleBallTracker::getCurrentTimestamp() {
 bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands) {
     // Open debug log file in append mode
     std::ofstream debug_log("engine_debug.log", std::ios::app);
-    debug_log << "\n  >> isBallHeld() for Ball " << ball.id << " <<" << std::endl;
+    debug_log << "\n  >> FRAME " << frame_counter_ << " - isBallHeld() for Ball " << ball.id << " <<" << std::endl;
     
     // Use weighted scoring system based on tracking settings
     float held_score = 0.0f;
@@ -657,7 +657,7 @@ bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHan
     debug_log << "    wrist_proximity_weight: " << tracking_settings_.wrist_proximity_weight << std::endl;
     debug_log << "    wrist_proximity_threshold: " << tracking_settings_.wrist_proximity_threshold << "m" << std::endl;
     
-    // 1. ML Classification Evidence
+    // 1. ML Classification Evidence - TRUST YOLO FIRST
     debug_log << "  ML Classification:" << std::endl;
     debug_log << "    YOLO class_id: " << ball.yolo_class_id << std::endl;
     if (ball.yolo_class_id == 1) {  // ball_held class
@@ -699,11 +699,20 @@ bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHan
     debug_log << "    Minimum distance to any wrist: " << min_dist << "m" << std::endl;
     debug_log << "    Threshold: " << tracking_settings_.wrist_proximity_threshold << "m" << std::endl;
     
+    // CRITICAL FIX: Only use proximity as evidence if YOLO hasn't given us a strong signal
+    // If YOLO clearly says "ball" (in-air), don't let proximity override it
+    // Only add proximity weight if we don't have a YOLO detection OR if YOLO says ball_held
     if (min_dist < tracking_settings_.wrist_proximity_threshold) {
-        held_score += tracking_settings_.wrist_proximity_weight;
-        ball.held_by_hand_id = closest_hand;
-        debug_log << "    Ball is NEAR hand " << closest_hand << " -> adding "
-                 << tracking_settings_.wrist_proximity_weight << " to held_score" << std::endl;
+        // Only add proximity weight if YOLO agrees (ball_held) or if we have no YOLO detection
+        if (ball.yolo_class_id == 1 || !ball.has_yolo_detection) {
+            held_score += tracking_settings_.wrist_proximity_weight;
+            ball.held_by_hand_id = closest_hand;
+            debug_log << "    Ball is NEAR hand " << closest_hand << " AND (YOLO agrees OR no YOLO) -> adding "
+                     << tracking_settings_.wrist_proximity_weight << " to held_score" << std::endl;
+        } else {
+            debug_log << "    Ball is NEAR hand BUT YOLO says in-air (class=0) -> NOT adding proximity weight" << std::endl;
+            ball.held_by_hand_id = -1;  // Don't associate with hand if YOLO says in-air
+        }
     } else {
         ball.held_by_hand_id = -1;
         debug_log << "    Ball is NOT near any hand" << std::endl;
@@ -730,7 +739,7 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
     
     // Open debug log file in append mode
     std::ofstream debug_log("engine_debug.log", std::ios::app);
-    debug_log << "\n=== detectStatesAndEvents() ===" << std::endl;
+    debug_log << "\n=== FRAME " << frame_counter_ << " - detectStatesAndEvents() ===" << std::endl;
     debug_log << "Number of balls: " << balls.size() << std::endl;
     debug_log << "Number of hands: " << hands.size() << std::endl;
     
@@ -778,6 +787,28 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                     debug_log << "  Condition check: old_state_was_held=" << old_state_was_held
                              << " && !now_held=" << !now_held << std::endl;
                     debug_log << "  >>> GENERATING THROW EVENT <<<" << std::endl;
+                    
+                    // CRITICAL FIX: Estimate throw velocity from color predictor history
+                    // This prevents Kalman from immediately predicting downward motion
+                    auto estimated_velocity = ball.color_predictor.getVelocity();
+                    if (estimated_velocity.z != 0.0f) {  // Valid velocity estimate
+                        // Update Kalman velocity with throw velocity
+                        auto& state = ball.kalman.get_state();
+                        state(3) = estimated_velocity.x;  // vx
+                        state(4) = estimated_velocity.y;  // vy
+                        state(5) = estimated_velocity.z;  // vz
+                        
+                        debug_log << "  THROW VELOCITY INITIALIZED: ("
+                                 << estimated_velocity.x << ", "
+                                 << estimated_velocity.y << ", "
+                                 << estimated_velocity.z << ") m/s" << std::endl;
+                        std::cout << "[SimpleBallTracker] Throw velocity: ("
+                                 << estimated_velocity.x << ", "
+                                 << estimated_velocity.y << ", "
+                                 << estimated_velocity.z << ") m/s" << std::endl;
+                    } else {
+                        debug_log << "  WARNING: No valid velocity estimate for throw!" << std::endl;
+                    }
                     
                     events.push_back({
                         BallEvent::THROW,
@@ -832,10 +863,13 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     const cv::Mat& depth_frame,
     const CameraIntrinsics& intrinsics) {
     
+    // Increment frame counter
+    frame_counter_++;
+    
     // Open debug log file
     std::ofstream debug_log("engine_debug.log", std::ios::app);
     debug_log << "\n\n========================================" << std::endl;
-    debug_log << "=== SimpleBallTracker::update() ===" << std::endl;
+    debug_log << "=== FRAME " << frame_counter_ << " ===" << std::endl;
     debug_log << "========================================" << std::endl;
     
     // Calculate dt
@@ -889,19 +923,56 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         if (!profile) continue;
         
         // Get Kalman prediction for this ball (for boundary checking)
-        // We calculate this to enforce the prediction boundary, but we DON'T advance the filter state yet
+        // CRITICAL: We must NOT modify the Kalman state here, only peek at what it would predict
         cv::Point3f kalman_pred(0, 0, 0);
         bool has_prediction = false;
         
-        // Calculate prediction if we have recent tracking history (within last 5 frames)
-        if (ball.frames_without_yolo < 5) {
-            // Get predicted state WITHOUT advancing the filter
-            // We'll only advance it if we actually use the prediction
+        // Open debug log for this ball's prediction
+        std::ofstream pred_log("engine_debug.log", std::ios::app);
+        pred_log << "\n  >> FRAME " << frame_counter_ << " - Kalman Prediction for Ball " << ball.id << " (" << ball.color_name << ") <<" << std::endl;
+        pred_log << "  frames_without_yolo: " << ball.frames_without_yolo << std::endl;
+        
+        // CRITICAL FIX: Always calculate Kalman prediction, regardless of frames_without_yolo
+        // The Kalman filter naturally handles uncertainty through process noise (Q matrix)
+        // Disabling prediction causes sporadic snapping and loss of trajectory tracking
+        if (ball.kalman.get_state()(2) > 0.01f) {  // Only if Kalman has been initialized (z > 0)
+            // Log ColorBasedPredictor history
+            pred_log << "  ColorBasedPredictor history (" << ball.color_predictor.getHistorySize() << " frames):" << std::endl;
+            const auto& history = ball.color_predictor.getHistory();
+            int frame_idx = 0;
+            for (const auto& point : history) {
+                pred_log << "    Frame " << frame_idx++ << ": pos=("
+                         << point.position.x << ", "
+                         << point.position.y << ", "
+                         << point.position.z << ")" << std::endl;
+            }
+            
+            // Get velocity estimate
+            auto velocity = ball.color_predictor.getVelocity();
+            pred_log << "  Estimated velocity: (" << velocity.x << ", " << velocity.y << ", " << velocity.z << ") m/s" << std::endl;
+            
+            // SAVE the current Kalman state before prediction
+            auto saved_state = ball.kalman.get_state();
+            pred_log << "  Current Kalman state: pos=(" << saved_state(0) << ", " << saved_state(1) << ", " << saved_state(2)
+                     << ") vel=(" << saved_state(3) << ", " << saved_state(4) << ", " << saved_state(5) << ")" << std::endl;
+            
+            // Temporarily predict to see where Kalman thinks the ball should be
             ball.kalman.predict(dt);
-            auto state = ball.kalman.get_state();
-            kalman_pred = cv::Point3f(state(0), state(1), state(2));
+            auto predicted_state = ball.kalman.get_state();
+            kalman_pred = cv::Point3f(predicted_state(0), predicted_state(1), predicted_state(2));
             has_prediction = (kalman_pred.z > 0.01f);
+            
+            pred_log << "  Kalman prediction (dt=" << dt << "s): pos=("
+                     << kalman_pred.x << ", " << kalman_pred.y << ", " << kalman_pred.z << ")" << std::endl;
+            
+            // RESTORE the original state - we haven't actually measured anything yet!
+            // The prediction was just for checking the search boundary
+            ball.kalman.get_state() = saved_state;
+            pred_log << "  Kalman state restored" << std::endl;
+        } else {
+            pred_log << "  Kalman not initialized (z <= 0)" << std::endl;
         }
+        pred_log.close();
         
         // Find best matching detection (now enforces Kalman prediction boundary)
         const Detection* best_det = findBestColorMatch(yolo_detections, *profile,
@@ -1044,10 +1115,13 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                              closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
                     ball.tracking_reason = reason;
                     
-                    // Update Kalman with hand position
-                    ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                        closest_hand_pos.x, closest_hand_pos.y, closest_hand_pos.z));
-                    ball.color_predictor.addDetection(closest_hand_pos);
+                    // CRITICAL FIX: DO NOT update Kalman with hand snap positions!
+                    // Hand positions are not accurate ball positions and corrupt the Kalman state
+                    // This causes bad predictions when the ball is thrown
+                    // Only update Kalman with real YOLO or color detections
+                    
+                    // DO NOT add hand position to color predictor - it corrupts velocity!
+                    // ball.color_predictor.addDetection(closest_hand_pos);
                     ball.frames_without_yolo = 0;
                     continue;
                 }
@@ -1078,21 +1152,21 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 // If color tracking failed, fall through to Kalman-only prediction below
             }
             
-            if (ball.frames_without_yolo < 5) {
-                // Use Kalman prediction as the color tracker position
-                // NOTE: Kalman was already predicted at line 884, just use the state
+            // CRITICAL FIX: Use Kalman prediction but DON'T update with it
+            // Updating Kalman with its own predictions causes drift to compound
+            if (has_prediction && ball.frames_without_yolo < MAX_FRAMES_WITHOUT_YOLO) {
+                // Use Kalman prediction as the ball position for display
                 auto state = ball.kalman.get_state();
                 ball.position = cv::Point3f(state(0), state(1), state(2));
                 
-                // CRITICAL: Update Kalman filter with this position
-                // The Kalman filter learns from ALL color tracker positions, regardless of source
-                // This maintains trajectory continuity and allows prediction to continue moving
-                ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                    ball.position.x, ball.position.y, ball.position.z));
-                ball.color_predictor.addDetection(ball.position);
+                // DO NOT update Kalman with its own prediction - this causes drift!
+                // The Kalman filter should only be updated with real measurements
+                // The prediction uncertainty (P matrix) naturally grows over time
                 
-                // CRITICAL: Update yolo_class_id based on proximity to hands
-                // Don't let old class_id persist and cause wrong state detection
+                // Also don't add to color predictor - it needs real detections
+                // ball.color_predictor.addDetection(ball.position);
+                
+                // Update yolo_class_id based on proximity to hands
                 bool near_any_hand = false;
                 int nearest_hand_id = -1;
                 float nearest_dist = 999.0f;
@@ -1118,11 +1192,11 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     ball.tracking_reason = "Kalman pred";
                 }
             }
-            else if (ball.frames_without_yolo < MAX_FRAMES_WITHOUT_YOLO) {
-                // TRAJECTORY-BASED VALIDATION:
-                // Only allow hand association if ball's trajectory could reasonably reach that hand
+            else if (!has_prediction && ball.frames_without_yolo < MAX_FRAMES_WITHOUT_YOLO) {
+                // LEGACY FALLBACK: Only used when Kalman is not initialized
+                // This should rarely happen in normal operation
                 
-                // Get Kalman predicted position (already computed above in line 682)
+                // Use current Kalman state as fallback
                 auto predicted_state = ball.kalman.get_state();
                 cv::Point3f predicted_pos(predicted_state(0), predicted_state(1), predicted_state(2));
                 
@@ -1159,6 +1233,12 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                             snprintf(reason, sizeof(reason), "Traj→[%c] d=%.2fm",
                                      hand.id == 0 ? 'L' : 'R', closest_predicted_dist);
                             ball.tracking_reason = reason;
+                            
+                            // CRITICAL FIX: DO NOT update Kalman when snapping to hands
+                            // Hand positions corrupt the Kalman state and cause bad predictions
+                            
+                            // DO NOT add hand position to color predictor - it corrupts velocity!
+                            // ball.color_predictor.addDetection(ball.position);
                             break;
                         }
                     }
@@ -1169,6 +1249,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     ball.yolo_class_id = 0;  // Mark as in-air
                     ball.held_by_hand_id = -1;
                     ball.tracking_reason = "Traj→Flight";
+                    
+                    // CRITICAL: Update color predictor with flight prediction
+                    // This keeps the history active and velocity calculation accurate
+                    ball.color_predictor.addDetection(ball.position);
                 }
             }
         }
@@ -1500,3 +1584,5 @@ cv::Point2f SimpleBallTracker::project_3d_to_2d(const cv::Point3f& world_pos,
     }
     return cv::Point2f(-1, -1);
 }
+
+

@@ -555,10 +555,10 @@ if PYQT_AVAILABLE:
                 row=row,
                 label_text="Circle Radius (cm)",
                 tooltip_text="Radius of prediction circle showing search region.\n"
-                             "Range: 5-30cm. Default: 15cm.\n"
+                             "Range: 5-100cm. Default: 15cm.\n"
                              "Larger = wider search area.",
                 range_min=5,
-                range_max=30,
+                range_max=100,
                 initial_value=15,
                 update_func=lambda v: self.update_setting('prediction_radius_m', v / 100.0),  # Convert cm to m
                 is_float=False

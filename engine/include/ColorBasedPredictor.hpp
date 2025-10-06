@@ -94,6 +94,37 @@ public:
         return predicted;
     }
     
+    // Get current velocity estimate
+    cv::Point3f getVelocity() const {
+        if (history_.size() < 2) {
+            return cv::Point3f(0, 0, 0);
+        }
+        
+        // Calculate average velocity from recent detections
+        cv::Point3f velocity(0, 0, 0);
+        int velocity_samples = 0;
+        
+        for (size_t i = 1; i < history_.size(); ++i) {
+            const auto& prev = history_[i - 1];
+            const auto& curr = history_[i];
+            
+            float dt = std::chrono::duration_cast<std::chrono::duration<float>>(
+                curr.timestamp - prev.timestamp).count();
+            
+            if (dt > 0.001f) {  // Avoid division by very small numbers
+                cv::Point3f vel = (curr.position - prev.position) / dt;
+                velocity += vel;
+                velocity_samples++;
+            }
+        }
+        
+        if (velocity_samples == 0) {
+            return cv::Point3f(0, 0, 0);
+        }
+        
+        return velocity / static_cast<float>(velocity_samples);
+    }
+    
     // Get prediction radius in meters
     float getPredictionRadius() const {
         return settings_.prediction_radius_m;
@@ -110,6 +141,15 @@ public:
     
     // Get history size
     size_t getHistorySize() const { return history_.size(); }
+    
+    // Get the actual history for debugging
+    const std::deque<DetectionPoint>& getHistory() const { return history_; }
+    
+    // Get the most recent position
+    cv::Point3f getLastPosition() const {
+        if (history_.empty()) return cv::Point3f(0, 0, 0);
+        return history_.back().position;
+    }
 
 private:
     std::deque<DetectionPoint> history_;

@@ -263,6 +263,9 @@ private:
     // Timing
     std::chrono::steady_clock::time_point last_update_time_;
     
+    // Frame counter for debug logging
+    uint64_t frame_counter_ = 0;
+    
     // Model parameters
     int input_width_ = 640;
     int input_height_ = 640;

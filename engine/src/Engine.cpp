@@ -1084,7 +1084,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             }
             
             // Add color tracker info to panel (always, even if no tracker placed)
-            char info_text[256];
+            char info_text[512];
             if (ball.has_yolo_detection) {
                 std::string state = ball.is_held ? "HELD" : "FLIGHT";
                 std::string hand_info = "";
@@ -1095,13 +1095,22 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 snprintf(info_text, sizeof(info_text), "%s: %s%s z=%.2fm | %s",
                          ball.color_name.c_str(), state.c_str(), hand_info.c_str(),
                          ball.position.z, ball.tracking_reason.c_str());
+                info_lines.push_back(info_text);
+                info_colors.push_back(ball_color);
+                
+                // Add detailed ball position info
+                char pos_info[256];
+                snprintf(pos_info, sizeof(pos_info), "  Ball pos: (%.2f, %.2f, %.2f)",
+                         ball.position.x, ball.position.y, ball.position.z);
+                info_lines.push_back(pos_info);
+                info_colors.push_back(cv::Scalar(180, 180, 180));
             } else {
                 // No tracker placed - show why
                 snprintf(info_text, sizeof(info_text), "%s: NO TRACKER | %s",
                          ball.color_name.c_str(), ball.tracking_reason.c_str());
+                info_lines.push_back(info_text);
+                info_colors.push_back(ball_color);
             }
-            info_lines.push_back(info_text);
-            info_colors.push_back(ball_color);
             
             // Add detection evaluation details for this ball (ALWAYS, even if no tracker)
             if (!ball.detection_evaluations.empty()) {
@@ -1178,12 +1187,74 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             // Draw center point
             cv::circle(result, cv::Point(pred_x, pred_y), 4, circle_color, -1, cv::LINE_AA);
             
-            // Draw label with history size
-            std::string label = "P" + std::to_string(ball.id) + "(" + std::to_string(ball.color_predictor.getHistorySize()) + ")";
+            // Draw label with detailed prediction info
+            std::string label = "P" + std::to_string(ball.id) + "(" + std::string(ball.is_held ? "H" : "F") + ")";
             cv::putText(result, label, cv::Point(pred_x + 10, pred_y - 10),
                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
             cv::putText(result, label, cv::Point(pred_x + 10, pred_y - 10),
                        cv::FONT_HERSHEY_SIMPLEX, 0.5, circle_color, 1, cv::LINE_AA);
+            
+            // Add detailed prediction info to info panel
+            char pred_info[512];
+            snprintf(pred_info, sizeof(pred_info), "  Pred: pos=(%.2f,%.2f,%.2f) hist=%d grav=%s",
+                     pred_pos_3d.x, pred_pos_3d.y, pred_pos_3d.z,
+                     ball.color_predictor.getHistorySize(),
+                     ball.is_held ? "OFF" : "ON");
+            info_lines.push_back(pred_info);
+            info_colors.push_back(circle_color);
+            
+            // Add velocity info from color predictor
+            cv::Point3f velocity = ball.color_predictor.getVelocity();
+            char vel_info[256];
+            snprintf(vel_info, sizeof(vel_info), "  Velocity: (%.2f, %.2f, %.2f) m/s",
+                     velocity.x, velocity.y, velocity.z);
+            info_lines.push_back(vel_info);
+            info_colors.push_back(cv::Scalar(150, 150, 150));
+            
+            // Show distance between ball and prediction
+            if (ball.has_yolo_detection) {
+                float dx = ball.position.x - pred_pos_3d.x;
+                float dy = ball.position.y - pred_pos_3d.y;
+                float dz = ball.position.z - pred_pos_3d.z;
+                float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+                char dist_info[256];
+                snprintf(dist_info, sizeof(dist_info), "  Ball-Pred dist: %.3fm (dx=%.2f dy=%.2f dz=%.2f)",
+                         dist, dx, dy, dz);
+                info_lines.push_back(dist_info);
+                info_colors.push_back(cv::Scalar(150, 150, 150));
+            }
+            
+            // Show ball state info
+            char state_info[256];
+            snprintf(state_info, sizeof(state_info), "  is_held=%s yolo_class=%d held_by_hand=%d",
+                     ball.is_held ? "TRUE" : "FALSE", ball.yolo_class_id, ball.held_by_hand_id);
+            info_lines.push_back(state_info);
+            info_colors.push_back(cv::Scalar(200, 200, 100));
+            
+            // Show wrist distance
+            char wrist_info[256];
+            snprintf(wrist_info, sizeof(wrist_info), "  dist_to_wrist=%.3fm frames_no_yolo=%d",
+                     ball.distance_to_nearest_wrist, ball.frames_without_yolo);
+            info_lines.push_back(wrist_info);
+            info_colors.push_back(cv::Scalar(200, 200, 100));
+            
+            // Show the actual history positions for debugging
+            const auto& history = ball.color_predictor.getHistory();
+            if (!history.empty()) {
+                char hist_info[512];
+                if (history.size() >= 2) {
+                    const auto& last = history.back().position;
+                    const auto& prev = history[history.size()-2].position;
+                    snprintf(hist_info, sizeof(hist_info), "  History: last=(%.2f,%.2f,%.2f) prev=(%.2f,%.2f,%.2f)",
+                             last.x, last.y, last.z, prev.x, prev.y, prev.z);
+                } else {
+                    const auto& last = history.back().position;
+                    snprintf(hist_info, sizeof(hist_info), "  History: last=(%.2f,%.2f,%.2f) only",
+                             last.x, last.y, last.z);
+                }
+                info_lines.push_back(hist_info);
+                info_colors.push_back(cv::Scalar(180, 180, 180));
+            }
         }
     }
     

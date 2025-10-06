@@ -1143,40 +1143,86 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         }
     }
     
-    // Draw info panel in upper right corner
+    // Draw info panel in upper left corner with text wrapping
     if (!info_lines.empty()) {
-        int panel_x = result.cols - 550;  // Right side with margin
-        int panel_y = 30;  // Top margin
-        int line_height = 25;
-        int panel_width = 540;
-        int panel_height = (info_lines.size() + 1) * line_height + 10;
+        int panel_x = 10;  // Left side with small margin
+        int panel_y = 10;  // Top margin
+        int line_height = 22;
+        int max_width = result.cols - 20;  // Maximum width (full image width minus margins)
+        float font_scale = 0.45f;
+        int font_thickness = 1;
+        int font_face = cv::FONT_HERSHEY_SIMPLEX;
+        
+        // Process each info line and wrap if needed
+        std::vector<std::string> wrapped_lines;
+        std::vector<cv::Scalar> wrapped_colors;
+        
+        for (size_t i = 0; i < info_lines.size(); i++) {
+            std::string line = info_lines[i];
+            cv::Scalar color = info_colors[i];
+            
+            // Measure text width
+            int baseline = 0;
+            cv::Size text_size = cv::getTextSize(line, font_face, font_scale, font_thickness, &baseline);
+            
+            if (text_size.width <= max_width) {
+                // Line fits, add as-is
+                wrapped_lines.push_back(line);
+                wrapped_colors.push_back(color);
+            } else {
+                // Line is too long, need to wrap
+                std::string current_line;
+                std::istringstream words(line);
+                std::string word;
+                
+                while (words >> word) {
+                    std::string test_line = current_line.empty() ? word : current_line + " " + word;
+                    cv::Size test_size = cv::getTextSize(test_line, font_face, font_scale, font_thickness, &baseline);
+                    
+                    if (test_size.width <= max_width) {
+                        current_line = test_line;
+                    } else {
+                        // Current line is full, save it and start new line
+                        if (!current_line.empty()) {
+                            wrapped_lines.push_back(current_line);
+                            wrapped_colors.push_back(color);
+                        }
+                        current_line = word;
+                    }
+                }
+                
+                // Add remaining text
+                if (!current_line.empty()) {
+                    wrapped_lines.push_back(current_line);
+                    wrapped_colors.push_back(color);
+                }
+            }
+        }
+        
+        // Calculate panel dimensions based on wrapped lines
+        int panel_height = wrapped_lines.size() * line_height + 10;
         
         // Draw semi-transparent background
         cv::Mat overlay = result.clone();
-        cv::rectangle(overlay, 
-                     cv::Point(panel_x - 10, panel_y - 25),
-                     cv::Point(panel_x + panel_width, panel_y + panel_height),
+        cv::rectangle(overlay,
+                     cv::Point(panel_x - 5, panel_y - 5),
+                     cv::Point(max_width + 10, panel_y + panel_height),
                      cv::Scalar(0, 0, 0), -1);
         cv::addWeighted(overlay, 0.7, result, 0.3, 0, result);
         
-        // Draw title
-        cv::putText(result, "TRACKING INFO", 
-                   cv::Point(panel_x, panel_y),
-                   cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
-        
-        // Draw each info line
-        for (size_t i = 0; i < info_lines.size(); i++) {
-            int y = panel_y + (i + 1) * line_height;
+        // Draw each wrapped line
+        for (size_t i = 0; i < wrapped_lines.size(); i++) {
+            int y = panel_y + (i + 1) * line_height - 5;
             
             // Draw black outline for readability
-            cv::putText(result, info_lines[i], 
+            cv::putText(result, wrapped_lines[i],
                        cv::Point(panel_x, y),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+                       font_face, font_scale, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
             
             // Draw colored text
-            cv::putText(result, info_lines[i], 
+            cv::putText(result, wrapped_lines[i],
                        cv::Point(panel_x, y),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.5, info_colors[i], 1, cv::LINE_AA);
+                       font_face, font_scale, wrapped_colors[i], font_thickness, cv::LINE_AA);
         }
     }
     }

@@ -261,6 +261,27 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             std::cout << "[SimpleBallTracker] Updated prediction_time_s to " << value << "s" << std::endl;
             return true;
         }
+        // Color tracker matching weights
+        else if (key == "yolo_confidence_weight") {
+            tracking_settings_.yolo_confidence_weight = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated yolo_confidence_weight to " << value << std::endl;
+            return true;
+        }
+        else if (key == "yolo_class_weight") {
+            tracking_settings_.yolo_class_weight = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated yolo_class_weight to " << value << std::endl;
+            return true;
+        }
+        else if (key == "color_match_weight") {
+            tracking_settings_.color_match_weight = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated color_match_weight to " << value << std::endl;
+            return true;
+        }
+        else if (key == "kalman_proximity_weight") {
+            tracking_settings_.kalman_proximity_weight = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated kalman_proximity_weight to " << value << std::endl;
+            return true;
+        }
     } catch (const std::exception& e) {
         std::cerr << "[SimpleBallTracker] Error parsing setting " << key << "=" << value << ": " << e.what() << std::endl;
         return false;
@@ -319,10 +340,20 @@ const Detection* SimpleBallTracker::findBestColorMatch(
     const std::vector<Detection>& detections,
     const ColorProfile& profile,
     const cv::Mat& hsv_frame,
-    const std::set<int>& used_indices) {
+    const std::set<int>& used_indices,
+    const cv::Point3f& kalman_prediction) {
     
     const Detection* best_det = nullptr;
     float best_combined_score = 0.0f;
+    
+    // Store best scoring components for visualization
+    float best_class_score = 0.0f;
+    float best_confidence_score = 0.0f;
+    float best_color_score = 0.0f;
+    float best_kalman_score = 0.0f;
+    
+    // Check if Kalman prediction is valid (non-zero)
+    bool has_kalman_prediction = (kalman_prediction.z > 0.01f);
     
     for (const auto& det : detections) {
         // Skip if already used
@@ -342,18 +373,52 @@ const Detection* SimpleBallTracker::findBestColorMatch(
             continue;
         }
         
-        // PRIORITY SCORING:
-        // 1. YOLO class 'ball' (class_id=0) gets 3x weight - prioritize free-flight balls
-        // 2. YOLO confidence gets 2x weight - trust high-confidence detections
-        // 3. Color match gets 1x weight - ensure it's the right color
-        float class_weight = (det.class_id == 0) ? 3.0f : 1.0f;  // Prefer 'ball' over 'ball_held'
-        float combined_score = (class_weight * det.confidence * 2.0f) + color_score;
+        // CONFIGURABLE PRIORITY SCORING:
+        // Uses weights from tracking_settings_ to balance different factors
+        
+        // 1. YOLO class score (ball vs ball_held)
+        float class_score = (det.class_id == 0) ? tracking_settings_.yolo_class_weight : 1.0f;
+        
+        // 2. YOLO confidence score
+        float confidence_score = det.confidence * tracking_settings_.yolo_confidence_weight;
+        
+        // 3. Color match score
+        float weighted_color_score = color_score * tracking_settings_.color_match_weight;
+        
+        // 4. Kalman prediction proximity score (if enabled and available)
+        float kalman_score = 0.0f;
+        if (has_kalman_prediction && tracking_settings_.kalman_proximity_weight > 0.0f) {
+            // Calculate 3D distance from detection to Kalman prediction
+            float dist_3d = cv::norm(det.world_pos - kalman_prediction);
+            
+            // Convert distance to score: closer = higher score
+            // Use exponential decay: score = weight * exp(-dist / radius)
+            // This gives full weight at 0 distance, half weight at ~0.7*radius
+            float radius = tracking_settings_.prediction_radius_m;
+            kalman_score = tracking_settings_.kalman_proximity_weight * std::exp(-dist_3d / radius);
+        }
+        
+        // Combine all scores
+        float combined_score = class_score + confidence_score + weighted_color_score + kalman_score;
         
         if (combined_score > best_combined_score) {
             best_combined_score = combined_score;
             best_det = &det;
+            
+            // Store scoring components for this detection (will be saved to ball if this is the best match)
+            best_class_score = class_score;
+            best_confidence_score = confidence_score;
+            best_color_score = weighted_color_score;
+            best_kalman_score = kalman_score;
         }
     }
+    
+    // Store the scoring components in a temporary location (will be retrieved by caller)
+    last_match_class_score_ = best_class_score;
+    last_match_confidence_score_ = best_confidence_score;
+    last_match_color_score_ = best_color_score;
+    last_match_kalman_score_ = best_kalman_score;
+    last_match_total_score_ = best_combined_score;
     
     return best_det;
 }
@@ -703,9 +768,18 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         
         if (!profile) continue;
         
-        // Find best matching detection
-        const Detection* best_det = findBestColorMatch(yolo_detections, *profile, 
-                                                       hsv_frame, used_detections);
+        // Get Kalman prediction for this ball (if available)
+        cv::Point3f kalman_pred(0, 0, 0);
+        if (ball.frames_without_yolo == 0 && ball.has_yolo_detection) {
+            // Ball was detected last frame, use Kalman prediction
+            ball.kalman.predict(dt);
+            auto state = ball.kalman.get_state();
+            kalman_pred = cv::Point3f(state(0), state(1), state(2));
+        }
+        
+        // Find best matching detection (now considers Kalman prediction proximity)
+        const Detection* best_det = findBestColorMatch(yolo_detections, *profile,
+                                                       hsv_frame, used_detections, kalman_pred);
         
         if (best_det) {
             // Update from YOLO detection
@@ -719,10 +793,18 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             ball.yolo_class_id = best_det->class_id;
             ball.color_match_score = matchColor(*best_det, *profile, hsv_frame);
             
-            // Set tracking reason for debug visualization
-            char reason[128];
-            snprintf(reason, sizeof(reason), "YOLO: cls=%d conf=%.2f col=%.2f",
-                     best_det->class_id, best_det->confidence, ball.color_match_score);
+            // Store scoring components for visualization
+            ball.score_class = last_match_class_score_;
+            ball.score_confidence = last_match_confidence_score_;
+            ball.score_color = last_match_color_score_;
+            ball.score_kalman = last_match_kalman_score_;
+            ball.score_total = last_match_total_score_;
+            
+            // Set tracking reason for debug visualization with full equation
+            char reason[256];
+            snprintf(reason, sizeof(reason), "Score=%.2f (cls:%.2f + conf:%.2f + col:%.2f + kal:%.2f)",
+                     ball.score_total, ball.score_class, ball.score_confidence,
+                     ball.score_color, ball.score_kalman);
             ball.tracking_reason = reason;
             
             // Update Kalman filter (legacy)

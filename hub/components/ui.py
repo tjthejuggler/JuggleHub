@@ -1029,45 +1029,75 @@ if PYQT_AVAILABLE:
             painter = QPainter(pixmap)
             
             # --- Draw Kalman Predictions (Step 2) ---
+            # NEW: Matches the saved visualization style from Engine.cpp
             if self.show_kalman_predictions_toggle.isChecked():
-                painter.setPen(QPen(QColor(0, 0, 255, 150), 3))  # Blue
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                
                 # Debug logging
                 if len(frame_data.kalman_predictions) > 0:
                     self.log_message(f"[KALMAN VIZ] Rendering {len(frame_data.kalman_predictions)} Kalman predictions")
                 
-                # Get camera intrinsics from the first ball (if available)
-                if frame_data.balls:
-                    # We need intrinsics to project 3D to 2D
-                    # For now, use a simple projection assuming we have the data
-                    pass
+                # Get camera intrinsics
+                fx = 385.0  # Approximate D455 intrinsics
+                fy = 385.0
+                ppx = 320.0
+                ppy = 240.0
                 
                 for i, pred in enumerate(frame_data.kalman_predictions):
                     # Project 3D predicted position to 2D
-                    if pred.predicted_pos.z > 0:
-                        # Simple projection (you may need to get actual intrinsics)
-                        # For now, we'll use approximate values or get from first ball
-                        # Assuming standard D455 intrinsics at 640x480
-                        fx = 385.0  # Approximate
-                        fy = 385.0
-                        ppx = 320.0
-                        ppy = 240.0
-                        
-                        x_2d = int((pred.predicted_pos.x * fx) / pred.predicted_pos.z + ppx)
-                        y_2d = int((pred.predicted_pos.y * fy) / pred.predicted_pos.z + ppy)
-                        
-                        if i == 0:  # Log first prediction for debugging
-                            self.log_message(f"[KALMAN VIZ]   Pred {i}: 3D({pred.predicted_pos.x:.3f}, {pred.predicted_pos.y:.3f}, {pred.predicted_pos.z:.3f}) -> 2D({x_2d}, {y_2d})")
-                        
-                        radius = 8
-                        painter.drawEllipse(x_2d - radius, y_2d - radius, radius * 2, radius * 2)
-                        
-                        # Draw label
-                        painter.setPen(QPen(QColor(255, 255, 255)))
-                        painter.setFont(QFont("Arial", 8))
-                        painter.drawText(x_2d + 10, y_2d, f"KF-{pred.logical_id}")
-                        painter.setPen(QPen(QColor(0, 0, 255, 150), 3))
+                    if pred.predicted_pos.z <= 0:
+                        continue
+                    
+                    pred_x = int((pred.predicted_pos.x * fx) / pred.predicted_pos.z + ppx)
+                    pred_y = int((pred.predicted_pos.y * fy) / pred.predicted_pos.z + ppy)
+                    
+                    if i == 0:  # Log first prediction for debugging
+                        self.log_message(f"[KALMAN VIZ]   Pred {i}: 3D({pred.predicted_pos.x:.3f}, {pred.predicted_pos.y:.3f}, {pred.predicted_pos.z:.3f}) -> 2D({pred_x}, {pred_y})")
+                    
+                    # Get prediction radius - use a default if not available
+                    # The radius represents the search region uncertainty in meters
+                    uncertainty_meters = 0.15  # Default 15cm radius
+                    
+                    # Project uncertainty to pixel space
+                    uncertainty_pixels = (uncertainty_meters * fx) / pred.predicted_pos.z
+                    radius = int(uncertainty_pixels)
+                    
+                    # Clamp radius to reasonable bounds
+                    radius = max(20, min(radius, 150))
+                    
+                    # Choose color based on ball state (in freefall vs held)
+                    if pred.is_in_freefall:
+                        circle_color = QColor(255, 255, 100)  # Cyan-ish for in-flight balls (with gravity)
+                    else:
+                        circle_color = QColor(100, 100, 255)  # Red-ish for held balls (no gravity)
+                    
+                    # Draw semi-transparent circle showing prediction search region
+                    # Create a temporary pixmap for the overlay effect
+                    overlay = pixmap.copy()
+                    overlay_painter = QPainter(overlay)
+                    overlay_painter.setPen(QPen(circle_color, 2, Qt.PenStyle.SolidLine))
+                    overlay_painter.setBrush(Qt.BrushStyle.NoBrush)
+                    overlay_painter.drawEllipse(pred_x - radius, pred_y - radius, radius * 2, radius * 2)
+                    overlay_painter.end()
+                    
+                    # Blend the overlay with the main pixmap (50% transparency)
+                    painter.setOpacity(0.5)
+                    painter.drawPixmap(0, 0, overlay)
+                    painter.setOpacity(1.0)
+                    
+                    # Draw center point
+                    painter.setPen(QPen(circle_color, 1))
+                    painter.setBrush(QBrush(circle_color))
+                    painter.drawEllipse(pred_x - 4, pred_y - 4, 8, 8)
+                    
+                    # Draw label with history size (if available)
+                    # For now, just show the logical ID
+                    label = f"P{pred.logical_id}"
+                    
+                    # Draw label with black outline for visibility
+                    painter.setFont(QFont("Arial", 10))
+                    painter.setPen(QPen(QColor(0, 0, 0), 3))
+                    painter.drawText(pred_x + 10, pred_y - 10, label)
+                    painter.setPen(QPen(circle_color))
+                    painter.drawText(pred_x + 10, pred_y - 10, label)
             
             # --- Draw YOLO Detections (Step 3) ---
             if self.show_raw_detections_toggle.isChecked():

@@ -84,6 +84,13 @@ struct SimpleBall {
     // Debug info for visualization
     std::string tracking_reason;     // Why this position was chosen (for debugging)
     
+    // Scoring components for color tracker (for visualization)
+    float score_class = 0.0f;        // YOLO class score component
+    float score_confidence = 0.0f;   // YOLO confidence score component
+    float score_color = 0.0f;        // Color match score component
+    float score_kalman = 0.0f;       // Kalman proximity score component
+    float score_total = 0.0f;        // Total combined score
+    
     SimpleBall() : id(-1), is_held(false), previous_is_held(false),
                    held_by_hand_id(-1), state_change_counter(0),
                    distance_to_nearest_wrist(-1.0f),
@@ -119,6 +126,12 @@ struct TrackingSettings {
     int prediction_history_frames = 5;     // Number of frames to use for prediction
     float prediction_radius_m = 0.15f;     // Radius of prediction circle in meters (15cm)
     float prediction_time_s = 0.05f;       // How far ahead to predict (50ms - ~1-2 frames)
+    
+    // Color tracker matching weights (for choosing which YOLO detection to assign to each ball)
+    float yolo_confidence_weight = 2.0f;   // Weight for YOLO detection confidence
+    float yolo_class_weight = 3.0f;        // Weight for YOLO class (ball vs ball_held)
+    float color_match_weight = 1.0f;       // Weight for color matching score
+    float kalman_proximity_weight = 0.0f;  // Weight for proximity to Kalman prediction (0=disabled)
     
     TrackingSettings() = default;
 };
@@ -174,10 +187,11 @@ private:
     
     // Color matching
     float matchColor(const Detection& det, const ColorProfile& profile, const cv::Mat& hsv_frame);
-    const Detection* findBestColorMatch(const std::vector<Detection>& detections, 
-                                       const ColorProfile& profile, 
+    const Detection* findBestColorMatch(const std::vector<Detection>& detections,
+                                       const ColorProfile& profile,
                                        const cv::Mat& hsv_frame,
-                                       const std::set<int>& used_indices);
+                                       const std::set<int>& used_indices,
+                                       const cv::Point3f& kalman_prediction = cv::Point3f(0, 0, 0));
     
     // State detection
     bool isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands);
@@ -211,6 +225,13 @@ private:
     std::string settings_file_;
     cv::Mat last_color_frame_;  // For calibration
     TrackingSettings tracking_settings_;  // Tracking configuration
+    
+    // Last match scoring components (for visualization)
+    float last_match_class_score_ = 0.0f;
+    float last_match_confidence_score_ = 0.0f;
+    float last_match_color_score_ = 0.0f;
+    float last_match_kalman_score_ = 0.0f;
+    float last_match_total_score_ = 0.0f;
     
     // Timing
     std::chrono::steady_clock::time_point last_update_time_;

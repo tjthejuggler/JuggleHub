@@ -119,6 +119,9 @@ if PYQT_AVAILABLE:
             self.kalman_prediction_section = self.create_kalman_prediction_section()
             container_layout.addWidget(self.kalman_prediction_section)
             
+            self.color_tracker_weights_section = self.create_color_tracker_weights_section()
+            container_layout.addWidget(self.color_tracker_weights_section)
+            
             self.adaptive_color_section = self.create_adaptive_color_section()
             container_layout.addWidget(self.adaptive_color_section)
             
@@ -576,6 +579,98 @@ if PYQT_AVAILABLE:
                 update_func=lambda v: self.update_setting('prediction_time_s', v / 1000.0),  # Convert ms to s
                 is_float=False
             )
+        def create_color_tracker_weights_section(self):
+            """Create the Color Tracker Weights section"""
+            section = CollapsibleGroupBox("🎯 Color Tracker Weights", collapsed=False)
+            layout = QGridLayout()
+            section.get_content_layout().addLayout(layout)
+            
+            row = 0
+            
+            # Info label
+            info_label = QLabel("ℹ️ Control how the color tracker chooses which YOLO detection to assign to each ball")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label, row, 0, 1, 3)
+            row += 1
+            
+            # YOLO Confidence Weight
+            self.ct_yolo_confidence_weight_slider, self.ct_yolo_confidence_weight_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="YOLO Confidence Weight",
+                tooltip_text="Weight for YOLO detection confidence score.\n"
+                             "Range: 0.0-5.0. Default: 2.0.\n"
+                             "Higher = prefer high-confidence detections.",
+                range_min=0,
+                range_max=50,
+                initial_value=20,
+                update_func=lambda v: self.update_setting('yolo_confidence_weight', v / 10.0),
+                is_float=True
+            )
+            row += 1
+            
+            # YOLO Class Weight
+            self.ct_yolo_class_weight_slider, self.ct_yolo_class_weight_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="YOLO Class Weight",
+                tooltip_text="Weight for YOLO class (ball vs ball_held).\n"
+                             "Range: 0.0-5.0. Default: 3.0.\n"
+                             "Higher = strongly prefer 'ball' over 'ball_held'.",
+                range_min=0,
+                range_max=50,
+                initial_value=30,
+                update_func=lambda v: self.update_setting('yolo_class_weight', v / 10.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Color Match Weight
+            self.ct_color_match_weight_slider, self.ct_color_match_weight_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Color Match Weight",
+                tooltip_text="Weight for color matching score.\n"
+                             "Range: 0.0-5.0. Default: 1.0.\n"
+                             "Higher = require better color match.",
+                range_min=0,
+                range_max=50,
+                initial_value=10,
+                update_func=lambda v: self.update_setting('color_match_weight', v / 10.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Kalman Proximity Weight
+            self.ct_kalman_proximity_weight_slider, self.ct_kalman_proximity_weight_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Kalman Proximity Weight",
+                tooltip_text="Weight for proximity to Kalman prediction.\n"
+                             "Range: 0.0-5.0. Default: 0.0 (disabled).\n"
+                             "Higher = strongly prefer detections near prediction.\n"
+                             "⚠️ Set to 2.0-4.0 to fix the issue shown in your images!",
+                range_min=0,
+                range_max=50,
+                initial_value=0,
+                update_func=lambda v: self.update_setting('kalman_proximity_weight', v / 10.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Add explanation
+            explanation_label = QLabel(
+                "💡 <b>How it works:</b><br>"
+                "Each YOLO detection gets a score = (class_weight × confidence_weight × confidence) + "
+                "(color_match_weight × color_score) + (kalman_proximity_weight × proximity_score)<br><br>"
+                "The detection with the highest score is assigned to the ball.<br><br>"
+                "<b>To fix your issue:</b> Increase Kalman Proximity Weight to 2.0-4.0 so the tracker "
+                "prefers the detection closer to the prediction circle, even if it has lower confidence."
+            )
+            explanation_label.setStyleSheet("color: #aaaaaa; font-size: 10px; padding: 10px; background-color: #1e1e1e; border-radius: 5px;")
+            explanation_label.setWordWrap(True)
+            layout.addWidget(explanation_label, row, 0, 1, 3)
             row += 1
             
             return section
@@ -1208,6 +1303,16 @@ if PYQT_AVAILABLE:
             if not self._loading_settings:
                 self.save_settings()
 
+        def _safe_get_slider_value(self, slider, default_value):
+            """Safely get slider value, handling deleted Qt objects."""
+            try:
+                if slider is not None:
+                    return slider.value()
+            except RuntimeError:
+                # Qt object has been deleted
+                pass
+            return default_value
+        
         def get_current_settings(self) -> dict:
             """Get current calibration settings as a dictionary."""
             # Check if ALL UI elements exist before accessing them
@@ -1256,23 +1361,30 @@ if PYQT_AVAILABLE:
                 'collapsed_bytetrack': self.bytetrack_section.is_collapsed,
                 'collapsed_pose': self.pose_section.is_collapsed,
                 'collapsed_throw_catch': self.throw_catch_section.is_collapsed,
-                'collapsed_kalman_prediction': self.kalman_prediction_section.is_collapsed if hasattr(self, 'kalman_prediction_section') else False,
+                'collapsed_kalman_prediction': self.kalman_prediction_section.is_collapsed if hasattr(self, 'kalman_prediction_section') and self.kalman_prediction_section else False,
+                'collapsed_color_tracker_weights': self.color_tracker_weights_section.is_collapsed if hasattr(self, 'color_tracker_weights_section') and self.color_tracker_weights_section else False,
                 'collapsed_adaptive_color': self.adaptive_color_section.is_collapsed if hasattr(self, 'adaptive_color_section') else False,
                 'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False,
                 
                 # Kalman Prediction settings
-                'prediction_history_frames': self.kp_prediction_history_slider.value() if hasattr(self, 'kp_prediction_history_slider') else 5,
-                'prediction_radius_m': self.kp_prediction_radius_slider.value() / 100.0 if hasattr(self, 'kp_prediction_radius_slider') else 0.15,
-                'prediction_time_s': self.kp_prediction_time_slider.value() / 1000.0 if hasattr(self, 'kp_prediction_time_slider') else 0.05,
+                'prediction_history_frames': self._safe_get_slider_value(self.kp_prediction_history_slider, 5) if hasattr(self, 'kp_prediction_history_slider') else 5,
+                'prediction_radius_m': self._safe_get_slider_value(self.kp_prediction_radius_slider, 15) / 100.0 if hasattr(self, 'kp_prediction_radius_slider') else 0.15,
+                'prediction_time_s': self._safe_get_slider_value(self.kp_prediction_time_slider, 50) / 1000.0 if hasattr(self, 'kp_prediction_time_slider') else 0.05,
+                
+                # Color Tracker Weights
+                'yolo_confidence_weight': self._safe_get_slider_value(self.ct_yolo_confidence_weight_slider, 20) / 10.0 if hasattr(self, 'ct_yolo_confidence_weight_slider') else 2.0,
+                'yolo_class_weight': self._safe_get_slider_value(self.ct_yolo_class_weight_slider, 30) / 10.0 if hasattr(self, 'ct_yolo_class_weight_slider') else 3.0,
+                'color_match_weight': self._safe_get_slider_value(self.ct_color_match_weight_slider, 10) / 10.0 if hasattr(self, 'ct_color_match_weight_slider') else 1.0,
+                'kalman_proximity_weight': self._safe_get_slider_value(self.ct_kalman_proximity_weight_slider, 0) / 10.0 if hasattr(self, 'ct_kalman_proximity_weight_slider') else 0.0,
                 
                 # Adaptive color settings
                 'adaptive_enabled': self.adaptive_enabled_toggle.isChecked() if hasattr(self, 'adaptive_enabled_toggle') else True,
-                'adaptive_success_threshold': self.adaptive_success_thresh_slider.value() / 100.0 if hasattr(self, 'adaptive_success_thresh_slider') else 0.7,
-                'adaptive_failure_threshold': self.adaptive_failure_thresh_slider.value() / 100.0 if hasattr(self, 'adaptive_failure_thresh_slider') else 0.3,
-                'adaptive_expansion_step': self.adaptive_expansion_slider.value() if hasattr(self, 'adaptive_expansion_slider') else 2,
-                'adaptive_contraction_step': self.adaptive_contraction_slider.value() / 10.0 if hasattr(self, 'adaptive_contraction_slider') else 1.0,
-                'adaptive_history_window': self.adaptive_history_slider.value() if hasattr(self, 'adaptive_history_slider') else 60,
-                'adaptive_min_confidence': self.adaptive_min_confidence_slider.value() / 100.0 if hasattr(self, 'adaptive_min_confidence_slider') else 0.1
+                'adaptive_success_threshold': self._safe_get_slider_value(self.adaptive_success_thresh_slider, 70) / 100.0 if hasattr(self, 'adaptive_success_thresh_slider') else 0.7,
+                'adaptive_failure_threshold': self._safe_get_slider_value(self.adaptive_failure_thresh_slider, 30) / 100.0 if hasattr(self, 'adaptive_failure_thresh_slider') else 0.3,
+                'adaptive_expansion_step': self._safe_get_slider_value(self.adaptive_expansion_slider, 2) if hasattr(self, 'adaptive_expansion_slider') else 2,
+                'adaptive_contraction_step': self._safe_get_slider_value(self.adaptive_contraction_slider, 10) / 10.0 if hasattr(self, 'adaptive_contraction_slider') else 1.0,
+                'adaptive_history_window': self._safe_get_slider_value(self.adaptive_history_slider, 60) if hasattr(self, 'adaptive_history_slider') else 60,
+                'adaptive_min_confidence': self._safe_get_slider_value(self.adaptive_min_confidence_slider, 10) / 100.0 if hasattr(self, 'adaptive_min_confidence_slider') else 0.1
             }
             
             # Add ball profile settings
@@ -1395,6 +1507,23 @@ if PYQT_AVAILABLE:
             
             if 'prediction_time_s' in settings and hasattr(self, 'kp_prediction_time_slider'):
                 self.kp_prediction_time_slider.setValue(int(settings['prediction_time_s'] * 1000))  # s to ms
+            
+            if 'collapsed_color_tracker_weights' in settings and hasattr(self, 'color_tracker_weights_section'):
+                if settings['collapsed_color_tracker_weights'] != self.color_tracker_weights_section.is_collapsed:
+                    self.color_tracker_weights_section.toggle_collapsed()
+            
+            # Color Tracker Weights settings
+            if 'yolo_confidence_weight' in settings and hasattr(self, 'ct_yolo_confidence_weight_slider'):
+                self.ct_yolo_confidence_weight_slider.setValue(int(settings['yolo_confidence_weight'] * 10))
+            
+            if 'yolo_class_weight' in settings and hasattr(self, 'ct_yolo_class_weight_slider'):
+                self.ct_yolo_class_weight_slider.setValue(int(settings['yolo_class_weight'] * 10))
+            
+            if 'color_match_weight' in settings and hasattr(self, 'ct_color_match_weight_slider'):
+                self.ct_color_match_weight_slider.setValue(int(settings['color_match_weight'] * 10))
+            
+            if 'kalman_proximity_weight' in settings and hasattr(self, 'ct_kalman_proximity_weight_slider'):
+                self.ct_kalman_proximity_weight_slider.setValue(int(settings['kalman_proximity_weight'] * 10))
             
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:

@@ -14,7 +14,6 @@ public:
     struct PredictionSettings {
         int history_frames = 5;           // Number of frames to use for prediction
         float prediction_radius_m = 0.15f; // Radius of prediction circle in meters (15cm default)
-        float prediction_time_s = 0.05f;   // How far ahead to predict (50ms default - ~1-2 frames)
         float gravity = 9.81f;             // Gravity constant (m/s²)
         
         PredictionSettings() = default;
@@ -47,8 +46,10 @@ public:
     }
     
     // Get predicted position based on recent detections
+    // dt: time delta to predict ahead (typically frame delta time)
+    // is_in_air: whether to apply gravity to the prediction
     // Returns: predicted position, or (0,0,0) if insufficient data
-    cv::Point3f getPredictedPosition(bool is_in_air) const {
+    cv::Point3f getPredictedPosition(float dt, bool is_in_air) const {
         if (history_.size() < 2) {
             // Need at least 2 points to calculate velocity
             return cv::Point3f(0, 0, 0);
@@ -81,14 +82,13 @@ public:
         // Get most recent position
         cv::Point3f current_pos = history_.back().position;
         
-        // Predict forward in time
-        float pred_time = settings_.prediction_time_s;
-        cv::Point3f predicted = current_pos + velocity * pred_time;
+        // Predict forward in time using provided dt
+        cv::Point3f predicted = current_pos + velocity * dt;
         
         // Apply gravity if in air
         if (is_in_air) {
             // y += 0.5 * g * t²
-            predicted.y += 0.5f * settings_.gravity * pred_time * pred_time;
+            predicted.y += 0.5f * settings_.gravity * dt * dt;
         }
         
         return predicted;

@@ -270,7 +270,9 @@ void Engine::run() {
                 
                 // Get predicted position from color-based predictor
                 // This uses recent color detections and applies gravity for in-air balls
-                cv::Point3f pred_pos_3d = ball.color_predictor.getPredictedPosition(!ball.is_held);
+                // Use 1/60s as default prediction time (assumes 60 FPS)
+                float prediction_dt = 1.0f / 60.0f;
+                cv::Point3f pred_pos_3d = ball.color_predictor.getPredictedPosition(prediction_dt, !ball.is_held);
                 
                 // Skip if prediction failed (returns 0,0,0)
                 if (pred_pos_3d.z <= 0) {
@@ -1137,7 +1139,9 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             }
             
             // Get predicted position from color-based predictor
-            cv::Point3f pred_pos_3d = ball.color_predictor.getPredictedPosition(!ball.is_held);
+            // Use 1/60s as default prediction time (assumes 60 FPS)
+            float prediction_dt = 1.0f / 60.0f;
+            cv::Point3f pred_pos_3d = ball.color_predictor.getPredictedPosition(prediction_dt, !ball.is_held);
             
             // Skip if prediction failed
             if (pred_pos_3d.z <= 0) {

@@ -79,7 +79,6 @@ SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
             ColorBasedPredictor::PredictionSettings pred_settings;
             pred_settings.history_frames = tracking_settings_.prediction_history_frames;
             pred_settings.prediction_radius_m = tracking_settings_.prediction_radius_m;
-            pred_settings.prediction_time_s = tracking_settings_.prediction_time_s;
             ball.color_predictor.setSettings(pred_settings);
             
             balls_.push_back(ball);
@@ -248,17 +247,6 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
                 ball.color_predictor.setSettings(settings);
             }
             std::cout << "[SimpleBallTracker] Updated prediction_radius_m to " << value << "m" << std::endl;
-            return true;
-        }
-        else if (key == "prediction_time_s") {
-            tracking_settings_.prediction_time_s = std::stof(value);
-            // Update all ball predictors
-            for (auto& ball : balls_) {
-                auto settings = ball.color_predictor.getSettings();
-                settings.prediction_time_s = tracking_settings_.prediction_time_s;
-                ball.color_predictor.setSettings(settings);
-            }
-            std::cout << "[SimpleBallTracker] Updated prediction_time_s to " << value << "s" << std::endl;
             return true;
         }
         // Color tracker matching weights

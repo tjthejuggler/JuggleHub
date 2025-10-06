@@ -141,7 +141,6 @@ struct TrackingSettings {
     // Color-based prediction settings
     int prediction_history_frames = 5;     // Number of frames to use for prediction
     float prediction_radius_m = 0.15f;     // Radius of prediction circle in meters (15cm)
-    float prediction_time_s = 0.05f;       // How far ahead to predict (50ms - ~1-2 frames)
     
     // Color tracker matching weights (for choosing which YOLO detection to assign to each ball)
     float yolo_confidence_weight = 2.0f;   // Weight for YOLO detection confidence

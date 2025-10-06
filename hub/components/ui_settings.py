@@ -565,22 +565,6 @@ if PYQT_AVAILABLE:
             )
             row += 1
             
-            # Prediction time ahead
-            self.kp_prediction_time_slider, self.kp_prediction_time_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Prediction Time (ms)",
-                tooltip_text="How far ahead to predict ball position.\n"
-                             "Range: 10-200ms. Default: 50ms.\n"
-                             "Higher = further ahead but less accurate.",
-                range_min=10,
-                range_max=200,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('prediction_time_s', v / 1000.0),  # Convert ms to s
-                is_float=False
-            )
-            row += 1
-            
             return section
             
         def create_color_tracker_weights_section(self):
@@ -1373,7 +1357,6 @@ if PYQT_AVAILABLE:
                 # Kalman Prediction settings
                 'prediction_history_frames': self._safe_get_slider_value(self.kp_prediction_history_slider, 5) if hasattr(self, 'kp_prediction_history_slider') else 5,
                 'prediction_radius_m': self._safe_get_slider_value(self.kp_prediction_radius_slider, 15) / 100.0 if hasattr(self, 'kp_prediction_radius_slider') else 0.15,
-                'prediction_time_s': self._safe_get_slider_value(self.kp_prediction_time_slider, 50) / 1000.0 if hasattr(self, 'kp_prediction_time_slider') else 0.05,
                 
                 # Color Tracker Weights
                 'yolo_confidence_weight': self._safe_get_slider_value(self.ct_yolo_confidence_weight_slider, 20) / 10.0 if hasattr(self, 'ct_yolo_confidence_weight_slider') else 2.0,
@@ -1508,9 +1491,6 @@ if PYQT_AVAILABLE:
             
             if 'prediction_radius_m' in settings and hasattr(self, 'kp_prediction_radius_slider'):
                 self.kp_prediction_radius_slider.setValue(int(settings['prediction_radius_m'] * 100))  # m to cm
-            
-            if 'prediction_time_s' in settings and hasattr(self, 'kp_prediction_time_slider'):
-                self.kp_prediction_time_slider.setValue(int(settings['prediction_time_s'] * 1000))  # s to ms
             
             if 'collapsed_color_tracker_weights' in settings and hasattr(self, 'color_tracker_weights_section'):
                 if settings['collapsed_color_tracker_weights'] != self.color_tracker_weights_section.is_collapsed:

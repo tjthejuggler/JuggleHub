@@ -148,6 +148,16 @@ struct TrackingSettings {
     float color_match_weight = 1.0f;       // Weight for color matching score
     float kalman_proximity_weight = 0.0f;  // Weight for proximity to Kalman prediction (0=disabled)
     
+    // Minimum score threshold for using YOLO detection as color tracker
+    // If best YOLO detection score is below this, use Kalman prediction instead
+    float min_yolo_score_threshold = 0.0f;  // 0.0 = always use YOLO if available (default behavior)
+    
+    // Color tracker override settings - force use of YOLO even if score is below threshold
+    // when these conditions are met (helps unstick Kalman prediction)
+    float override_confidence_threshold = 0.7f;  // Minimum YOLO confidence for override
+    float override_color_threshold = 0.8f;       // Minimum color match score for override
+    bool override_require_ball_class = true;     // Only override if ML class is 'ball' (not 'ball_held')
+    
     TrackingSettings() = default;
 };
 

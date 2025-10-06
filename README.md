@@ -2,9 +2,18 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-06 17:03 CEST
+**Last Updated:** 2025-10-06 17:50 CEST
 
 **Recent Changes (2025-10-06):**
+- **🎯 CONFIGURABLE YOLO SCORE THRESHOLD FOR KALMAN FALLBACK**
+  - **New Feature**: Added `min_yolo_score_threshold` setting to control when to use Kalman prediction
+  - **Smart Fallback**: When YOLO detection score is below threshold, system automatically uses Kalman prediction
+  - **Configurable via UDP**: Setting can be adjusted in real-time through ball settings interface
+  - **Default Behavior**: Threshold set to 0.0 by default (always use YOLO if available)
+  - **Use Case**: Increase threshold to prefer Kalman prediction when YOLO detections are uncertain
+  - See [`engine/include/SimpleBallTracker.hpp`](engine/include/SimpleBallTracker.hpp:153) and [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:268-273,890-948)
+
+**Previous Changes (2025-10-06):**
 - **🎯 KALMAN PREDICTION BOUNDARY ENFORCEMENT + HAND-ATTACHED TRACKING**
   - **Issue 1**: System was accepting YOLO detections anywhere on screen, even outside Kalman prediction radius
   - **Solution 1**: Added hard boundary check - YOLO detections outside prediction radius are now rejected

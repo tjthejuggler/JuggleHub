@@ -647,6 +647,69 @@ if PYQT_AVAILABLE:
             )
             row += 1
             
+            # Separator for override settings
+            layout.addWidget(QLabel("Color Tracker Override Settings:"), row, 0, 1, 3)
+            row += 1
+            
+            # Min YOLO Score Threshold
+            self.ct_min_yolo_score_slider, self.ct_min_yolo_score_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min YOLO Score Threshold",
+                tooltip_text="Minimum total score for using YOLO detection as color tracker.\n"
+                             "Range: 0.0-10.0. Default: 0.0 (always use YOLO if available).\n"
+                             "If score is below this, use Kalman prediction instead.\n"
+                             "Higher = require better YOLO detection to use it.",
+                range_min=0,
+                range_max=100,
+                initial_value=0,
+                update_func=lambda v: self.update_setting('min_yolo_score_threshold', v / 10.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Override Confidence Threshold
+            self.ct_override_confidence_slider, self.ct_override_confidence_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Override Confidence Threshold",
+                tooltip_text="Minimum YOLO confidence to force use even if score is below threshold.\n"
+                             "Range: 0.0-1.0. Default: 0.7.\n"
+                             "Helps 'unstick' Kalman predictions with high-confidence detections.",
+                range_min=0,
+                range_max=100,
+                initial_value=70,
+                update_func=lambda v: self.update_setting('override_confidence_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Override Color Threshold
+            self.ct_override_color_slider, self.ct_override_color_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Override Color Threshold",
+                tooltip_text="Minimum color match score to force use even if score is below threshold.\n"
+                             "Range: 0.0-1.0. Default: 0.8.\n"
+                             "Requires good color match for override.",
+                range_min=0,
+                range_max=100,
+                initial_value=80,
+                update_func=lambda v: self.update_setting('override_color_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Override Require Ball Class Toggle
+            self.ct_override_require_ball_toggle = QPushButton("Override Requires 'Ball' Class")
+            self.ct_override_require_ball_toggle.setCheckable(True)
+            self.ct_override_require_ball_toggle.setChecked(True)
+            self.ct_override_require_ball_toggle.clicked.connect(
+                lambda: self.update_setting('override_require_ball_class', 1 if self.ct_override_require_ball_toggle.isChecked() else 0)
+            )
+            layout.addWidget(self.ct_override_require_ball_toggle, row, 0, 1, 3)
+            row += 1
+            
             # Add explanation
             explanation_label = QLabel(
                 "💡 <b>How it works:</b><br>"
@@ -1364,6 +1427,12 @@ if PYQT_AVAILABLE:
                 'color_match_weight': self._safe_get_slider_value(self.ct_color_match_weight_slider, 10) / 10.0 if hasattr(self, 'ct_color_match_weight_slider') else 1.0,
                 'kalman_proximity_weight': self._safe_get_slider_value(self.ct_kalman_proximity_weight_slider, 0) / 10.0 if hasattr(self, 'ct_kalman_proximity_weight_slider') else 0.0,
                 
+                # Color Tracker Override Settings
+                'min_yolo_score_threshold': self._safe_get_slider_value(self.ct_min_yolo_score_slider, 0) / 10.0 if hasattr(self, 'ct_min_yolo_score_slider') else 0.0,
+                'override_confidence_threshold': self._safe_get_slider_value(self.ct_override_confidence_slider, 70) / 100.0 if hasattr(self, 'ct_override_confidence_slider') else 0.7,
+                'override_color_threshold': self._safe_get_slider_value(self.ct_override_color_slider, 80) / 100.0 if hasattr(self, 'ct_override_color_slider') else 0.8,
+                'override_require_ball_class': self.ct_override_require_ball_toggle.isChecked() if hasattr(self, 'ct_override_require_ball_toggle') else True,
+                
                 # Adaptive color settings
                 'adaptive_enabled': self.adaptive_enabled_toggle.isChecked() if hasattr(self, 'adaptive_enabled_toggle') else True,
                 'adaptive_success_threshold': self._safe_get_slider_value(self.adaptive_success_thresh_slider, 70) / 100.0 if hasattr(self, 'adaptive_success_thresh_slider') else 0.7,
@@ -1508,6 +1577,19 @@ if PYQT_AVAILABLE:
             
             if 'kalman_proximity_weight' in settings and hasattr(self, 'ct_kalman_proximity_weight_slider'):
                 self.ct_kalman_proximity_weight_slider.setValue(int(settings['kalman_proximity_weight'] * 10))
+            
+            # Color Tracker Override Settings
+            if 'min_yolo_score_threshold' in settings and hasattr(self, 'ct_min_yolo_score_slider'):
+                self.ct_min_yolo_score_slider.setValue(int(settings['min_yolo_score_threshold'] * 10))
+            
+            if 'override_confidence_threshold' in settings and hasattr(self, 'ct_override_confidence_slider'):
+                self.ct_override_confidence_slider.setValue(int(settings['override_confidence_threshold'] * 100))
+            
+            if 'override_color_threshold' in settings and hasattr(self, 'ct_override_color_slider'):
+                self.ct_override_color_slider.setValue(int(settings['override_color_threshold'] * 100))
+            
+            if 'override_require_ball_class' in settings and hasattr(self, 'ct_override_require_ball_toggle'):
+                self.ct_override_require_ball_toggle.setChecked(settings['override_require_ball_class'])
             
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:

@@ -270,6 +270,26 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             std::cout << "[SimpleBallTracker] Updated kalman_proximity_weight to " << value << std::endl;
             return true;
         }
+        else if (key == "min_yolo_score_threshold") {
+            tracking_settings_.min_yolo_score_threshold = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated min_yolo_score_threshold to " << value << std::endl;
+            return true;
+        }
+        else if (key == "override_confidence_threshold") {
+            tracking_settings_.override_confidence_threshold = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated override_confidence_threshold to " << value << std::endl;
+            return true;
+        }
+        else if (key == "override_color_threshold") {
+            tracking_settings_.override_color_threshold = std::stof(value);
+            std::cout << "[SimpleBallTracker] Updated override_color_threshold to " << value << std::endl;
+            return true;
+        }
+        else if (key == "override_require_ball_class") {
+            tracking_settings_.override_require_ball_class = (value == "true" || value == "1");
+            std::cout << "[SimpleBallTracker] Updated override_require_ball_class to " << value << std::endl;
+            return true;
+        }
     } catch (const std::exception& e) {
         std::cerr << "[SimpleBallTracker] Error parsing setting " << key << "=" << value << ": " << e.what() << std::endl;
         return false;
@@ -868,14 +888,15 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         
         if (!profile) continue;
         
-        // Get Kalman prediction for this ball
-        // CRITICAL: Always predict if we have any tracking history, not just when frames_without_yolo == 0
-        // This ensures we enforce the prediction boundary even when we've lost YOLO for a few frames
+        // Get Kalman prediction for this ball (for boundary checking)
+        // We calculate this to enforce the prediction boundary, but we DON'T advance the filter state yet
         cv::Point3f kalman_pred(0, 0, 0);
         bool has_prediction = false;
         
-        // Use Kalman prediction if we have recent tracking history (within last 5 frames)
+        // Calculate prediction if we have recent tracking history (within last 5 frames)
         if (ball.frames_without_yolo < 5) {
+            // Get predicted state WITHOUT advancing the filter
+            // We'll only advance it if we actually use the prediction
             ball.kalman.predict(dt);
             auto state = ball.kalman.get_state();
             kalman_pred = cv::Point3f(state(0), state(1), state(2));
@@ -886,7 +907,22 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         const Detection* best_det = findBestColorMatch(yolo_detections, *profile,
                                                        hsv_frame, used_detections, kalman_pred);
         
-        if (best_det) {
+        // Check if the best detection meets the minimum score threshold
+        bool score_meets_threshold = (best_det && last_match_total_score_ >= tracking_settings_.min_yolo_score_threshold);
+        
+        // Check if detection qualifies for override (high confidence, good color, correct class)
+        bool qualifies_for_override = false;
+        if (best_det && !score_meets_threshold) {
+            float color_match = matchColor(*best_det, *profile, hsv_frame);
+            bool is_ball_class = (best_det->class_id == 0);  // 0 = ball (in-air)
+            
+            qualifies_for_override =
+                (best_det->confidence >= tracking_settings_.override_confidence_threshold) &&
+                (color_match >= tracking_settings_.override_color_threshold) &&
+                (!tracking_settings_.override_require_ball_class || is_ball_class);
+        }
+        
+        if (best_det && (score_meets_threshold || qualifies_for_override)) {
             // Update from YOLO detection
             ball.position = best_det->world_pos;
             ball.pixel_pos = cv::Point2f(best_det->box.x + best_det->box.width / 2.0f,
@@ -910,9 +946,15 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             
             // Set tracking reason for debug visualization with full equation
             char reason[256];
-            snprintf(reason, sizeof(reason), "Score=%.2f (cls:%.2f + conf:%.2f + col:%.2f + kal:%.2f)",
-                     ball.score_total, ball.score_class, ball.score_confidence,
-                     ball.score_color, ball.score_kalman);
+            if (qualifies_for_override && !score_meets_threshold) {
+                snprintf(reason, sizeof(reason), "OVERRIDE Score=%.2f (cls:%.2f + conf:%.2f + col:%.2f + kal:%.2f)",
+                         ball.score_total, ball.score_class, ball.score_confidence,
+                         ball.score_color, ball.score_kalman);
+            } else {
+                snprintf(reason, sizeof(reason), "Score=%.2f (cls:%.2f + conf:%.2f + col:%.2f + kal:%.2f)",
+                         ball.score_total, ball.score_class, ball.score_confidence,
+                         ball.score_color, ball.score_kalman);
+            }
             ball.tracking_reason = reason;
             
             // Update Kalman filter (legacy)
@@ -925,7 +967,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             used_detections.insert(best_det->index);
         }
         else {
-            // No YOLO detection within prediction radius (or no YOLO detection at all)
+            // No YOLO detection within prediction radius, no detection at all, or score below threshold
             ball.has_yolo_detection = false;
             ball.frames_without_yolo++;
             
@@ -933,7 +975,13 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             ball.detection_evaluations = last_detection_evaluations_;
             
             // Show rejection reason in debug output
-            if (!last_rejection_reason_.empty()) {
+            if (best_det && !score_meets_threshold) {
+                // Detection exists but score is below threshold
+                char reason[256];
+                snprintf(reason, sizeof(reason), "Score %.2f < threshold %.2f - using Kalman",
+                         last_match_total_score_, tracking_settings_.min_yolo_score_threshold);
+                ball.tracking_reason = reason;
+            } else if (!last_rejection_reason_.empty()) {
                 ball.tracking_reason = "YOLO rejected: " + last_rejection_reason_;
             }
             
@@ -1031,10 +1079,17 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             }
             
             if (ball.frames_without_yolo < 5) {
-                // Use Kalman prediction for short gaps
-                ball.kalman.predict(dt);
+                // Use Kalman prediction as the color tracker position
+                // NOTE: Kalman was already predicted at line 884, just use the state
                 auto state = ball.kalman.get_state();
                 ball.position = cv::Point3f(state(0), state(1), state(2));
+                
+                // CRITICAL: Update Kalman filter with this position
+                // The Kalman filter learns from ALL color tracker positions, regardless of source
+                // This maintains trajectory continuity and allows prediction to continue moving
+                ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                    ball.position.x, ball.position.y, ball.position.z));
+                ball.color_predictor.addDetection(ball.position);
                 
                 // CRITICAL: Update yolo_class_id based on proximity to hands
                 // Don't let old class_id persist and cause wrong state detection

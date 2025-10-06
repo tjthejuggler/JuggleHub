@@ -237,7 +237,8 @@ void Engine::run() {
 
             // Add to frame buffers
             RecordingFrame rec_frame = {color_image.clone(), last_raw_detections_,
-                                       tracked_objects_compat, tracked_hands_compat, tracked_balls, visualization_states_};
+                                       tracked_objects_compat, tracked_hands_compat, tracked_balls,
+                                       tracked_hands, visualization_states_};
             {
                 std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
                 frame_buffer_.push_back(rec_frame);
@@ -622,12 +623,27 @@ void Engine::saveRecording() {
     try {
         fs::create_directories(recording_dir_no_boxes);
         
+        // Start recording logger
+        if (recording_logger_.start(recording_dir.string())) {
+            INFO_LOG("Recording logger started: ", recording_dir.string(), "/recording.log");
+        }
+        
         int frame_num = 0;
         for (const auto& rec_frame : frame_buffer_) {
             std::string filename = ss.str() + "_frame_" + std::to_string(frame_num++) + ".jpg";
             fs::path filepath = recording_dir_no_boxes / filename;
             cv::imwrite(filepath.string(), rec_frame.frame);
+            
+            // Log frame data to recording.log
+            if (recording_logger_.isActive()) {
+                recording_logger_.logFrame(rec_frame.tracked_balls,
+                                          rec_frame.tracked_hands_simple,
+                                          camera_intrinsics_);
+            }
         }
+        
+        // Close recording logger
+        recording_logger_.close();
         
         INFO_LOG("Saved ", frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
 
@@ -720,12 +736,27 @@ void Engine::stopContinuousRecording() {
     try {
         fs::create_directories(recording_dir_no_boxes);
         
+        // Start recording logger
+        if (recording_logger_.start(recording_dir.string())) {
+            INFO_LOG("Recording logger started: ", recording_dir.string(), "/recording.log");
+        }
+        
         int frame_num = 0;
         for (const auto& rec_frame : continuous_frame_buffer_) {
             std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num++) + ".jpg";
             fs::path filepath = recording_dir_no_boxes / filename;
             cv::imwrite(filepath.string(), rec_frame.frame);
+            
+            // Log frame data to recording.log
+            if (recording_logger_.isActive()) {
+                recording_logger_.logFrame(rec_frame.tracked_balls,
+                                          rec_frame.tracked_hands_simple,
+                                          camera_intrinsics_);
+            }
         }
+        
+        // Close recording logger
+        recording_logger_.close();
         
         INFO_LOG("Saved ", continuous_frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
 

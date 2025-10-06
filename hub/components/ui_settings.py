@@ -1667,6 +1667,16 @@ if PYQT_AVAILABLE:
                 print(f"✅ Settings loaded from {filepath}")
                 if 'saved_at' in settings:
                     print(f"   Saved at: {settings['saved_at']}")
+                
+                # CRITICAL FIX: Send all loaded settings to the engine
+                # The UI sliders are now set, but the engine doesn't know about them yet
+                # Add a delay to ensure the engine's UDP listener is fully initialized
+                print("📤 Sending loaded settings to engine...")
+                import time
+                time.sleep(2.0)  # Wait 2 seconds for engine to be fully ready
+                self._send_all_settings_to_engine(settings)
+                print("✅ All settings sent to engine")
+                
                 return True
             except Exception as e:
                 print(f"❌ Error loading settings: {e}")
@@ -1674,6 +1684,125 @@ if PYQT_AVAILABLE:
             finally:
                 # Always reset the flag
                 self._loading_settings = False
+        
+        def _send_all_settings_to_engine(self, settings: dict):
+            """Send all settings from the loaded configuration to the engine.
+            
+            This is called after loading settings to ensure the engine receives
+            all configuration values, not just the UI slider positions.
+            """
+            # YOLO Tracker settings
+            if 'confidence_threshold' in settings:
+                self.udp_client.send_setting('confidence_threshold', settings['confidence_threshold'])
+            
+            if 'nms_threshold' in settings:
+                self.udp_client.send_setting('nms_threshold', settings['nms_threshold'])
+            
+            # ByteTrack settings
+            if 'track_buffer' in settings:
+                self.udp_client.send_setting('track_buffer', settings['track_buffer'])
+            
+            if 'track_thresh' in settings:
+                self.udp_client.send_setting('track_thresh', settings['track_thresh'])
+            
+            if 'high_thresh' in settings:
+                self.udp_client.send_setting('high_thresh', settings['high_thresh'])
+            
+            if 'match_thresh' in settings:
+                self.udp_client.send_setting('match_thresh', settings['match_thresh'])
+            
+            # Throw/Catch Detection settings
+            if 'ml_ball_weight' in settings:
+                self.udp_client.send_setting('ml_ball_weight', settings['ml_ball_weight'])
+            
+            if 'ml_ball_held_weight' in settings:
+                self.udp_client.send_setting('ml_ball_held_weight', settings['ml_ball_held_weight'])
+            
+            if 'wrist_proximity_weight' in settings:
+                self.udp_client.send_setting('wrist_proximity_weight', settings['wrist_proximity_weight'])
+            
+            if 'wrist_proximity_threshold' in settings:
+                self.udp_client.send_setting('wrist_proximity_threshold', settings['wrist_proximity_threshold'])
+            
+            if 'undetected_near_hand_threshold' in settings:
+                self.udp_client.send_setting('undetected_near_hand_threshold', settings['undetected_near_hand_threshold'])
+            
+            if 'min_frames_for_state_change' in settings:
+                self.udp_client.send_setting('min_frames_for_state_change', settings['min_frames_for_state_change'])
+            
+            if 'tc_sound_on_catch' in settings:
+                self.udp_client.send_setting('tc_sound_on_catch', 1 if settings['tc_sound_on_catch'] else 0)
+            
+            if 'tc_sound_on_throw' in settings:
+                self.udp_client.send_setting('tc_sound_on_throw', 1 if settings['tc_sound_on_throw'] else 0)
+            
+            # Kalman Prediction settings
+            if 'prediction_history_frames' in settings:
+                self.udp_client.send_setting('prediction_history_frames', settings['prediction_history_frames'])
+            
+            if 'prediction_radius_m' in settings:
+                self.udp_client.send_setting('prediction_radius_m', settings['prediction_radius_m'])
+            
+            # Color Tracker Weights
+            if 'yolo_confidence_weight' in settings:
+                self.udp_client.send_setting('yolo_confidence_weight', settings['yolo_confidence_weight'])
+            
+            if 'yolo_class_weight' in settings:
+                self.udp_client.send_setting('yolo_class_weight', settings['yolo_class_weight'])
+            
+            if 'color_match_weight' in settings:
+                self.udp_client.send_setting('color_match_weight', settings['color_match_weight'])
+            
+            if 'kalman_proximity_weight' in settings:
+                self.udp_client.send_setting('kalman_proximity_weight', settings['kalman_proximity_weight'])
+            
+            # Color Tracker Override Settings
+            if 'min_yolo_score_threshold' in settings:
+                self.udp_client.send_setting('min_yolo_score_threshold', settings['min_yolo_score_threshold'])
+            
+            if 'override_confidence_threshold' in settings:
+                self.udp_client.send_setting('override_confidence_threshold', settings['override_confidence_threshold'])
+            
+            if 'override_color_threshold' in settings:
+                self.udp_client.send_setting('override_color_threshold', settings['override_color_threshold'])
+            
+            if 'override_require_ball_class' in settings:
+                self.udp_client.send_setting('override_require_ball_class', 1 if settings['override_require_ball_class'] else 0)
+            
+            # Adaptive color settings
+            if 'adaptive_enabled' in settings:
+                self.udp_client.send_setting('adaptive_enabled', 1 if settings['adaptive_enabled'] else 0)
+            
+            if 'adaptive_success_threshold' in settings:
+                self.udp_client.send_setting('adaptive_success_threshold', settings['adaptive_success_threshold'])
+            
+            if 'adaptive_failure_threshold' in settings:
+                self.udp_client.send_setting('adaptive_failure_threshold', settings['adaptive_failure_threshold'])
+            
+            if 'adaptive_expansion_step' in settings:
+                self.udp_client.send_setting('adaptive_expansion_step', settings['adaptive_expansion_step'])
+            
+            if 'adaptive_contraction_step' in settings:
+                self.udp_client.send_setting('adaptive_contraction_step', settings['adaptive_contraction_step'])
+            
+            if 'adaptive_history_window' in settings:
+                self.udp_client.send_setting('adaptive_history_window', settings['adaptive_history_window'])
+            
+            if 'adaptive_min_confidence' in settings:
+                self.udp_client.send_setting('adaptive_min_confidence', settings['adaptive_min_confidence'])
+            
+            # Ball tracking enabled states
+            if 'ball_tracking_enabled' in settings:
+                for ball_name, enabled in settings['ball_tracking_enabled'].items():
+                    self.udp_client.send_setting(f'track_{ball_name}', 1 if enabled else 0)
+            
+            # Ball hue ranges (send to engine, not just ball_settings.json)
+            if 'ball_hue_ranges' in settings:
+                for ball_name, hue_range in settings['ball_hue_ranges'].items():
+                    if 'min_hue' in hue_range:
+                        self.udp_client.send_setting(f'{ball_name}_min_hue', hue_range['min_hue'])
+                    if 'max_hue' in hue_range:
+                        self.udp_client.send_setting(f'{ball_name}_max_hue', hue_range['max_hue'])
         
         def test_catch_sound(self):
             """Play a test sound for catch events"""

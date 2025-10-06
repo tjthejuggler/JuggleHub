@@ -1032,7 +1032,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             ball.kalman.update(KalmanFilter3D::MeasurementVector(
                 ball.position.x, ball.position.y, ball.position.z));
             
-            // NEW: Update color-based predictor with this detection
+            // ALWAYS add to color predictor - we consider the ball to be here
             ball.color_predictor.addDetection(ball.position);
             
             used_detections.insert(best_det->index);
@@ -1120,8 +1120,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     // This causes bad predictions when the ball is thrown
                     // Only update Kalman with real YOLO or color detections
                     
-                    // DO NOT add hand position to color predictor - it corrupts velocity!
-                    // ball.color_predictor.addDetection(closest_hand_pos);
+                    // ALWAYS add position to color predictor - we consider the ball to be here
+                    ball.color_predictor.addDetection(ball.position);
                     ball.frames_without_yolo = 0;
                     continue;
                 }
@@ -1163,8 +1163,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 // The Kalman filter should only be updated with real measurements
                 // The prediction uncertainty (P matrix) naturally grows over time
                 
-                // Also don't add to color predictor - it needs real detections
-                // ball.color_predictor.addDetection(ball.position);
+                // CRITICAL FIX: DO add to color predictor to maintain history continuity
+                // The color predictor needs continuous position updates to maintain velocity estimates
+                // This allows the history to continue even when YOLO detections are missing
+                ball.color_predictor.addDetection(ball.position);
                 
                 // Update yolo_class_id based on proximity to hands
                 bool near_any_hand = false;
@@ -1237,8 +1239,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                             // CRITICAL FIX: DO NOT update Kalman when snapping to hands
                             // Hand positions corrupt the Kalman state and cause bad predictions
                             
-                            // DO NOT add hand position to color predictor - it corrupts velocity!
-                            // ball.color_predictor.addDetection(ball.position);
+                            // ALWAYS add position to color predictor - we consider the ball to be here
+                            ball.color_predictor.addDetection(ball.position);
                             break;
                         }
                     }

@@ -5,6 +5,7 @@
 #include "../src/modules/UdpBallColorModule.hpp"
 #include "../src/modules/UdpBallSettingsModule.hpp"
 #include "SimpleBallTracker.hpp" // Include the simplified ball tracker
+#include "RecordingLogger.hpp" // Include recording logger
 #include "json.hpp" // Include nlohmann/json
 #include <memory>
 #include <queue>
@@ -113,6 +114,7 @@ private:
         std::vector<TrackedObject> tracked_objects;
         std::vector<TrackedHand> tracked_hands;
         std::vector<SimpleBall> tracked_balls;  // Store SimpleBall data for color visualization
+        std::vector<SimpleHand> tracked_hands_simple;  // Store SimpleHand data for logging
         juggler::v1::VisualizationStates viz_states;  // Store visualization states
     };
     std::deque<RecordingFrame> frame_buffer_;
@@ -131,6 +133,9 @@ private:
     juggler::v1::VisualizationStates visualization_states_;  // Store current visualization states
     std::vector<Detection> last_raw_detections_; // Keep for calibration
     std::vector<TrackedObject> last_tracked_objects_; // Keep for calibration
+    
+    // Recording logger for detailed frame-by-frame tracking data
+    RecordingLogger recording_logger_;
     
     // Helper function to render visualizations on a frame
     cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame, const RecordingFrame& rec_frame);

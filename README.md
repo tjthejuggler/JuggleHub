@@ -2,9 +2,29 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-06 17:50 CEST
+**Last Updated:** 2025-10-06 20:44 CEST
 
 **Recent Changes (2025-10-06):**
+- **🔧 SETTINGS PERSISTENCE FIX**
+  - **Issue Fixed**: Settings were being saved and loaded in UI but not applied to engine on startup
+  - **Root Cause**: Settings were only sent to engine when sliders changed, not when loaded from file
+  - **Solution**: Added `_send_all_settings_to_engine()` method that sends all loaded settings to engine after loading
+  - **Impact**: All calibration settings now properly persist between sessions - no need to re-adjust sliders
+  - **Affected Settings**: YOLO tracker, ByteTrack, throw/catch detection, Kalman prediction, color tracker weights, adaptive color, and ball profiles
+  - See [`hub/components/ui_settings.py`](hub/components/ui_settings.py:1650-1677,1679-1800) for implementation
+
+**Previous Changes (2025-10-06):**
+- **📊 RECORDING LOG SYSTEM**
+  - **New Feature**: Comprehensive frame-by-frame logging during recordings
+  - **Kalman History**: Complete color predictor history for each ball in every frame
+  - **Color Tracker Data**: Detailed position and tracking information
+  - **Prediction Analysis**: Full prediction details including velocity, gravity, and error metrics
+  - **Debug Information**: Detection evaluations, scoring breakdowns, and state transitions
+  - **Automatic Creation**: Log file automatically created in recording directory as `recording.log`
+  - **Use Case**: Debug strange Kalman prediction behavior and analyze tracking performance
+  - See [`RECORDING_LOG_DOCUMENTATION.md`](RECORDING_LOG_DOCUMENTATION.md) for complete documentation
+
+**Previous Changes (2025-10-06):**
 - **🎯 CONFIGURABLE YOLO SCORE THRESHOLD FOR KALMAN FALLBACK**
   - **New Feature**: Added `min_yolo_score_threshold` setting to control when to use Kalman prediction
   - **Smart Fallback**: When YOLO detection score is below threshold, system automatically uses Kalman prediction

@@ -57,6 +57,8 @@ struct DetectionEvaluation {
     float kalman_score;
     float distance_to_prediction;
     bool passed_filters;
+    bool override_applied;           // Whether override was used for this detection
+    bool override_qualified;         // Whether detection qualified for override
 };
 
 // Simple hand state

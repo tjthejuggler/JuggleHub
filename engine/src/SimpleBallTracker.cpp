@@ -393,6 +393,8 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         eval.color_score = 0.0f;
         eval.kalman_score = 0.0f;
         eval.distance_to_prediction = has_kalman_prediction ? cv::norm(det.world_pos - kalman_prediction) : -1.0f;
+        eval.override_applied = false;
+        eval.override_qualified = false;
         
         // Skip if already used
         if (used_indices.find(det.index) != used_indices.end()) {
@@ -413,21 +415,48 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         }
         
         // CRITICAL: If we have a valid Kalman prediction, reject detections outside the prediction radius
-        // This ensures we only use YOLO detections that are within the expected search area
+        // UNLESS they qualify for override (high confidence + good color match)
         if (has_kalman_prediction) {
             float dist_3d = cv::norm(det.world_pos - kalman_prediction);
             float radius = tracking_settings_.prediction_radius_m;
             debug_log << "    Distance to Kalman pred: " << dist_3d << "m (radius: " << radius << "m)" << std::endl;
             
-            // Reject detection if it's outside the prediction circumference
+            // Check if detection qualifies for override BEFORE rejecting based on distance
             if (dist_3d > radius) {
-                char reason[128];
-                snprintf(reason, sizeof(reason), "REJECTED: Dist %.2fm>%.2fm", dist_3d, radius);
-                rejection_reason = reason;
-                eval.result = reason;
-                evaluations.push_back(eval);
-                debug_log << "    REJECTED: Outside Kalman radius" << std::endl;
-                continue;  // Skip this detection - it's too far from where we expect the ball to be
+                // Calculate color match for override check
+                float color_score = matchColor(det, profile, hsv_frame);
+                bool is_ball_class = (det.class_id == 0);  // 0 = ball (in-air)
+                
+                bool qualifies_for_override =
+                    (det.confidence >= tracking_settings_.override_confidence_threshold) &&
+                    (color_score >= tracking_settings_.override_color_threshold) &&
+                    (!tracking_settings_.override_require_ball_class || is_ball_class);
+                
+                // Store override info in evaluation
+                eval.override_qualified = qualifies_for_override;
+                
+                debug_log << "    Override check: conf=" << det.confidence
+                         << " (thresh=" << tracking_settings_.override_confidence_threshold << ")"
+                         << ", color=" << color_score
+                         << " (thresh=" << tracking_settings_.override_color_threshold << ")"
+                         << ", class=" << det.class_id
+                         << ", qualifies=" << (qualifies_for_override ? "YES" : "NO") << std::endl;
+                
+                if (!qualifies_for_override) {
+                    // Reject detection - outside radius and doesn't qualify for override
+                    char reason[128];
+                    snprintf(reason, sizeof(reason), "REJECTED: Dist %.2fm>%.2fm", dist_3d, radius);
+                    rejection_reason = reason;
+                    eval.result = reason;
+                    evaluations.push_back(eval);
+                    debug_log << "    REJECTED: Outside Kalman radius (no override)" << std::endl;
+                    continue;  // Skip this detection
+                } else {
+                    // Detection qualifies for override - allow it despite distance
+                    eval.override_applied = true;
+                    debug_log << "    *** OVERRIDE APPLIED *** Distance " << dist_3d
+                             << "m exceeds radius but high confidence/color" << std::endl;
+                }
             }
         }
         
@@ -489,7 +518,21 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         debug_log << "      Kalman score: " << kalman_score << std::endl;
         debug_log << "      TOTAL: " << combined_score << std::endl;
         
-        if (combined_score > best_combined_score) {
+        // CRITICAL: If this detection has override applied, it ALWAYS wins regardless of score
+        if (eval.override_applied) {
+            debug_log << "    >>> OVERRIDE FORCES SELECTION (ignoring score comparison) <<<" << std::endl;
+            best_combined_score = combined_score;
+            best_det = &det;
+            
+            // Store scoring components
+            best_class_score = class_score;
+            best_confidence_score = confidence_score;
+            best_color_score = weighted_color_score;
+            best_kalman_score = kalman_score;
+            
+            eval.result = "SELECTED (OVERRIDE)";
+        }
+        else if (combined_score > best_combined_score) {
             debug_log << "    >>> NEW BEST DETECTION <<<" << std::endl;
             best_combined_score = combined_score;
             best_det = &det;

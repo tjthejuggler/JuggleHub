@@ -204,8 +204,13 @@ public:
                         log_file_ << "      Kalman score: " << eval.kalman_score << "\n";
                     }
                     if (eval.distance_to_prediction >= 0) {
-                        log_file_ << "      Distance to prediction: " 
+                        log_file_ << "      Distance to prediction: "
                                  << std::setprecision(4) << eval.distance_to_prediction << " m\n";
+                    }
+                    // Override information
+                    if (eval.override_qualified) {
+                        log_file_ << "      Override qualified: YES\n";
+                        log_file_ << "      Override applied: " << (eval.override_applied ? "YES" : "NO") << "\n";
                     }
                 }
             }

@@ -256,6 +256,43 @@ void Engine::run() {
             auto detections = ball_tracker_->detectBalls(color_image, depth_frame, rs_intrinsics);
         }
 
+        // Populate color-based predictions for visualization
+        // NEW: Uses color detection history instead of Kalman filter
+        if (use_dnn_tracker_ && simple_tracker_) {
+            for (const auto& ball : tracked_balls) {
+                // Only create prediction if we have enough color detection history
+                if (!ball.color_predictor.hasEnoughData()) {
+                    continue;  // Skip balls without sufficient history
+                }
+                
+                auto* kalman_pred = frame_data.add_kalman_predictions();
+                kalman_pred->set_logical_id(ball.id);
+                
+                // Get predicted position from color-based predictor
+                // This uses recent color detections and applies gravity for in-air balls
+                cv::Point3f pred_pos_3d = ball.color_predictor.getPredictedPosition(!ball.is_held);
+                
+                // Skip if prediction failed (returns 0,0,0)
+                if (pred_pos_3d.z <= 0) {
+                    continue;
+                }
+                
+                auto* pred_pos = kalman_pred->mutable_predicted_pos();
+                pred_pos->set_x(pred_pos_3d.x);
+                pred_pos->set_y(pred_pos_3d.y);
+                pred_pos->set_z(pred_pos_3d.z);
+                
+                // Project to 2D
+                cv::Point2f pred_pos_2d = SimpleBallTracker::project_3d_to_2d(pred_pos_3d, camera_intrinsics_);
+                auto* pred_2d = kalman_pred->mutable_predicted_pos_2d();
+                pred_2d->set_x(pred_pos_2d.x);
+                pred_2d->set_y(pred_pos_2d.y);
+                
+                // Determine if in freefall (not held)
+                kalman_pred->set_is_in_freefall(!ball.is_held);
+            }
+        }
+        
         // Populate balls from SimpleBall
         for (const auto& ball : tracked_balls) {
             if (ball.position.z <= 0) continue;  // Skip invalid depth
@@ -1049,6 +1086,62 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             info_lines.push_back(info_text);
             info_colors.push_back(color);
         }
+    
+    // Draw color-based prediction circles
+    // NEW: Shows predicted search region based on color detection history
+    if (viz.show_kalman_predictions()) {
+        for (const auto& ball : rec_frame.tracked_balls) {
+            // Only draw if we have enough history
+            if (!ball.color_predictor.hasEnoughData()) {
+                continue;
+            }
+            
+            // Get predicted position from color-based predictor
+            cv::Point3f pred_pos_3d = ball.color_predictor.getPredictedPosition(!ball.is_held);
+            
+            // Skip if prediction failed
+            if (pred_pos_3d.z <= 0) {
+                continue;
+            }
+            
+            // Project to 2D
+            int pred_x = static_cast<int>((pred_pos_3d.x * camera_intrinsics_.fx) / pred_pos_3d.z + camera_intrinsics_.ppx);
+            int pred_y = static_cast<int>((pred_pos_3d.y * camera_intrinsics_.fy) / pred_pos_3d.z + camera_intrinsics_.ppy);
+            
+            // Get prediction radius from settings (in meters)
+            float uncertainty_meters = ball.color_predictor.getPredictionRadius();
+            
+            // Project uncertainty to pixel space
+            float uncertainty_pixels = (uncertainty_meters * camera_intrinsics_.fx) / pred_pos_3d.z;
+            int radius = static_cast<int>(uncertainty_pixels);
+            
+            // Clamp radius to reasonable bounds
+            radius = std::max(20, std::min(radius, 150));
+            
+            // Choose color based on ball state
+            cv::Scalar circle_color;
+            if (ball.is_held) {
+                circle_color = cv::Scalar(100, 100, 255);  // Red-ish for held balls (no gravity)
+            } else {
+                circle_color = cv::Scalar(255, 255, 100);  // Cyan-ish for in-flight balls (with gravity)
+            }
+            
+            // Draw semi-transparent circle showing prediction search region
+            cv::Mat overlay = result.clone();
+            cv::circle(overlay, cv::Point(pred_x, pred_y), radius, circle_color, 2, cv::LINE_AA);
+            cv::addWeighted(overlay, 0.5, result, 0.5, 0, result);
+            
+            // Draw center point
+            cv::circle(result, cv::Point(pred_x, pred_y), 4, circle_color, -1, cv::LINE_AA);
+            
+            // Draw label with history size
+            std::string label = "P" + std::to_string(ball.id) + "(" + std::to_string(ball.color_predictor.getHistorySize()) + ")";
+            cv::putText(result, label, cv::Point(pred_x + 10, pred_y - 10),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+            cv::putText(result, label, cv::Point(pred_x + 10, pred_y - 10),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.5, circle_color, 1, cv::LINE_AA);
+        }
+    }
     
     // Draw info panel in upper right corner
     if (!info_lines.empty()) {

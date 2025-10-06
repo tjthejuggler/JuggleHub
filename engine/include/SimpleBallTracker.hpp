@@ -8,6 +8,7 @@
 #include <set>
 #include "json.hpp"
 #include "KalmanFilter3D.hpp"
+#include "ColorBasedPredictor.hpp"
 
 using json = nlohmann::json;
 
@@ -72,7 +73,8 @@ struct SimpleBall {
     // Tracking
     bool has_yolo_detection;         // True if YOLO sees it this frame
     int frames_without_yolo;         // Counter for fallback logic
-    KalmanFilter3D kalman;           // Only used when YOLO fails
+    KalmanFilter3D kalman;           // Only used when YOLO fails (legacy)
+    ColorBasedPredictor color_predictor;  // NEW: Color-based prediction for visualization
     
     // Confidence
     float yolo_confidence;           // YOLO detection confidence
@@ -112,6 +114,11 @@ struct TrackingSettings {
     
     // State change parameters
     int min_frames_for_state_change = 2;   // Frames needed to confirm state change (REDUCED from 3 to 2)
+    
+    // Color-based prediction settings
+    int prediction_history_frames = 5;     // Number of frames to use for prediction
+    float prediction_radius_m = 0.15f;     // Radius of prediction circle in meters (15cm)
+    float prediction_time_s = 0.05f;       // How far ahead to predict (50ms - ~1-2 frames)
     
     TrackingSettings() = default;
 };

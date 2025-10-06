@@ -74,6 +74,14 @@ SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
             SimpleBall ball;
             ball.id = ball_id++;
             ball.color_name = profile.name;
+            
+            // Initialize color predictor with tracking settings
+            ColorBasedPredictor::PredictionSettings pred_settings;
+            pred_settings.history_frames = tracking_settings_.prediction_history_frames;
+            pred_settings.prediction_radius_m = tracking_settings_.prediction_radius_m;
+            pred_settings.prediction_time_s = tracking_settings_.prediction_time_s;
+            ball.color_predictor.setSettings(pred_settings);
+            
             balls_.push_back(ball);
         }
     }
@@ -218,6 +226,39 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         else if (key == "min_frames_for_state_change") {
             tracking_settings_.min_frames_for_state_change = std::stoi(value);
             std::cout << "[SimpleBallTracker] Updated min_frames_for_state_change to " << value << std::endl;
+            return true;
+        }
+        else if (key == "prediction_history_frames") {
+            tracking_settings_.prediction_history_frames = std::stoi(value);
+            // Update all ball predictors
+            for (auto& ball : balls_) {
+                auto settings = ball.color_predictor.getSettings();
+                settings.history_frames = tracking_settings_.prediction_history_frames;
+                ball.color_predictor.setSettings(settings);
+            }
+            std::cout << "[SimpleBallTracker] Updated prediction_history_frames to " << value << std::endl;
+            return true;
+        }
+        else if (key == "prediction_radius_m") {
+            tracking_settings_.prediction_radius_m = std::stof(value);
+            // Update all ball predictors
+            for (auto& ball : balls_) {
+                auto settings = ball.color_predictor.getSettings();
+                settings.prediction_radius_m = tracking_settings_.prediction_radius_m;
+                ball.color_predictor.setSettings(settings);
+            }
+            std::cout << "[SimpleBallTracker] Updated prediction_radius_m to " << value << "m" << std::endl;
+            return true;
+        }
+        else if (key == "prediction_time_s") {
+            tracking_settings_.prediction_time_s = std::stof(value);
+            // Update all ball predictors
+            for (auto& ball : balls_) {
+                auto settings = ball.color_predictor.getSettings();
+                settings.prediction_time_s = tracking_settings_.prediction_time_s;
+                ball.color_predictor.setSettings(settings);
+            }
+            std::cout << "[SimpleBallTracker] Updated prediction_time_s to " << value << "s" << std::endl;
             return true;
         }
     } catch (const std::exception& e) {
@@ -684,9 +725,12 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                      best_det->class_id, best_det->confidence, ball.color_match_score);
             ball.tracking_reason = reason;
             
-            // Update Kalman filter
+            // Update Kalman filter (legacy)
             ball.kalman.update(KalmanFilter3D::MeasurementVector(
                 ball.position.x, ball.position.y, ball.position.z));
+            
+            // NEW: Update color-based predictor with this detection
+            ball.color_predictor.addDetection(ball.position);
             
             used_detections.insert(best_det->index);
         }

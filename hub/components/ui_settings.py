@@ -116,6 +116,9 @@ if PYQT_AVAILABLE:
             self.throw_catch_section = self.create_throw_catch_section()
             container_layout.addWidget(self.throw_catch_section)
             
+            self.kalman_prediction_section = self.create_kalman_prediction_section()
+            container_layout.addWidget(self.kalman_prediction_section)
+            
             self.adaptive_color_section = self.create_adaptive_color_section()
             container_layout.addWidget(self.adaptive_color_section)
             
@@ -509,6 +512,71 @@ if PYQT_AVAILABLE:
                 QPushButton:pressed { background-color: #2e7d32; }
             """)
             layout.addWidget(self.tc_test_throw_sound_button, row, 2)
+            
+            return section
+        
+        def create_kalman_prediction_section(self):
+            """Create the Kalman Prediction Settings section"""
+            section = CollapsibleGroupBox("🎯 Kalman Prediction", collapsed=False)
+            layout = QGridLayout()
+            section.get_content_layout().addLayout(layout)
+            
+            row = 0
+            
+            # Info label
+            info_label = QLabel("ℹ️ Configure prediction circle based on color detection history")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label, row, 0, 1, 3)
+            row += 1
+            
+            # Prediction history frames
+            self.kp_prediction_history_slider, self.kp_prediction_history_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="History Frames",
+                tooltip_text="Number of recent color detections to use for prediction.\n"
+                             "Range: 2-10 frames. Default: 5.\n"
+                             "Higher = smoother but slower to adapt.",
+                range_min=2,
+                range_max=10,
+                initial_value=5,
+                update_func=lambda v: self.update_setting('prediction_history_frames', v),
+                is_float=False
+            )
+            row += 1
+            
+            # Prediction radius
+            self.kp_prediction_radius_slider, self.kp_prediction_radius_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Circle Radius (cm)",
+                tooltip_text="Radius of prediction circle showing search region.\n"
+                             "Range: 5-30cm. Default: 15cm.\n"
+                             "Larger = wider search area.",
+                range_min=5,
+                range_max=30,
+                initial_value=15,
+                update_func=lambda v: self.update_setting('prediction_radius_m', v / 100.0),  # Convert cm to m
+                is_float=False
+            )
+            row += 1
+            
+            # Prediction time ahead
+            self.kp_prediction_time_slider, self.kp_prediction_time_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Prediction Time (ms)",
+                tooltip_text="How far ahead to predict ball position.\n"
+                             "Range: 10-200ms. Default: 50ms.\n"
+                             "Higher = further ahead but less accurate.",
+                range_min=10,
+                range_max=200,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('prediction_time_s', v / 1000.0),  # Convert ms to s
+                is_float=False
+            )
+            row += 1
             
             return section
         
@@ -1188,8 +1256,14 @@ if PYQT_AVAILABLE:
                 'collapsed_bytetrack': self.bytetrack_section.is_collapsed,
                 'collapsed_pose': self.pose_section.is_collapsed,
                 'collapsed_throw_catch': self.throw_catch_section.is_collapsed,
+                'collapsed_kalman_prediction': self.kalman_prediction_section.is_collapsed if hasattr(self, 'kalman_prediction_section') else False,
                 'collapsed_adaptive_color': self.adaptive_color_section.is_collapsed if hasattr(self, 'adaptive_color_section') else False,
                 'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False,
+                
+                # Kalman Prediction settings
+                'prediction_history_frames': self.kp_prediction_history_slider.value() if hasattr(self, 'kp_prediction_history_slider') else 5,
+                'prediction_radius_m': self.kp_prediction_radius_slider.value() / 100.0 if hasattr(self, 'kp_prediction_radius_slider') else 0.15,
+                'prediction_time_s': self.kp_prediction_time_slider.value() / 1000.0 if hasattr(self, 'kp_prediction_time_slider') else 0.05,
                 
                 # Adaptive color settings
                 'adaptive_enabled': self.adaptive_enabled_toggle.isChecked() if hasattr(self, 'adaptive_enabled_toggle') else True,
@@ -1307,6 +1381,20 @@ if PYQT_AVAILABLE:
             if 'collapsed_throw_catch' in settings:
                 if settings['collapsed_throw_catch'] != self.throw_catch_section.is_collapsed:
                     self.throw_catch_section.toggle_collapsed()
+            
+            if 'collapsed_kalman_prediction' in settings and hasattr(self, 'kalman_prediction_section'):
+                if settings['collapsed_kalman_prediction'] != self.kalman_prediction_section.is_collapsed:
+                    self.kalman_prediction_section.toggle_collapsed()
+            
+            # Kalman Prediction settings
+            if 'prediction_history_frames' in settings and hasattr(self, 'kp_prediction_history_slider'):
+                self.kp_prediction_history_slider.setValue(settings['prediction_history_frames'])
+            
+            if 'prediction_radius_m' in settings and hasattr(self, 'kp_prediction_radius_slider'):
+                self.kp_prediction_radius_slider.setValue(int(settings['prediction_radius_m'] * 100))  # m to cm
+            
+            if 'prediction_time_s' in settings and hasattr(self, 'kp_prediction_time_slider'):
+                self.kp_prediction_time_slider.setValue(int(settings['prediction_time_s'] * 1000))  # s to ms
             
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:

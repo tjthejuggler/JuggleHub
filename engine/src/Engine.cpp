@@ -535,6 +535,16 @@ void Engine::processCommands() {
                         response.set_message("Tracker not ready for color calibration");
                     }
                     break;
+                case juggler::v1::CommandRequest::ENABLE_FEATURE:
+                    // Throw/catch events are always sent, so just acknowledge
+                    response.set_message("Feature '" + command.feature_name() + "' enabled (events always sent)");
+                    DEBUG_LOG("Feature enabled: ", command.feature_name());
+                    break;
+                case juggler::v1::CommandRequest::DISABLE_FEATURE:
+                    // Throw/catch events are always sent, so just acknowledge
+                    response.set_message("Feature '" + command.feature_name() + "' disabled (events always sent)");
+                    DEBUG_LOG("Feature disabled: ", command.feature_name());
+                    break;
                 default:
                     response.set_success(false);
                     response.set_message("Unknown command");

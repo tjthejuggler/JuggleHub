@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButt
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from PyQt6.QtGui import QFont
 from apps.base import BaseApp
+import juggler_pb2
 
 
 class CatchSignal(QObject):
@@ -114,7 +115,7 @@ class CatchCounterApp(BaseApp):
         if hasattr(frame_data, 'throw_catch_events'):
             for event in frame_data.throw_catch_events:
                 # Count catch events
-                if event.event_type == event.CATCH:
+                if event.type == juggler_pb2.ThrowCatchEvent.CATCH:
                     self.signal_emitter.catch_detected.emit()
     
     def _increment_counter(self):

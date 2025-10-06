@@ -21,12 +21,23 @@ public:
         close();
     }
     
+    // Structure to store event information
+    struct EventRecord {
+        int frame_number;
+        std::string event_type;  // "THROW" or "CATCH"
+        int ball_id;
+        std::string ball_color;
+        int hand_id;
+        std::string hand_side;  // "LEFT" or "RIGHT"
+    };
+    
     // Start a new recording log session
     bool start(const std::string& recording_dir) {
         if (is_active_) {
             close();
         }
         
+        recording_dir_ = recording_dir;
         std::string log_path = recording_dir + "/recording.log";
         log_file_.open(log_path, std::ios::out | std::ios::trunc);
         
@@ -36,8 +47,9 @@ public:
         
         is_active_ = true;
         frame_number_ = 0;
+        event_records_.clear();
         
-        // Write header
+        // Write header (events summary will be written at close())
         log_file_ << "========================================\n";
         log_file_ << "JUGGLEHUB RECORDING LOG\n";
         log_file_ << "========================================\n";
@@ -45,11 +57,40 @@ public:
         log_file_ << "Recording Directory: " << recording_dir << "\n";
         log_file_ << "========================================\n\n";
         
+        // Placeholder for events summary (will be filled in at close())
+        log_file_ << "[EVENTS SUMMARY WILL BE INSERTED HERE]\n\n";
+        
         return true;
     }
     
+    // Log throw/catch events for this frame
+    void logEvents(const std::vector<BallEvent>& events,
+                   const std::vector<SimpleBall>& balls) {
+        if (!is_active_) return;
+        
+        for (const auto& event : events) {
+            EventRecord record;
+            record.frame_number = frame_number_;
+            record.event_type = (event.type == BallEvent::THROW) ? "THROW" : "CATCH";
+            record.ball_id = event.ball_id;
+            record.hand_id = event.hand_id;
+            record.hand_side = (event.hand_id == 0) ? "LEFT" : "RIGHT";
+            
+            // Find ball color
+            record.ball_color = "unknown";
+            for (const auto& ball : balls) {
+                if (ball.id == event.ball_id) {
+                    record.ball_color = ball.color_name;
+                    break;
+                }
+            }
+            
+            event_records_.push_back(record);
+        }
+    }
+    
     // Log a single frame's tracking data
-    void logFrame(const std::vector<SimpleBall>& balls, 
+    void logFrame(const std::vector<SimpleBall>& balls,
                   const std::vector<SimpleHand>& hands,
                   const CameraIntrinsics& intrinsics) {
         if (!is_active_) return;
@@ -222,7 +263,7 @@ public:
         frame_number_++;
     }
     
-    // Close the log file
+    // Close the log file and write events summary at the top
     void close() {
         if (is_active_ && log_file_.is_open()) {
             log_file_ << "========================================\n";
@@ -230,6 +271,11 @@ public:
             log_file_ << "Total frames logged: " << frame_number_ << "\n";
             log_file_ << "========================================\n";
             log_file_.close();
+            
+            // Now rewrite the file with events summary at the top
+            if (!event_records_.empty()) {
+                writeEventsToTop();
+            }
         }
         is_active_ = false;
     }
@@ -240,6 +286,8 @@ private:
     std::ofstream log_file_;
     bool is_active_;
     int frame_number_;
+    std::string recording_dir_;
+    std::vector<EventRecord> event_records_;
     
     std::string getCurrentTimestamp() {
         auto now = std::chrono::system_clock::now();
@@ -250,5 +298,55 @@ private:
         std::ostringstream oss;
         oss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
         return oss.str();
+    }
+    
+    void writeEventsToTop() {
+        // Read the entire log file
+        std::string log_path = recording_dir_ + "/recording.log";
+        std::ifstream read_file(log_path);
+        if (!read_file.is_open()) return;
+        
+        std::stringstream buffer;
+        buffer << read_file.rdbuf();
+        std::string content = buffer.str();
+        read_file.close();
+        
+        // Find the placeholder and replace it with events summary
+        std::string placeholder = "[EVENTS SUMMARY WILL BE INSERTED HERE]";
+        size_t pos = content.find(placeholder);
+        
+        if (pos != std::string::npos) {
+            std::ostringstream events_summary;
+            events_summary << "========================================\n";
+            events_summary << "THROW/CATCH EVENTS SUMMARY\n";
+            events_summary << "========================================\n";
+            events_summary << "Total events: " << event_records_.size() << "\n\n";
+            
+            if (!event_records_.empty()) {
+                events_summary << "Frame | Event Type | Ball (Color) | Hand\n";
+                events_summary << "------|------------|--------------|------\n";
+                
+                for (const auto& record : event_records_) {
+                    events_summary << std::setw(5) << record.frame_number << " | "
+                                  << std::setw(10) << std::left << record.event_type << " | "
+                                  << "Ball " << record.ball_id << " (" << std::setw(6) << record.ball_color << ") | "
+                                  << record.hand_side << "\n";
+                }
+            } else {
+                events_summary << "No throw/catch events recorded.\n";
+            }
+            
+            events_summary << "========================================\n";
+            
+            // Replace placeholder with events summary
+            content.replace(pos, placeholder.length(), events_summary.str());
+            
+            // Write back to file
+            std::ofstream write_file(log_path, std::ios::out | std::ios::trunc);
+            if (write_file.is_open()) {
+                write_file << content;
+                write_file.close();
+            }
+        }
     }
 };

@@ -2,17 +2,10 @@
 #include <iostream>
 #include <fstream>
 
-int main(int argc, char* argv[]) {
-    // Create debug log file at startup
-    std::ofstream debug_log("engine_debug.log", std::ios::out | std::ios::trunc);
-    debug_log << "=== ENGINE STARTED ===" << std::endl;
-    debug_log << "Build: 3D MATCHING - 2025-10-03" << std::endl;
-    debug_log << "╔════════════════════════════════════════╗" << std::endl;
-    debug_log << "║  ENGINE WITH 3D MATCHING - BUILD 2025 ║" << std::endl;
-    debug_log << "║  If you see this, new code is loaded  ║" << std::endl;
-    debug_log << "╚════════════════════════════════════════╝" << std::endl;
-    debug_log.close();
+// Global flag to control debug logging
+bool g_enable_debug_log = false;
 
+int main(int argc, char* argv[]) {
     Engine::OutputFormat format = Engine::OutputFormat::DEFAULT;
     bool use_dnn_tracker = false;
     bool verbose = false;
@@ -29,6 +22,7 @@ int main(int argc, char* argv[]) {
             std::cout << "  --help                        Show this help message" << std::endl;
             std::cout << "  --use-dnn-tracker             Enable the DNN tracker" << std::endl;
             std::cout << "  --verbose                     Enable verbose output" << std::endl;
+            std::cout << "  --debug-log                   Enable debug logging to engine_debug.log" << std::endl;
             std::cout << "  --device=<device>             Set the inference device (e.g., CPU, GPU, NPU, AUTO)" << std::endl;
             std::cout << "  --camera-settings=<path>      Path to camera settings JSON file" << std::endl;
             std::cout << "  --model=<model_name>          Specify the model name (e.g., yolo11s)" << std::endl;
@@ -42,6 +36,8 @@ int main(int argc, char* argv[]) {
             use_dnn_tracker = true;
         } else if (arg == "--verbose") {
             verbose = true;
+        } else if (arg == "--debug-log") {
+            g_enable_debug_log = true;
         } else if (arg.rfind("--device=", 0) == 0) {
             device_name = arg.substr(9);
         } else if (arg.rfind("--camera-settings=", 0) == 0) {
@@ -51,6 +47,18 @@ int main(int argc, char* argv[]) {
         } else if (arg.rfind("--pose-model=", 0) == 0) {
             pose_model_name = arg.substr(13);
         }
+    }
+
+    // Create debug log file at startup only if debug logging is enabled
+    if (g_enable_debug_log) {
+        std::ofstream debug_log("engine_debug.log", std::ios::out | std::ios::trunc);
+        debug_log << "=== ENGINE STARTED ===" << std::endl;
+        debug_log << "Build: 3D MATCHING - 2025-10-03" << std::endl;
+        debug_log << "╔════════════════════════════════════════╗" << std::endl;
+        debug_log << "║  ENGINE WITH 3D MATCHING - BUILD 2025 ║" << std::endl;
+        debug_log << "║  If you see this, new code is loaded  ║" << std::endl;
+        debug_log << "╚════════════════════════════════════════╝" << std::endl;
+        debug_log.close();
     }
 
     try {

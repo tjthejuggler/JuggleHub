@@ -238,7 +238,7 @@ void Engine::run() {
             // Add to frame buffers
             RecordingFrame rec_frame = {color_image.clone(), last_raw_detections_,
                                        tracked_objects_compat, tracked_hands_compat, tracked_balls,
-                                       tracked_hands, visualization_states_};
+                                       tracked_hands, ball_events, visualization_states_};
             {
                 std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
                 frame_buffer_.push_back(rec_frame);
@@ -646,6 +646,9 @@ void Engine::saveRecording() {
             
             // Log frame data to recording.log
             if (recording_logger_.isActive()) {
+                // Log events first
+                recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls);
+                // Then log frame data
                 recording_logger_.logFrame(rec_frame.tracked_balls,
                                           rec_frame.tracked_hands_simple,
                                           camera_intrinsics_);
@@ -759,6 +762,9 @@ void Engine::stopContinuousRecording() {
             
             // Log frame data to recording.log
             if (recording_logger_.isActive()) {
+                // Log events first
+                recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls);
+                // Then log frame data
                 recording_logger_.logFrame(rec_frame.tracked_balls,
                                           rec_frame.tracked_hands_simple,
                                           camera_intrinsics_);
@@ -986,26 +992,44 @@ void Engine::startCameraWithSettings(const std::string& settings_file, uint32_t 
     startCamera();
 }
 cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const RecordingFrame& rec_frame) {
-    cv::Mat result = frame.clone();
     const auto& viz = rec_frame.viz_states;
     
     // Prepare info panel data
     std::vector<std::string> info_lines;
     std::vector<cv::Scalar> info_colors;
     
+    // First, collect all info lines to determine required height
+    cv::Mat temp_result = frame.clone();
+    
+    // Add throw/catch events at the top if they exist
+    for (const auto& event : rec_frame.ball_events) {
+        std::string hand_side = event.hand_id == 0 ? "LEFT" : "RIGHT";
+        std::string event_type = event.type == BallEvent::THROW ? "THROW" : "CATCH";
+        std::string event_text = event_type + " " + hand_side;
+        
+        // Add to the beginning of info lines
+        info_lines.insert(info_lines.begin(), event_text);
+        
+        // Color: Green for catch, Orange for throw
+        cv::Scalar event_color = event.type == BallEvent::CATCH ?
+                                 cv::Scalar(0, 255, 0) :      // Green for CATCH
+                                 cv::Scalar(0, 165, 255);     // Orange for THROW
+        info_colors.insert(info_colors.begin(), event_color);
+    }
+    
     // Draw YOLO detections with numbering
     if (record_with_yolo_boxes_ || viz.show_raw_detections()) {
         int det_num = 1;
         for (const auto& det : rec_frame.raw_detections) {
             // Draw red box for YOLO detection
-            cv::rectangle(result, det.box, cv::Scalar(0, 0, 255), 2);
+            cv::rectangle(temp_result, det.box, cv::Scalar(0, 0, 255), 2);
             
             // Draw detection number on the box
             std::string num_label = "#" + std::to_string(det_num);
-            cv::putText(result, num_label, 
+            cv::putText(temp_result, num_label,
                        cv::Point(det.box.x + 5, det.box.y + 20),
                        cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-            cv::putText(result, num_label, 
+            cv::putText(temp_result, num_label,
                        cv::Point(det.box.x + 5, det.box.y + 20),
                        cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
             
@@ -1024,7 +1048,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     // Draw ByteTrack boxes (legacy support)
     if (record_with_bytetrack_boxes_ || viz.show_tracked_boxes()) {
         for (const auto& obj : rec_frame.tracked_objects) {
-            cv::rectangle(result, obj.box, cv::Scalar(0, 165, 255), 3); // Orange for ByteTrack, thicker
+            cv::rectangle(temp_result, obj.box, cv::Scalar(0, 165, 255), 3); // Orange for ByteTrack, thicker
         }
     }
     
@@ -1037,11 +1061,11 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 int wrist_y = static_cast<int>((hand.wrist_pos_3d.y * camera_intrinsics_.fy) / hand.wrist_pos_3d.z + camera_intrinsics_.ppy);
                 
                 // Draw wrist circle
-                cv::circle(result, cv::Point(wrist_x, wrist_y), 20, cv::Scalar(255, 255, 0), 4); // Cyan
+                cv::circle(temp_result, cv::Point(wrist_x, wrist_y), 20, cv::Scalar(255, 255, 0), 4); // Cyan
                 
                 // Draw hand label
                 std::string label = hand.id == 0 ? "L" : "R";
-                cv::putText(result, label, cv::Point(wrist_x - 5, wrist_y + 5),
+                cv::putText(temp_result, label, cv::Point(wrist_x - 5, wrist_y + 5),
                            cv::FONT_HERSHEY_SIMPLEX, 1.2, cv::Scalar(255, 255, 255), 2);
                 
                 // Draw skeleton if enabled
@@ -1050,7 +1074,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                         if (kp.z > 0) {
                             int kp_x = static_cast<int>((kp.x * camera_intrinsics_.fx) / kp.z + camera_intrinsics_.ppx);
                             int kp_y = static_cast<int>((kp.y * camera_intrinsics_.fy) / kp.z + camera_intrinsics_.ppy);
-                            cv::circle(result, cv::Point(kp_x, kp_y), 4, cv::Scalar(255, 255, 0), -1);
+                            cv::circle(temp_result, cv::Point(kp_x, kp_y), 4, cv::Scalar(255, 255, 0), -1);
                         }
                     }
                 }
@@ -1097,23 +1121,23 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             // Draw based on whether ball is held
             if (ball.is_held) {
                 // Dashed circle for held balls (draw as regular circle with thicker line)
-                cv::circle(result, cv::Point(center_x, center_y), radius, color, 3, cv::LINE_AA);
+                cv::circle(temp_result, cv::Point(center_x, center_y), radius, color, 3, cv::LINE_AA);
             } else {
                 // Filled circle for in-air balls
-                cv::circle(result, cv::Point(center_x, center_y), radius, color, -1, cv::LINE_AA);
+                cv::circle(temp_result, cv::Point(center_x, center_y), radius, color, -1, cv::LINE_AA);
                 // Black border for visibility
                 if (ball.color_name == "white") {
-                    cv::circle(result, cv::Point(center_x, center_y), radius, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+                    cv::circle(temp_result, cv::Point(center_x, center_y), radius, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
                 } else {
-                    cv::circle(result, cv::Point(center_x, center_y), radius, cv::Scalar(0, 0, 0), 1, cv::LINE_AA);
+                    cv::circle(temp_result, cv::Point(center_x, center_y), radius, cv::Scalar(0, 0, 0), 1, cv::LINE_AA);
                 }
             }
             
             // Draw simple label on ball (just first letter)
             std::string label = ball.color_name.substr(0, 1);
-            cv::putText(result, label, cv::Point(center_x - 5, center_y + 5),
+            cv::putText(temp_result, label, cv::Point(center_x - 5, center_y + 5),
                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-                cv::putText(result, label, cv::Point(center_x - 5, center_y + 5),
+                cv::putText(temp_result, label, cv::Point(center_x - 5, center_y + 5),
                            cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
             }
             
@@ -1178,6 +1202,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 }
             }
         }
+    }
     
     // Draw color-based prediction circles
     // NEW: Shows predicted search region based on color detection history
@@ -1221,23 +1246,23 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             }
             
             // Draw semi-transparent circle showing prediction search region
-            cv::Mat overlay = result.clone();
+            cv::Mat overlay = temp_result.clone();
             cv::circle(overlay, cv::Point(pred_x, pred_y), radius, circle_color, 2, cv::LINE_AA);
-            cv::addWeighted(overlay, 0.5, result, 0.5, 0, result);
+            cv::addWeighted(overlay, 0.5, temp_result, 0.5, 0, temp_result);
             
             // Draw center point
-            cv::circle(result, cv::Point(pred_x, pred_y), 4, circle_color, -1, cv::LINE_AA);
+            cv::circle(temp_result, cv::Point(pred_x, pred_y), 4, circle_color, -1, cv::LINE_AA);
             
             // Draw label with detailed prediction info
             std::string label = "P" + std::to_string(ball.id) + "(" + std::string(ball.is_held ? "H" : "F") + ")";
-            cv::putText(result, label, cv::Point(pred_x + 10, pred_y - 10),
+            cv::putText(temp_result, label, cv::Point(pred_x + 10, pred_y - 10),
                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-            cv::putText(result, label, cv::Point(pred_x + 10, pred_y - 10),
+            cv::putText(temp_result, label, cv::Point(pred_x + 10, pred_y - 10),
                        cv::FONT_HERSHEY_SIMPLEX, 0.5, circle_color, 1, cv::LINE_AA);
             
             // Add detailed prediction info to info panel
             char pred_info[512];
-            snprintf(pred_info, sizeof(pred_info), "  Pred: pos=(%.2f,%.2f,%.2f) hist=%d grav=%s",
+            snprintf(pred_info, sizeof(pred_info), "  Pred: pos=(%.2f,%.2f,%.2f) hist=%zu grav=%s",
                      pred_pos_3d.x, pred_pos_3d.y, pred_pos_3d.z,
                      ball.color_predictor.getHistorySize(),
                      ball.is_held ? "OFF" : "ON");
@@ -1299,20 +1324,17 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         }
     }
     
-    // Draw info panel in upper left corner with text wrapping
+    // Process text wrapping and calculate required height
+    int line_height = 22;
+    int max_width = temp_result.cols - 20;  // Maximum width (full image width minus margins)
+    float font_scale = 0.45f;
+    int font_thickness = 1;
+    int font_face = cv::FONT_HERSHEY_SIMPLEX;
+    
+    std::vector<std::string> wrapped_lines;
+    std::vector<cv::Scalar> wrapped_colors;
+    
     if (!info_lines.empty()) {
-        int panel_x = 10;  // Left side with small margin
-        int panel_y = 10;  // Top margin
-        int line_height = 22;
-        int max_width = result.cols - 20;  // Maximum width (full image width minus margins)
-        float font_scale = 0.45f;
-        int font_thickness = 1;
-        int font_face = cv::FONT_HERSHEY_SIMPLEX;
-        
-        // Process each info line and wrap if needed
-        std::vector<std::string> wrapped_lines;
-        std::vector<cv::Scalar> wrapped_colors;
-        
         for (size_t i = 0; i < info_lines.size(); i++) {
             std::string line = info_lines[i];
             cv::Scalar color = info_colors[i];
@@ -1354,17 +1376,28 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 }
             }
         }
+    }
+    
+    // Calculate required text panel height
+    int text_panel_height = wrapped_lines.empty() ? 0 : (wrapped_lines.size() * line_height + 20);
+    
+    // Create larger image with space for text below
+    int total_height = frame.rows + text_panel_height;
+    cv::Mat result(total_height, frame.cols, frame.type(), cv::Scalar(0, 0, 0));
+    
+    // Copy original frame with visualizations to top portion
+    temp_result.copyTo(result(cv::Rect(0, 0, frame.cols, frame.rows)));
+    
+    // Draw text panel below the image
+    if (!wrapped_lines.empty()) {
+        int panel_x = 10;
+        int panel_y = frame.rows + 10;  // Start below the image
         
-        // Calculate panel dimensions based on wrapped lines
-        int panel_height = wrapped_lines.size() * line_height + 10;
-        
-        // Draw semi-transparent background
-        cv::Mat overlay = result.clone();
-        cv::rectangle(overlay,
-                     cv::Point(panel_x - 5, panel_y - 5),
-                     cv::Point(max_width + 10, panel_y + panel_height),
-                     cv::Scalar(0, 0, 0), -1);
-        cv::addWeighted(overlay, 0.7, result, 0.3, 0, result);
+        // Draw dark background for text area
+        cv::rectangle(result,
+                     cv::Point(0, frame.rows),
+                     cv::Point(frame.cols, total_height),
+                     cv::Scalar(20, 20, 20), -1);
         
         // Draw each wrapped line
         for (size_t i = 0; i < wrapped_lines.size(); i++) {
@@ -1379,9 +1412,8 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             cv::putText(result, wrapped_lines[i],
                        cv::Point(panel_x, y),
                        font_face, font_scale, wrapped_colors[i], font_thickness, cv::LINE_AA);
-        }
-    }
-    }
-    
-    return result;
+       }
+   }
+   
+   return result;
 }

@@ -102,6 +102,7 @@ INSTALL_DEPS=false
 CREATE_VENV=false
 NO_UI=false
 DEBUG=false
+ENGINE_LOG=false  # New flag for engine logging
 ZMQ_ENDPOINT="tcp://localhost:5555"
 CAMERA_SETTINGS=""
 ENGINE_DEVICE="GPU"  # Default device for the engine
@@ -135,6 +136,10 @@ PASS_THROUGH_ARGS=()
              ENGINE_MODEL="$2"
              shift 2
              ;;
+         --engine-log)
+             ENGINE_LOG=true
+             shift
+             ;;
          -h|--help)
              echo "Usage: $0 [OPTIONS] [-- SCRIPT_ARGS]"
              echo "Options:"
@@ -144,6 +149,7 @@ PASS_THROUGH_ARGS=()
              echo "  --camera-settings <file>    Camera settings JSON file (e.g., default.json)"
              echo "  --device <device>           Engine inference device (CPU, GPU, NPU, AUTO) [default: GPU]"
              echo "  --model <model>             Engine model name (e.g., yolo11s) [default: yolo11n]"
+             echo "  --engine-log                Enable engine logging to engine.log and engine_debug.log"
              echo "  -h, --help                  Show this help message"
              echo ""
              echo "Script Arguments (passed to hub/main.py):"
@@ -277,6 +283,11 @@ fi
 echo -e "${BLUE}🧠 Starting C++ engine with device: $ENGINE_DEVICE${NC}"
 ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=$ENGINE_DEVICE" "--model=$ENGINE_MODEL" "--pose-model=yolo11n-pose")
 
+# Add debug-log flag if engine logging is enabled
+if [ "$ENGINE_LOG" = true ]; then
+    ENGINE_ARGS+=("--debug-log")
+fi
+
 # Determine which camera settings to use
 if [ -n "$CAMERA_SETTINGS" ]; then
     CAMERA_SETTINGS_PATH="$PROJECT_ROOT/camera_settings/$CAMERA_SETTINGS"
@@ -301,10 +312,21 @@ fi
 
 echo "Engine command: $ENGINE_EXECUTABLE ${ENGINE_ARGS[@]}"
 
+# Clean up old log files if logging is disabled
+if [ "$ENGINE_LOG" != true ]; then
+    rm -f "$PROJECT_ROOT/engine.log" "$PROJECT_ROOT/engine_debug.log" 2>/dev/null
+fi
+
 # No longer need to change directories. Execute from project root.
 set -m
-# Redirect engine output to a log file for debugging
-"$ENGINE_EXECUTABLE" "${ENGINE_ARGS[@]}" > "$PROJECT_ROOT/engine.log" 2>&1 &
+# Redirect engine output based on --engine-log flag
+if [ "$ENGINE_LOG" = true ]; then
+    echo -e "${YELLOW}📝 Engine logging enabled - output will be written to engine.log and engine_debug.log${NC}"
+    "$ENGINE_EXECUTABLE" "${ENGINE_ARGS[@]}" > "$PROJECT_ROOT/engine.log" 2>&1 &
+else
+    # Discard engine output by default
+    "$ENGINE_EXECUTABLE" "${ENGINE_ARGS[@]}" > /dev/null 2>&1 &
+fi
 ENGINE_PID=$!
 set +m
 

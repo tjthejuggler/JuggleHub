@@ -115,6 +115,7 @@ private:
         std::vector<TrackedHand> tracked_hands;
         std::vector<SimpleBall> tracked_balls;  // Store SimpleBall data for color visualization
         std::vector<SimpleHand> tracked_hands_simple;  // Store SimpleHand data for logging
+        std::vector<BallEvent> ball_events;  // Store throw/catch events for this frame
         juggler::v1::VisualizationStates viz_states;  // Store visualization states
     };
     std::deque<RecordingFrame> frame_buffer_;

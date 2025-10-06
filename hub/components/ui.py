@@ -1606,59 +1606,90 @@ if PYQT_AVAILABLE:
                 self.log_message("Color profile calibration cancelled.")
 
         def video_view_clicked(self, event):
+            print(f"🖱️ video_view_clicked() called! Button checked: {self.set_color_profile_button.isChecked()}")
             # Ball management calibration removed - using legacy color tracking only
             if self.set_color_profile_button.isChecked():
+                print(f"✅ Calibration mode is active!")
                 scene_pos = self.video_view.mapToScene(event.pos())
+                print(f"📍 Scene pos: {scene_pos}")
                 pixmap_item = self.video_pixmap_item
+                print(f"🖼️ Pixmap item exists: {pixmap_item is not None}")
+                print(f"🖼️ Pixmap exists: {pixmap_item.pixmap() is not None if pixmap_item else False}")
                 
                 # Check if the click is within the pixmap bounds
                 if pixmap_item.pixmap() and pixmap_item.sceneBoundingRect().contains(scene_pos):
+                    print(f"✅ Click is within pixmap bounds!")
                     # Transform scene coordinates to pixmap (image) coordinates
                     img_pos = pixmap_item.mapFromScene(scene_pos)
+                    print(f"📍 Image pos: ({img_pos.x():.1f}, {img_pos.y():.1f})")
                     
                     color_name = self.color_profile_combo.currentText()
+                    print(f"🎨 Selected color: '{color_name}'")
                     self.log_message(f"Clicked at pixel ({img_pos.x():.1f}, {img_pos.y():.1f}) to set '{color_name}' color profile")
                     
                     # Get the current frame image
                     frame_image = self.get_latest_frame()
+                    print(f"🖼️ Frame available: {frame_image is not None}")
+                    
                     if frame_image is not None:
-                        # Extract color at the clicked position
-                        x, y = int(img_pos.x()), int(img_pos.y())
-                        # Ensure coordinates are within bounds
-                        x = max(0, min(x, frame_image.shape[1] - 1))
-                        y = max(0, min(y, frame_image.shape[0] - 1))
-                        
-                        # Sample a small region around the click for better color accuracy
-                        sample_size = 10
-                        x1 = max(0, x - sample_size)
-                        y1 = max(0, y - sample_size)
-                        x2 = min(frame_image.shape[1], x + sample_size)
-                        y2 = min(frame_image.shape[0], y + sample_size)
-                        
-                        roi = frame_image[y1:y2, x1:x2]
-                        hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-                        avg_hsv = np.mean(hsv_roi, axis=(0, 1))
-                        
-                        self.log_message(f"Sampled HSV color: H={avg_hsv[0]:.1f}, S={avg_hsv[1]:.1f}, V={avg_hsv[2]:.1f}")
-                        
-                        # Send calibration command to engine via ZMQ
-                        command = juggler_pb2.CommandRequest()
-                        command.type = juggler_pb2.CommandRequest.CommandType.CALIBRATE_COLOR
-                        command.color_name = color_name
-                        command.click_x = x
-                        command.click_y = y
-                        
                         try:
+                            print(f"✅ Frame is valid, proceeding with color sampling...")
+                            # Extract color at the clicked position
+                            x, y = int(img_pos.x()), int(img_pos.y())
+                            # Ensure coordinates are within bounds
+                            x = max(0, min(x, frame_image.shape[1] - 1))
+                            y = max(0, min(y, frame_image.shape[0] - 1))
+                            
+                            # Sample a small region around the click for better color accuracy
+                            sample_size = 10
+                            x1 = max(0, x - sample_size)
+                            y1 = max(0, y - sample_size)
+                            x2 = min(frame_image.shape[1], x + sample_size)
+                            y2 = min(frame_image.shape[0], y + sample_size)
+                            
+                            roi = frame_image[y1:y2, x1:x2]
+                            hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                            avg_hsv = np.mean(hsv_roi, axis=(0, 1))
+                            
+                            print(f"📊 Sampled HSV: H={avg_hsv[0]:.1f}, S={avg_hsv[1]:.1f}, V={avg_hsv[2]:.1f}")
+                            self.log_message(f"Sampled HSV color: H={avg_hsv[0]:.1f}, S={avg_hsv[1]:.1f}, V={avg_hsv[2]:.1f}")
+                            
+                            print(f"📦 Creating ZMQ command...")
+                            # Send calibration command to engine via ZMQ
+                            command = juggler_pb2.CommandRequest()
+                            print(f"📦 Command object created")
+                            command.type = juggler_pb2.CommandRequest.CommandType.CALIBRATE_COLOR
+                            print(f"📦 Command type set to CALIBRATE_COLOR")
+                            command.color_name = color_name
+                            print(f"📦 Color name set to '{color_name}'")
+                            command.click_x = x
+                            command.click_y = y
+                            print(f"📦 Click coordinates set to ({x}, {y})")
+                            
+                            print(f"📤 About to send ZMQ command...")
+                            self.log_message(f"📤 Sending CALIBRATE_COLOR command for '{color_name}' at ({x}, {y})")
                             response = self.zmq_client.send_command(command)
+                            print(f"📥 Response received: success={response.success}, message='{response.message}'")
+                            self.log_message(f"📥 Response from engine: success={response.success}, message='{response.message}'")
+                            
                             if response.success:
+                                print(f"✅ Response was successful, proceeding with reload...")
                                 self.log_message(f"✅ Color profile '{color_name}' updated successfully from YOLO detection box")
                                 self.color_profile_status_label.setText(f"✅ '{color_name}' profile set! Click 'Set Color Profile' again to calibrate another color.")
                                 
                                 # Reload ball profiles to update the hue sliders in Ball Profiles section
-                                # Add a small delay to allow the C++ engine to save the file
+                                # CRITICAL FIX: Call reload immediately instead of using timer
+                                # The timer was not firing because the app was closing too quickly
                                 if hasattr(self, 'settings_widget') and self.settings_widget:
-                                    # Use QTimer to delay the reload slightly
-                                    QTimer.singleShot(200, lambda: self._reload_ball_profiles_after_calibration(color_name))
+                                    self.log_message(f"🔄 Calling reload_ball_profiles() immediately for '{color_name}'")
+                                    try:
+                                        # Call reload directly - no timer delay needed
+                                        self.settings_widget.reload_ball_profiles()
+                                        self.log_message(f"✅ Ball profile sliders updated for '{color_name}'")
+                                    except Exception as e:
+                                        self.log_message(f"❌ Error reloading ball profiles: {e}")
+                                        import traceback
+                                        self.log_message(f"Stack trace: {traceback.format_exc()}")
                             else:
                                 # Check if the error is about no YOLO box found
                                 if "No YOLO detection box found" in response.message:
@@ -1672,9 +1703,13 @@ if PYQT_AVAILABLE:
                                     self.log_message(f"❌ Failed to update color profile: {response.message}")
                                     self.color_profile_status_label.setText(f"❌ Failed to set '{color_name}' profile: {response.message}")
                         except Exception as e:
-                            self.log_message(f"❌ Error sending calibration command: {e}")
+                            print(f"❌ EXCEPTION during calibration: {e}")
+                            import traceback
+                            print(f"Stack trace: {traceback.format_exc()}")
+                            self.log_message(f"❌ Error during calibration: {e}")
                             self.color_profile_status_label.setText(f"❌ Error: {e}")
                     else:
+                        print(f"❌ ERROR: frame_image is None!")
                         self.log_message(f"❌ Error: No frame image available for color sampling")
                         self.color_profile_status_label.setText("❌ No frame available")
                     
@@ -1687,11 +1722,27 @@ if PYQT_AVAILABLE:
         def _reload_ball_profiles_after_calibration(self, color_name: str):
             """Helper method to reload ball profiles after calibration with proper error handling"""
             try:
-                if hasattr(self, 'settings_widget') and self.settings_widget:
-                    self.settings_widget.reload_ball_profiles()
-                    self.log_message(f"🎨 Ball profile hue sliders updated for '{color_name}'")
+                self.log_message(f"🔄 _reload_ball_profiles_after_calibration() called for '{color_name}'")
+                
+                if not hasattr(self, 'settings_widget'):
+                    self.log_message(f"❌ ERROR: self.settings_widget does not exist!")
+                    return
+                
+                if not self.settings_widget:
+                    self.log_message(f"❌ ERROR: self.settings_widget is None!")
+                    return
+                
+                if not hasattr(self.settings_widget, 'reload_ball_profiles'):
+                    self.log_message(f"❌ ERROR: settings_widget does not have reload_ball_profiles method!")
+                    return
+                
+                self.log_message(f"✅ Calling settings_widget.reload_ball_profiles()...")
+                self.settings_widget.reload_ball_profiles()
+                self.log_message(f"🎨 Ball profile hue sliders updated for '{color_name}'")
             except Exception as e:
                 self.log_message(f"⚠️ Warning: Could not reload ball profiles: {e}")
+                import traceback
+                self.log_message(f"Stack trace: {traceback.format_exc()}")
 
 class JuggleHubUI:
     def __init__(self, config: dict, zmq_client: Optional['ZMQClient'] = None, hub_instance=None):

@@ -48,7 +48,7 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
         const std::string ball_model_path = "engine/models/" + model_name + ".xml";
         const std::string pose_model_path = "engine/models/" + pose_model_name + ".xml";
         simple_tracker_ = std::make_shared<SimpleBallTracker>(
-            ball_model_path, pose_model_path, device_name, "ball_settings.json");
+            ball_model_path, pose_model_path, device_name, "hub/ball_settings.json");
         DEBUG_LOG("[LOG] SimpleBallTracker initialized successfully");
     } catch (const std::exception& e) {
         ERROR_LOG("FATAL ERROR: Failed to initialize SimpleBallTracker: ", e.what());
@@ -80,7 +80,7 @@ void Engine::run() {
     if (use_dnn_tracker_) {
         settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_);
     } else {
-        ball_tracker_ = std::make_shared<juggler::BallTracker>("ball_settings.json");
+        ball_tracker_ = std::make_shared<juggler::BallTracker>("hub/ball_settings.json");
         settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(ball_tracker_);
     }
     settings_module_->setup();

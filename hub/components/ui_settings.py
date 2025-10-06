@@ -1148,27 +1148,105 @@ if PYQT_AVAILABLE:
             """Reload ball profiles from ball_settings.json and update sliders"""
             import json
             import os
+            from PyQt6.QtWidgets import QApplication
             ball_settings_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ball_settings.json")
+            
+            print(f"🔄 reload_ball_profiles() called - reading from {ball_settings_path}")
+            
+            # CRITICAL: Ensure the Ball Profiles section is expanded so sliders are visible
+            if hasattr(self, 'ball_profiles_section') and self.ball_profiles_section.is_collapsed:
+                print(f"⚠️ Ball Profiles section is collapsed - expanding it now")
+                self.ball_profiles_section.toggle_collapsed()
+                QApplication.processEvents()
             
             try:
                 with open(ball_settings_path, 'r') as f:
                     self.ball_profiles = json.load(f)
                 
-                # Update slider values
+                print(f"📖 Loaded ball profiles: {list(self.ball_profiles.keys())}")
+                
+                # Update slider values AND send to engine
                 for ball_name, sliders in self.ball_hue_sliders.items():
                     if ball_name in self.ball_profiles:
                         hsv_data = self.ball_profiles[ball_name]
                         min_hsv = hsv_data.get('min_hsv', [0, 0, 0])
                         max_hsv = hsv_data.get('max_hsv', [180, 255, 255])
                         
-                        sliders['min'].setValue(int(min_hsv[0]))
-                        sliders['max'].setValue(int(max_hsv[0]))
-                        sliders['min_label'].setText(str(int(min_hsv[0])))
-                        sliders['max_label'].setText(str(int(max_hsv[0])))
+                        min_hue_value = int(min_hsv[0])
+                        max_hue_value = int(max_hsv[0])
+                        
+                        print(f"🎨 Updating {ball_name}: min_hue={min_hue_value}, max_hue={max_hue_value}")
+                        
+                        # CRITICAL FIX: Block signals during update to prevent triggering valueChanged
+                        # which would send UDP messages and potentially cause recursion
+                        sliders['min'].blockSignals(True)
+                        sliders['max'].blockSignals(True)
+                        
+                        # Get current values to check if they're already correct
+                        current_min = sliders['min'].value()
+                        current_max = sliders['max'].value()
+                        print(f"   Current slider values BEFORE update: min={current_min}, max={current_max}")
+                        
+                        # CRITICAL: If values are already correct, Qt won't update the visual
+                        # So we MUST set to a different value first to force a visual change
+                        if current_min == min_hue_value and current_max == max_hue_value:
+                            print(f"   ⚠️ Values already match! Forcing visual update by resetting range...")
+                        
+                        # NUCLEAR OPTION: Reset the entire range to force Qt to recalculate everything
+                        # This is the most aggressive way to force a visual update
+                        sliders['min'].setRange(0, 180)  # Reset range
+                        sliders['max'].setRange(0, 180)
+                        
+                        # Set to a completely different value first
+                        sliders['min'].setValue(90)  # Middle value
+                        sliders['max'].setValue(90)
+                        sliders['min'].setSliderPosition(90)
+                        sliders['max'].setSliderPosition(90)
+                        
+                        # Force render of the middle position
+                        sliders['min'].update()
+                        sliders['max'].update()
+                        QApplication.processEvents()
+                        
+                        # Now set to the actual target values
+                        sliders['min'].setValue(min_hue_value)
+                        sliders['max'].setValue(max_hue_value)
+                        sliders['min'].setSliderPosition(min_hue_value)
+                        sliders['max'].setSliderPosition(max_hue_value)
+                        sliders['min_label'].setText(str(min_hue_value))
+                        sliders['max_label'].setText(str(max_hue_value))
+                        
+                        # Re-enable signals
+                        sliders['min'].blockSignals(False)
+                        sliders['max'].blockSignals(False)
+                        
+                        # Force immediate visual update with multiple refresh calls
+                        sliders['min'].update()
+                        sliders['max'].update()
+                        sliders['min'].repaint()
+                        sliders['max'].repaint()
+                        sliders['min_label'].update()
+                        sliders['max_label'].update()
+                        sliders['min'].style().unpolish(sliders['min'])
+                        sliders['min'].style().polish(sliders['min'])
+                        sliders['max'].style().unpolish(sliders['max'])
+                        sliders['max'].style().polish(sliders['max'])
+                        QApplication.processEvents()
+                        
+                        print(f"   Slider values after update: min={sliders['min'].value()}, max={sliders['max'].value()}")
+                        print(f"   Slider positions after update: min={sliders['min'].sliderPosition()}, max={sliders['max'].sliderPosition()}")
+                        
+                        # CRITICAL FIX: Send the updated hue values to the engine
+                        # This ensures the engine uses the calibrated values immediately
+                        self.udp_client.send_setting(f"{ball_name}_min_hue", min_hue_value)
+                        self.udp_client.send_setting(f"{ball_name}_max_hue", max_hue_value)
+                        print(f"📤 Sent calibrated hue range to engine: {ball_name} min={min_hue_value}, max={max_hue_value}")
                 
-                print("✅ Ball profiles reloaded")
+                print("✅ Ball profiles reloaded and sent to engine")
             except Exception as e:
                 print(f"❌ Error reloading ball profiles: {e}")
+                import traceback
+                traceback.print_exc()
 
         def toggle_pose_model(self):
             is_enabled = self.pose_model_toggle.isChecked()

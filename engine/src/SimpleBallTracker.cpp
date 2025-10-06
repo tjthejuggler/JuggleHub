@@ -1366,25 +1366,26 @@ bool SimpleBallTracker::calibrateColor(const std::string& color_name,
     
     cv::Mat roi_hsv = hsv_frame(roi);
     
-    // Calculate mean and stddev
-    cv::Scalar mean, stddev;
-    cv::meanStdDev(roi_hsv, mean, stddev);
+    // Calculate mean HSV values
+    cv::Scalar mean;
+    cv::meanStdDev(roi_hsv, mean, cv::noArray());
     
-    // Set range as mean ± 2*stddev (with minimum tolerances)
-    float hue_tol = std::max(15.0f, static_cast<float>(stddev[0]) * 2.0f);
-    float sat_tol = std::max(50.0f, static_cast<float>(stddev[1]) * 2.0f);
-    float val_tol = std::max(50.0f, static_cast<float>(stddev[2]) * 2.0f);
+    // Simple calibration: average hue ± 20 on either side
+    // Keep saturation and value ranges wide for robustness
+    const float hue_tolerance = 20.0f;
+    const float sat_min = 50.0f;   // Minimum saturation to avoid white/gray
+    const float val_min = 50.0f;   // Minimum value to avoid black
     
     cv::Scalar min_hsv(
-        std::max(0.0, mean[0] - hue_tol),
-        std::max(0.0, mean[1] - sat_tol),
-        std::max(0.0, mean[2] - val_tol)
+        std::max(0.0, mean[0] - hue_tolerance),
+        sat_min,
+        val_min
     );
     
     cv::Scalar max_hsv(
-        std::min(180.0, mean[0] + hue_tol),
-        std::min(255.0, mean[1] + sat_tol),
-        std::min(255.0, mean[2] + val_tol)
+        std::min(180.0, mean[0] + hue_tolerance),
+        255.0,  // Max saturation
+        255.0   // Max value
     );
     
     // Find and update color profile

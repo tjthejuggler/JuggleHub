@@ -186,13 +186,49 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         std::string color_name = key.substr(6);  // Remove "track_" prefix
         bool enable = (value == "true" || value == "1");
         
+        std::cout << "[SimpleBallTracker] Received track setting: " << key << "=" << value << std::endl;
+        std::cout << "[SimpleBallTracker] Color: " << color_name << ", Enable: " << enable << std::endl;
+        
+        bool found = false;
         for (auto& profile : color_profiles_) {
             if (profile.name == color_name) {
                 profile.enabled = enable;
-                saveSettings();
-                return true;
+                found = true;
+                std::cout << "[SimpleBallTracker] Updated profile '" << color_name << "' enabled=" << enable << std::endl;
+                break;
             }
         }
+        
+        if (!found) {
+            std::cerr << "[SimpleBallTracker] WARNING: Color profile '" << color_name << "' not found!" << std::endl;
+            return false;
+        }
+        
+        saveSettings();
+        
+        // CRITICAL: Reinitialize balls list based on new enabled profiles
+        std::cout << "[SimpleBallTracker] Reinitializing balls based on enabled profiles..." << std::endl;
+        balls_.clear();
+        int ball_id = 0;
+        for (const auto& profile : color_profiles_) {
+            if (profile.enabled && ball_id < 3) {  // Max 3 balls
+                SimpleBall ball;
+                ball.id = ball_id++;
+                ball.color_name = profile.name;
+                
+                // Initialize color predictor with tracking settings
+                ColorBasedPredictor::PredictionSettings pred_settings;
+                pred_settings.history_frames = tracking_settings_.prediction_history_frames;
+                pred_settings.prediction_radius_m = tracking_settings_.prediction_radius_m;
+                ball.color_predictor.setSettings(pred_settings);
+                
+                balls_.push_back(ball);
+                std::cout << "[SimpleBallTracker]   Added ball " << ball.id << " for color '" << ball.color_name << "'" << std::endl;
+            }
+        }
+        std::cout << "[SimpleBallTracker] Now tracking " << balls_.size() << " balls" << std::endl;
+        
+        return true;
     }
     
     // Handle tracking settings
@@ -963,7 +999,15 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             }
         }
         
-        if (!profile) continue;
+        if (!profile) {
+            std::cout << "[SimpleBallTracker] WARNING: No enabled profile found for ball '" << ball.color_name << "'" << std::endl;
+            continue;
+        }
+        
+        std::cout << "[SimpleBallTracker] Matching ball '" << ball.color_name << "' with HSV range: H["
+                  << profile->min_hsv[0] << "-" << profile->max_hsv[0] << "] S["
+                  << profile->min_hsv[1] << "-" << profile->max_hsv[1] << "] V["
+                  << profile->min_hsv[2] << "-" << profile->max_hsv[2] << "]" << std::endl;
         
         // Get Kalman prediction for this ball (for boundary checking)
         // CRITICAL: We must NOT modify the Kalman state here, only peek at what it would predict

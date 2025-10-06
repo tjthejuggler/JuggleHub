@@ -908,7 +908,9 @@ if PYQT_AVAILABLE:
             # Load ball profiles from ball_settings.json
             import json
             import os
-            ball_settings_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ball_settings.json")
+            # Path should be hub/ball_settings.json (one directory up from components/)
+            ball_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ball_settings.json")
+            ball_settings_path = os.path.normpath(ball_settings_path)
             
             try:
                 with open(ball_settings_path, 'r') as f:
@@ -1073,16 +1075,20 @@ if PYQT_AVAILABLE:
 
         def toggle_ball_tracking(self, ball_name: str, enabled: bool):
             """Toggle tracking for a specific ball color"""
-            print(f"{'Enabling' if enabled else 'Disabling'} tracking for {ball_name}")
+            print(f"🔄 {'Enabling' if enabled else 'Disabling'} tracking for {ball_name}")
             
             # Update the ball_profiles dict
             if ball_name in self.ball_profiles:
                 self.ball_profiles[ball_name]['enabled'] = enabled
                 # Save to ball_settings.json
                 self.save_ball_settings()
+                print(f"💾 Updated ball_profiles and saved to file: {ball_name} enabled={enabled}")
+            else:
+                print(f"⚠️ WARNING: {ball_name} not found in ball_profiles!")
             
             # Send command to engine via UDP
             self.udp_client.send_setting(f"track_{ball_name}", 1 if enabled else 0)
+            print(f"📤 Sent UDP command: track_{ball_name}={1 if enabled else 0}")
             
             # Auto-save settings
             if not self._loading_settings:
@@ -1113,7 +1119,9 @@ if PYQT_AVAILABLE:
             """Save ball profiles to ball_settings.json"""
             import json
             import os
-            ball_settings_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ball_settings.json")
+            # Path should be hub/ball_settings.json (one directory up from components/)
+            ball_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ball_settings.json")
+            ball_settings_path = os.path.normpath(ball_settings_path)
             
             try:
                 with open(ball_settings_path, 'w') as f:
@@ -1149,7 +1157,9 @@ if PYQT_AVAILABLE:
             import json
             import os
             from PyQt6.QtWidgets import QApplication
-            ball_settings_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ball_settings.json")
+            # Path should be hub/ball_settings.json (one directory up from components/)
+            ball_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ball_settings.json")
+            ball_settings_path = os.path.normpath(ball_settings_path)
             
             print(f"🔄 reload_ball_profiles() called - reading from {ball_settings_path}")
             

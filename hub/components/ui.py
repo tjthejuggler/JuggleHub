@@ -1678,16 +1678,15 @@ if PYQT_AVAILABLE:
                                 self.color_profile_status_label.setText(f"✅ '{color_name}' profile set! Click 'Set Color Profile' again to calibrate another color.")
                                 
                                 # Reload ball profiles to update the hue sliders in Ball Profiles section
-                                # CRITICAL FIX: Call reload immediately instead of using timer
-                                # The timer was not firing because the app was closing too quickly
+                                # CRITICAL FIX: Add small delay to allow engine to finish writing the file
+                                # The engine saves the file after calibration, but we need to wait for it to complete
                                 if hasattr(self, 'settings_widget') and self.settings_widget:
-                                    self.log_message(f"🔄 Calling reload_ball_profiles() immediately for '{color_name}'")
+                                    self.log_message(f"🔄 Scheduling reload_ball_profiles() for '{color_name}' after 100ms delay")
                                     try:
-                                        # Call reload directly - no timer delay needed
-                                        self.settings_widget.reload_ball_profiles()
-                                        self.log_message(f"✅ Ball profile sliders updated for '{color_name}'")
+                                        # Use QTimer to delay reload by 100ms to avoid race condition
+                                        QTimer.singleShot(100, lambda: self._reload_ball_profiles_with_logging(color_name))
                                     except Exception as e:
-                                        self.log_message(f"❌ Error reloading ball profiles: {e}")
+                                        self.log_message(f"❌ Error scheduling reload: {e}")
                                         import traceback
                                         self.log_message(f"Stack trace: {traceback.format_exc()}")
                             else:
@@ -1719,10 +1718,10 @@ if PYQT_AVAILABLE:
             # Call original event handler
             QGraphicsView.mousePressEvent(self.video_view, event)
         
-        def _reload_ball_profiles_after_calibration(self, color_name: str):
+        def _reload_ball_profiles_with_logging(self, color_name: str):
             """Helper method to reload ball profiles after calibration with proper error handling"""
             try:
-                self.log_message(f"🔄 _reload_ball_profiles_after_calibration() called for '{color_name}'")
+                self.log_message(f"🔄 _reload_ball_profiles_with_logging() called for '{color_name}'")
                 
                 if not hasattr(self, 'settings_widget'):
                     self.log_message(f"❌ ERROR: self.settings_widget does not exist!")

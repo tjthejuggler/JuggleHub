@@ -909,10 +909,35 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     cv::Mat result = frame.clone();
     const auto& viz = rec_frame.viz_states;
     
-    // Draw YOLO detections (legacy support)
+    // Prepare info panel data
+    std::vector<std::string> info_lines;
+    std::vector<cv::Scalar> info_colors;
+    
+    // Draw YOLO detections with numbering
     if (record_with_yolo_boxes_ || viz.show_raw_detections()) {
+        int det_num = 1;
         for (const auto& det : rec_frame.raw_detections) {
-            cv::rectangle(result, det.box, cv::Scalar(0, 0, 255), 2); // Red for YOLO
+            // Draw red box for YOLO detection
+            cv::rectangle(result, det.box, cv::Scalar(0, 0, 255), 2);
+            
+            // Draw detection number on the box
+            std::string num_label = "#" + std::to_string(det_num);
+            cv::putText(result, num_label, 
+                       cv::Point(det.box.x + 5, det.box.y + 20),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+            cv::putText(result, num_label, 
+                       cv::Point(det.box.x + 5, det.box.y + 20),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+            
+            // Add YOLO info to panel
+            std::string class_name = (det.class_id == 0) ? "ball" : "ball_held";
+            char info_text[128];
+            snprintf(info_text, sizeof(info_text), "#%d YOLO: %s conf=%.2f", 
+                     det_num, class_name.c_str(), det.confidence);
+            info_lines.push_back(info_text);
+            info_colors.push_back(cv::Scalar(255, 255, 255)); // White for YOLO
+            
+            det_num++;
         }
     }
     
@@ -1003,38 +1028,64 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 }
             }
             
-            // Draw label with background for better visibility
-            std::string label = ball.color_name + " (" + std::to_string(ball.id) + ")";
-            std::string pos_label = "(" + std::to_string(static_cast<int>(ball.position.z * 100)) + "cm)";
+            // Draw simple label on ball (just first letter)
+            std::string label = ball.color_name.substr(0, 1);
+            cv::putText(result, label, cv::Point(center_x - 5, center_y + 5),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+            cv::putText(result, label, cv::Point(center_x - 5, center_y + 5),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
             
-            // Use white text with black outline for visibility
-            cv::putText(result, label, cv::Point(center_x + 15, center_y),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-            cv::putText(result, label, cv::Point(center_x + 15, center_y),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
-            
-            cv::putText(result, pos_label, cv::Point(center_x + 15, center_y + 15),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-            cv::putText(result, pos_label, cv::Point(center_x + 15, center_y + 15),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
-            
-            // Show wrist association if held
+            // Add color tracker info to panel
+            char info_text[256];
+            std::string state = ball.is_held ? "HELD" : "FLIGHT";
+            std::string hand_info = "";
             if (ball.is_held && ball.held_by_hand_id >= 0) {
-                std::string wrist_label = "[" + std::string(ball.held_by_hand_id == 0 ? "L" : "R") + "]";
-                cv::putText(result, wrist_label, cv::Point(center_x + 15, center_y + 30),
-                           cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-                cv::putText(result, wrist_label, cv::Point(center_x + 15, center_y + 30),
-                           cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+                hand_info = " [" + std::string(ball.held_by_hand_id == 0 ? "L" : "R") + "]";
             }
             
-            // Show tracking reason for debugging
-            if (!ball.tracking_reason.empty()) {
-                cv::putText(result, ball.tracking_reason, cv::Point(center_x + 15, center_y + 45),
-                           cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-                cv::putText(result, ball.tracking_reason, cv::Point(center_x + 15, center_y + 45),
-                           cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 0), 1, cv::LINE_AA);
-            }
+            snprintf(info_text, sizeof(info_text), "%s: %s%s z=%.2fm | %s", 
+                     ball.color_name.c_str(), state.c_str(), hand_info.c_str(),
+                     ball.position.z, ball.tracking_reason.c_str());
+            info_lines.push_back(info_text);
+            info_colors.push_back(color);
         }
+    
+    // Draw info panel in upper right corner
+    if (!info_lines.empty()) {
+        int panel_x = result.cols - 550;  // Right side with margin
+        int panel_y = 30;  // Top margin
+        int line_height = 25;
+        int panel_width = 540;
+        int panel_height = (info_lines.size() + 1) * line_height + 10;
+        
+        // Draw semi-transparent background
+        cv::Mat overlay = result.clone();
+        cv::rectangle(overlay, 
+                     cv::Point(panel_x - 10, panel_y - 25),
+                     cv::Point(panel_x + panel_width, panel_y + panel_height),
+                     cv::Scalar(0, 0, 0), -1);
+        cv::addWeighted(overlay, 0.7, result, 0.3, 0, result);
+        
+        // Draw title
+        cv::putText(result, "TRACKING INFO", 
+                   cv::Point(panel_x, panel_y),
+                   cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
+        
+        // Draw each info line
+        for (size_t i = 0; i < info_lines.size(); i++) {
+            int y = panel_y + (i + 1) * line_height;
+            
+            // Draw black outline for readability
+            cv::putText(result, info_lines[i], 
+                       cv::Point(panel_x, y),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+            
+            // Draw colored text
+            cv::putText(result, info_lines[i], 
+                       cv::Point(panel_x, y),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.5, info_colors[i], 1, cv::LINE_AA);
+        }
+    }
     }
     
     return result;

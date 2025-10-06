@@ -236,78 +236,6 @@ static float get_score_for_color(const ColorScores& scores, const std::string& c
     return 0.0f;
 }
 
-// Helper function to check if a detection matches a tracker's color profile
-static float check_color_match_confidence(
-    const cv::Mat& color_frame,
-    const Detection& detection,
-    const std::string& color_name,
-    juggler::ColorTracker* color_tracker
-) {
-    if (color_name.empty() || !color_tracker) {
-        return 0.0f; // No color assignment or tracker
-    }
-    
-    // Get color profiles from color tracker
-    const auto& profiles = color_tracker->getColorProfiles();
-    
-    // Find matching color profile
-    for (const auto& profile : profiles) {
-        if (profile.name == color_name && profile.enabled) {
-            // Convert detection bbox center to point
-            cv::Point2f center(
-                detection.box.x + detection.box.width / 2.0f,
-                detection.box.y + detection.box.height / 2.0f
-            );
-            
-            // Check if center is within frame bounds
-            if (center.x < 0 || center.x >= color_frame.cols ||
-                center.y < 0 || center.y >= color_frame.rows) {
-                return 0.0f;
-            }
-            
-            // Convert to HSV
-            cv::Mat hsv_frame;
-            cv::cvtColor(color_frame, hsv_frame, cv::COLOR_BGR2HSV);
-            
-            // Sample a small region around the center (5x5 pixels)
-            const int sample_radius = 5;
-            int match_count = 0;
-            int total_count = 0;
-            
-            for (int dy = -sample_radius; dy <= sample_radius; dy++) {
-                for (int dx = -sample_radius; dx <= sample_radius; dx++) {
-                    int x = static_cast<int>(center.x) + dx;
-                    int y = static_cast<int>(center.y) + dy;
-                    
-                    if (x >= 0 && x < hsv_frame.cols && y >= 0 && y < hsv_frame.rows) {
-                        cv::Vec3b hsv_pixel = hsv_frame.at<cv::Vec3b>(y, x);
-                        
-                        // Check if pixel matches color profile
-                        bool matches = (hsv_pixel[0] >= profile.min_hsv[0] && hsv_pixel[0] <= profile.max_hsv[0] &&
-                                       hsv_pixel[1] >= profile.min_hsv[1] && hsv_pixel[1] <= profile.max_hsv[1] &&
-                                       hsv_pixel[2] >= profile.min_hsv[2] && hsv_pixel[2] <= profile.max_hsv[2]);
-                        
-                        // Check secondary range for wrap-around colors (like red)
-                        if (!matches && profile.min_hsv2[0] >= 0) {
-                            matches = (hsv_pixel[0] >= profile.min_hsv2[0] && hsv_pixel[0] <= profile.max_hsv2[0] &&
-                                      hsv_pixel[1] >= profile.min_hsv2[1] && hsv_pixel[1] <= profile.max_hsv2[1] &&
-                                      hsv_pixel[2] >= profile.min_hsv2[2] && hsv_pixel[2] <= profile.max_hsv2[2]);
-                        }
-                        
-                        if (matches) match_count++;
-                        total_count++;
-                    }
-                }
-            }
-            
-            // Return confidence as percentage of matching pixels
-            return total_count > 0 ? static_cast<float>(match_count) / total_count : 0.0f;
-        }
-    }
-    
-    return 0.0f; // Color profile not found or disabled
-}
-
 // Simple greedy assignment (can be upgraded to full Hungarian later)
 static std::vector<std::pair<int, int>> optimal_assignment(
     const std::vector<std::vector<float>>& cost_matrix,
@@ -385,26 +313,24 @@ DNNTracker::DNNTracker(const std::string& ball_model_path, const std::string& po
     reinitialize_tracker();
     initialize_logical_trackers();
     
-    // Initialize color tracker
-    color_tracker_ = std::make_unique<juggler::ColorTracker>("ball_settings.json");
-    
-    // Initialize adaptive color manager
+    // Initialize adaptive color manager with default color profiles
     juggler::AdaptationConfig adaptive_config;
     adaptive_config.enabled = true;
     adaptive_color_manager_ = std::make_unique<juggler::AdaptiveColorManager>(adaptive_config);
     
-    // Initialize adaptive profiles from color tracker profiles
-    const auto& color_profiles = color_tracker_->getColorProfiles();
-    std::vector<cv::Scalar> min_hsv_values, max_hsv_values;
-    std::vector<std::string> color_names;
-    std::vector<bool> enabled_states;
-    
-    for (const auto& profile : color_profiles) {
-        min_hsv_values.push_back(profile.min_hsv);
-        max_hsv_values.push_back(profile.max_hsv);
-        color_names.push_back(profile.name);
-        enabled_states.push_back(profile.enabled);
-    }
+    // Initialize with default color profiles
+    std::vector<cv::Scalar> min_hsv_values = {
+        cv::Scalar(45, 50, 50),   // green
+        cv::Scalar(140, 50, 50),  // pink
+        cv::Scalar(5, 50, 50)     // orange
+    };
+    std::vector<cv::Scalar> max_hsv_values = {
+        cv::Scalar(75, 255, 255),   // green
+        cv::Scalar(175, 255, 255),  // pink
+        cv::Scalar(20, 255, 255)    // orange
+    };
+    std::vector<std::string> color_names = {"green", "pink", "orange"};
+    std::vector<bool> enabled_states = {true, true, true};
     
     adaptive_color_manager_->initializeFromProfiles(min_hsv_values, max_hsv_values,
                                                      color_names, enabled_states);
@@ -833,10 +759,10 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     // NEW APPROACH: Create one tracker per enabled color profile, not just when all trackers are lost
     std::ofstream auto_init_log("engine_debug.log", std::ios::app);
     
-    // Get enabled color profiles
+    // Get enabled color profiles from adaptive manager
     std::vector<std::string> enabled_colors;
-    if (color_tracker_) {
-        const auto& profiles = color_tracker_->getColorProfiles();
+    if (adaptive_color_manager_) {
+        const auto& profiles = adaptive_color_manager_->getProfiles();
         for (const auto& profile : profiles) {
             if (profile.enabled) {
                 enabled_colors.push_back(profile.name);
@@ -1036,46 +962,6 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     std::vector<TrackedHand> tracked_hands;
     if (pose_model_enabled_) {
         tracked_hands = run_pose_estimation(color_frame, depth_frame, intrinsics);
-    }
-
-    // --- 8. RUN COLOR TRACKING ---
-    // Convert depth_frame cv::Mat to rs2_intrinsics for ColorTracker
-    rs2_intrinsics rs_intrinsics;
-    rs_intrinsics.fx = intrinsics.fx;
-    rs_intrinsics.fy = intrinsics.fy;
-    rs_intrinsics.ppx = intrinsics.ppx;
-    rs_intrinsics.ppy = intrinsics.ppy;
-    rs_intrinsics.width = color_frame.cols;
-    rs_intrinsics.height = color_frame.rows;
-    rs_intrinsics.model = RS2_DISTORTION_BROWN_CONRADY;
-    for (int i = 0; i < 5; i++) rs_intrinsics.coeffs[i] = 0.0f;
-    
-    color_tracked_balls_ = color_tracker_->update(color_frame, depth_frame, rs_intrinsics,
-                                                   final_tracked_objects, tracked_hands);
-
-    // --- 9. FUSE COLOR TRACKING MEASUREMENTS INTO PERSISTENT TRACKERS ---
-    // Fuse color tracking measurements into persistent trackers
-    for (const auto& color_ball : color_tracked_balls_) {
-        if (!color_ball.is_active) continue;
-        
-        // Find corresponding persistent tracker
-        for (auto& ball : logical_ball_trackers_) {
-            if (ball.logical_id == color_ball.logical_id && ball.status != TrackerStatus::LOST) {
-                // Use color position as additional measurement
-                if (color_ball.world_pos.z > 0.2f && color_ball.world_pos.z < 2.0f) {
-                    ball.kf.update(KalmanFilter3D::MeasurementVector(
-                        color_ball.world_pos.x, color_ball.world_pos.y, color_ball.world_pos.z));
-                    std::ofstream debug_log("engine_debug.log", std::ios::app);
-                    debug_log << "[Color Fusion] Updated tracker " << ball.logical_id
-                              << " with color measurement at ("
-                              << color_ball.world_pos.x << ", "
-                              << color_ball.world_pos.y << ", "
-                              << color_ball.world_pos.z << ")" << std::endl;
-                    debug_log.close();
-                }
-                break;
-            }
-        }
     }
 
     return {final_tracked_objects, tracked_hands};
@@ -1451,10 +1337,16 @@ void DNNTracker::update_setting(const std::string& key, const std::string& value
                 std::cout << "Adaptive history window set to " << config.history_window_size << " frames" << std::endl;
             }
         }
-        // Forward color tracker settings (track_*, color hue settings)
-        else if (key.find("track_") == 0 || key.find("_min_hue") != std::string::npos || key.find("_max_hue") != std::string::npos) {
-            if (color_tracker_) {
-                color_tracker_->updateSetting(key, value);
+        // Color profile enable/disable settings
+        else if (key.find("track_") == 0) {
+            // Extract color name from key like "track_green"
+            std::string color_name = key.substr(6); // Remove "track_" prefix
+            bool enabled = (value == "true" || value == "1");
+            
+            if (adaptive_color_manager_) {
+                adaptive_color_manager_->setProfileEnabled(color_name, enabled);
+                std::cout << "Color profile '" << color_name << "' "
+                          << (enabled ? "enabled" : "disabled") << std::endl;
             }
         }
         else std::cerr << "Warning: Unknown DNNTracker setting key '" << key << "'" << std::endl;

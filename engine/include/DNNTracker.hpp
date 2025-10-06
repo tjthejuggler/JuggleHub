@@ -14,7 +14,6 @@
 #include "ByteTrack/BYTETracker.h"
 #include "KalmanFilter3D.hpp"
 #include "PersistentTracker.hpp" // New persistent tracker data structure
-#include "ColorTracker.hpp" // Color-based ball tracking
 #include "ThrowCatchDetector.hpp" // Throw and catch event detection
 #include "AdaptiveColorManager.hpp" // Adaptive color range adjustment
 
@@ -63,13 +62,11 @@ public:
     const std::vector<PersistentTracker>& get_ball_trackers() const { return logical_ball_trackers_; }
     const std::vector<Detection>& get_last_raw_detections() const { return last_raw_detections_; }
     const std::vector<Detection>& get_unmatched_detections() const { return unmatched_detections_; }
-    const std::vector<juggler::ColorTrackedBall>& get_color_tracked_balls() const { return color_tracked_balls_; }
     static cv::Point2f project_3d_to_2d(const cv::Point3f& world_pos, const CameraIntrinsics& intrinsics);
     
     // Getters for logical trackers (needed for Engine.cpp)
     const std::vector<PersistentTracker>& get_logical_ball_trackers() const { return logical_ball_trackers_; }
     const std::vector<PersistentTracker>& get_logical_hand_trackers() const { return logical_hand_trackers_; }
-    juggler::ColorTracker* get_color_tracker() { return color_tracker_.get(); }
     
     // Getters for visualization data
     const std::vector<cv::Point3f>& get_predicted_positions() const { return predicted_positions_; }
@@ -100,10 +97,6 @@ private:
     // Bytetrack
     std::unique_ptr<byte_track::BYTETracker> tracker;
 
-    // --- Color Tracker ---
-    std::unique_ptr<juggler::ColorTracker> color_tracker_;
-    std::vector<juggler::ColorTrackedBall> color_tracked_balls_;
-    
     // --- Adaptive Color Manager ---
     std::unique_ptr<juggler::AdaptiveColorManager> adaptive_color_manager_;
     

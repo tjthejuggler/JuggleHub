@@ -2,9 +2,23 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-05 23:26 UTC
+**Last Updated:** 2025-10-06 17:03 CEST
 
-**Recent Changes (2025-10-05):**
+**Recent Changes (2025-10-06):**
+- **🎯 KALMAN PREDICTION BOUNDARY ENFORCEMENT + HAND-ATTACHED TRACKING**
+  - **Issue 1**: System was accepting YOLO detections anywhere on screen, even outside Kalman prediction radius
+  - **Solution 1**: Added hard boundary check - YOLO detections outside prediction radius are now rejected
+  - **Issue 2**: Prediction boundary was disabled after losing YOLO for even one frame
+  - **Solution 2**: Boundary enforcement now persists for up to 5 frames after losing YOLO
+  - **Issue 3**: No visibility into why YOLO detections were rejected
+  - **Solution 3**: Added rejection reason tracking - shows why detection was rejected in debug output
+  - **Issue 4**: When ball is predicted to be in hand, tracker should stay attached to hand
+  - **Solution 4**: When Kalman prediction is within wrist proximity threshold, tracker snaps to hand and searches for color blob near hand
+  - **Hand-Attached Behavior**: If prediction indicates ball is in hand, tracker follows hand position even as hand moves
+  - **Result**: More stable tracking with clear debug visibility and proper hand-attached behavior
+  - See [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp) lines 374-386, 446-452, 860-930 for implementation
+
+**Previous Changes (2025-10-05):**
 - **🎯 FREE-FLIGHT TRACKING FIX - Eliminated Hand Confusion**
   - **Issue**: Ball tracker was flickering to hands during free flight (frames 171-175)
   - **Root Cause**: Color blob fallback was active for all balls, detecting pink/red hands
@@ -12,7 +26,6 @@ A high-performance monorepo combining C++ real-time ball tracking with Python-ba
   - **Free Flight Mode**: Relies exclusively on Kalman prediction, no color fallback
   - **In-Hand Mode**: Color blob search refines position when ball is near wrist
   - **Result**: Stable tracking during juggling, no more hand confusion
-  - See [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp) lines 686-730 for implementation
 
 **Previous Changes (2025-10-04):**
 - **🎯 MAJOR SIMPLIFICATION - Simplified Ball Tracking System** - Complete overhaul of tracking architecture

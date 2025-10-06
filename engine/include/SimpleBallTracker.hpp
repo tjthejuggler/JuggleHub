@@ -46,6 +46,19 @@ struct Detection {
     int index;  // Index in detection array
 };
 
+// Detection evaluation result (for debug visualization)
+struct DetectionEvaluation {
+    int detection_index;
+    std::string result;  // "SELECTED", "REJECTED: reason", or "SCORED: X.XX"
+    float total_score;
+    float class_score;
+    float confidence_score;
+    float color_score;
+    float kalman_score;
+    float distance_to_prediction;
+    bool passed_filters;
+};
+
 // Simple hand state
 struct SimpleHand {
     int id;                    // 0=left, 1=right
@@ -90,6 +103,9 @@ struct SimpleBall {
     float score_color = 0.0f;        // Color match score component
     float score_kalman = 0.0f;       // Kalman proximity score component
     float score_total = 0.0f;        // Total combined score
+    
+    // Detection evaluations for this ball (for visualization)
+    std::vector<DetectionEvaluation> detection_evaluations;
     
     SimpleBall() : id(-1), is_held(false), previous_is_held(false),
                    held_by_hand_id(-1), state_change_counter(0),
@@ -232,6 +248,8 @@ private:
     float last_match_color_score_ = 0.0f;
     float last_match_kalman_score_ = 0.0f;
     float last_match_total_score_ = 0.0f;
+    std::string last_rejection_reason_ = "";  // Why detection was rejected
+    std::vector<DetectionEvaluation> last_detection_evaluations_;  // Evaluation of all detections
     
     // Timing
     std::chrono::steady_clock::time_point last_update_time_;

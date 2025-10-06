@@ -352,26 +352,92 @@ const Detection* SimpleBallTracker::findBestColorMatch(
     float best_color_score = 0.0f;
     float best_kalman_score = 0.0f;
     
+    // Store rejection reasons for debug output
+    std::string rejection_reason = "";
+    
+    // Store detailed evaluation for ALL detections (for visualization)
+    std::vector<DetectionEvaluation> evaluations;
+    
     // Check if Kalman prediction is valid (non-zero)
     bool has_kalman_prediction = (kalman_prediction.z > 0.01f);
     
+    // Open debug log
+    std::ofstream debug_log("engine_debug.log", std::ios::app);
+    debug_log << "\n  >> findBestColorMatch() for " << profile.name << " <<" << std::endl;
+    debug_log << "  Has Kalman prediction: " << (has_kalman_prediction ? "YES" : "NO") << std::endl;
+    if (has_kalman_prediction) {
+        debug_log << "  Kalman pred pos: (" << kalman_prediction.x << ", " << kalman_prediction.y << ", " << kalman_prediction.z << ")" << std::endl;
+        debug_log << "  Prediction radius: " << tracking_settings_.prediction_radius_m << "m" << std::endl;
+    }
+    debug_log << "  Evaluating " << detections.size() << " detections:" << std::endl;
+    
     for (const auto& det : detections) {
+        debug_log << "\n  Detection #" << det.index << ":" << std::endl;
+        debug_log << "    Position: (" << det.world_pos.x << ", " << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
+        debug_log << "    Confidence: " << det.confidence << std::endl;
+        debug_log << "    Class ID: " << det.class_id << " (" << (det.class_id == 0 ? "ball" : "ball_held") << ")" << std::endl;
+        DetectionEvaluation eval;
+        eval.detection_index = det.index;
+        eval.passed_filters = false;
+        eval.total_score = 0.0f;
+        eval.class_score = 0.0f;
+        eval.confidence_score = 0.0f;
+        eval.color_score = 0.0f;
+        eval.kalman_score = 0.0f;
+        eval.distance_to_prediction = has_kalman_prediction ? cv::norm(det.world_pos - kalman_prediction) : -1.0f;
+        
         // Skip if already used
         if (used_indices.find(det.index) != used_indices.end()) {
+            rejection_reason = "Already used";
+            eval.result = "REJECTED: Used";
+            evaluations.push_back(eval);
+            debug_log << "    REJECTED: Already used by another ball" << std::endl;
             continue;
         }
         
         // Skip if invalid depth
         if (det.world_pos.z < MIN_DEPTH || det.world_pos.z > MAX_DEPTH) {
+            rejection_reason = "Invalid depth";
+            eval.result = "REJECTED: Depth";
+            evaluations.push_back(eval);
+            debug_log << "    REJECTED: Invalid depth (" << det.world_pos.z << "m not in range " << MIN_DEPTH << "-" << MAX_DEPTH << ")" << std::endl;
             continue;
+        }
+        
+        // CRITICAL: If we have a valid Kalman prediction, reject detections outside the prediction radius
+        // This ensures we only use YOLO detections that are within the expected search area
+        if (has_kalman_prediction) {
+            float dist_3d = cv::norm(det.world_pos - kalman_prediction);
+            float radius = tracking_settings_.prediction_radius_m;
+            debug_log << "    Distance to Kalman pred: " << dist_3d << "m (radius: " << radius << "m)" << std::endl;
+            
+            // Reject detection if it's outside the prediction circumference
+            if (dist_3d > radius) {
+                char reason[128];
+                snprintf(reason, sizeof(reason), "REJECTED: Dist %.2fm>%.2fm", dist_3d, radius);
+                rejection_reason = reason;
+                eval.result = reason;
+                evaluations.push_back(eval);
+                debug_log << "    REJECTED: Outside Kalman radius" << std::endl;
+                continue;  // Skip this detection - it's too far from where we expect the ball to be
+            }
         }
         
         float color_score = matchColor(det, profile, hsv_frame);
+        debug_log << "    Color match score: " << color_score << " (threshold: " << MIN_COLOR_MATCH_SCORE << ")" << std::endl;
         
         // Only consider detections with reasonable color match
         if (color_score < MIN_COLOR_MATCH_SCORE) {
+            char reason[128];
+            snprintf(reason, sizeof(reason), "REJECTED: Color %.2f<%.2f", color_score, MIN_COLOR_MATCH_SCORE);
+            rejection_reason = reason;
+            eval.result = reason;
+            evaluations.push_back(eval);
+            debug_log << "    REJECTED: Low color match" << std::endl;
             continue;
         }
+        
+        eval.passed_filters = true;
         
         // CONFIGURABLE PRIORITY SCORING:
         // Uses weights from tracking_settings_ to balance different factors
@@ -401,7 +467,22 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         // Combine all scores
         float combined_score = class_score + confidence_score + weighted_color_score + kalman_score;
         
+        // Store in evaluation
+        eval.class_score = class_score;
+        eval.confidence_score = confidence_score;
+        eval.color_score = weighted_color_score;
+        eval.kalman_score = kalman_score;
+        eval.total_score = combined_score;
+        
+        debug_log << "    SCORING:" << std::endl;
+        debug_log << "      Class score: " << class_score << std::endl;
+        debug_log << "      Confidence score: " << confidence_score << std::endl;
+        debug_log << "      Color score: " << weighted_color_score << std::endl;
+        debug_log << "      Kalman score: " << kalman_score << std::endl;
+        debug_log << "      TOTAL: " << combined_score << std::endl;
+        
         if (combined_score > best_combined_score) {
+            debug_log << "    >>> NEW BEST DETECTION <<<" << std::endl;
             best_combined_score = combined_score;
             best_det = &det;
             
@@ -410,8 +491,31 @@ const Detection* SimpleBallTracker::findBestColorMatch(
             best_confidence_score = confidence_score;
             best_color_score = weighted_color_score;
             best_kalman_score = kalman_score;
+            
+            eval.result = "SELECTED";
+        } else {
+            debug_log << "    Not better than current best (" << best_combined_score << ")" << std::endl;
+            char result[64];
+            snprintf(result, sizeof(result), "Score %.2f < %.2f", combined_score, best_combined_score);
+            eval.result = result;
+        }
+        
+        evaluations.push_back(eval);
+    }
+    
+    debug_log << "\n  FINAL RESULT:" << std::endl;
+    if (best_det) {
+        debug_log << "    Selected detection #" << best_det->index << " with score " << best_combined_score << std::endl;
+    } else {
+        debug_log << "    NO DETECTION SELECTED" << std::endl;
+        if (!rejection_reason.empty()) {
+            debug_log << "    Last rejection reason: " << rejection_reason << std::endl;
         }
     }
+    debug_log.close();
+    
+    // Store evaluations for visualization
+    last_detection_evaluations_ = evaluations;
     
     // Store the scoring components in a temporary location (will be retrieved by caller)
     last_match_class_score_ = best_class_score;
@@ -419,6 +523,14 @@ const Detection* SimpleBallTracker::findBestColorMatch(
     last_match_color_score_ = best_color_score;
     last_match_kalman_score_ = best_kalman_score;
     last_match_total_score_ = best_combined_score;
+    
+    // If no detection was found, store the rejection reason
+    if (!best_det && !rejection_reason.empty()) {
+        // Store in a member variable so caller can access it
+        last_rejection_reason_ = rejection_reason;
+    } else {
+        last_rejection_reason_ = "";
+    }
     
     return best_det;
 }
@@ -768,16 +880,21 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         
         if (!profile) continue;
         
-        // Get Kalman prediction for this ball (if available)
+        // Get Kalman prediction for this ball
+        // CRITICAL: Always predict if we have any tracking history, not just when frames_without_yolo == 0
+        // This ensures we enforce the prediction boundary even when we've lost YOLO for a few frames
         cv::Point3f kalman_pred(0, 0, 0);
-        if (ball.frames_without_yolo == 0 && ball.has_yolo_detection) {
-            // Ball was detected last frame, use Kalman prediction
+        bool has_prediction = false;
+        
+        // Use Kalman prediction if we have recent tracking history (within last 5 frames)
+        if (ball.frames_without_yolo < 5) {
             ball.kalman.predict(dt);
             auto state = ball.kalman.get_state();
             kalman_pred = cv::Point3f(state(0), state(1), state(2));
+            has_prediction = (kalman_pred.z > 0.01f);
         }
         
-        // Find best matching detection (now considers Kalman prediction proximity)
+        // Find best matching detection (now enforces Kalman prediction boundary)
         const Detection* best_det = findBestColorMatch(yolo_detections, *profile,
                                                        hsv_frame, used_detections, kalman_pred);
         
@@ -800,6 +917,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             ball.score_kalman = last_match_kalman_score_;
             ball.score_total = last_match_total_score_;
             
+            // Store detection evaluations for visualization
+            ball.detection_evaluations = last_detection_evaluations_;
+            
             // Set tracking reason for debug visualization with full equation
             char reason[256];
             snprintf(reason, sizeof(reason), "Score=%.2f (cls:%.2f + conf:%.2f + col:%.2f + kal:%.2f)",
@@ -817,9 +937,110 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             used_detections.insert(best_det->index);
         }
         else {
-            // No YOLO detection - use fallback
+            // No YOLO detection within prediction radius (or no YOLO detection at all)
             ball.has_yolo_detection = false;
             ball.frames_without_yolo++;
+            
+            // Store detection evaluations even when no match found
+            ball.detection_evaluations = last_detection_evaluations_;
+            
+            // Show rejection reason in debug output
+            if (!last_rejection_reason_.empty()) {
+                ball.tracking_reason = "YOLO rejected: " + last_rejection_reason_;
+            }
+            
+            // If we have a valid Kalman prediction, try fallback strategies
+            if (has_prediction && ball.frames_without_yolo < 5) {
+                // Check if Kalman prediction is near any hand
+                float min_hand_dist = std::numeric_limits<float>::max();
+                int closest_hand_id = -1;
+                cv::Point3f closest_hand_pos(0, 0, 0);
+                
+                for (const auto& hand : hands) {
+                    if (!hand.is_visible) continue;
+                    float dist = cv::norm(kalman_pred - hand.wrist_pos_3d);
+                    if (dist < min_hand_dist) {
+                        min_hand_dist = dist;
+                        closest_hand_id = hand.id;
+                        closest_hand_pos = hand.wrist_pos_3d;
+                    }
+                }
+                
+                // If prediction is very close to a hand (within wrist proximity threshold),
+                // attach tracker to hand and search for color blob near hand
+                if (min_hand_dist < tracking_settings_.wrist_proximity_threshold) {
+                    // Project hand position to 2D
+                    cv::Point2f hand_2d = project_3d_to_2d(closest_hand_pos, intrinsics);
+                    
+                    // Search for color blob near the hand (smaller radius for hand-attached search)
+                    cv::Point2f color_blob = searchForColorBlob(hsv_frame, *profile, hand_2d, 80);
+                    
+                    if (color_blob.x > 0 && color_blob.y > 0) {
+                        // Found color blob near hand - use it!
+                        float depth = getDepthAtPoint(depth_frame, color_blob);
+                        if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
+                            cv::Point3f color_pos = deprojectToWorld(color_blob, depth, intrinsics);
+                            ball.position = color_pos;
+                            ball.pixel_pos = color_blob;
+                            ball.held_by_hand_id = closest_hand_id;
+                            ball.yolo_class_id = 1;  // Mark as held
+                            char reason[128];
+                            snprintf(reason, sizeof(reason), "Color@Hand[%c] d=%.2fm",
+                                     closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
+                            ball.tracking_reason = reason;
+                            
+                            // Update Kalman with color detection
+                            ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                                color_pos.x, color_pos.y, color_pos.z));
+                            ball.color_predictor.addDetection(color_pos);
+                            ball.frames_without_yolo = 0;
+                            continue;
+                        }
+                    }
+                    
+                    // No color blob found - snap directly to hand position
+                    ball.position = closest_hand_pos;
+                    ball.pixel_pos = hand_2d;
+                    ball.held_by_hand_id = closest_hand_id;
+                    ball.yolo_class_id = 1;  // Mark as held
+                    char reason[128];
+                    snprintf(reason, sizeof(reason), "Snap→Hand[%c] d=%.2fm",
+                             closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
+                    ball.tracking_reason = reason;
+                    
+                    // Update Kalman with hand position
+                    ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                        closest_hand_pos.x, closest_hand_pos.y, closest_hand_pos.z));
+                    ball.color_predictor.addDetection(closest_hand_pos);
+                    ball.frames_without_yolo = 0;
+                    continue;
+                }
+                
+                // Prediction is NOT near a hand - try color tracking at prediction point
+                cv::Point2f pred_2d = project_3d_to_2d(kalman_pred, intrinsics);
+                cv::Point2f color_blob = searchForColorBlob(hsv_frame, *profile, pred_2d, COLOR_SEARCH_RADIUS);
+                
+                if (color_blob.x > 0 && color_blob.y > 0) {
+                    // Found color blob at predicted location - use it!
+                    float depth = getDepthAtPoint(depth_frame, color_blob);
+                    if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
+                        cv::Point3f color_pos = deprojectToWorld(color_blob, depth, intrinsics);
+                        
+                        ball.position = color_pos;
+                        ball.pixel_pos = color_blob;
+                        ball.tracking_reason = "Color@Kalman";
+                        
+                        // Update Kalman with color detection
+                        ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                            color_pos.x, color_pos.y, color_pos.z));
+                        ball.color_predictor.addDetection(color_pos);
+                        ball.frames_without_yolo = 0;
+                        continue;
+                    }
+                }
+                
+                // If color tracking failed, fall through to Kalman-only prediction below
+            }
             
             if (ball.frames_without_yolo < 5) {
                 // Use Kalman prediction for short gaps

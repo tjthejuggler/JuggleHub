@@ -579,6 +579,10 @@ if PYQT_AVAILABLE:
                 update_func=lambda v: self.update_setting('prediction_time_s', v / 1000.0),  # Convert ms to s
                 is_float=False
             )
+            row += 1
+            
+            return section
+            
         def create_color_tracker_weights_section(self):
             """Create the Color Tracker Weights section"""
             section = CollapsibleGroupBox("🎯 Color Tracker Weights", collapsed=False)

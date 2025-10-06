@@ -1015,7 +1015,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         }
     }
     
-    // Draw color-tracked balls
+    // Draw color-tracked balls and their evaluation info
     if (viz.show_color_tracker()) {
         // Load color profiles to get RGB colors for each ball
         std::map<std::string, cv::Scalar> color_map;
@@ -1037,7 +1037,8 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         }
         
         for (const auto& ball : rec_frame.tracked_balls) {
-            if (!ball.has_yolo_detection) continue;  // Only draw active balls
+            // Draw tracker visualization only if ball has YOLO detection
+            if (ball.has_yolo_detection) {
             
             int center_x = static_cast<int>(ball.pixel_pos.x);
             int center_y = static_cast<int>(ball.pixel_pos.y);
@@ -1069,22 +1070,61 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             std::string label = ball.color_name.substr(0, 1);
             cv::putText(result, label, cv::Point(center_x - 5, center_y + 5),
                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-            cv::putText(result, label, cv::Point(center_x - 5, center_y + 5),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
-            
-            // Add color tracker info to panel
-            char info_text[256];
-            std::string state = ball.is_held ? "HELD" : "FLIGHT";
-            std::string hand_info = "";
-            if (ball.is_held && ball.held_by_hand_id >= 0) {
-                hand_info = " [" + std::string(ball.held_by_hand_id == 0 ? "L" : "R") + "]";
+                cv::putText(result, label, cv::Point(center_x - 5, center_y + 5),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
             }
             
-            snprintf(info_text, sizeof(info_text), "%s: %s%s z=%.2fm | %s", 
-                     ball.color_name.c_str(), state.c_str(), hand_info.c_str(),
-                     ball.position.z, ball.tracking_reason.c_str());
+            // Get color for this ball (for info panel)
+            cv::Scalar ball_color = cv::Scalar(255, 255, 255);  // Default white
+            auto it = color_map.find(ball.color_name);
+            if (it != color_map.end()) {
+                ball_color = it->second;
+            }
+            
+            // Add color tracker info to panel (always, even if no tracker placed)
+            char info_text[256];
+            if (ball.has_yolo_detection) {
+                std::string state = ball.is_held ? "HELD" : "FLIGHT";
+                std::string hand_info = "";
+                if (ball.is_held && ball.held_by_hand_id >= 0) {
+                    hand_info = " [" + std::string(ball.held_by_hand_id == 0 ? "L" : "R") + "]";
+                }
+                
+                snprintf(info_text, sizeof(info_text), "%s: %s%s z=%.2fm | %s",
+                         ball.color_name.c_str(), state.c_str(), hand_info.c_str(),
+                         ball.position.z, ball.tracking_reason.c_str());
+            } else {
+                // No tracker placed - show why
+                snprintf(info_text, sizeof(info_text), "%s: NO TRACKER | %s",
+                         ball.color_name.c_str(), ball.tracking_reason.c_str());
+            }
             info_lines.push_back(info_text);
-            info_colors.push_back(color);
+            info_colors.push_back(ball_color);
+            
+            // Add detection evaluation details for this ball (ALWAYS, even if no tracker)
+            if (!ball.detection_evaluations.empty()) {
+                for (const auto& eval : ball.detection_evaluations) {
+                    char eval_text[256];
+                    if (eval.passed_filters) {
+                        // Show full scoring for detections that passed filters
+                        snprintf(eval_text, sizeof(eval_text),
+                                "  Det#%d: %s (%.2f = cls:%.2f+conf:%.2f+col:%.2f+kal:%.2f)",
+                                eval.detection_index, eval.result.c_str(), eval.total_score,
+                                eval.class_score, eval.confidence_score, eval.color_score, eval.kalman_score);
+                    } else {
+                        // Show rejection reason for filtered detections
+                        if (eval.distance_to_prediction >= 0) {
+                            snprintf(eval_text, sizeof(eval_text), "  Det#%d: %s (d=%.2fm)",
+                                    eval.detection_index, eval.result.c_str(), eval.distance_to_prediction);
+                        } else {
+                            snprintf(eval_text, sizeof(eval_text), "  Det#%d: %s",
+                                    eval.detection_index, eval.result.c_str());
+                        }
+                    }
+                    info_lines.push_back(eval_text);
+                    info_colors.push_back(cv::Scalar(200, 200, 200)); // Light gray for details
+                }
+            }
         }
     
     // Draw color-based prediction circles

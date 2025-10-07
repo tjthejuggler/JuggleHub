@@ -122,9 +122,6 @@ if PYQT_AVAILABLE:
             self.color_tracker_weights_section = self.create_color_tracker_weights_section()
             container_layout.addWidget(self.color_tracker_weights_section)
             
-            self.adaptive_color_section = self.create_adaptive_color_section()
-            container_layout.addWidget(self.adaptive_color_section)
-            
             self.ball_profiles_section = self.create_ball_profiles_section()
             container_layout.addWidget(self.ball_profiles_section)
             
@@ -726,142 +723,6 @@ if PYQT_AVAILABLE:
             
             return section
         
-        def create_adaptive_color_section(self):
-            """Create the Adaptive Color Tracking section"""
-            section = CollapsibleGroupBox("🎨 Adaptive Color Tracking", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Enable/Disable adaptive system
-            self.adaptive_enabled_toggle = QPushButton("Enable Adaptive Ranges")
-            self.adaptive_enabled_toggle.setCheckable(True)
-            self.adaptive_enabled_toggle.setChecked(True)
-            self.adaptive_enabled_toggle.clicked.connect(lambda: self.update_setting('adaptive_enabled', 1 if self.adaptive_enabled_toggle.isChecked() else 0))
-            layout.addWidget(self.adaptive_enabled_toggle, row, 0, 1, 3)
-            row += 1
-            
-            # Success rate thresholds
-            layout.addWidget(QLabel("Adaptation Thresholds:"), row, 0, 1, 3)
-            row += 1
-            
-            self.adaptive_success_thresh_slider, self.adaptive_success_thresh_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Success Threshold",
-                tooltip_text="Success rate above which ranges contract.\n"
-                             "Range: 0-100%. Default: 70%.\n"
-                             "Higher = more aggressive contraction.",
-                range_min=50,
-                range_max=95,
-                initial_value=70,
-                update_func=lambda v: self.update_setting('adaptive_success_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            self.adaptive_failure_thresh_slider, self.adaptive_failure_thresh_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Failure Threshold",
-                tooltip_text="Success rate below which ranges expand.\n"
-                             "Range: 0-50%. Default: 30%.\n"
-                             "Lower = more aggressive expansion.",
-                range_min=5,
-                range_max=50,
-                initial_value=30,
-                update_func=lambda v: self.update_setting('adaptive_failure_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Adaptation rates
-            layout.addWidget(QLabel("Adaptation Rates:"), row, 0, 1, 3)
-            row += 1
-            
-            self.adaptive_expansion_slider, self.adaptive_expansion_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Expansion Step (degrees)",
-                tooltip_text="How much to expand hue range when failing.\n"
-                             "Range: 1-10 degrees. Default: 2.\n"
-                             "Higher = faster adaptation but less stable.",
-                range_min=1,
-                range_max=10,
-                initial_value=2,
-                update_func=lambda v: self.update_setting('adaptive_expansion_step', v),
-                is_float=False
-            )
-            row += 1
-            
-            self.adaptive_contraction_slider, self.adaptive_contraction_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Contraction Step (degrees)",
-                tooltip_text="How much to contract hue range when succeeding.\n"
-                             "Range: 0.5-5 degrees. Default: 1.\n"
-                             "Higher = faster adaptation but may lose tracking.",
-                range_min=5,
-                range_max=50,
-                initial_value=10,
-                update_func=lambda v: self.update_setting('adaptive_contraction_step', v / 10.0),
-                is_float=True
-            )
-            row += 1
-            
-            # History window
-            self.adaptive_history_slider, self.adaptive_history_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="History Window (frames)",
-                tooltip_text="Number of frames to track for success rate.\n"
-                             "Range: 30-120 frames. Default: 60.\n"
-                             "Higher = more stable but slower to adapt.",
-                range_min=30,
-                range_max=120,
-                initial_value=60,
-                update_func=lambda v: self.update_setting('adaptive_history_window', v),
-                is_float=False
-            )
-            row += 1
-            
-            # Status display
-            layout.addWidget(QLabel("Current Status:"), row, 0, 1, 3)
-            row += 1
-            
-            self.adaptive_status_text = QTextEdit()
-            self.adaptive_status_text.setMaximumHeight(150)
-            self.adaptive_status_text.setReadOnly(True)
-            self.adaptive_status_text.setPlainText("Adaptive color tracking status will appear here...")
-            layout.addWidget(self.adaptive_status_text, row, 0, 1, 3)
-            row += 1
-            
-            # Reset button
-            reset_button = QPushButton("Reset to Defaults")
-            reset_button.clicked.connect(self.reset_adaptive_settings)
-            reset_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #f44336;
-                    color: white;
-                    padding: 8px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #da190b; }
-            """)
-            layout.addWidget(reset_button, row, 0, 1, 3)
-            
-            return section
-        
-        def reset_adaptive_settings(self):
-            """Reset adaptive color settings to defaults"""
-            self.adaptive_success_thresh_slider.setValue(70)
-            self.adaptive_failure_thresh_slider.setValue(30)
-            self.adaptive_expansion_slider.setValue(2)
-            self.adaptive_contraction_slider.setValue(10)
-            self.adaptive_history_slider.setValue(60)
-            print("✅ Adaptive color settings reset to defaults")
 
         def _calculate_hsv_range_from_rgb(self, rgb):
             """Calculate appropriate HSV range from RGB color values."""
@@ -1467,14 +1328,6 @@ if PYQT_AVAILABLE:
                 'override_color_threshold': self._safe_get_slider_value(self.ct_override_color_slider, 80) / 100.0 if hasattr(self, 'ct_override_color_slider') else 0.8,
                 'override_require_ball_class': self.ct_override_require_ball_toggle.isChecked() if hasattr(self, 'ct_override_require_ball_toggle') else True,
                 
-                # Adaptive color settings
-                'adaptive_enabled': self.adaptive_enabled_toggle.isChecked() if hasattr(self, 'adaptive_enabled_toggle') else True,
-                'adaptive_success_threshold': self._safe_get_slider_value(self.adaptive_success_thresh_slider, 70) / 100.0 if hasattr(self, 'adaptive_success_thresh_slider') else 0.7,
-                'adaptive_failure_threshold': self._safe_get_slider_value(self.adaptive_failure_thresh_slider, 30) / 100.0 if hasattr(self, 'adaptive_failure_thresh_slider') else 0.3,
-                'adaptive_expansion_step': self._safe_get_slider_value(self.adaptive_expansion_slider, 2) if hasattr(self, 'adaptive_expansion_slider') else 2,
-                'adaptive_contraction_step': self._safe_get_slider_value(self.adaptive_contraction_slider, 10) / 10.0 if hasattr(self, 'adaptive_contraction_slider') else 1.0,
-                'adaptive_history_window': self._safe_get_slider_value(self.adaptive_history_slider, 60) if hasattr(self, 'adaptive_history_slider') else 60,
-                'adaptive_min_confidence': self._safe_get_slider_value(self.adaptive_min_confidence_slider, 10) / 100.0 if hasattr(self, 'adaptive_min_confidence_slider') else 0.1
             }
             
             # Add ball profile settings
@@ -1633,28 +1486,6 @@ if PYQT_AVAILABLE:
                 if settings['collapsed_ball_profiles'] != self.ball_profiles_section.is_collapsed:
                     self.ball_profiles_section.toggle_collapsed()
             
-            # Restore adaptive color settings
-            if 'adaptive_enabled' in settings and hasattr(self, 'adaptive_enabled_toggle'):
-                self.adaptive_enabled_toggle.setChecked(settings['adaptive_enabled'])
-            
-            if 'adaptive_success_threshold' in settings and hasattr(self, 'adaptive_success_thresh_slider'):
-                self.adaptive_success_thresh_slider.setValue(int(settings['adaptive_success_threshold'] * 100))
-            
-            if 'adaptive_failure_threshold' in settings and hasattr(self, 'adaptive_failure_thresh_slider'):
-                self.adaptive_failure_thresh_slider.setValue(int(settings['adaptive_failure_threshold'] * 100))
-            
-            if 'adaptive_expansion_step' in settings and hasattr(self, 'adaptive_expansion_slider'):
-                self.adaptive_expansion_slider.setValue(settings['adaptive_expansion_step'])
-            
-            if 'adaptive_contraction_step' in settings and hasattr(self, 'adaptive_contraction_slider'):
-                self.adaptive_contraction_slider.setValue(int(settings['adaptive_contraction_step'] * 10))
-            
-            if 'adaptive_history_window' in settings and hasattr(self, 'adaptive_history_slider'):
-                self.adaptive_history_slider.setValue(settings['adaptive_history_window'])
-            
-            if 'adaptive_min_confidence' in settings and hasattr(self, 'adaptive_min_confidence_slider'):
-                self.adaptive_min_confidence_slider.setValue(int(settings['adaptive_min_confidence'] * 100))
-            
             # Restore ball profile settings
             if 'ball_tracking_enabled' in settings and hasattr(self, 'ball_checkboxes'):
                 for ball_name, enabled in settings['ball_tracking_enabled'].items():
@@ -1802,28 +1633,6 @@ if PYQT_AVAILABLE:
             
             if 'override_require_ball_class' in settings:
                 self.udp_client.send_setting('override_require_ball_class', 1 if settings['override_require_ball_class'] else 0)
-            
-            # Adaptive color settings
-            if 'adaptive_enabled' in settings:
-                self.udp_client.send_setting('adaptive_enabled', 1 if settings['adaptive_enabled'] else 0)
-            
-            if 'adaptive_success_threshold' in settings:
-                self.udp_client.send_setting('adaptive_success_threshold', settings['adaptive_success_threshold'])
-            
-            if 'adaptive_failure_threshold' in settings:
-                self.udp_client.send_setting('adaptive_failure_threshold', settings['adaptive_failure_threshold'])
-            
-            if 'adaptive_expansion_step' in settings:
-                self.udp_client.send_setting('adaptive_expansion_step', settings['adaptive_expansion_step'])
-            
-            if 'adaptive_contraction_step' in settings:
-                self.udp_client.send_setting('adaptive_contraction_step', settings['adaptive_contraction_step'])
-            
-            if 'adaptive_history_window' in settings:
-                self.udp_client.send_setting('adaptive_history_window', settings['adaptive_history_window'])
-            
-            if 'adaptive_min_confidence' in settings:
-                self.udp_client.send_setting('adaptive_min_confidence', settings['adaptive_min_confidence'])
             
             # Ball tracking enabled states
             if 'ball_tracking_enabled' in settings:

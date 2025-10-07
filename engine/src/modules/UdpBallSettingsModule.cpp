@@ -5,16 +5,9 @@
 namespace juggler {
 namespace modules {
 
-UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<juggler::BallTracker> ball_tracker)
-    : ball_tracker_(ball_tracker),
-      socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)),
-      use_simple_tracker_for_settings_(false) {
-}
-
 UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<SimpleBallTracker> simple_tracker)
     : simple_tracker_(simple_tracker),
-      socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)),
-      use_simple_tracker_for_settings_(true) {
+      socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)) {
 }
 
 UdpBallSettingsModule::~UdpBallSettingsModule() {
@@ -56,17 +49,8 @@ void UdpBallSettingsModule::UdpListen() {
                         std::istringstream iss(message);
                         std::string key, value;
                         if (std::getline(iss, key, '=') && std::getline(iss, value)) {
-                            if (use_simple_tracker_for_settings_) {
-                                if (simple_tracker_) {
-                                    simple_tracker_->updateSetting(key, value);
-                                }
-                            } else {
-                                if (key == "save_settings") {
-                                    ball_tracker_->saveSettings();
-                                    std::cout << "Settings saved." << std::endl;
-                                } else {
-                                    ball_tracker_->update_setting(key, value);
-                                }
+                            if (simple_tracker_) {
+                                simple_tracker_->updateSetting(key, value);
                             }
                         } else {
                             std::cerr << "Warning: Malformed settings message received." << std::endl;

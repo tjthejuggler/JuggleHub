@@ -513,10 +513,16 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         
         // Skip if invalid depth
         if (det.world_pos.z < MIN_DEPTH || det.world_pos.z > MAX_DEPTH) {
-            rejection_reason = "Invalid depth";
-            eval.result = "REJECTED: Depth";
+            char reason[128];
+            if (det.world_pos.z < MIN_DEPTH) {
+                snprintf(reason, sizeof(reason), "REJECTED: Depth %.3fm < MIN=%.1fm", det.world_pos.z, MIN_DEPTH);
+            } else {
+                snprintf(reason, sizeof(reason), "REJECTED: Depth %.3fm > MAX=%.1fm", det.world_pos.z, MAX_DEPTH);
+            }
+            rejection_reason = reason;
+            eval.result = reason;
             evaluations.push_back(eval);
-            debug_log << "    REJECTED: Invalid depth (" << det.world_pos.z << "m not in range " << MIN_DEPTH << "-" << MAX_DEPTH << ")" << std::endl;
+            debug_log << "    " << reason << std::endl;
             continue;
         }
         
@@ -1129,8 +1135,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         }
     }
     
-    // NEW: If all profiles are calibrated, use pure euclidean distance matching
-    if (all_calibrated && balls_.size() > 0 && yolo_detections.size() > 0) {
+    // Use euclidean distance matching for all calibrated balls
+    if (balls_.size() > 0 && yolo_detections.size() > 0) {
         OPEN_DEBUG_LOG(euclidean_log);
         euclidean_log << "\n=== FRAME " << frame_counter_ << " - EUCLIDEAN COLOR MATCHING ===" << std::endl;
         euclidean_log << "Using PURE euclidean distance matching for all balls" << std::endl;
@@ -1171,7 +1177,12 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 if (used_detections.find(det.index) != used_detections.end()) continue;
                 
                 // Skip if invalid depth
-                if (det.world_pos.z < MIN_DEPTH || det.world_pos.z > MAX_DEPTH) continue;
+                if (det.world_pos.z < MIN_DEPTH || det.world_pos.z > MAX_DEPTH) {
+                    euclidean_log << "  Det#" << det.index << " REJECTED: Depth " << det.world_pos.z
+                                 << "m is " << (det.world_pos.z < MIN_DEPTH ? "< MIN_DEPTH=" : "> MAX_DEPTH=")
+                                 << (det.world_pos.z < MIN_DEPTH ? MIN_DEPTH : MAX_DEPTH) << "m" << std::endl;
+                    continue;
+                }
                 
                 // Sample 5x5 pixels from detection center
                 cv::Point2f center(det.box.x + det.box.width / 2.0f,
@@ -1234,9 +1245,11 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         // CRITICAL FIX: Add temporal consistency bonus to prevent flip-flopping
         // If a ball was matched to a detection in the previous frame, give it a bonus
         // This creates "stickiness" that prevents rapid reassignment when distances are similar
-        const float TEMPORAL_CONSISTENCY_BONUS = 0.05f;  // Reduces effective distance by this amount
+        const float TEMPORAL_CONSISTENCY_BONUS = 0.15f;  // Reduces effective distance by this amount (increased from 0.05)
+        const float SPATIAL_THRESHOLD = 0.30f;  // Maximum distance to apply bonus (increased from 0.15m)
         
-        euclidean_log << "\nApplying temporal consistency bonus (bonus=" << TEMPORAL_CONSISTENCY_BONUS << "):" << std::endl;
+        euclidean_log << "\nApplying temporal consistency bonus (bonus=" << TEMPORAL_CONSISTENCY_BONUS
+                     << ", spatial_threshold=" << SPATIAL_THRESHOLD << "m):" << std::endl;
         for (auto& match : matches) {
             auto& ball = balls_[match.ball_idx];
             
@@ -1252,13 +1265,19 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 float dz = det.world_pos.z - ball.position.z;
                 float spatial_dist = std::sqrt(dx*dx + dy*dy + dz*dz);
                 
-                // If detection is close to where the ball was (within 0.15m), apply bonus
-                if (spatial_dist < 0.15f) {
+                // If detection is close to where the ball was, apply bonus
+                // Use larger threshold to handle fast-moving balls during juggling
+                if (spatial_dist < SPATIAL_THRESHOLD) {
                     float original_dist = match.euclidean_distance;
-                    match.euclidean_distance -= TEMPORAL_CONSISTENCY_BONUS;
+                    // Scale bonus based on proximity: closer = stronger bonus
+                    float proximity_factor = 1.0f - (spatial_dist / SPATIAL_THRESHOLD);
+                    float scaled_bonus = TEMPORAL_CONSISTENCY_BONUS * proximity_factor;
+                    match.euclidean_distance -= scaled_bonus;
                     euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color
                                  << ") <-> Det[" << match.det_idx << "]: spatial_dist=" << spatial_dist
-                                 << "m, bonus applied! " << original_dist << " -> " << match.euclidean_distance << std::endl;
+                                 << "m, proximity_factor=" << proximity_factor
+                                 << ", bonus=" << scaled_bonus
+                                 << " | " << original_dist << " -> " << match.euclidean_distance << std::endl;
                 }
             }
         }
@@ -1342,10 +1361,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         euclidean_log.close();
     }
     
-    // For each ball, try to match with YOLO detection (LEGACY or fallback)
+    // Handle unmatched balls with fallback strategies (Kalman prediction, color tracking, hand snapping)
     for (auto& ball : balls_) {
         // Skip if already matched by euclidean system
-        if (all_calibrated && ball.has_yolo_detection && ball.frames_without_yolo == 0) {
+        if (ball.has_yolo_detection && ball.frames_without_yolo == 0) {
             continue;
         }
         
@@ -1363,14 +1382,14 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             continue;
         }
         
-        if (profile->avg_hue >= 0.0f) {
-            std::cout << "[SimpleBallTracker] Matching ball '" << ball.color_name
-                     << "' with avg H=" << profile->avg_hue << ", S=" << profile->avg_saturation << std::endl;
-        } else {
-            std::cout << "[SimpleBallTracker] Matching ball '" << ball.color_name << "' with HSV range: H["
-                      << profile->min_hsv[0] << "-" << profile->max_hsv[0] << "] S["
-                      << profile->min_hsv[1] << "-" << profile->max_hsv[1] << "] V["
-                      << profile->min_hsv[2] << "-" << profile->max_hsv[2] << "]" << std::endl;
+        // CRITICAL: Only process balls with calibrated colors
+        // If not calibrated, skip this ball entirely (no legacy matching)
+        if (profile->avg_hue < 0.0f || profile->avg_saturation < 0.0f) {
+            std::cout << "[SimpleBallTracker] WARNING: Ball '" << ball.color_name
+                     << "' not calibrated (no avg_hue/avg_saturation) - skipping" << std::endl;
+            ball.has_yolo_detection = false;
+            ball.frames_without_yolo++;
+            continue;
         }
         
         // Get Kalman prediction for this ball (for boundary checking)

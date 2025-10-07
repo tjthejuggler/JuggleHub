@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ModuleBase.hpp"
-#include "BallTracker.hpp"
 #include "SimpleBallTracker.hpp"
 #include <memory>
 #include <thread>
@@ -12,7 +11,6 @@ namespace modules {
 
 class UdpBallSettingsModule : public ModuleBase {
 public:
-    UdpBallSettingsModule(std::shared_ptr<juggler::BallTracker> ball_tracker);
     UdpBallSettingsModule(std::shared_ptr<SimpleBallTracker> simple_tracker);
     ~UdpBallSettingsModule();
 
@@ -25,9 +23,7 @@ public:
 private:
     void UdpListen();
 
-    std::shared_ptr<juggler::BallTracker> ball_tracker_;
     std::shared_ptr<SimpleBallTracker> simple_tracker_;
-    bool use_simple_tracker_for_settings_ = false;
 
     std::unique_ptr<std::thread> listener_thread_;
     asio::io_context io_context_;

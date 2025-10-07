@@ -82,8 +82,7 @@ private:
     std::unique_ptr<ModuleBase> active_module_;
     std::unique_ptr<UdpBallColorModule> color_module_;
     std::unique_ptr<juggler::modules::UdpBallSettingsModule> settings_module_;
-    std::shared_ptr<juggler::BallTracker> ball_tracker_;
-    std::shared_ptr<SimpleBallTracker> simple_tracker_; // Simplified ball tracker
+    std::shared_ptr<SimpleBallTracker> simple_tracker_;
     bool use_dnn_tracker_; // Flag to switch between old/new tracker (kept for compatibility)
     bool verbose_;
 

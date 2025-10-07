@@ -40,12 +40,11 @@ add_executable(juggle_engine
     src/Engine.cpp
     src/SimpleBallTracker.cpp
     src/KalmanFilter3D.cpp
-    src/BallTracker.cpp
     src/modules/UdpBallColorModule.cpp
     src/modules/PositionToRgbModule.cpp
     src/networking/UdpSender.cpp
     src/modules/UdpBallSettingsModule.cpp
-    ${PROTO_SRCS} ${PROTO_HDRS} # Add your generated proto files
+    ${PROTO_SRCS} ${PROTO_HDRS}
 )
 
 # --- Link All Libraries to the Executable ---

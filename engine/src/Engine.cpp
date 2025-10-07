@@ -1,9 +1,8 @@
 #include "Engine.hpp"
 #include "DebugLog.hpp"
-#include "BallTracker.hpp"
 #include "modules/UdpBallColorModule.hpp"
 #include "modules/PositionToRgbModule.hpp"
-#include "SimpleBallTracker.hpp" // Include the SimpleBallTracker header
+#include "SimpleBallTracker.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -77,12 +76,7 @@ void Engine::run() {
     startCamera();
 
     // Initialize settings module with SimpleBallTracker
-    if (use_dnn_tracker_) {
-        settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_);
-    } else {
-        ball_tracker_ = std::make_shared<juggler::BallTracker>("hub/ball_settings.json");
-        settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(ball_tracker_);
-    }
+    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_);
     settings_module_->setup();
 
     while (running_) {
@@ -251,10 +245,6 @@ void Engine::run() {
                 continuous_frame_buffer_.push_back(rec_frame);
             }
  
-        } else {
-            // Old BallTracker path (not used when use_dnn_tracker_ is true)
-            auto rs_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
-            auto detections = ball_tracker_->detectBalls(color_image, depth_frame, rs_intrinsics);
         }
 
         // Populate color-based predictions for visualization

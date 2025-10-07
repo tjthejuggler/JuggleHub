@@ -290,5 +290,5 @@ private:
     static constexpr int MIN_FRAMES_FOR_STATE_CHANGE = 3;      // Debounce state changes
     static constexpr float MIN_COLOR_MATCH_SCORE = 0.5f;       // 50% match required
     static constexpr float MIN_DEPTH = 0.2f;
-    static constexpr float MAX_DEPTH = 2.0f;
+    static constexpr float MAX_DEPTH = 4.0f;  // Increased from 2.0m to allow tracking at greater distances
 };

@@ -1350,6 +1350,8 @@ if PYQT_AVAILABLE:
                 'min_frames_for_state_change': self.tc_min_frames_slider.value(),
                 'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked(),
                 'tc_sound_on_throw': self.tc_sound_on_throw_toggle.isChecked(),
+                'tc_name_on_catch': self.tc_name_on_catch_toggle.isChecked(),
+                'tc_name_on_throw': self.tc_name_on_throw_toggle.isChecked(),
                 
                 # Collapsed states for UI persistence
                 'collapsed_camera': self.camera_section.is_collapsed,
@@ -1465,6 +1467,12 @@ if PYQT_AVAILABLE:
             
             if 'tc_sound_on_throw' in settings:
                 self.tc_sound_on_throw_toggle.setChecked(settings['tc_sound_on_throw'])
+            
+            if 'tc_name_on_catch' in settings:
+                self.tc_name_on_catch_toggle.setChecked(settings['tc_name_on_catch'])
+            
+            if 'tc_name_on_throw' in settings:
+                self.tc_name_on_throw_toggle.setChecked(settings['tc_name_on_throw'])
             
             # Restore collapsed states
             if 'collapsed_camera' in settings:
@@ -1651,6 +1659,12 @@ if PYQT_AVAILABLE:
             if 'tc_sound_on_throw' in settings:
                 self.udp_client.send_setting('tc_sound_on_throw', 1 if settings['tc_sound_on_throw'] else 0)
             
+            if 'tc_name_on_catch' in settings:
+                self.udp_client.send_setting('tc_name_on_catch', 1 if settings['tc_name_on_catch'] else 0)
+            
+            if 'tc_name_on_throw' in settings:
+                self.udp_client.send_setting('tc_name_on_throw', 1 if settings['tc_name_on_throw'] else 0)
+            
             # Kalman Prediction settings
             if 'prediction_history_frames' in settings:
                 self.udp_client.send_setting('prediction_history_frames', settings['prediction_history_frames'])
@@ -1700,12 +1714,13 @@ if PYQT_AVAILABLE:
         def test_catch_sound(self):
             """Play a test sound for catch events"""
             self.play_system_sound(frequency=800, duration=100)
-            # Also send to engine
-            self.update_setting('tc_test_catch_sound', 1)
             print("🔊 Playing catch test sound (800 Hz)")
         
         def test_throw_sound(self):
             """Play a test sound for throw events"""
+            self.play_system_sound(frequency=1200, duration=100)
+            print("🔊 Playing throw test sound (1200 Hz)")
+        
         def test_catch_name(self):
             """Play a test color name for catch events"""
             # Play a random color name as test
@@ -1735,32 +1750,33 @@ if PYQT_AVAILABLE:
                     
                     system = platform.system()
                     if system == "Linux":
-                        # Use mpg123 or ffplay for MP3 playback
+                        # Use paplay for instant playback (same as beep sounds)
+                        # This is much faster than mpg123/ffplay
                         try:
-                            subprocess.run(['mpg123', '-q', audio_file], timeout=2, check=False)
+                            subprocess.Popen(['paplay', audio_file],
+                                           stdout=subprocess.DEVNULL,
+                                           stderr=subprocess.DEVNULL)
                         except FileNotFoundError:
-                            # Fallback to ffplay if mpg123 not available
+                            # Fallback to mpg123 if paplay not available
                             try:
-                                subprocess.run(['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', audio_file], 
-                                             timeout=2, check=False)
+                                subprocess.Popen(['mpg123', '-q', audio_file],
+                                               stdout=subprocess.DEVNULL,
+                                               stderr=subprocess.DEVNULL)
                             except FileNotFoundError:
-                                print("⚠️ Neither mpg123 nor ffplay found. Install with: sudo apt install mpg123")
+                                print("⚠️ Neither paplay nor mpg123 found. Install with: sudo apt install pulseaudio-utils")
                     elif system == "Darwin":  # macOS
-                        subprocess.run(['afplay', audio_file], timeout=2, check=False)
+                        subprocess.Popen(['afplay', audio_file],
+                                       stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL)
                     elif system == "Windows":
-                        # Use Windows Media Player
+                        # Use winsound for instant playback
                         import winsound
-                        winsound.PlaySound(audio_file, winsound.SND_FILENAME)
+                        winsound.PlaySound(audio_file, winsound.SND_FILENAME | winsound.SND_ASYNC)
                 except Exception as e:
                     print(f"⚠️ Could not play color name audio: {e}")
             
             # Play sound in background thread to avoid blocking UI
             threading.Thread(target=play_in_thread, daemon=True).start()
-        
-            self.play_system_sound(frequency=1200, duration=100)
-            # Also send to engine
-            self.update_setting('tc_test_throw_sound', 1)
-            print("🔊 Playing throw test sound (1200 Hz)")
         
         def play_system_sound(self, frequency=1000, duration=100):
             """Play a simple beep sound using system commands"""

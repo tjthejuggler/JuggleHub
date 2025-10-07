@@ -1328,36 +1328,42 @@ if PYQT_AVAILABLE:
                     
                     painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
                     
-                    # Draw label with background for better visibility
+                    # Draw label NEXT TO the circle (offset by radius + margin) for better visibility
                     painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
                     label = f"{color_ball.color_name} ({color_ball.logical_id})"
                     pos_label = f"({color_ball.world_pos.z:.2f}m)"
+                    
+                    # Position labels to the right of the circle with a margin
+                    label_offset_x = center_x + radius + 8  # 8px margin from circle edge
+                    label_y = center_y - 5  # Slightly above center
+                    pos_label_y = center_y + 10  # Below the main label
                     
                     # Use black text with white outline for white balls, white text with black outline for others
                     if color_ball.color_name.lower() == 'white':
                         # Draw text shadow for white balls
                         painter.setPen(QPen(QColor(255, 255, 255)))
-                        painter.drawText(center_x + 14, center_y - 1, label)
-                        painter.drawText(center_x + 16, center_y + 1, label)
-                        painter.drawText(center_x + 14, center_y + 14, pos_label)
-                        painter.drawText(center_x + 16, center_y + 16, pos_label)
+                        painter.drawText(label_offset_x - 1, label_y - 1, label)
+                        painter.drawText(label_offset_x + 1, label_y + 1, label)
+                        painter.drawText(label_offset_x - 1, pos_label_y - 1, pos_label)
+                        painter.drawText(label_offset_x + 1, pos_label_y + 1, pos_label)
                         # Draw actual text
                         painter.setPen(QPen(QColor(0, 0, 0)))
-                        painter.drawText(center_x + 15, center_y, label)
-                        painter.drawText(center_x + 15, center_y + 15, pos_label)
+                        painter.drawText(label_offset_x, label_y, label)
+                        painter.drawText(label_offset_x, pos_label_y, pos_label)
                     else:
                         painter.setPen(QPen(QColor(255, 255, 255)))
-                        painter.drawText(center_x + 15, center_y, label)
-                        painter.drawText(center_x + 15, center_y + 15, pos_label)
+                        painter.drawText(label_offset_x, label_y, label)
+                        painter.drawText(label_offset_x, pos_label_y, pos_label)
                     
-                    # Show wrist association if present
+                    # Show wrist association if present (also offset to the right)
                     if color_ball.associated_wrist_id >= 0:
                         wrist_label = "L" if color_ball.associated_wrist_id == 0 else "R"
+                        wrist_label_y = center_y + 25  # Below position label
                         if color_ball.color_name.lower() == 'white':
                             painter.setPen(QPen(QColor(0, 0, 0)))
                         else:
                             painter.setPen(QPen(QColor(255, 255, 255)))
-                        painter.drawText(center_x + 15, center_y + 30, f"[{wrist_label}]")
+                        painter.drawText(label_offset_x, wrist_label_y, f"[{wrist_label}]")
 
             # --- Draw Tracker Tails ---
             if self.show_tails_toggle.isChecked():

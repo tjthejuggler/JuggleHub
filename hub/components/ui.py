@@ -145,6 +145,9 @@ if PYQT_AVAILABLE:
             self.frame_count = 0
             self.start_time = time.time()
             self.last_frame_data: Optional[juggler_pb2.FrameData] = None
+            # Rolling window for FPS calculation (last 50 frames)
+            self.frame_timestamps = []
+            self.fps_window_size = 50
             self.calibration_mode = False
             self.udp_client = UdpClient()
             self.is_continuous_recording = False
@@ -821,6 +824,14 @@ if PYQT_AVAILABLE:
         def _update_ui(self, frame_data: juggler_pb2.FrameData):
             self.last_frame_data = frame_data
             self.frame_count += 1
+            
+            # Update rolling window of frame timestamps for FPS calculation
+            current_time = time.time()
+            self.frame_timestamps.append(current_time)
+            # Keep only the last fps_window_size frames
+            if len(self.frame_timestamps) > self.fps_window_size:
+                self.frame_timestamps.pop(0)
+            
             self.log_message(f"UI received frame {frame_data.frame_number} with {len(frame_data.balls)} balls.")
             
             # Check for throw/catch events and play sounds if enabled
@@ -974,8 +985,17 @@ if PYQT_AVAILABLE:
             self.status_label.setText(f"✅ Receiving data - Frame {frame_data.frame_number}")
         
         def _periodic_update(self):
-            elapsed = time.time() - self.start_time
-            fps = self.frame_count / elapsed if elapsed > 0 else 0
+            # Calculate FPS using rolling window for more responsive display
+            if len(self.frame_timestamps) >= 2:
+                # Calculate FPS from the time span of frames in the window
+                time_span = self.frame_timestamps[-1] - self.frame_timestamps[0]
+                if time_span > 0:
+                    fps = (len(self.frame_timestamps) - 1) / time_span
+                else:
+                    fps = 0.0
+            else:
+                fps = 0.0
+            
             self.fps_label.setText(f"FPS: {fps:.1f}")
             self.frame_count_label.setText(f"Frames: {self.frame_count}")
             if self.last_frame_data:

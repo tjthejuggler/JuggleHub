@@ -2,9 +2,18 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-07 00:55 CEST
+**Last Updated:** 2025-10-07 23:41 CEST
 
 **Recent Changes (2025-10-07):**
+- **📊 RESPONSIVE FPS DISPLAY**
+  - **Issue Fixed**: FPS display was slow to update, taking a long time to reflect true frame rate
+  - **Root Cause**: FPS was calculated using total elapsed time since startup, creating a very slow-moving average
+  - **Solution**: Implemented rolling window FPS calculation using last 50 frames
+  - **Impact**: FPS display now updates in real-time, providing immediate feedback on performance changes
+  - **Technical Details**: Uses timestamp-based calculation over 50-frame window for accurate, responsive FPS measurement
+  - See [`hub/components/ui.py`](hub/components/ui.py:148-150,824-834,985-996) for implementation
+
+**Previous Changes (2025-10-07):**
 - **🎯 HAND IDENTITY VALIDATION FIX**
   - **Issue Fixed**: YOLO-Pose occasionally mislabels left/right hands, causing incorrect throw/catch side detection
   - **Root Cause**: Pose estimation models can swap hand labels during fast movements or arm crossing

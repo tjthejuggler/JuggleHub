@@ -15,4 +15,6 @@ V6.2 - all boxes made 1 pixel larger on all sides compared to V5
 V6.6 - all boxes made 5 pixels smaller on all sides compared to V5
 V8 - uses the bigger bounding boxes from V6.6
 V9.1 - uses bigger bounding boxes from V6.6 and has more targeted failures as well as 2 kinds of augmented images based on the new targeted dataset
+V9.1.1 - none of the V9 augmented data
 V9.2 - same as V9.1 but has less augmented data('all' has been removed)
+V9.3 - same as V9.1 except all 'ball' classes are 2 pixels smaller on all sides and all 'ball_held' are 1 pixels larger on all sides

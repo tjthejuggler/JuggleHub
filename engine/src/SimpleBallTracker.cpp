@@ -1402,8 +1402,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         // CRITICAL FIX: Add temporal consistency bonus to prevent flip-flopping
         // If a ball was matched to a detection in the previous frame, give it a bonus
         // This creates "stickiness" that prevents rapid reassignment when distances are similar
-        const float TEMPORAL_CONSISTENCY_BONUS = 0.15f;  // Reduces effective distance by this amount (increased from 0.05)
-        const float SPATIAL_THRESHOLD = 0.30f;  // Maximum distance to apply bonus (increased from 0.15m)
+        const float TEMPORAL_CONSISTENCY_BONUS = 0.25f;  // Reduces effective distance by this amount (increased from 0.15 to reduce flickering)
+        const float SPATIAL_THRESHOLD = 0.40f;  // Maximum distance to apply bonus (increased from 0.30m to reduce flickering)
         
         DEBUG_LOG(euclidean_log, {
             OPEN_DEBUG_LOG(euclidean_log);

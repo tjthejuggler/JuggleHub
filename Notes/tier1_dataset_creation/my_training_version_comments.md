@@ -12,3 +12,7 @@ V5 - specifically targeted edgecases images added, about 400 of them
 V6 - all boxes made one pixel smaller on all sides compared to V5
 V6.1 - all boxes made 2 pixels smaller on all sides compared to V5
 V6.2 - all boxes made 1 pixel larger on all sides compared to V5
+V6.6 - all boxes made 5 pixels smaller on all sides compared to V5
+V8 - uses the bigger bounding boxes from V6.6
+V9.1 - uses bigger bounding boxes from V6.6 and has more targeted failures as well as 2 kinds of augmented images based on the new targeted dataset
+V9.2 - same as V9.1 but has less augmented data('all' has been removed)

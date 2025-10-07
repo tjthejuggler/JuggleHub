@@ -246,7 +246,7 @@ Once you have several completed annotation sessions and their corresponding `via
     *   **Example Command:**
     ```bash
     python scripts/prepare_dataset.py \
-        --dataset-name V9_1_targeted \
+        --dataset-name V9_2_targeted \
         --source-dir /home/twain/Projects/JuggleHub/engine/data/annotation_sessions \
         --output-dir /home/twain/Projects/JuggleHub/engine/data/3_training_datasets \
         --tags V8rs455_lonely_hands_low_light_intentional_realsense V8rs455_just_hands_low_light_intentional_and_auto_realsense V8rs455_led_balls_mixedlight_sessions_intentional_realsense V8rs455_normal_balls_daylight_sessions_auto_realsense V8rs455_normal_balls_mixedlight_sessions_intentional_realsense V8_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes V8_ball_col_aug V8_hard_negatives V9.1_augmented V9.1_augmented_all V9.1_targeted_lowish_light_60fps_default_realsense

@@ -1,9 +1,16 @@
 #include "ThrowCatchDetector.hpp"
 #include "DNNTracker.hpp" // For Detection struct
+#include "DebugLogControl.hpp" // For g_enable_debug_log
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include <chrono>
+
+// Debug logging helper - write to engine_debug.log
+#define OPEN_DEBUG_LOG(var_name) \
+    std::ofstream var_name; \
+    if (g_enable_debug_log) var_name.open("engine_debug.log", std::ios::app)
 
 namespace juggler {
 
@@ -80,6 +87,15 @@ std::vector<ThrowCatchDetector::DetectedEvent> ThrowCatchDetector::detectEvents(
             // Determine which hand this is (left=0, right=1)
             int hand_id = hand.is_left_hand ? 0 : 1;
             
+            // DEBUG: Print hand info
+            DEBUG_LOG_WRITE({
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "[THROW_CATCH_DEBUG] Checking hand: logical_id=" << hand.logical_id
+                          << ", is_left_hand=" << hand.is_left_hand
+                          << ", hand_id=" << hand_id
+                          << " (" << (hand_id == 0 ? "LEFT" : "RIGHT") << ")" << std::endl;
+            });
+            
             // --- CATCH DETECTION ---
             if (ball.ball_state == BallState::IN_FLIGHT || 
                 ball.ball_state == BallState::TRANSITIONING) {
@@ -95,24 +111,33 @@ std::vector<ThrowCatchDetector::DetectedEvent> ThrowCatchDetector::detectEvents(
                     }
                     // If we've been transitioning long enough, confirm the catch
                     else if (meetsTemporalRequirement(ball, config_.min_frames_for_event)) {
-                        ball.ball_state = (hand_id == 0) ? 
-                            BallState::HELD_LEFT : BallState::HELD_RIGHT;
+                        BallState new_state = (hand_id == 0) ? BallState::HELD_LEFT : BallState::HELD_RIGHT;
+                        
+                        DEBUG_LOG_WRITE({
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "\n[CATCH] Ball " << ball.logical_id
+                                      << " caught by hand_id=" << hand_id << " (" << (hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                                      << " | hand.logical_id=" << hand.logical_id
+                                      << " | hand.is_left_hand=" << hand.is_left_hand
+                                      << " | Setting holding_hand_id=" << hand.logical_id
+                                      << " | ball_state=" << (new_state == BallState::HELD_LEFT ? "HELD_LEFT" : "HELD_RIGHT")
+                                      << std::endl;
+                        });
+                        
+                        ball.ball_state = new_state;
                         ball.frames_in_current_state = 0;
-                        ball.parent_id = hand.logical_id;
+                        ball.holding_hand_id = hand.logical_id;  // Use holding_hand_id instead of parent_id
                         ball.is_in_freefall = false;
                         
                         // Create catch event
                         ball.update_from_kf();
                         cv::Point3f pos(ball.position.x(), ball.position.y(), ball.position.z());
-                        DetectedEvent event(DetectedEvent::CATCH, ball.logical_id, 
+                        DetectedEvent event(DetectedEvent::CATCH, ball.logical_id,
                                           hand_id, timestamp_us, pos);
                         event.evidence = catch_evidence;
                         events.push_back(event);
                         
-                        std::cout << "CATCH detected: Ball " << ball.logical_id 
-                                  << " by " << (hand_id == 0 ? "LEFT" : "RIGHT") 
-                                  << " hand (score: " << catch_evidence.total_score << ")" 
-                                  << std::endl;
+                        // Removed duplicate log
                     }
                 }
                 // Reset transitioning if we've been in it too long without confirming
@@ -124,15 +149,30 @@ std::vector<ThrowCatchDetector::DetectedEvent> ThrowCatchDetector::detectEvents(
             }
             
             // --- THROW DETECTION ---
-            if ((ball.ball_state == BallState::HELD_LEFT && hand_id == 0) ||
-                (ball.ball_state == BallState::HELD_RIGHT && hand_id == 1) ||
-                ball.ball_state == BallState::TRANSITIONING) {
-                
+            // Only check for throws from the hand that's currently holding the ball
+            bool should_check_throw = (ball.ball_state == BallState::HELD_LEFT && hand_id == 0) ||
+                                      (ball.ball_state == BallState::HELD_RIGHT && hand_id == 1);
+            
+            // Removed verbose per-frame log
+            
+            if (should_check_throw) {
                 EventEvidence throw_evidence = evaluateThrowEvidence(ball, hand, dt);
                 
                 if (throw_evidence.total_score >= config_.throw_threshold) {
                     // Transition to TRANSITIONING state first
                     if (ball.ball_state != BallState::TRANSITIONING) {
+                        // parent_id was already set during catch - don't overwrite it!
+                        DEBUG_LOG_WRITE({
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "[THROW_CATCH_DEBUG] THROW START: Ball " << ball.logical_id
+                                      << " starting throw from hand_id=" << hand_id
+                                      << " (hand.logical_id=" << hand.logical_id
+                                      << ", is_left_hand=" << hand.is_left_hand << ")"
+                                      << " -> Keeping parent_id=" << ball.parent_id << " (set during catch)" << std::endl;
+                        });
+                        
+                        // DON'T overwrite parent_id here - it was set correctly during catch!
+                        // ball.parent_id = hand.logical_id;  // BUG: This was overwriting the catch parent_id
                         ball.ball_state = BallState::TRANSITIONING;
                         ball.frames_in_current_state = 0;
                     }
@@ -140,21 +180,49 @@ std::vector<ThrowCatchDetector::DetectedEvent> ThrowCatchDetector::detectEvents(
                     else if (meetsTemporalRequirement(ball, config_.min_frames_for_event)) {
                         ball.ball_state = BallState::IN_FLIGHT;
                         ball.frames_in_current_state = 0;
-                        ball.parent_id = -1;
                         ball.is_in_freefall = true;
                         
-                        // Create throw event
+                        // Create throw event using the hand stored in parent_id
                         ball.update_from_kf();
                         cv::Point3f pos(ball.position.x(), ball.position.y(), ball.position.z());
-                        DetectedEvent event(DetectedEvent::THROW, ball.logical_id, 
-                                          hand_id, timestamp_us, pos);
+                        
+                        // Determine which hand threw based on holding_hand_id (set during catch)
+                        int throwing_hand_id = hand_id;  // Default to current hand
+                        DEBUG_LOG_WRITE({
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "\n[THROW] Ball " << ball.logical_id
+                                      << " | holding_hand_id=" << ball.holding_hand_id
+                                      << " | Looking up hand..." << std::endl;
+                            
+                            for (const auto& h : hands) {
+                                debug_log << "  Checking hand: logical_id=" << h.logical_id
+                                          << " | is_left_hand=" << h.is_left_hand << std::endl;
+                                if (h.logical_id == ball.holding_hand_id) {
+                                    throwing_hand_id = h.is_left_hand ? 0 : 1;
+                                    debug_log << "  ✓ MATCH! hand.logical_id=" << h.logical_id
+                                              << " | hand.is_left_hand=" << h.is_left_hand
+                                              << " | throwing_hand_id=" << throwing_hand_id
+                                              << " (" << (throwing_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                                              << std::endl;
+                                    break;
+                                }
+                            }
+                        });
+                        
+                        DetectedEvent event(DetectedEvent::THROW, ball.logical_id,
+                                          throwing_hand_id, timestamp_us, pos);
                         event.evidence = throw_evidence;
                         events.push_back(event);
                         
-                        std::cout << "THROW detected: Ball " << ball.logical_id 
-                                  << " by " << (hand_id == 0 ? "LEFT" : "RIGHT") 
-                                  << " hand (score: " << throw_evidence.total_score << ")" 
-                                  << std::endl;
+                        DEBUG_LOG_WRITE({
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "[THROW RESULT] Ball " << ball.logical_id
+                                      << " thrown by " << (throwing_hand_id == 0 ? "LEFT" : "RIGHT")
+                                      << " hand" << std::endl;
+                        });
+                        
+                        // Clear holding_hand_id after throw is confirmed
+                        ball.holding_hand_id = -1;
                     }
                 }
             }

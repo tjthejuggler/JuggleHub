@@ -1,10 +1,17 @@
 #include "SimpleBallTracker.hpp"
+#include "DebugLogControl.hpp"
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <set>
+
+// Helper macro for conditional debug logging
+// Creates a null stream when logging is disabled
+#define OPEN_DEBUG_LOG(var_name) \
+    std::ofstream var_name; \
+    if (g_enable_debug_log) var_name.open("engine_debug.log", std::ios::app)
 
 // Helper function for depth filtering
 static float get_filtered_depth(const cv::Mat& depth_frame, const cv::Point2f& pixel) {
@@ -406,7 +413,7 @@ const Detection* SimpleBallTracker::findBestColorMatch(
     bool has_kalman_prediction = (kalman_prediction.z > 0.01f);
     
     // Open debug log
-    std::ofstream debug_log("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(debug_log);
     debug_log << "\n  >> FRAME " << frame_counter_ << " - findBestColorMatch() for " << profile.name << " <<" << std::endl;
     debug_log << "  Has Kalman prediction: " << (has_kalman_prediction ? "YES" : "NO") << std::endl;
     if (has_kalman_prediction) {
@@ -723,7 +730,7 @@ uint64_t SimpleBallTracker::getCurrentTimestamp() {
 
 bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands) {
     // Open debug log file in append mode
-    std::ofstream debug_log("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(debug_log);
     debug_log << "\n  >> FRAME " << frame_counter_ << " - isBallHeld() for Ball " << ball.id << " <<" << std::endl;
     
     // Use weighted scoring system based on tracking settings
@@ -759,7 +766,10 @@ bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHan
     debug_log << "    Number of hands: " << hands.size() << std::endl;
     
     for (const auto& hand : hands) {
-        debug_log << "    Hand " << hand.id << " (visible=" << hand.is_visible << ")" << std::endl;
+        debug_log << "    Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT")
+                  << ", visible=" << hand.is_visible << ")" << std::endl;
+        debug_log << "      Hand position: (" << hand.wrist_pos_3d.x << ", "
+                  << hand.wrist_pos_3d.y << ", " << hand.wrist_pos_3d.z << ")" << std::endl;
         if (!hand.is_visible) continue;
         
         float dist = cv::norm(ball.position - hand.wrist_pos_3d);
@@ -768,7 +778,8 @@ bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHan
         if (dist < min_dist) {
             min_dist = dist;
             closest_hand = hand.id;
-            debug_log << "      This is the closest hand so far" << std::endl;
+            debug_log << "      >>> This is the closest hand so far (hand.id=" << hand.id
+                      << " = " << (hand.id == 0 ? "LEFT" : "RIGHT") << ") <<<" << std::endl;
         }
     }
     
@@ -781,21 +792,36 @@ bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHan
     // CRITICAL FIX: Only use proximity as evidence if YOLO hasn't given us a strong signal
     // If YOLO clearly says "ball" (in-air), don't let proximity override it
     // Only add proximity weight if we don't have a YOLO detection OR if YOLO says ball_held
+    int old_held_by_hand_id = ball.held_by_hand_id;
+    
     if (min_dist < tracking_settings_.wrist_proximity_threshold) {
         // Only add proximity weight if YOLO agrees (ball_held) or if we have no YOLO detection
         if (ball.yolo_class_id == 1 || !ball.has_yolo_detection) {
             held_score += tracking_settings_.wrist_proximity_weight;
             ball.held_by_hand_id = closest_hand;
-            debug_log << "    Ball is NEAR hand " << closest_hand << " AND (YOLO agrees OR no YOLO) -> adding "
+            debug_log << "    Ball is NEAR hand " << closest_hand << " (" << (closest_hand == 0 ? "LEFT" : "RIGHT")
+                      << ") AND (YOLO agrees OR no YOLO) -> adding "
                      << tracking_settings_.wrist_proximity_weight << " to held_score" << std::endl;
+            if (old_held_by_hand_id != ball.held_by_hand_id) {
+                debug_log << "    *** held_by_hand_id CHANGED: " << old_held_by_hand_id << " -> " << ball.held_by_hand_id << " ***" << std::endl;
+            }
         } else {
-            debug_log << "    Ball is NEAR hand BUT YOLO says in-air (class=0) -> NOT adding proximity weight" << std::endl;
-            ball.held_by_hand_id = -1;  // Don't associate with hand if YOLO says in-air
+            debug_log << "    Ball is NEAR hand " << closest_hand << " (" << (closest_hand == 0 ? "LEFT" : "RIGHT")
+                      << ") BUT YOLO says in-air (class=0) -> NOT adding proximity weight" << std::endl;
+            // CRITICAL FIX: Don't clear held_by_hand_id - preserve it for throw detection
+            // ball.held_by_hand_id = -1;  // OLD: This was clearing the hand ID too early
+            debug_log << "    PRESERVING held_by_hand_id=" << ball.held_by_hand_id << " (ball is in-air but we remember which hand threw it)" << std::endl;
         }
     } else {
-        ball.held_by_hand_id = -1;
+        // CRITICAL FIX: Don't clear held_by_hand_id when ball moves away - preserve it for throw detection
+        // ball.held_by_hand_id = -1;  // OLD: This was clearing the hand ID too early
         debug_log << "    Ball is NOT near any hand" << std::endl;
+        debug_log << "    PRESERVING held_by_hand_id=" << ball.held_by_hand_id << " (ball moved away but we remember which hand it came from)" << std::endl;
     }
+    
+    debug_log << "    FINAL held_by_hand_id: " << ball.held_by_hand_id
+              << (ball.held_by_hand_id >= 0 ? (ball.held_by_hand_id == 0 ? " (LEFT)" : " (RIGHT)") : " (NONE)")
+              << std::endl;
     
     debug_log << "  FINAL SCORES:" << std::endl;
     debug_log << "    held_score: " << held_score << std::endl;
@@ -817,7 +843,7 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
     std::vector<BallEvent> events;
     
     // Open debug log file in append mode
-    std::ofstream debug_log("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(debug_log);
     debug_log << "\n=== FRAME " << frame_counter_ << " - detectStatesAndEvents() ===" << std::endl;
     debug_log << "Number of balls: " << balls.size() << std::endl;
     debug_log << "Number of hands: " << hands.size() << std::endl;
@@ -896,8 +922,26 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                         getCurrentTimestamp()
                     });
                     debug_log << "  >>> THROW EVENT GENERATED <<<" << std::endl;
+                    
+                    // Log to both console and debug log file
                     std::cout << "[SimpleBallTracker] THROW detected: Ball " << ball.id
                              << " from hand " << ball.held_by_hand_id << std::endl;
+                    
+                    DEBUG_LOG_WRITE({
+                        OPEN_DEBUG_LOG(throw_log);
+                        throw_log << "\n[THROW] Ball " << ball.id
+                                  << " thrown from hand " << ball.held_by_hand_id;
+                        if (ball.held_by_hand_id == 0) {
+                            throw_log << " (LEFT)";
+                        } else if (ball.held_by_hand_id == 1) {
+                            throw_log << " (RIGHT)";
+                        } else {
+                            throw_log << " (UNKNOWN/NOT_SET)";
+                        }
+                        throw_log << " | velocity=(" << estimated_velocity.x << ", "
+                                  << estimated_velocity.y << ", " << estimated_velocity.z << ") m/s"
+                                  << std::endl;
+                    });
                 }
                 else if (!old_state_was_held && now_held) {
                     // Was in air, now held = CATCH
@@ -912,8 +956,25 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                         getCurrentTimestamp()
                     });
                     debug_log << "  >>> CATCH EVENT GENERATED <<<" << std::endl;
+                    
+                    // Log to both console and debug log file
                     std::cout << "[SimpleBallTracker] CATCH detected: Ball " << ball.id
                              << " by hand " << ball.held_by_hand_id << std::endl;
+                    
+                    DEBUG_LOG_WRITE({
+                        OPEN_DEBUG_LOG(catch_log);
+                        catch_log << "\n[CATCH] Ball " << ball.id
+                                  << " caught by hand " << ball.held_by_hand_id;
+                        if (ball.held_by_hand_id == 0) {
+                            catch_log << " (LEFT)";
+                        } else if (ball.held_by_hand_id == 1) {
+                            catch_log << " (RIGHT)";
+                        } else {
+                            catch_log << " (UNKNOWN/NOT_SET)";
+                        }
+                        catch_log << " | ball_color=" << ball.color_name
+                                  << std::endl;
+                    });
                 }
                 else {
                     debug_log << "  WARNING: State change confirmed but no event generated!" << std::endl;
@@ -946,7 +1007,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     frame_counter_++;
     
     // Open debug log file
-    std::ofstream debug_log("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(debug_log);
     debug_log << "\n\n========================================" << std::endl;
     debug_log << "=== FRAME " << frame_counter_ << " ===" << std::endl;
     debug_log << "========================================" << std::endl;
@@ -1015,7 +1076,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         bool has_prediction = false;
         
         // Open debug log for this ball's prediction
-        std::ofstream pred_log("engine_debug.log", std::ios::app);
+        OPEN_DEBUG_LOG(pred_log);
         pred_log << "\n  >> FRAME " << frame_counter_ << " - Kalman Prediction for Ball " << ball.id << " (" << ball.color_name << ") <<" << std::endl;
         pred_log << "  frames_without_yolo: " << ball.frames_without_yolo << std::endl;
         
@@ -1350,7 +1411,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // Detect ball states and events
     std::vector<BallEvent> events = detectStatesAndEvents(balls_, hands);
     
-    std::ofstream debug_log_end("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(debug_log_end);
     debug_log_end << "\n=== Update Complete ===" << std::endl;
     debug_log_end << "Events generated: " << events.size() << std::endl;
     for (const auto& event : events) {

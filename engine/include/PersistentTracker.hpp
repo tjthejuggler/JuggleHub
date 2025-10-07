@@ -38,6 +38,7 @@ struct PersistentTracker {
     // --- Occlusion & Lifetime Management ---
     int frames_since_seen = 0;      // Counter for how many frames the object has been unobserved.
     int parent_id = -1;             // If OCCLUDED, this stores the logical_id of the object it's hidden by (e.g., a hand).
+    int holding_hand_id = -1;       // For throw/catch detection: stores logical_id of hand holding/throwing this ball
 
     // --- Heuristics for Hand Tracking ---
     bool is_left_hand = false;      // Flag to identify the left hand persistently.

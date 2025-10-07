@@ -2,9 +2,22 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-06 20:44 CEST
+**Last Updated:** 2025-10-07 00:55 CEST
 
-**Recent Changes (2025-10-06):**
+**Recent Changes (2025-10-07):**
+- **🎯 HAND IDENTITY VALIDATION FIX**
+  - **Issue Fixed**: YOLO-Pose occasionally mislabels left/right hands, causing incorrect throw/catch side detection
+  - **Root Cause**: Pose estimation models can swap hand labels during fast movements or arm crossing
+  - **Solution**: Implemented temporal consistency validation with kinematic chain verification
+  - **Validation Strategy**:
+    - Tracks hand positions frame-to-frame to detect sudden identity swaps
+    - Uses arm skeleton chain (shoulder→elbow→wrist) to validate anatomical correctness
+    - Automatically corrects YOLO-Pose errors before creating TrackedHand objects
+  - **Impact**: Significantly improved accuracy of throw/catch side detection, especially during complex juggling patterns with arm crossing
+  - **Works With**: All juggling patterns including those with arm crossing and fast hand movements
+  - See [`engine/src/DNNTracker.cpp`](engine/src/DNNTracker.cpp:1524-1595) for implementation
+
+**Previous Changes (2025-10-06):**
 - **🔧 SETTINGS PERSISTENCE FIX**
   - **Issue Fixed**: Settings were being saved and loaded in UI but not applied to engine on startup
   - **Root Cause**: Settings were only sent to engine when sliders changed, not when loaded from file

@@ -1,4 +1,5 @@
 #include "DNNTracker.hpp"
+#include "DebugLogControl.hpp"
 #include <iostream>
 #include <fstream>
 #include <algorithm> // Required for std::max and std::min
@@ -7,6 +8,12 @@
 #include <limits>
 #include <vector>
 #include <iomanip>  // for std::setprecision
+
+// Helper macro for conditional debug logging
+// Creates a null stream when logging is disabled
+#define OPEN_DEBUG_LOG(var_name) \
+    std::ofstream var_name; \
+    if (g_enable_debug_log) var_name.open("engine_debug.log", std::ios::app)
 
 // --- HELPER FUNCTIONS ---
 
@@ -351,7 +358,11 @@ void DNNTracker::initialize_logical_trackers() {
 
     logical_hand_trackers_.clear();
     for (int i = 0; i < NUM_HANDS; ++i) {
-        logical_hand_trackers_.emplace_back(i + NUM_BALLS, "hand"); // Give hands unique IDs
+        auto& hand = logical_hand_trackers_.emplace_back(i + NUM_BALLS, "hand");
+        // Initialize hand identity: first hand (index 0) is left, second (index 1) is right
+        hand.is_left_hand = (i == 0);
+        std::cerr << "[INIT] Hand tracker " << hand.logical_id << " initialized as "
+                  << (hand.is_left_hand ? "LEFT" : "RIGHT") << std::endl;
     }
 }
 
@@ -403,7 +414,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     last_raw_detections_.clear();
     std::vector<byte_track::Object> detections_for_bytetrack = postprocess_ball_detection(color_frame, depth_frame, intrinsics, output_tensor, scale_x, scale_y, last_raw_detections_);
 
-    std::ofstream debug_log("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(debug_log);
     debug_log << "\n========================================" << std::endl;
     debug_log << "3D MATCHING CODE IS RUNNING!" << std::endl;
     debug_log << "Raw detections: " << last_raw_detections_.size() << std::endl;
@@ -446,7 +457,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     
     // Remove duplicate detections (identical or nearly identical bboxes)
     std::vector<const Detection*> unique_detections;
-    std::ofstream dedup_log("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(dedup_log);
     dedup_log << "[DEDUP] Filtering duplicates from " << valid_detections.size() << " detections..." << std::endl;
 
     for (const auto* det : valid_detections) {
@@ -531,7 +542,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     // --- NEW: COLOR-DOMINATED ASSIGNMENT ---
     // Instead of using Kalman predictions for matching, use color dominance as PRIMARY identity
     if (!ball_trackers_list.empty() && !valid_detections.empty()) {
-        std::ofstream color_log("engine_debug.log", std::ios::app);
+        OPEN_DEBUG_LOG(color_log);
         color_log << "\n[COLOR-DOMINATED] Starting color-based assignment" << std::endl;
         color_log << "[COLOR-DOMINATED] " << ball_trackers_list.size() << " active trackers, "
                   << valid_detections.size() << " valid detections" << std::endl;
@@ -707,7 +718,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     // --- STORE FUTURE PREDICTIONS FOR VISUALIZATION ---
     // After updates are complete, predict where each tracker will be in the NEXT frame
     // This shows the Kalman filter's trajectory prediction ahead of the current position
-    std::ofstream pred_log("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(pred_log);
     pred_log << "[PRED VIZ] Checking " << logical_ball_trackers_.size() << " ball trackers for predictions" << std::endl;
     
     for (auto& ball : logical_ball_trackers_) {
@@ -757,7 +768,7 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     
     // Auto-initialize trackers based on enabled color profiles (Step 6: Auto-Init)
     // NEW APPROACH: Create one tracker per enabled color profile, not just when all trackers are lost
-    std::ofstream auto_init_log("engine_debug.log", std::ios::app);
+    OPEN_DEBUG_LOG(auto_init_log);
     
     // Get enabled color profiles from adaptive manager
     std::vector<std::string> enabled_colors;
@@ -916,25 +927,51 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
     
     auto_init_log.close();
     
-    // Handle hand tracking (keep ByteTrack for hands as they move slower)
-    std::vector<Detection> hand_detections;
-    for (const auto& det : last_raw_detections_) {
-        if (det.class_id == 3) {
-            hand_detections.push_back(det);
+    // --- 4. UPDATE HAND TRACKING FROM POSE ESTIMATION ---
+    // Run pose estimation BEFORE throw/catch detection to get accurate hand positions
+    std::vector<TrackedHand> tracked_hands_pose;
+    if (pose_model_enabled_) {
+        tracked_hands_pose = run_pose_estimation(color_frame, depth_frame, intrinsics);
+        
+        // Update logical hand trackers with pose data
+        // CRITICAL: Match by is_left_hand flag, not by array index!
+        for (const auto& pose_hand : tracked_hands_pose) {
+            // pose_hand.id: 0 = left, 1 = right
+            bool is_left = (pose_hand.id == 0);
+            
+            // Find the hand tracker that should be this hand
+            for (auto& hand_tracker : logical_hand_trackers_) {
+                // Match by is_left_hand flag (or initialize if not set)
+                if (hand_tracker.is_left_hand == is_left || hand_tracker.status == TrackerStatus::LOST) {
+                    std::cerr << "[HAND_TRACKING] Updating hand tracker with logical_id=" << hand_tracker.logical_id
+                              << " to be " << (is_left ? "LEFT" : "RIGHT") << " hand"
+                              << " (pose id=" << pose_hand.id << ")" << std::endl;
+                    
+                    // Update position
+                    hand_tracker.kf.update(KalmanFilter3D::MeasurementVector(
+                        pose_hand.wrist_pos_3d.x, pose_hand.wrist_pos_3d.y, pose_hand.wrist_pos_3d.z));
+                    hand_tracker.update_from_kf();
+                    hand_tracker.status = TrackerStatus::TRACKED;
+                    hand_tracker.frames_since_seen = 0;
+                    
+                    // Set is_left_hand based on pose estimation
+                    hand_tracker.is_left_hand = is_left;
+                    break; // Found the right tracker, move to next pose hand
+                }
+            }
         }
     }
-    manage_hand_tracks(hand_detections);
 
-    // --- 4. RUN THROW/CATCH DETECTION ---
+    // --- 5. RUN THROW/CATCH DETECTION ---
     detected_events_ = throw_catch_detector_->detectEvents(
         logical_ball_trackers_, logical_hand_trackers_, last_raw_detections_, dt);
     
-    // --- 5. MANAGE HEURISTICS (Legacy occlusion handling) ---
+    // --- 6. MANAGE HEURISTICS (Legacy occlusion handling) ---
     // Note: manage_ball_occlusion() is now largely replaced by ThrowCatchDetector
     // but we keep it for backward compatibility and edge cases
     manage_ball_occlusion();
 
-    // --- 6. COMPILE FINAL RESULTS ---
+    // --- 7. COMPILE FINAL RESULTS ---
     std::vector<PersistentTracker*> all_logical_trackers;
     for(auto& ball : logical_ball_trackers_) all_logical_trackers.push_back(&ball);
     for(auto& hand : logical_hand_trackers_) all_logical_trackers.push_back(&hand);
@@ -958,13 +995,8 @@ std::pair<std::vector<TrackedObject>, std::vector<TrackedHand>> DNNTracker::upda
         });
     }
 
-    // --- 7. RUN POSE ESTIMATION ---
-    std::vector<TrackedHand> tracked_hands;
-    if (pose_model_enabled_) {
-        tracked_hands = run_pose_estimation(color_frame, depth_frame, intrinsics);
-    }
-
-    return {final_tracked_objects, tracked_hands};
+    // Return pose estimation results (already computed earlier)
+    return {final_tracked_objects, tracked_hands_pose};
 }
 
 
@@ -1523,7 +1555,80 @@ std::vector<TrackedHand> DNNTracker::run_pose_estimation(const cv::Mat& color_fr
             }
         }
         
-        // --- 6. CREATE TRACKED HANDS FROM WRIST KEYPOINTS ---
+        // --- 6. HAND IDENTITY VALIDATION ---
+        // Validate and correct YOLO-Pose hand assignments using temporal consistency and kinematic chains
+        static cv::Point3f prev_left_wrist(0, 0, 0);
+        static cv::Point3f prev_right_wrist(0, 0, 0);
+        static bool prev_frame_valid = false;
+        
+        bool current_frame_valid = (keypoint_confidences[9] > keypoint_confidence_threshold &&
+                                    keypoint_confidences[10] > keypoint_confidence_threshold &&
+                                    keypoints_3d[9].z > 0.2f && keypoints_3d[10].z > 0.2f);
+        
+        if (current_frame_valid && prev_frame_valid) {
+            // Calculate distances from current detections to previous positions
+            float dist_9_to_prev_left = calculate_distance(keypoints_3d[9], prev_left_wrist);
+            float dist_9_to_prev_right = calculate_distance(keypoints_3d[9], prev_right_wrist);
+            float dist_10_to_prev_left = calculate_distance(keypoints_3d[10], prev_left_wrist);
+            float dist_10_to_prev_right = calculate_distance(keypoints_3d[10], prev_right_wrist);
+            
+            // Check if YOLO-Pose swapped them (keypoint 9 closer to prev right, keypoint 10 closer to prev left)
+            bool yolo_swapped = (dist_9_to_prev_right < dist_9_to_prev_left) &&
+                                (dist_10_to_prev_left < dist_10_to_prev_right);
+            
+            if (yolo_swapped) {
+                // ADDITIONAL VALIDATION: Check arm chain consistency
+                // Left shoulder (5) → left elbow (7) → left wrist (9)
+                // Right shoulder (6) → right elbow (8) → right wrist (10)
+                
+                bool chain_validation_available = (keypoint_confidences[5] > keypoint_confidence_threshold &&
+                                                  keypoint_confidences[6] > keypoint_confidence_threshold &&
+                                                  keypoint_confidences[7] > keypoint_confidence_threshold &&
+                                                  keypoint_confidences[8] > keypoint_confidence_threshold &&
+                                                  keypoints_3d[5].z > 0.2f && keypoints_3d[6].z > 0.2f &&
+                                                  keypoints_3d[7].z > 0.2f && keypoints_3d[8].z > 0.2f);
+                
+                bool should_swap = true; // Default to temporal consistency
+                
+                if (chain_validation_available) {
+                    // Calculate arm chain lengths
+                    float left_chain_9 = calculate_distance(keypoints_3d[5], keypoints_3d[7]) +
+                                        calculate_distance(keypoints_3d[7], keypoints_3d[9]);
+                    float left_chain_10 = calculate_distance(keypoints_3d[5], keypoints_3d[7]) +
+                                         calculate_distance(keypoints_3d[7], keypoints_3d[10]);
+                    
+                    float right_chain_9 = calculate_distance(keypoints_3d[6], keypoints_3d[8]) +
+                                         calculate_distance(keypoints_3d[8], keypoints_3d[9]);
+                    float right_chain_10 = calculate_distance(keypoints_3d[6], keypoints_3d[8]) +
+                                          calculate_distance(keypoints_3d[8], keypoints_3d[10]);
+                    
+                    // Correct assignment: left chain should be shorter with wrist 9, right chain shorter with wrist 10
+                    bool chain_agrees_with_yolo = (left_chain_9 < left_chain_10) && (right_chain_10 < right_chain_9);
+                    
+                    // If chain validation disagrees with temporal, trust the chain (more reliable)
+                    if (chain_agrees_with_yolo) {
+                        should_swap = false; // YOLO was actually correct
+                    }
+                }
+                
+                if (should_swap) {
+                    std::swap(keypoints_3d[9], keypoints_3d[10]);
+                    std::swap(keypoint_confidences[9], keypoint_confidences[10]);
+                    std::cout << "[POSE] Corrected hand swap based on temporal/kinematic validation" << std::endl;
+                }
+            }
+        }
+        
+        // Update previous positions for next frame
+        if (current_frame_valid) {
+            prev_left_wrist = keypoints_3d[9];
+            prev_right_wrist = keypoints_3d[10];
+            prev_frame_valid = true;
+        } else {
+            prev_frame_valid = false;
+        }
+        
+        // --- 7. CREATE TRACKED HANDS FROM WRIST KEYPOINTS ---
         // Left wrist is keypoint 9, right wrist is keypoint 10
         
         // Left hand

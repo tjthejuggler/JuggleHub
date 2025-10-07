@@ -5,7 +5,7 @@ import re
 
 def main():
     parser = argparse.ArgumentParser(description="Copy corresponding 'no_boxes' images to a new directory.")
-    parser.add_argument("target_dir", help="The full path of the target directory containing 'boxes' images.")
+    parser.add_argument("target_dir", help="The full path of the target directory containing visualization images.")
     args = parser.parse_args()
 
     target_dir = args.target_dir
@@ -13,12 +13,12 @@ def main():
         print(f"Error: Target directory not found at '{target_dir}'")
         return
 
-    if not target_dir.endswith('_boxes'):
-        print(f"Error: Target directory name must end with '_boxes'.")
+    if not target_dir.endswith('with_vizualizations'):
+        print(f"Error: Target directory name must end with 'with_vizualizations'.")
         return
         
     # Create the output directory
-    output_dir = target_dir.replace('_boxes', '_no_boxes')
+    output_dir = target_dir.replace('with_vizualizations', 'images')
     os.makedirs(output_dir, exist_ok=True)
     print(f"Created output directory: {output_dir}")
 
@@ -26,8 +26,8 @@ def main():
     base_raw_recordings_path = '/home/twain/Projects/JuggleHub/engine/data/1_raw_recordings'
 
     # Regex to extract info from filename
-    # e.g. continuous_2025-09-27_09-21-45_frame_6577_boxes.jpg
-    filename_pattern = re.compile(r'(.+)_frame_(\d+)_boxes\.jpg$')
+    # e.g. continuous_2025-09-27_09-21-45_frame_6577_viz.jpg
+    filename_pattern = re.compile(r'(.+)_frame_(\d+)_viz\.jpg$')
 
     copied_count = 0
     not_found_count = 0
@@ -49,9 +49,14 @@ def main():
             dest_path = os.path.join(output_dir, source_filename)
 
             if os.path.exists(source_path):
-                shutil.copy(source_path, dest_path)
-                print(f"Copied '{source_filename}'")
-                copied_count += 1
+                # Check if source and destination are the same file
+                if os.path.abspath(source_path) == os.path.abspath(dest_path):
+                    print(f"Skipping '{source_filename}' (source and destination are the same)")
+                    copied_count += 1
+                else:
+                    shutil.copy(source_path, dest_path)
+                    print(f"Copied '{source_filename}'")
+                    copied_count += 1
             else:
                 print(f"Warning: Corresponding 'no_boxes' image not found for '{filename}' at '{source_path}'")
                 not_found_count += 1

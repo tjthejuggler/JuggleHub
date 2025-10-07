@@ -3,7 +3,7 @@ import json
 import shutil
 
 def process_directory(v5_dir):
-    v6_6_dir = v5_dir.replace("V5", "V6.6")
+    v6_6_dir = v5_dir.replace("V9", "V9.1")
     if not os.path.exists(v6_6_dir):
         shutil.copytree(v5_dir, v6_6_dir)
 
@@ -37,12 +37,7 @@ def process_json_file(file_path):
 
 if __name__ == "__main__":
     v5_directories = [
-        "/home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5rs455_just_hands_low_light_intentional_and_auto_realsense",
-        "/home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5_2_rs455_lonely_hands_low_light_intentional_realsense",
-        "/home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5rs455_normal_balls_mixedlight_sessions_intentional_realsense",
-        "/home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5rs455_normal_balls_daylight_sessions_auto_realsense",
-        "/home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5_intentional_edgecases_mixed_balls_normal_light_mixed_rs_no_boxes",
-        "/home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V5rs455_led_balls_mixedlight_sessions_intentional_realsense"
+        "/home/twain/Projects/JuggleHub/engine/data/annotation_sessions/V9_targeted_lowish_light_60fps_default_realsense"
     ]
 
     for v5_dir in v5_directories:

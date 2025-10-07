@@ -1131,13 +1131,18 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     
     // NEW: If all profiles are calibrated, use pure euclidean distance matching
     if (all_calibrated && balls_.size() > 0 && yolo_detections.size() > 0) {
-        std::cout << "[SimpleBallTracker] Using PURE euclidean distance matching for all balls" << std::endl;
+        OPEN_DEBUG_LOG(euclidean_log);
+        euclidean_log << "\n=== FRAME " << frame_counter_ << " - EUCLIDEAN COLOR MATCHING ===" << std::endl;
+        euclidean_log << "Using PURE euclidean distance matching for all balls" << std::endl;
         
         // Calculate euclidean distances for all ball-detection pairs
         struct BallDetectionMatch {
             int ball_idx;
             int det_idx;
             float euclidean_distance;
+            float measured_hue;
+            float measured_sat;
+            std::string ball_color;
         };
         std::vector<BallDetectionMatch> matches;
         
@@ -1155,8 +1160,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             
             if (!profile) continue;
             
-            std::cout << "[SimpleBallTracker] Ball '" << ball.color_name
-                     << "' calibrated: H=" << profile->avg_hue << ", S=" << profile->avg_saturation << std::endl;
+            euclidean_log << "\nBall[" << ball_idx << "] '" << ball.color_name << "' calibrated: H="
+                         << profile->avg_hue << ", S=" << profile->avg_saturation << std::endl;
             
             // Calculate distance to each detection
             for (size_t det_idx = 0; det_idx < yolo_detections.size(); ++det_idx) {
@@ -1210,15 +1215,55 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 
                 float distance = std::sqrt(hue_diff * hue_diff + sat_diff * sat_diff);
                 
-                matches.push_back({static_cast<int>(ball_idx), static_cast<int>(det_idx), distance});
+                BallDetectionMatch match;
+                match.ball_idx = static_cast<int>(ball_idx);
+                match.det_idx = static_cast<int>(det_idx);
+                match.euclidean_distance = distance;
+                match.measured_hue = avg_hue;
+                match.measured_sat = avg_sat;
+                match.ball_color = ball.color_name;
+                matches.push_back(match);
                 
-                std::cout << "  Det#" << det.index << " -> " << ball.color_name
-                         << ": H=" << avg_hue << ", S=" << avg_sat
-                         << ", dist=" << distance << std::endl;
+                euclidean_log << "  Det#" << det.index << " -> " << ball.color_name
+                             << ": measured H=" << avg_hue << ", S=" << avg_sat
+                             << " | target H=" << profile->avg_hue << ", S=" << profile->avg_saturation
+                             << " | dist=" << distance << std::endl;
             }
         }
         
-        // Sort by distance (closest first)
+        // CRITICAL FIX: Add temporal consistency bonus to prevent flip-flopping
+        // If a ball was matched to a detection in the previous frame, give it a bonus
+        // This creates "stickiness" that prevents rapid reassignment when distances are similar
+        const float TEMPORAL_CONSISTENCY_BONUS = 0.05f;  // Reduces effective distance by this amount
+        
+        euclidean_log << "\nApplying temporal consistency bonus (bonus=" << TEMPORAL_CONSISTENCY_BONUS << "):" << std::endl;
+        for (auto& match : matches) {
+            auto& ball = balls_[match.ball_idx];
+            
+            // Check if this ball had a YOLO detection in the previous frame
+            // and if the detection index is still valid
+            if (ball.has_yolo_detection && ball.frames_without_yolo == 0) {
+                // Ball had a detection last frame - check if this detection is close to the previous position
+                const auto& det = yolo_detections[match.det_idx];
+                
+                // Calculate 3D distance from current detection to ball's previous position
+                float dx = det.world_pos.x - ball.position.x;
+                float dy = det.world_pos.y - ball.position.y;
+                float dz = det.world_pos.z - ball.position.z;
+                float spatial_dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+                
+                // If detection is close to where the ball was (within 0.15m), apply bonus
+                if (spatial_dist < 0.15f) {
+                    float original_dist = match.euclidean_distance;
+                    match.euclidean_distance -= TEMPORAL_CONSISTENCY_BONUS;
+                    euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color
+                                 << ") <-> Det[" << match.det_idx << "]: spatial_dist=" << spatial_dist
+                                 << "m, bonus applied! " << original_dist << " -> " << match.euclidean_distance << std::endl;
+                }
+            }
+        }
+        
+        // Sort by distance (closest first) - now includes temporal consistency bonus
         std::sort(matches.begin(), matches.end(),
                  [](const BallDetectionMatch& a, const BallDetectionMatch& b) {
                      return a.euclidean_distance < b.euclidean_distance;
@@ -1228,22 +1273,25 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         // Each ball gets exactly one detection, each detection assigned to exactly one ball
         std::set<int> assigned_balls, assigned_dets;
         
-        std::cout << "[SimpleBallTracker] Euclidean matching - sorted pairs:" << std::endl;
+        euclidean_log << "\nEuclidean matching - sorted pairs (closest first):" << std::endl;
         for (const auto& match : matches) {
-            std::cout << "  Ball[" << match.ball_idx << "] <-> Det[" << match.det_idx
-                     << "] dist=" << match.euclidean_distance << std::endl;
+            euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color << ") <-> Det[" << match.det_idx
+                         << "] dist=" << match.euclidean_distance
+                         << " (H=" << match.measured_hue << ", S=" << match.measured_sat << ")" << std::endl;
         }
         
+        euclidean_log << "\nAssignment process:" << std::endl;
         for (const auto& match : matches) {
             // Skip if this ball already has a detection
             if (assigned_balls.find(match.ball_idx) != assigned_balls.end()) {
-                std::cout << "  Skipping: Ball[" << match.ball_idx << "] already assigned" << std::endl;
+                euclidean_log << "  SKIP: Ball[" << match.ball_idx << "](" << match.ball_color
+                             << ") already assigned" << std::endl;
                 continue;
             }
             
             // Skip if this detection already assigned to another ball
             if (assigned_dets.find(match.det_idx) != assigned_dets.end()) {
-                std::cout << "  Skipping: Det[" << match.det_idx << "] already assigned" << std::endl;
+                euclidean_log << "  SKIP: Det[" << match.det_idx << "] already assigned" << std::endl;
                 continue;
             }
             
@@ -1275,17 +1323,23 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 ball.position.x, ball.position.y, ball.position.z));
             ball.color_predictor.addDetection(ball.position);
             
-            std::cout << "[SimpleBallTracker] MATCHED: " << ball.color_name
-                     << " <- Det#" << det.index << " (dist=" << match.euclidean_distance << ")" << std::endl;
+            euclidean_log << "  *** MATCHED: Ball[" << match.ball_idx << "](" << ball.color_name
+                         << ") <- Det#" << det.index << " (dist=" << match.euclidean_distance << ") ***" << std::endl;
         }
         
         // Mark unmatched balls
+        euclidean_log << "\nUnmatched balls:" << std::endl;
         for (size_t ball_idx = 0; ball_idx < balls_.size(); ++ball_idx) {
             if (assigned_balls.find(ball_idx) == assigned_balls.end()) {
                 balls_[ball_idx].has_yolo_detection = false;
                 balls_[ball_idx].frames_without_yolo++;
+                euclidean_log << "  Ball[" << ball_idx << "](" << balls_[ball_idx].color_name
+                             << ") - NO MATCH" << std::endl;
             }
         }
+        
+        euclidean_log << "=== END EUCLIDEAN MATCHING ===" << std::endl;
+        euclidean_log.close();
     }
     
     // For each ball, try to match with YOLO detection (LEGACY or fallback)

@@ -1109,7 +1109,6 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             
             int center_x = static_cast<int>(ball.pixel_pos.x);
             int center_y = static_cast<int>(ball.pixel_pos.y);
-            int radius = 12;
             
             // Get color for this ball
             cv::Scalar color = cv::Scalar(255, 255, 255);  // Default white
@@ -1118,27 +1117,24 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 color = it->second;
             }
             
-            // Draw based on whether ball is held
+            // Draw ONLY the color letter with a white circle border - NO filled circle covering the ball
+            // This allows us to see the actual ball color underneath
+            std::string label = ball.color_name.substr(0, 1);
+            
+            // Draw white circle border around the letter for visibility
+            int label_radius = 15;
+            cv::circle(temp_result, cv::Point(center_x, center_y), label_radius, cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
+            
+            // If held, draw dashed circle (simulate with thicker line)
             if (ball.is_held) {
-                // Dashed circle for held balls (draw as regular circle with thicker line)
-                cv::circle(temp_result, cv::Point(center_x, center_y), radius, color, 3, cv::LINE_AA);
-            } else {
-                // Filled circle for in-air balls
-                cv::circle(temp_result, cv::Point(center_x, center_y), radius, color, -1, cv::LINE_AA);
-                // Black border for visibility
-                if (ball.color_name == "white") {
-                    cv::circle(temp_result, cv::Point(center_x, center_y), radius, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-                } else {
-                    cv::circle(temp_result, cv::Point(center_x, center_y), radius, cv::Scalar(0, 0, 0), 1, cv::LINE_AA);
-                }
+                cv::circle(temp_result, cv::Point(center_x, center_y), label_radius + 3, color, 2, cv::LINE_AA);
             }
             
-            // Draw simple label on ball (just first letter)
-            std::string label = ball.color_name.substr(0, 1);
-            cv::putText(temp_result, label, cv::Point(center_x - 5, center_y + 5),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-                cv::putText(temp_result, label, cv::Point(center_x - 5, center_y + 5),
-                           cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+            // Draw the color letter with black outline for visibility
+            cv::putText(temp_result, label, cv::Point(center_x - 8, center_y + 8),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 4, cv::LINE_AA);
+            cv::putText(temp_result, label, cv::Point(center_x - 8, center_y + 8),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv::LINE_AA);
             }
             
             // Get color for this ball (for info panel)

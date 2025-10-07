@@ -8,10 +8,14 @@
 #include <set>
 
 // Helper macro for conditional debug logging
-// Creates a null stream when logging is disabled
+// Only creates stream object when logging is enabled
 #define OPEN_DEBUG_LOG(var_name) \
     std::ofstream var_name; \
-    if (g_enable_debug_log) var_name.open("engine_debug.log", std::ios::app)
+    if (g_enable_debug_log) { var_name.open("engine_debug.log", std::ios::app); }
+
+// Helper macro to wrap debug log writes
+#define DEBUG_LOG(stream, code) \
+    if (g_enable_debug_log) { code }
 
 // Helper function for depth filtering
 static float get_filtered_depth(const cv::Mat& depth_frame, const cv::Point2f& pixel) {
@@ -476,20 +480,25 @@ const Detection* SimpleBallTracker::findBestColorMatch(
     bool has_kalman_prediction = (kalman_prediction.z > 0.01f);
     
     // Open debug log
-    OPEN_DEBUG_LOG(debug_log);
-    debug_log << "\n  >> FRAME " << frame_counter_ << " - findBestColorMatch() for " << profile.name << " <<" << std::endl;
-    debug_log << "  Has Kalman prediction: " << (has_kalman_prediction ? "YES" : "NO") << std::endl;
-    if (has_kalman_prediction) {
-        debug_log << "  Kalman pred pos: (" << kalman_prediction.x << ", " << kalman_prediction.y << ", " << kalman_prediction.z << ")" << std::endl;
-        debug_log << "  Prediction radius: " << tracking_settings_.prediction_radius_m << "m" << std::endl;
-    }
-    debug_log << "  Evaluating " << detections.size() << " detections:" << std::endl;
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\n  >> FRAME " << frame_counter_ << " - findBestColorMatch() for " << profile.name << " <<" << std::endl;
+        debug_log << "  Has Kalman prediction: " << (has_kalman_prediction ? "YES" : "NO") << std::endl;
+        if (has_kalman_prediction) {
+            debug_log << "  Kalman pred pos: (" << kalman_prediction.x << ", " << kalman_prediction.y << ", " << kalman_prediction.z << ")" << std::endl;
+            debug_log << "  Prediction radius: " << tracking_settings_.prediction_radius_m << "m" << std::endl;
+        }
+        debug_log << "  Evaluating " << detections.size() << " detections:" << std::endl;
+    });
     
     for (const auto& det : detections) {
-        debug_log << "\n  Detection #" << det.index << ":" << std::endl;
-        debug_log << "    Position: (" << det.world_pos.x << ", " << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
-        debug_log << "    Confidence: " << det.confidence << std::endl;
-        debug_log << "    Class ID: " << det.class_id << " (" << (det.class_id == 0 ? "ball" : "ball_held") << ")" << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "\n  Detection #" << det.index << ":" << std::endl;
+            debug_log << "    Position: (" << det.world_pos.x << ", " << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
+            debug_log << "    Confidence: " << det.confidence << std::endl;
+            debug_log << "    Class ID: " << det.class_id << " (" << (det.class_id == 0 ? "ball" : "ball_held") << ")" << std::endl;
+        });
         DetectionEvaluation eval;
         eval.detection_index = det.index;
         eval.passed_filters = false;
@@ -507,7 +516,10 @@ const Detection* SimpleBallTracker::findBestColorMatch(
             rejection_reason = "Already used";
             eval.result = "REJECTED: Used";
             evaluations.push_back(eval);
-            debug_log << "    REJECTED: Already used by another ball" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    REJECTED: Already used by another ball" << std::endl;
+            });
             continue;
         }
         
@@ -522,7 +534,10 @@ const Detection* SimpleBallTracker::findBestColorMatch(
             rejection_reason = reason;
             eval.result = reason;
             evaluations.push_back(eval);
-            debug_log << "    " << reason << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    " << reason << std::endl;
+            });
             continue;
         }
         
@@ -531,7 +546,10 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         if (has_kalman_prediction) {
             float dist_3d = cv::norm(det.world_pos - kalman_prediction);
             float radius = tracking_settings_.prediction_radius_m;
-            debug_log << "    Distance to Kalman pred: " << dist_3d << "m (radius: " << radius << "m)" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    Distance to Kalman pred: " << dist_3d << "m (radius: " << radius << "m)" << std::endl;
+            });
             
             // Check if detection qualifies for override BEFORE rejecting based on distance
             if (dist_3d > radius) {
@@ -547,12 +565,15 @@ const Detection* SimpleBallTracker::findBestColorMatch(
                 // Store override info in evaluation
                 eval.override_qualified = qualifies_for_override;
                 
-                debug_log << "    Override check: conf=" << det.confidence
-                         << " (thresh=" << tracking_settings_.override_confidence_threshold << ")"
-                         << ", color=" << color_score
-                         << " (thresh=" << tracking_settings_.override_color_threshold << ")"
-                         << ", class=" << det.class_id
-                         << ", qualifies=" << (qualifies_for_override ? "YES" : "NO") << std::endl;
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "    Override check: conf=" << det.confidence
+                             << " (thresh=" << tracking_settings_.override_confidence_threshold << ")"
+                             << ", color=" << color_score
+                             << " (thresh=" << tracking_settings_.override_color_threshold << ")"
+                             << ", class=" << det.class_id
+                             << ", qualifies=" << (qualifies_for_override ? "YES" : "NO") << std::endl;
+                });
                 
                 if (!qualifies_for_override) {
                     // Reject detection - outside radius and doesn't qualify for override
@@ -561,19 +582,28 @@ const Detection* SimpleBallTracker::findBestColorMatch(
                     rejection_reason = reason;
                     eval.result = reason;
                     evaluations.push_back(eval);
-                    debug_log << "    REJECTED: Outside Kalman radius (no override)" << std::endl;
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "    REJECTED: Outside Kalman radius (no override)" << std::endl;
+                    });
                     continue;  // Skip this detection
                 } else {
                     // Detection qualifies for override - allow it despite distance
                     eval.override_applied = true;
-                    debug_log << "    *** OVERRIDE APPLIED *** Distance " << dist_3d
-                             << "m exceeds radius but high confidence/color" << std::endl;
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "    *** OVERRIDE APPLIED *** Distance " << dist_3d
+                                 << "m exceeds radius but high confidence/color" << std::endl;
+                    });
                 }
             }
         }
         
         float color_score = matchColor(det, profile, hsv_frame);
-        debug_log << "    Color match score: " << color_score << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "    Color match score: " << color_score << std::endl;
+        });
         
         // NEW: For euclidean distance matching, don't reject based on threshold
         // We want to assign each detection to the CLOSEST color, even if the match isn't perfect
@@ -587,11 +617,17 @@ const Detection* SimpleBallTracker::findBestColorMatch(
                 rejection_reason = reason;
                 eval.result = reason;
                 evaluations.push_back(eval);
-                debug_log << "    REJECTED: Low color match (legacy mode)" << std::endl;
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "    REJECTED: Low color match (legacy mode)" << std::endl;
+                });
                 continue;
             }
         } else {
-            debug_log << "    Using euclidean matching - no threshold rejection" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    Using euclidean matching - no threshold rejection" << std::endl;
+            });
         }
         
         eval.passed_filters = true;
@@ -631,16 +667,22 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         eval.kalman_score = kalman_score;
         eval.total_score = combined_score;
         
-        debug_log << "    SCORING:" << std::endl;
-        debug_log << "      Class score: " << class_score << std::endl;
-        debug_log << "      Confidence score: " << confidence_score << std::endl;
-        debug_log << "      Color score: " << weighted_color_score << std::endl;
-        debug_log << "      Kalman score: " << kalman_score << std::endl;
-        debug_log << "      TOTAL: " << combined_score << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "    SCORING:" << std::endl;
+            debug_log << "      Class score: " << class_score << std::endl;
+            debug_log << "      Confidence score: " << confidence_score << std::endl;
+            debug_log << "      Color score: " << weighted_color_score << std::endl;
+            debug_log << "      Kalman score: " << kalman_score << std::endl;
+            debug_log << "      TOTAL: " << combined_score << std::endl;
+        });
         
         // CRITICAL: If this detection has override applied, it ALWAYS wins regardless of score
         if (eval.override_applied) {
-            debug_log << "    >>> OVERRIDE FORCES SELECTION (ignoring score comparison) <<<" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    >>> OVERRIDE FORCES SELECTION (ignoring score comparison) <<<" << std::endl;
+            });
             best_combined_score = combined_score;
             best_det = &det;
             
@@ -653,7 +695,10 @@ const Detection* SimpleBallTracker::findBestColorMatch(
             eval.result = "SELECTED (OVERRIDE)";
         }
         else if (combined_score > best_combined_score) {
-            debug_log << "    >>> NEW BEST DETECTION <<<" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    >>> NEW BEST DETECTION <<<" << std::endl;
+            });
             best_combined_score = combined_score;
             best_det = &det;
             
@@ -665,7 +710,10 @@ const Detection* SimpleBallTracker::findBestColorMatch(
             
             eval.result = "SELECTED";
         } else {
-            debug_log << "    Not better than current best (" << best_combined_score << ")" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    Not better than current best (" << best_combined_score << ")" << std::endl;
+            });
             char result[64];
             snprintf(result, sizeof(result), "Score %.2f < %.2f", combined_score, best_combined_score);
             eval.result = result;
@@ -674,16 +722,19 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         evaluations.push_back(eval);
     }
     
-    debug_log << "\n  FINAL RESULT:" << std::endl;
-    if (best_det) {
-        debug_log << "    Selected detection #" << best_det->index << " with score " << best_combined_score << std::endl;
-    } else {
-        debug_log << "    NO DETECTION SELECTED" << std::endl;
-        if (!rejection_reason.empty()) {
-            debug_log << "    Last rejection reason: " << rejection_reason << std::endl;
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\n  FINAL RESULT:" << std::endl;
+        if (best_det) {
+            debug_log << "    Selected detection #" << best_det->index << " with score " << best_combined_score << std::endl;
+        } else {
+            debug_log << "    NO DETECTION SELECTED" << std::endl;
+            if (!rejection_reason.empty()) {
+                debug_log << "    Last rejection reason: " << rejection_reason << std::endl;
+            }
         }
-    }
-    debug_log.close();
+        debug_log.close();
+    });
     
     // Store evaluations for visualization
     last_detection_evaluations_ = evaluations;
@@ -806,65 +857,89 @@ uint64_t SimpleBallTracker::getCurrentTimestamp() {
 }
 
 bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands) {
-    // Open debug log file in append mode
-    OPEN_DEBUG_LOG(debug_log);
-    debug_log << "\n  >> FRAME " << frame_counter_ << " - isBallHeld() for Ball " << ball.id << " <<" << std::endl;
-    
     // Use weighted scoring system based on tracking settings
     float held_score = 0.0f;
     float in_air_score = 0.0f;
     
-    debug_log << "  Tracking settings:" << std::endl;
-    debug_log << "    ml_ball_weight: " << tracking_settings_.ml_ball_weight << std::endl;
-    debug_log << "    ml_ball_held_weight: " << tracking_settings_.ml_ball_held_weight << std::endl;
-    debug_log << "    wrist_proximity_weight: " << tracking_settings_.wrist_proximity_weight << std::endl;
-    debug_log << "    wrist_proximity_threshold: " << tracking_settings_.wrist_proximity_threshold << "m" << std::endl;
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\n  >> FRAME " << frame_counter_ << " - isBallHeld() for Ball " << ball.id << " <<" << std::endl;
+        debug_log << "  Tracking settings:" << std::endl;
+        debug_log << "    ml_ball_weight: " << tracking_settings_.ml_ball_weight << std::endl;
+        debug_log << "    ml_ball_held_weight: " << tracking_settings_.ml_ball_held_weight << std::endl;
+        debug_log << "    wrist_proximity_weight: " << tracking_settings_.wrist_proximity_weight << std::endl;
+        debug_log << "    wrist_proximity_threshold: " << tracking_settings_.wrist_proximity_threshold << "m" << std::endl;
+        debug_log << "  ML Classification:" << std::endl;
+        debug_log << "    YOLO class_id: " << ball.yolo_class_id << std::endl;
+    });
     
     // 1. ML Classification Evidence - TRUST YOLO FIRST
-    debug_log << "  ML Classification:" << std::endl;
-    debug_log << "    YOLO class_id: " << ball.yolo_class_id << std::endl;
     if (ball.yolo_class_id == 1) {  // ball_held class
         held_score += tracking_settings_.ml_ball_held_weight;
-        debug_log << "    Class is 'ball_held' -> adding " << tracking_settings_.ml_ball_held_weight
-                 << " to held_score" << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "    Class is 'ball_held' -> adding " << tracking_settings_.ml_ball_held_weight
+                     << " to held_score" << std::endl;
+        });
     } else if (ball.yolo_class_id == 0) {  // ball (in-air) class
         in_air_score += tracking_settings_.ml_ball_weight;
-        debug_log << "    Class is 'ball' (in-air) -> adding " << tracking_settings_.ml_ball_weight
-                 << " to in_air_score" << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "    Class is 'ball' (in-air) -> adding " << tracking_settings_.ml_ball_weight
+                     << " to in_air_score" << std::endl;
+        });
     } else {
-        debug_log << "    Unknown class_id!" << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "    Unknown class_id!" << std::endl;
+        });
     }
     
     // 2. Wrist Proximity Evidence - also store distance for UI display
     float min_dist = std::numeric_limits<float>::max();
     int closest_hand = -1;
     
-    debug_log << "  Wrist Proximity Check:" << std::endl;
-    debug_log << "    Number of hands: " << hands.size() << std::endl;
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  Wrist Proximity Check:" << std::endl;
+        debug_log << "    Number of hands: " << hands.size() << std::endl;
+    });
     
     for (const auto& hand : hands) {
-        debug_log << "    Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT")
-                  << ", visible=" << hand.is_visible << ")" << std::endl;
-        debug_log << "      Hand position: (" << hand.wrist_pos_3d.x << ", "
-                  << hand.wrist_pos_3d.y << ", " << hand.wrist_pos_3d.z << ")" << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "    Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT")
+                      << ", visible=" << hand.is_visible << ")" << std::endl;
+            debug_log << "      Hand position: (" << hand.wrist_pos_3d.x << ", "
+                      << hand.wrist_pos_3d.y << ", " << hand.wrist_pos_3d.z << ")" << std::endl;
+        });
         if (!hand.is_visible) continue;
         
         float dist = cv::norm(ball.position - hand.wrist_pos_3d);
-        debug_log << "      Distance to ball: " << dist << "m" << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "      Distance to ball: " << dist << "m" << std::endl;
+        });
         
         if (dist < min_dist) {
             min_dist = dist;
             closest_hand = hand.id;
-            debug_log << "      >>> This is the closest hand so far (hand.id=" << hand.id
-                      << " = " << (hand.id == 0 ? "LEFT" : "RIGHT") << ") <<<" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "      >>> This is the closest hand so far (hand.id=" << hand.id
+                          << " = " << (hand.id == 0 ? "LEFT" : "RIGHT") << ") <<<" << std::endl;
+            });
         }
     }
     
     // Store distance for UI display
     ball.distance_to_nearest_wrist = (min_dist < std::numeric_limits<float>::max()) ? min_dist : -1.0f;
     
-    debug_log << "    Minimum distance to any wrist: " << min_dist << "m" << std::endl;
-    debug_log << "    Threshold: " << tracking_settings_.wrist_proximity_threshold << "m" << std::endl;
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "    Minimum distance to any wrist: " << min_dist << "m" << std::endl;
+        debug_log << "    Threshold: " << tracking_settings_.wrist_proximity_threshold << "m" << std::endl;
+    });
     
     // CRITICAL FIX: Only use proximity as evidence if YOLO hasn't given us a strong signal
     // If YOLO clearly says "ball" (in-air), don't let proximity override it
@@ -876,40 +951,55 @@ bool SimpleBallTracker::isBallHeld(SimpleBall& ball, const std::vector<SimpleHan
         if (ball.yolo_class_id == 1 || !ball.has_yolo_detection) {
             held_score += tracking_settings_.wrist_proximity_weight;
             ball.held_by_hand_id = closest_hand;
-            debug_log << "    Ball is NEAR hand " << closest_hand << " (" << (closest_hand == 0 ? "LEFT" : "RIGHT")
-                      << ") AND (YOLO agrees OR no YOLO) -> adding "
-                     << tracking_settings_.wrist_proximity_weight << " to held_score" << std::endl;
-            if (old_held_by_hand_id != ball.held_by_hand_id) {
-                debug_log << "    *** held_by_hand_id CHANGED: " << old_held_by_hand_id << " -> " << ball.held_by_hand_id << " ***" << std::endl;
-            }
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    Ball is NEAR hand " << closest_hand << " (" << (closest_hand == 0 ? "LEFT" : "RIGHT")
+                          << ") AND (YOLO agrees OR no YOLO) -> adding "
+                         << tracking_settings_.wrist_proximity_weight << " to held_score" << std::endl;
+                if (old_held_by_hand_id != ball.held_by_hand_id) {
+                    debug_log << "    *** held_by_hand_id CHANGED: " << old_held_by_hand_id << " -> " << ball.held_by_hand_id << " ***" << std::endl;
+                }
+            });
         } else {
-            debug_log << "    Ball is NEAR hand " << closest_hand << " (" << (closest_hand == 0 ? "LEFT" : "RIGHT")
-                      << ") BUT YOLO says in-air (class=0) -> NOT adding proximity weight" << std::endl;
-            // CRITICAL FIX: Don't clear held_by_hand_id - preserve it for throw detection
-            // ball.held_by_hand_id = -1;  // OLD: This was clearing the hand ID too early
-            debug_log << "    PRESERVING held_by_hand_id=" << ball.held_by_hand_id << " (ball is in-air but we remember which hand threw it)" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    Ball is NEAR hand " << closest_hand << " (" << (closest_hand == 0 ? "LEFT" : "RIGHT")
+                          << ") BUT YOLO says in-air (class=0) -> NOT adding proximity weight" << std::endl;
+                // CRITICAL FIX: Don't clear held_by_hand_id - preserve it for throw detection
+                // ball.held_by_hand_id = -1;  // OLD: This was clearing the hand ID too early
+                debug_log << "    PRESERVING held_by_hand_id=" << ball.held_by_hand_id << " (ball is in-air but we remember which hand threw it)" << std::endl;
+            });
         }
     } else {
         // CRITICAL FIX: Don't clear held_by_hand_id when ball moves away - preserve it for throw detection
         // ball.held_by_hand_id = -1;  // OLD: This was clearing the hand ID too early
-        debug_log << "    Ball is NOT near any hand" << std::endl;
-        debug_log << "    PRESERVING held_by_hand_id=" << ball.held_by_hand_id << " (ball moved away but we remember which hand it came from)" << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "    Ball is NOT near any hand" << std::endl;
+            debug_log << "    PRESERVING held_by_hand_id=" << ball.held_by_hand_id << " (ball moved away but we remember which hand it came from)" << std::endl;
+        });
     }
     
-    debug_log << "    FINAL held_by_hand_id: " << ball.held_by_hand_id
-              << (ball.held_by_hand_id >= 0 ? (ball.held_by_hand_id == 0 ? " (LEFT)" : " (RIGHT)") : " (NONE)")
-              << std::endl;
-    
-    debug_log << "  FINAL SCORES:" << std::endl;
-    debug_log << "    held_score: " << held_score << std::endl;
-    debug_log << "    in_air_score: " << in_air_score << std::endl;
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "    FINAL held_by_hand_id: " << ball.held_by_hand_id
+                  << (ball.held_by_hand_id >= 0 ? (ball.held_by_hand_id == 0 ? " (LEFT)" : " (RIGHT)") : " (NONE)")
+                  << std::endl;
+        debug_log << "  FINAL SCORES:" << std::endl;
+        debug_log << "    held_score: " << held_score << std::endl;
+        debug_log << "    in_air_score: " << in_air_score << std::endl;
+    });
     
     // Decision: held if held_score is higher
     bool result = held_score > in_air_score;
-    debug_log << "  DECISION: " << (result ? "HELD" : "IN_AIR")
-             << " (held_score " << (result ? ">" : "<=") << " in_air_score)" << std::endl;
     
-    debug_log.close();
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  DECISION: " << (result ? "HELD" : "IN_AIR")
+                 << " (held_score " << (result ? ">" : "<=") << " in_air_score)" << std::endl;
+        debug_log.close();
+    });
+    
     return result;
 }
 
@@ -919,56 +1009,75 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
     
     std::vector<BallEvent> events;
     
-    // Open debug log file in append mode
-    OPEN_DEBUG_LOG(debug_log);
-    debug_log << "\n=== FRAME " << frame_counter_ << " - detectStatesAndEvents() ===" << std::endl;
-    debug_log << "Number of balls: " << balls.size() << std::endl;
-    debug_log << "Number of hands: " << hands.size() << std::endl;
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\n=== FRAME " << frame_counter_ << " - detectStatesAndEvents() ===" << std::endl;
+        debug_log << "Number of balls: " << balls.size() << std::endl;
+        debug_log << "Number of hands: " << hands.size() << std::endl;
+    });
     
     for (auto& ball : balls) {
-        debug_log << "\n--- Ball " << ball.id << " (" << ball.color_name << ") ---" << std::endl;
-        debug_log << "  Current is_held state: " << (ball.is_held ? "HELD" : "IN_AIR") << std::endl;
-        debug_log << "  YOLO class_id: " << ball.yolo_class_id << " (0=ball, 1=ball_held)" << std::endl;
-        debug_log << "  Has YOLO detection: " << (ball.has_yolo_detection ? "YES" : "NO") << std::endl;
-        debug_log << "  Frames without YOLO: " << ball.frames_without_yolo << std::endl;
-        debug_log << "  Distance to nearest wrist: " << ball.distance_to_nearest_wrist << "m" << std::endl;
-        debug_log << "  Held by hand ID: " << ball.held_by_hand_id << std::endl;
-        debug_log << "  State change counter: " << ball.state_change_counter << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "\n--- Ball " << ball.id << " (" << ball.color_name << ") ---" << std::endl;
+            debug_log << "  Current is_held state: " << (ball.is_held ? "HELD" : "IN_AIR") << std::endl;
+            debug_log << "  YOLO class_id: " << ball.yolo_class_id << " (0=ball, 1=ball_held)" << std::endl;
+            debug_log << "  Has YOLO detection: " << (ball.has_yolo_detection ? "YES" : "NO") << std::endl;
+            debug_log << "  Frames without YOLO: " << ball.frames_without_yolo << std::endl;
+            debug_log << "  Distance to nearest wrist: " << ball.distance_to_nearest_wrist << "m" << std::endl;
+            debug_log << "  Held by hand ID: " << ball.held_by_hand_id << std::endl;
+            debug_log << "  State change counter: " << ball.state_change_counter << std::endl;
+        });
         
         // Get current held state based on detection
         bool now_held = isBallHeld(ball, hands);
-        debug_log << "  isBallHeld() returned: " << (now_held ? "HELD" : "IN_AIR") << std::endl;
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  isBallHeld() returned: " << (now_held ? "HELD" : "IN_AIR") << std::endl;
+        });
         
         // Debounce state changes (require min_frames_for_state_change consecutive frames)
         if (now_held != ball.is_held) {
             ball.state_change_counter++;
-            debug_log << "  STATE MISMATCH! now_held=" << (now_held ? "HELD" : "IN_AIR")
-                     << " vs ball.is_held=" << (ball.is_held ? "HELD" : "IN_AIR") << std::endl;
-            debug_log << "  Incrementing state_change_counter to: " << ball.state_change_counter << std::endl;
-            debug_log << "  Need " << tracking_settings_.min_frames_for_state_change
-                     << " frames to confirm state change" << std::endl;
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  STATE MISMATCH! now_held=" << (now_held ? "HELD" : "IN_AIR")
+                         << " vs ball.is_held=" << (ball.is_held ? "HELD" : "IN_AIR") << std::endl;
+                debug_log << "  Incrementing state_change_counter to: " << ball.state_change_counter << std::endl;
+                debug_log << "  Need " << tracking_settings_.min_frames_for_state_change
+                         << " frames to confirm state change" << std::endl;
+            });
             
             if (ball.state_change_counter >= tracking_settings_.min_frames_for_state_change) {
                 // State change confirmed - generate event based on OLD state → NEW state
                 bool old_state_was_held = ball.is_held;  // Current state before change
                 
-                debug_log << "  *** STATE CHANGE CONFIRMED ***" << std::endl;
-                debug_log << "  OLD state (ball.is_held): " << (old_state_was_held ? "HELD" : "IN_AIR") << std::endl;
-                debug_log << "  NEW state (now_held): " << (now_held ? "HELD" : "IN_AIR") << std::endl;
-                debug_log << "  held_by_hand_id: " << ball.held_by_hand_id << std::endl;
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  *** STATE CHANGE CONFIRMED ***" << std::endl;
+                    debug_log << "  OLD state (ball.is_held): " << (old_state_was_held ? "HELD" : "IN_AIR") << std::endl;
+                    debug_log << "  NEW state (now_held): " << (now_held ? "HELD" : "IN_AIR") << std::endl;
+                    debug_log << "  held_by_hand_id: " << ball.held_by_hand_id << std::endl;
+                });
                 
                 ball.is_held = now_held;  // Update to new state
                 ball.state_change_counter = 0;
                 
-                debug_log << "  Transition: " << (old_state_was_held ? "HELD" : "IN_AIR")
-                         << " -> " << (now_held ? "HELD" : "IN_AIR") << std::endl;
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  Transition: " << (old_state_was_held ? "HELD" : "IN_AIR")
+                             << " -> " << (now_held ? "HELD" : "IN_AIR") << std::endl;
+                });
                 
                 // Generate event based on transition
                 if (old_state_was_held && !now_held) {
                     // Was held, now in air = THROW
-                    debug_log << "  Condition check: old_state_was_held=" << old_state_was_held
-                             << " && !now_held=" << !now_held << std::endl;
-                    debug_log << "  >>> GENERATING THROW EVENT <<<" << std::endl;
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  Condition check: old_state_was_held=" << old_state_was_held
+                                 << " && !now_held=" << !now_held << std::endl;
+                        debug_log << "  >>> GENERATING THROW EVENT <<<" << std::endl;
+                    });
                     
                     // CRITICAL FIX: Estimate throw velocity from color predictor history
                     // This prevents Kalman from immediately predicting downward motion
@@ -980,16 +1089,22 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                         state(4) = estimated_velocity.y;  // vy
                         state(5) = estimated_velocity.z;  // vz
                         
-                        debug_log << "  THROW VELOCITY INITIALIZED: ("
-                                 << estimated_velocity.x << ", "
-                                 << estimated_velocity.y << ", "
-                                 << estimated_velocity.z << ") m/s" << std::endl;
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  THROW VELOCITY INITIALIZED: ("
+                                     << estimated_velocity.x << ", "
+                                     << estimated_velocity.y << ", "
+                                     << estimated_velocity.z << ") m/s" << std::endl;
+                        });
                         std::cout << "[SimpleBallTracker] Throw velocity: ("
                                  << estimated_velocity.x << ", "
                                  << estimated_velocity.y << ", "
                                  << estimated_velocity.z << ") m/s" << std::endl;
                     } else {
-                        debug_log << "  WARNING: No valid velocity estimate for throw!" << std::endl;
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  WARNING: No valid velocity estimate for throw!" << std::endl;
+                        });
                     }
                     
                     events.push_back({
@@ -998,7 +1113,11 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                         ball.held_by_hand_id,
                         getCurrentTimestamp()
                     });
-                    debug_log << "  >>> THROW EVENT GENERATED <<<" << std::endl;
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  >>> THROW EVENT GENERATED <<<" << std::endl;
+                    });
                     
                     // Log to both console and debug log file
                     std::cout << "[SimpleBallTracker] THROW detected: Ball " << ball.id
@@ -1022,9 +1141,12 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                 }
                 else if (!old_state_was_held && now_held) {
                     // Was in air, now held = CATCH
-                    debug_log << "  Condition check: !old_state_was_held=" << !old_state_was_held
-                             << " && now_held=" << now_held << std::endl;
-                    debug_log << "  >>> GENERATING CATCH EVENT <<<" << std::endl;
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  Condition check: !old_state_was_held=" << !old_state_was_held
+                                 << " && now_held=" << now_held << std::endl;
+                        debug_log << "  >>> GENERATING CATCH EVENT <<<" << std::endl;
+                    });
                     
                     events.push_back({
                         BallEvent::CATCH,
@@ -1032,7 +1154,11 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                         ball.held_by_hand_id,
                         getCurrentTimestamp()
                     });
-                    debug_log << "  >>> CATCH EVENT GENERATED <<<" << std::endl;
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  >>> CATCH EVENT GENERATED <<<" << std::endl;
+                    });
                     
                     // Log to both console and debug log file
                     std::cout << "[SimpleBallTracker] CATCH detected: Ball " << ball.id
@@ -1054,23 +1180,32 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                     });
                 }
                 else {
-                    debug_log << "  WARNING: State change confirmed but no event generated!" << std::endl;
-                    debug_log << "  This means both old and new states are the same, which shouldn't happen!" << std::endl;
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  WARNING: State change confirmed but no event generated!" << std::endl;
+                        debug_log << "  This means both old and new states are the same, which shouldn't happen!" << std::endl;
+                    });
                 }
             }
         }
         else {
             // State is stable, reset counter
-            debug_log << "  State is STABLE (now_held == ball.is_held)" << std::endl;
-            if (ball.state_change_counter > 0) {
-                debug_log << "  Resetting state_change_counter from " << ball.state_change_counter << " to 0" << std::endl;
-            }
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  State is STABLE (now_held == ball.is_held)" << std::endl;
+                if (ball.state_change_counter > 0) {
+                    debug_log << "  Resetting state_change_counter from " << ball.state_change_counter << " to 0" << std::endl;
+                }
+            });
             ball.state_change_counter = 0;
         }
     }
     
-    debug_log << "\nTotal events generated: " << events.size() << std::endl;
-    debug_log.close();
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\nTotal events generated: " << events.size() << std::endl;
+        debug_log.close();
+    });
     
     return events;
 }
@@ -1083,41 +1218,52 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // Increment frame counter
     frame_counter_++;
     
-    // Open debug log file
-    OPEN_DEBUG_LOG(debug_log);
-    debug_log << "\n\n========================================" << std::endl;
-    debug_log << "=== FRAME " << frame_counter_ << " ===" << std::endl;
-    debug_log << "========================================" << std::endl;
-    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\n\n========================================" << std::endl;
+        debug_log << "=== FRAME " << frame_counter_ << " ===" << std::endl;
+        debug_log << "========================================" << std::endl;
+    });
+
     // Calculate dt
     auto current_time = std::chrono::steady_clock::now();
     float dt = std::chrono::duration_cast<std::chrono::duration<float>>(
         current_time - last_update_time_).count();
     last_update_time_ = current_time;
-    
-    debug_log << "Delta time: " << dt << "s" << std::endl;
-    
+
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "Delta time: " << dt << "s" << std::endl;
+    });
+
     // Run YOLO detection
     std::vector<Detection> yolo_detections = runBallDetection(color_frame, depth_frame, intrinsics);
-    debug_log << "YOLO detections: " << yolo_detections.size() << std::endl;
-    for (size_t i = 0; i < yolo_detections.size(); ++i) {
-        const auto& det = yolo_detections[i];
-        debug_log << "  Detection " << i << ": class_id=" << det.class_id
-                 << " (0=ball, 1=ball_held), conf=" << det.confidence
-                 << ", pos=(" << det.world_pos.x << ", " << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
-    }
     
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "YOLO detections: " << yolo_detections.size() << std::endl;
+        for (size_t i = 0; i < yolo_detections.size(); ++i) {
+            const auto& det = yolo_detections[i];
+            debug_log << "  Detection " << i << ": class_id=" << det.class_id
+                     << " (0=ball, 1=ball_held), conf=" << det.confidence
+                     << ", pos=(" << det.world_pos.x << ", " << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
+        }
+    });
+
     // Run pose estimation
     std::vector<SimpleHand> hands = runPoseEstimation(color_frame, depth_frame, intrinsics);
     hands_ = hands;  // Store for getters
-    
-    debug_log << "Hands detected: " << hands.size() << std::endl;
-    for (const auto& hand : hands) {
-        debug_log << "  Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT")
-                 << "): pos=(" << hand.wrist_pos_3d.x << ", " << hand.wrist_pos_3d.y
-                 << ", " << hand.wrist_pos_3d.z << "), visible=" << hand.is_visible << std::endl;
-    }
-    debug_log.close();
+
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "Hands detected: " << hands.size() << std::endl;
+        for (const auto& hand : hands) {
+            debug_log << "  Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT")
+                     << "): pos=(" << hand.wrist_pos_3d.x << ", " << hand.wrist_pos_3d.y
+                     << ", " << hand.wrist_pos_3d.z << "), visible=" << hand.is_visible << std::endl;
+        }
+        debug_log.close();
+    });
     
     // Convert to HSV once
     cv::Mat hsv_frame;
@@ -1137,9 +1283,11 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     
     // Use euclidean distance matching for all calibrated balls
     if (balls_.size() > 0 && yolo_detections.size() > 0) {
-        OPEN_DEBUG_LOG(euclidean_log);
-        euclidean_log << "\n=== FRAME " << frame_counter_ << " - EUCLIDEAN COLOR MATCHING ===" << std::endl;
-        euclidean_log << "Using PURE euclidean distance matching for all balls" << std::endl;
+        DEBUG_LOG(euclidean_log, {
+            OPEN_DEBUG_LOG(euclidean_log);
+            euclidean_log << "\n=== FRAME " << frame_counter_ << " - EUCLIDEAN COLOR MATCHING ===" << std::endl;
+            euclidean_log << "Using PURE euclidean distance matching for all balls" << std::endl;
+        });
         
         // Calculate euclidean distances for all ball-detection pairs
         struct BallDetectionMatch {
@@ -1166,8 +1314,11 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             
             if (!profile) continue;
             
-            euclidean_log << "\nBall[" << ball_idx << "] '" << ball.color_name << "' calibrated: H="
-                         << profile->avg_hue << ", S=" << profile->avg_saturation << std::endl;
+            DEBUG_LOG(euclidean_log, {
+                OPEN_DEBUG_LOG(euclidean_log);
+                euclidean_log << "\nBall[" << ball_idx << "] '" << ball.color_name << "' calibrated: H="
+                             << profile->avg_hue << ", S=" << profile->avg_saturation << std::endl;
+            });
             
             // Calculate distance to each detection
             for (size_t det_idx = 0; det_idx < yolo_detections.size(); ++det_idx) {
@@ -1178,9 +1329,12 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 
                 // Skip if invalid depth
                 if (det.world_pos.z < MIN_DEPTH || det.world_pos.z > MAX_DEPTH) {
-                    euclidean_log << "  Det#" << det.index << " REJECTED: Depth " << det.world_pos.z
-                                 << "m is " << (det.world_pos.z < MIN_DEPTH ? "< MIN_DEPTH=" : "> MAX_DEPTH=")
-                                 << (det.world_pos.z < MIN_DEPTH ? MIN_DEPTH : MAX_DEPTH) << "m" << std::endl;
+                    DEBUG_LOG(euclidean_log, {
+                        OPEN_DEBUG_LOG(euclidean_log);
+                        euclidean_log << "  Det#" << det.index << " REJECTED: Depth " << det.world_pos.z
+                                     << "m is " << (det.world_pos.z < MIN_DEPTH ? "< MIN_DEPTH=" : "> MAX_DEPTH=")
+                                     << (det.world_pos.z < MIN_DEPTH ? MIN_DEPTH : MAX_DEPTH) << "m" << std::endl;
+                    });
                     continue;
                 }
                 
@@ -1235,10 +1389,13 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 match.ball_color = ball.color_name;
                 matches.push_back(match);
                 
-                euclidean_log << "  Det#" << det.index << " -> " << ball.color_name
-                             << ": measured H=" << avg_hue << ", S=" << avg_sat
-                             << " | target H=" << profile->avg_hue << ", S=" << profile->avg_saturation
-                             << " | dist=" << distance << std::endl;
+                DEBUG_LOG(euclidean_log, {
+                    OPEN_DEBUG_LOG(euclidean_log);
+                    euclidean_log << "  Det#" << det.index << " -> " << ball.color_name
+                                 << ": measured H=" << avg_hue << ", S=" << avg_sat
+                                 << " | target H=" << profile->avg_hue << ", S=" << profile->avg_saturation
+                                 << " | dist=" << distance << std::endl;
+                });
             }
         }
         
@@ -1248,8 +1405,11 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         const float TEMPORAL_CONSISTENCY_BONUS = 0.15f;  // Reduces effective distance by this amount (increased from 0.05)
         const float SPATIAL_THRESHOLD = 0.30f;  // Maximum distance to apply bonus (increased from 0.15m)
         
-        euclidean_log << "\nApplying temporal consistency bonus (bonus=" << TEMPORAL_CONSISTENCY_BONUS
-                     << ", spatial_threshold=" << SPATIAL_THRESHOLD << "m):" << std::endl;
+        DEBUG_LOG(euclidean_log, {
+            OPEN_DEBUG_LOG(euclidean_log);
+            euclidean_log << "\nApplying temporal consistency bonus (bonus=" << TEMPORAL_CONSISTENCY_BONUS
+                         << ", spatial_threshold=" << SPATIAL_THRESHOLD << "m):" << std::endl;
+        });
         for (auto& match : matches) {
             auto& ball = balls_[match.ball_idx];
             
@@ -1273,11 +1433,14 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     float proximity_factor = 1.0f - (spatial_dist / SPATIAL_THRESHOLD);
                     float scaled_bonus = TEMPORAL_CONSISTENCY_BONUS * proximity_factor;
                     match.euclidean_distance -= scaled_bonus;
-                    euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color
-                                 << ") <-> Det[" << match.det_idx << "]: spatial_dist=" << spatial_dist
-                                 << "m, proximity_factor=" << proximity_factor
-                                 << ", bonus=" << scaled_bonus
-                                 << " | " << original_dist << " -> " << match.euclidean_distance << std::endl;
+                    DEBUG_LOG(euclidean_log, {
+                        OPEN_DEBUG_LOG(euclidean_log);
+                        euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color
+                                     << ") <-> Det[" << match.det_idx << "]: spatial_dist=" << spatial_dist
+                                     << "m, proximity_factor=" << proximity_factor
+                                     << ", bonus=" << scaled_bonus
+                                     << " | " << original_dist << " -> " << match.euclidean_distance << std::endl;
+                    });
                 }
             }
         }
@@ -1292,25 +1455,34 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         // Each ball gets exactly one detection, each detection assigned to exactly one ball
         std::set<int> assigned_balls, assigned_dets;
         
-        euclidean_log << "\nEuclidean matching - sorted pairs (closest first):" << std::endl;
-        for (const auto& match : matches) {
-            euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color << ") <-> Det[" << match.det_idx
-                         << "] dist=" << match.euclidean_distance
-                         << " (H=" << match.measured_hue << ", S=" << match.measured_sat << ")" << std::endl;
-        }
-        
-        euclidean_log << "\nAssignment process:" << std::endl;
+        DEBUG_LOG(euclidean_log, {
+            OPEN_DEBUG_LOG(euclidean_log);
+            euclidean_log << "\nEuclidean matching - sorted pairs (closest first):" << std::endl;
+            for (const auto& match : matches) {
+                euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color << ") <-> Det[" << match.det_idx
+                             << "] dist=" << match.euclidean_distance
+                             << " (H=" << match.measured_hue << ", S=" << match.measured_sat << ")" << std::endl;
+            }
+            
+            euclidean_log << "\nAssignment process:" << std::endl;
+        });
         for (const auto& match : matches) {
             // Skip if this ball already has a detection
             if (assigned_balls.find(match.ball_idx) != assigned_balls.end()) {
-                euclidean_log << "  SKIP: Ball[" << match.ball_idx << "](" << match.ball_color
-                             << ") already assigned" << std::endl;
+                DEBUG_LOG(euclidean_log, {
+                    OPEN_DEBUG_LOG(euclidean_log);
+                    euclidean_log << "  SKIP: Ball[" << match.ball_idx << "](" << match.ball_color
+                                 << ") already assigned" << std::endl;
+                });
                 continue;
             }
             
             // Skip if this detection already assigned to another ball
             if (assigned_dets.find(match.det_idx) != assigned_dets.end()) {
-                euclidean_log << "  SKIP: Det[" << match.det_idx << "] already assigned" << std::endl;
+                DEBUG_LOG(euclidean_log, {
+                    OPEN_DEBUG_LOG(euclidean_log);
+                    euclidean_log << "  SKIP: Det[" << match.det_idx << "] already assigned" << std::endl;
+                });
                 continue;
             }
             
@@ -1342,23 +1514,29 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 ball.position.x, ball.position.y, ball.position.z));
             ball.color_predictor.addDetection(ball.position);
             
-            euclidean_log << "  *** MATCHED: Ball[" << match.ball_idx << "](" << ball.color_name
-                         << ") <- Det#" << det.index << " (dist=" << match.euclidean_distance << ") ***" << std::endl;
+            DEBUG_LOG(euclidean_log, {
+                OPEN_DEBUG_LOG(euclidean_log);
+                euclidean_log << "  *** MATCHED: Ball[" << match.ball_idx << "](" << ball.color_name
+                             << ") <- Det#" << det.index << " (dist=" << match.euclidean_distance << ") ***" << std::endl;
+            });
         }
         
         // Mark unmatched balls
-        euclidean_log << "\nUnmatched balls:" << std::endl;
-        for (size_t ball_idx = 0; ball_idx < balls_.size(); ++ball_idx) {
-            if (assigned_balls.find(ball_idx) == assigned_balls.end()) {
-                balls_[ball_idx].has_yolo_detection = false;
-                balls_[ball_idx].frames_without_yolo++;
-                euclidean_log << "  Ball[" << ball_idx << "](" << balls_[ball_idx].color_name
-                             << ") - NO MATCH" << std::endl;
+        DEBUG_LOG(euclidean_log, {
+            OPEN_DEBUG_LOG(euclidean_log);
+            euclidean_log << "\nUnmatched balls:" << std::endl;
+            for (size_t ball_idx = 0; ball_idx < balls_.size(); ++ball_idx) {
+                if (assigned_balls.find(ball_idx) == assigned_balls.end()) {
+                    balls_[ball_idx].has_yolo_detection = false;
+                    balls_[ball_idx].frames_without_yolo++;
+                    euclidean_log << "  Ball[" << ball_idx << "](" << balls_[ball_idx].color_name
+                                 << ") - NO MATCH" << std::endl;
+                }
             }
-        }
-        
-        euclidean_log << "=== END EUCLIDEAN MATCHING ===" << std::endl;
-        euclidean_log.close();
+            
+            euclidean_log << "=== END EUCLIDEAN MATCHING ===" << std::endl;
+            euclidean_log.close();
+        });
     }
     
     // Handle unmatched balls with fallback strategies (Kalman prediction, color tracking, hand snapping)
@@ -1398,51 +1576,62 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         bool has_prediction = false;
         
         // Open debug log for this ball's prediction
-        OPEN_DEBUG_LOG(pred_log);
-        pred_log << "\n  >> FRAME " << frame_counter_ << " - Kalman Prediction for Ball " << ball.id << " (" << ball.color_name << ") <<" << std::endl;
-        pred_log << "  frames_without_yolo: " << ball.frames_without_yolo << std::endl;
+        DEBUG_LOG(pred_log, {
+            OPEN_DEBUG_LOG(pred_log);
+            pred_log << "\n  >> FRAME " << frame_counter_ << " - Kalman Prediction for Ball " << ball.id << " (" << ball.color_name << ") <<" << std::endl;
+            pred_log << "  frames_without_yolo: " << ball.frames_without_yolo << std::endl;
+        });
         
         // CRITICAL FIX: Always calculate Kalman prediction, regardless of frames_without_yolo
         // The Kalman filter naturally handles uncertainty through process noise (Q matrix)
         // Disabling prediction causes sporadic snapping and loss of trajectory tracking
         if (ball.kalman.get_state()(2) > 0.01f) {  // Only if Kalman has been initialized (z > 0)
             // Log ColorBasedPredictor history
-            pred_log << "  ColorBasedPredictor history (" << ball.color_predictor.getHistorySize() << " frames):" << std::endl;
-            const auto& history = ball.color_predictor.getHistory();
-            int frame_idx = 0;
-            for (const auto& point : history) {
-                pred_log << "    Frame " << frame_idx++ << ": pos=("
-                         << point.position.x << ", "
-                         << point.position.y << ", "
-                         << point.position.z << ")" << std::endl;
-            }
-            
-            // Get velocity estimate
-            auto velocity = ball.color_predictor.getVelocity();
-            pred_log << "  Estimated velocity: (" << velocity.x << ", " << velocity.y << ", " << velocity.z << ") m/s" << std::endl;
-            
-            // SAVE the current Kalman state before prediction
-            auto saved_state = ball.kalman.get_state();
-            pred_log << "  Current Kalman state: pos=(" << saved_state(0) << ", " << saved_state(1) << ", " << saved_state(2)
-                     << ") vel=(" << saved_state(3) << ", " << saved_state(4) << ", " << saved_state(5) << ")" << std::endl;
-            
-            // Temporarily predict to see where Kalman thinks the ball should be
-            ball.kalman.predict(dt);
-            auto predicted_state = ball.kalman.get_state();
-            kalman_pred = cv::Point3f(predicted_state(0), predicted_state(1), predicted_state(2));
-            has_prediction = (kalman_pred.z > 0.01f);
-            
-            pred_log << "  Kalman prediction (dt=" << dt << "s): pos=("
-                     << kalman_pred.x << ", " << kalman_pred.y << ", " << kalman_pred.z << ")" << std::endl;
-            
-            // RESTORE the original state - we haven't actually measured anything yet!
-            // The prediction was just for checking the search boundary
-            ball.kalman.get_state() = saved_state;
-            pred_log << "  Kalman state restored" << std::endl;
+            DEBUG_LOG(pred_log, {
+                OPEN_DEBUG_LOG(pred_log);
+                pred_log << "  ColorBasedPredictor history (" << ball.color_predictor.getHistorySize() << " frames):" << std::endl;
+            });
+            DEBUG_LOG(pred_log, {
+                OPEN_DEBUG_LOG(pred_log);
+                const auto& history = ball.color_predictor.getHistory();
+                int frame_idx = 0;
+                for (const auto& point : history) {
+                    pred_log << "    Frame " << frame_idx++ << ": pos=("
+                             << point.position.x << ", "
+                             << point.position.y << ", "
+                             << point.position.z << ")" << std::endl;
+                }
+                
+                // Get velocity estimate
+                auto velocity = ball.color_predictor.getVelocity();
+                pred_log << "  Estimated velocity: (" << velocity.x << ", " << velocity.y << ", " << velocity.z << ") m/s" << std::endl;
+                
+                // SAVE the current Kalman state before prediction
+                auto saved_state = ball.kalman.get_state();
+                pred_log << "  Current Kalman state: pos=(" << saved_state(0) << ", " << saved_state(1) << ", " << saved_state(2)
+                         << ") vel=(" << saved_state(3) << ", " << saved_state(4) << ", " << saved_state(5) << ")" << std::endl;
+                
+                // Temporarily predict to see where Kalman thinks the ball should be
+                ball.kalman.predict(dt);
+                auto predicted_state = ball.kalman.get_state();
+                kalman_pred = cv::Point3f(predicted_state(0), predicted_state(1), predicted_state(2));
+                has_prediction = (kalman_pred.z > 0.01f);
+                
+                pred_log << "  Kalman prediction (dt=" << dt << "s): pos=("
+                         << kalman_pred.x << ", " << kalman_pred.y << ", " << kalman_pred.z << ")" << std::endl;
+                
+                // RESTORE the original state - we haven't actually measured anything yet!
+                // The prediction was just for checking the search boundary
+                ball.kalman.get_state() = saved_state;
+                pred_log << "  Kalman state restored" << std::endl;
+            });
         } else {
-            pred_log << "  Kalman not initialized (z <= 0)" << std::endl;
+            DEBUG_LOG(pred_log, {
+                OPEN_DEBUG_LOG(pred_log);
+                pred_log << "  Kalman not initialized (z <= 0)" << std::endl;
+                pred_log.close();
+            });
         }
-        pred_log.close();
         
         // Find best matching detection (now enforces Kalman prediction boundary)
         const Detection* best_det = findBestColorMatch(yolo_detections, *profile,
@@ -1733,15 +1922,17 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // Detect ball states and events
     std::vector<BallEvent> events = detectStatesAndEvents(balls_, hands);
     
-    OPEN_DEBUG_LOG(debug_log_end);
-    debug_log_end << "\n=== Update Complete ===" << std::endl;
-    debug_log_end << "Events generated: " << events.size() << std::endl;
-    for (const auto& event : events) {
-        debug_log_end << "  " << (event.type == BallEvent::THROW ? "THROW" : "CATCH")
-                  << " - Ball " << event.ball_id << ", Hand " << event.hand_id << std::endl;
-    }
-    debug_log_end << "========================================\n" << std::endl;
-    debug_log_end.close();
+    DEBUG_LOG(debug_log_end, {
+        OPEN_DEBUG_LOG(debug_log_end);
+        debug_log_end << "\n=== Update Complete ===" << std::endl;
+        debug_log_end << "Events generated: " << events.size() << std::endl;
+        for (const auto& event : events) {
+            debug_log_end << "  " << (event.type == BallEvent::THROW ? "THROW" : "CATCH")
+                      << " - Ball " << event.ball_id << ", Hand " << event.hand_id << std::endl;
+        }
+        debug_log_end << "========================================\n" << std::endl;
+        debug_log_end.close();
+    });
     
     return {balls_, events};
 }

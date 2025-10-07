@@ -22,19 +22,27 @@ struct CameraIntrinsics {
 struct ColorProfile {
     std::string name;
     bool enabled;
+    
+    // NEW: Average hue and saturation from calibration
+    float avg_hue;        // Average hue value (0-180)
+    float avg_saturation; // Average saturation value (0-255)
+    
+    // LEGACY: Keep old min/max ranges for backward compatibility
     cv::Scalar min_hsv;
     cv::Scalar max_hsv;
     cv::Scalar min_hsv2;  // For wrap-around colors like red
     cv::Scalar max_hsv2;
     
     ColorProfile(const std::string& n = "",
+                 float avg_h = -1.0f,
+                 float avg_s = -1.0f,
                  const cv::Scalar& min = cv::Scalar(0, 0, 0),
                  const cv::Scalar& max = cv::Scalar(180, 255, 255),
                  const cv::Scalar& min2 = cv::Scalar(-1, -1, -1),
                  const cv::Scalar& max2 = cv::Scalar(-1, -1, -1),
                  bool en = true)
-        : name(n), enabled(en), min_hsv(min), max_hsv(max), 
-          min_hsv2(min2), max_hsv2(max2) {}
+        : name(n), enabled(en), avg_hue(avg_h), avg_saturation(avg_s),
+          min_hsv(min), max_hsv(max), min_hsv2(min2), max_hsv2(max2) {}
 };
 
 // Detection from YOLO

@@ -69,9 +69,9 @@ SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
     if (!loadSettings()) {
         std::cerr << "[SimpleBallTracker] Failed to load settings, using defaults" << std::endl;
         // Set up default color profiles
-        color_profiles_.push_back(ColorProfile("green", cv::Scalar(45, 100, 100), cv::Scalar(75, 255, 255)));
-        color_profiles_.push_back(ColorProfile("pink", cv::Scalar(140, 100, 100), cv::Scalar(175, 255, 255)));
-        color_profiles_.push_back(ColorProfile("orange", cv::Scalar(5, 100, 100), cv::Scalar(20, 255, 255)));
+        color_profiles_.push_back(ColorProfile("green", -1.0f, -1.0f, cv::Scalar(45, 100, 100), cv::Scalar(75, 255, 255)));
+        color_profiles_.push_back(ColorProfile("pink", -1.0f, -1.0f, cv::Scalar(140, 100, 100), cv::Scalar(175, 255, 255)));
+        color_profiles_.push_back(ColorProfile("orange", -1.0f, -1.0f, cv::Scalar(5, 100, 100), cv::Scalar(20, 255, 255)));
     }
     
     // Initialize balls based on enabled color profiles
@@ -144,7 +144,11 @@ bool SimpleBallTracker::loadSettings() {
                 );
             }
             
-            color_profiles_.push_back(ColorProfile(color_name, min_hsv, max_hsv, min_hsv2, max_hsv2, enabled));
+            // Load avg_hue and avg_saturation if available
+            float avg_hue = color_data.value("avg_hue", -1.0f);
+            float avg_sat = color_data.value("avg_saturation", -1.0f);
+            
+            color_profiles_.push_back(ColorProfile(color_name, avg_hue, avg_sat, min_hsv, max_hsv, min_hsv2, max_hsv2, enabled));
             
             std::cout << "[SimpleBallTracker] Loaded color '" << color_name << "' enabled=" << enabled << std::endl;
         }
@@ -166,6 +170,16 @@ void SimpleBallTracker::saveSettings() {
         for (const auto& profile : color_profiles_) {
             json color_data;
             color_data["enabled"] = profile.enabled;
+            
+            // NEW: Save average hue and saturation if calibrated
+            if (profile.avg_hue >= 0.0f) {
+                color_data["avg_hue"] = profile.avg_hue;
+            }
+            if (profile.avg_saturation >= 0.0f) {
+                color_data["avg_saturation"] = profile.avg_saturation;
+            }
+            
+            // LEGACY: Keep min/max ranges for backward compatibility
             color_data["min_hsv"] = {profile.min_hsv[0], profile.min_hsv[1], profile.min_hsv[2]};
             color_data["max_hsv"] = {profile.max_hsv[0], profile.max_hsv[1], profile.max_hsv[2]};
             
@@ -341,7 +355,7 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
     return false;
 }
 
-float SimpleBallTracker::matchColor(const Detection& det, const ColorProfile& profile, 
+float SimpleBallTracker::matchColor(const Detection& det, const ColorProfile& profile,
                                    const cv::Mat& hsv_frame) {
     // Get detection center
     cv::Point2f center(det.box.x + det.box.width / 2.0f,
@@ -353,7 +367,56 @@ float SimpleBallTracker::matchColor(const Detection& det, const ColorProfile& pr
         return 0.0f;
     }
     
-    // Sample 7x7 region around center
+    // NEW: If profile has calibrated avg_hue and avg_saturation, use euclidean distance
+    if (profile.avg_hue >= 0.0f && profile.avg_saturation >= 0.0f) {
+        // Sample 5x5 region around center to get average hue/saturation
+        const int sample_radius = 2;  // 5x5 = radius of 2
+        std::vector<float> hue_samples;
+        std::vector<float> sat_samples;
+        
+        for (int dy = -sample_radius; dy <= sample_radius; dy++) {
+            for (int dx = -sample_radius; dx <= sample_radius; dx++) {
+                int x = static_cast<int>(center.x) + dx;
+                int y = static_cast<int>(center.y) + dy;
+                
+                if (x >= 0 && x < hsv_frame.cols && y >= 0 && y < hsv_frame.rows) {
+                    cv::Vec3b hsv = hsv_frame.at<cv::Vec3b>(y, x);
+                    hue_samples.push_back(static_cast<float>(hsv[0]));
+                    sat_samples.push_back(static_cast<float>(hsv[1]));
+                }
+            }
+        }
+        
+        if (hue_samples.empty()) return 0.0f;
+        
+        // Calculate average hue and saturation
+        float avg_hue = 0.0f;
+        float avg_sat = 0.0f;
+        for (float h : hue_samples) avg_hue += h;
+        for (float s : sat_samples) avg_sat += s;
+        avg_hue /= hue_samples.size();
+        avg_sat /= sat_samples.size();
+        
+        // Calculate euclidean distance in hue-saturation space
+        // Normalize hue to 0-1 range (divide by 180) and saturation to 0-1 range (divide by 255)
+        float hue_diff = (avg_hue / 180.0f) - (profile.avg_hue / 180.0f);
+        float sat_diff = (avg_sat / 255.0f) - (profile.avg_saturation / 255.0f);
+        
+        // Handle hue wrap-around (hue is circular)
+        if (hue_diff > 0.5f) hue_diff -= 1.0f;
+        if (hue_diff < -0.5f) hue_diff += 1.0f;
+        
+        float euclidean_dist = std::sqrt(hue_diff * hue_diff + sat_diff * sat_diff);
+        
+        // Convert distance to similarity score (0 = perfect match, higher = worse match)
+        // Use exponential decay: score = exp(-distance * scale_factor)
+        // Scale factor of 10 means distance of 0.1 gives score of ~0.37
+        float similarity = std::exp(-euclidean_dist * 10.0f);
+        
+        return similarity;
+    }
+    
+    // LEGACY: Fall back to range-based matching if not calibrated
     const int sample_radius = 7;
     int match_count = 0;
     int total_count = 0;
@@ -504,17 +567,25 @@ const Detection* SimpleBallTracker::findBestColorMatch(
         }
         
         float color_score = matchColor(det, profile, hsv_frame);
-        debug_log << "    Color match score: " << color_score << " (threshold: " << MIN_COLOR_MATCH_SCORE << ")" << std::endl;
+        debug_log << "    Color match score: " << color_score << std::endl;
         
-        // Only consider detections with reasonable color match
-        if (color_score < MIN_COLOR_MATCH_SCORE) {
-            char reason[128];
-            snprintf(reason, sizeof(reason), "REJECTED: Color %.2f<%.2f", color_score, MIN_COLOR_MATCH_SCORE);
-            rejection_reason = reason;
-            eval.result = reason;
-            evaluations.push_back(eval);
-            debug_log << "    REJECTED: Low color match" << std::endl;
-            continue;
+        // NEW: For euclidean distance matching, don't reject based on threshold
+        // We want to assign each detection to the CLOSEST color, even if the match isn't perfect
+        bool use_euclidean = (profile.avg_hue >= 0.0f && profile.avg_saturation >= 0.0f);
+        
+        if (!use_euclidean) {
+            // LEGACY: Only apply threshold for range-based matching
+            if (color_score < MIN_COLOR_MATCH_SCORE) {
+                char reason[128];
+                snprintf(reason, sizeof(reason), "REJECTED: Color %.2f<%.2f", color_score, MIN_COLOR_MATCH_SCORE);
+                rejection_reason = reason;
+                eval.result = reason;
+                evaluations.push_back(eval);
+                debug_log << "    REJECTED: Low color match (legacy mode)" << std::endl;
+                continue;
+            }
+        } else {
+            debug_log << "    Using euclidean matching - no threshold rejection" << std::endl;
         }
         
         eval.passed_filters = true;
@@ -1049,8 +1120,181 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // Track which detections are used
     std::set<int> used_detections;
     
-    // For each ball, try to match with YOLO detection
+    // NEW: Check if ALL enabled profiles are calibrated for euclidean matching
+    bool all_calibrated = true;
+    for (const auto& profile : color_profiles_) {
+        if (profile.enabled && (profile.avg_hue < 0.0f || profile.avg_saturation < 0.0f)) {
+            all_calibrated = false;
+            break;
+        }
+    }
+    
+    // NEW: If all profiles are calibrated, use pure euclidean distance matching
+    if (all_calibrated && balls_.size() > 0 && yolo_detections.size() > 0) {
+        std::cout << "[SimpleBallTracker] Using PURE euclidean distance matching for all balls" << std::endl;
+        
+        // Calculate euclidean distances for all ball-detection pairs
+        struct BallDetectionMatch {
+            int ball_idx;
+            int det_idx;
+            float euclidean_distance;
+        };
+        std::vector<BallDetectionMatch> matches;
+        
+        for (size_t ball_idx = 0; ball_idx < balls_.size(); ++ball_idx) {
+            auto& ball = balls_[ball_idx];
+            
+            // Find color profile
+            const ColorProfile* profile = nullptr;
+            for (const auto& p : color_profiles_) {
+                if (p.name == ball.color_name && p.enabled) {
+                    profile = &p;
+                    break;
+                }
+            }
+            
+            if (!profile) continue;
+            
+            std::cout << "[SimpleBallTracker] Ball '" << ball.color_name
+                     << "' calibrated: H=" << profile->avg_hue << ", S=" << profile->avg_saturation << std::endl;
+            
+            // Calculate distance to each detection
+            for (size_t det_idx = 0; det_idx < yolo_detections.size(); ++det_idx) {
+                const auto& det = yolo_detections[det_idx];
+                
+                // Skip if already used
+                if (used_detections.find(det.index) != used_detections.end()) continue;
+                
+                // Skip if invalid depth
+                if (det.world_pos.z < MIN_DEPTH || det.world_pos.z > MAX_DEPTH) continue;
+                
+                // Sample 5x5 pixels from detection center
+                cv::Point2f center(det.box.x + det.box.width / 2.0f,
+                                  det.box.y + det.box.height / 2.0f);
+                
+                if (center.x < 0 || center.x >= hsv_frame.cols ||
+                    center.y < 0 || center.y >= hsv_frame.rows) continue;
+                
+                const int sample_radius = 2;  // 5x5
+                std::vector<float> hue_samples, sat_samples;
+                
+                for (int dy = -sample_radius; dy <= sample_radius; dy++) {
+                    for (int dx = -sample_radius; dx <= sample_radius; dx++) {
+                        int x = static_cast<int>(center.x) + dx;
+                        int y = static_cast<int>(center.y) + dy;
+                        
+                        if (x >= 0 && x < hsv_frame.cols && y >= 0 && y < hsv_frame.rows) {
+                            cv::Vec3b hsv = hsv_frame.at<cv::Vec3b>(y, x);
+                            hue_samples.push_back(static_cast<float>(hsv[0]));
+                            sat_samples.push_back(static_cast<float>(hsv[1]));
+                        }
+                    }
+                }
+                
+                if (hue_samples.empty()) continue;
+                
+                // Calculate average
+                float avg_hue = 0.0f, avg_sat = 0.0f;
+                for (float h : hue_samples) avg_hue += h;
+                for (float s : sat_samples) avg_sat += s;
+                avg_hue /= hue_samples.size();
+                avg_sat /= sat_samples.size();
+                
+                // Calculate euclidean distance (normalized)
+                float hue_diff = (avg_hue / 180.0f) - (profile->avg_hue / 180.0f);
+                float sat_diff = (avg_sat / 255.0f) - (profile->avg_saturation / 255.0f);
+                
+                // Handle hue wrap-around
+                if (hue_diff > 0.5f) hue_diff -= 1.0f;
+                if (hue_diff < -0.5f) hue_diff += 1.0f;
+                
+                float distance = std::sqrt(hue_diff * hue_diff + sat_diff * sat_diff);
+                
+                matches.push_back({static_cast<int>(ball_idx), static_cast<int>(det_idx), distance});
+                
+                std::cout << "  Det#" << det.index << " -> " << ball.color_name
+                         << ": H=" << avg_hue << ", S=" << avg_sat
+                         << ", dist=" << distance << std::endl;
+            }
+        }
+        
+        // Sort by distance (closest first)
+        std::sort(matches.begin(), matches.end(),
+                 [](const BallDetectionMatch& a, const BallDetectionMatch& b) {
+                     return a.euclidean_distance < b.euclidean_distance;
+                 });
+        
+        // CRITICAL: Greedy assignment with proper one-to-one matching
+        // Each ball gets exactly one detection, each detection assigned to exactly one ball
+        std::set<int> assigned_balls, assigned_dets;
+        
+        std::cout << "[SimpleBallTracker] Euclidean matching - sorted pairs:" << std::endl;
+        for (const auto& match : matches) {
+            std::cout << "  Ball[" << match.ball_idx << "] <-> Det[" << match.det_idx
+                     << "] dist=" << match.euclidean_distance << std::endl;
+        }
+        
+        for (const auto& match : matches) {
+            // Skip if this ball already has a detection
+            if (assigned_balls.find(match.ball_idx) != assigned_balls.end()) {
+                std::cout << "  Skipping: Ball[" << match.ball_idx << "] already assigned" << std::endl;
+                continue;
+            }
+            
+            // Skip if this detection already assigned to another ball
+            if (assigned_dets.find(match.det_idx) != assigned_dets.end()) {
+                std::cout << "  Skipping: Det[" << match.det_idx << "] already assigned" << std::endl;
+                continue;
+            }
+            
+            auto& ball = balls_[match.ball_idx];
+            const auto& det = yolo_detections[match.det_idx];
+            
+            // Mark as assigned
+            assigned_balls.insert(match.ball_idx);
+            assigned_dets.insert(match.det_idx);
+            used_detections.insert(det.index);
+            
+            // Assign detection to ball
+            ball.position = det.world_pos;
+            ball.pixel_pos = cv::Point2f(det.box.x + det.box.width / 2.0f,
+                                         det.box.y + det.box.height / 2.0f);
+            ball.bbox = det.box;
+            ball.has_yolo_detection = true;
+            ball.frames_without_yolo = 0;
+            ball.yolo_confidence = det.confidence;
+            ball.yolo_class_id = det.class_id;
+            ball.color_match_score = std::exp(-match.euclidean_distance * 10.0f);  // For display
+            
+            char reason[128];
+            snprintf(reason, sizeof(reason), "Euclidean dist=%.3f", match.euclidean_distance);
+            ball.tracking_reason = reason;
+            
+            // Update Kalman
+            ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                ball.position.x, ball.position.y, ball.position.z));
+            ball.color_predictor.addDetection(ball.position);
+            
+            std::cout << "[SimpleBallTracker] MATCHED: " << ball.color_name
+                     << " <- Det#" << det.index << " (dist=" << match.euclidean_distance << ")" << std::endl;
+        }
+        
+        // Mark unmatched balls
+        for (size_t ball_idx = 0; ball_idx < balls_.size(); ++ball_idx) {
+            if (assigned_balls.find(ball_idx) == assigned_balls.end()) {
+                balls_[ball_idx].has_yolo_detection = false;
+                balls_[ball_idx].frames_without_yolo++;
+            }
+        }
+    }
+    
+    // For each ball, try to match with YOLO detection (LEGACY or fallback)
     for (auto& ball : balls_) {
+        // Skip if already matched by euclidean system
+        if (all_calibrated && ball.has_yolo_detection && ball.frames_without_yolo == 0) {
+            continue;
+        }
+        
         // Find matching color profile
         const ColorProfile* profile = nullptr;
         for (const auto& p : color_profiles_) {
@@ -1065,10 +1309,15 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             continue;
         }
         
-        std::cout << "[SimpleBallTracker] Matching ball '" << ball.color_name << "' with HSV range: H["
-                  << profile->min_hsv[0] << "-" << profile->max_hsv[0] << "] S["
-                  << profile->min_hsv[1] << "-" << profile->max_hsv[1] << "] V["
-                  << profile->min_hsv[2] << "-" << profile->max_hsv[2] << "]" << std::endl;
+        if (profile->avg_hue >= 0.0f) {
+            std::cout << "[SimpleBallTracker] Matching ball '" << ball.color_name
+                     << "' with avg H=" << profile->avg_hue << ", S=" << profile->avg_saturation << std::endl;
+        } else {
+            std::cout << "[SimpleBallTracker] Matching ball '" << ball.color_name << "' with HSV range: H["
+                      << profile->min_hsv[0] << "-" << profile->max_hsv[0] << "] S["
+                      << profile->min_hsv[1] << "-" << profile->max_hsv[1] << "] V["
+                      << profile->min_hsv[2] << "-" << profile->max_hsv[2] << "]" << std::endl;
+        }
         
         // Get Kalman prediction for this ball (for boundary checking)
         // CRITICAL: We must NOT modify the Kalman state here, only peek at what it would predict
@@ -1436,9 +1685,9 @@ bool SimpleBallTracker::calibrateColor(const std::string& color_name,
     // Find detection containing click point
     const Detection* clicked_det = nullptr;
     for (const auto& det : last_raw_detections_) {
-        if (click_point.x >= det.box.x && 
+        if (click_point.x >= det.box.x &&
             click_point.x <= (det.box.x + det.box.width) &&
-            click_point.y >= det.box.y && 
+            click_point.y >= det.box.y &&
             click_point.y <= (det.box.y + det.box.height)) {
             clicked_det = &det;
             break;
@@ -1451,60 +1700,79 @@ bool SimpleBallTracker::calibrateColor(const std::string& color_name,
         return false;
     }
     
-    // Convert to HSV and sample detection box
+    // Convert to HSV
     cv::Mat hsv_frame;
     cv::cvtColor(last_color_frame_, hsv_frame, cv::COLOR_BGR2HSV);
     
-    cv::Rect roi(
-        std::max(0, static_cast<int>(clicked_det->box.x)),
-        std::max(0, static_cast<int>(clicked_det->box.y)),
-        std::min(static_cast<int>(clicked_det->box.width),
-                 hsv_frame.cols - static_cast<int>(clicked_det->box.x)),
-        std::min(static_cast<int>(clicked_det->box.height),
-                 hsv_frame.rows - static_cast<int>(clicked_det->box.y))
-    );
+    // Calculate center of bounding box
+    int center_x = static_cast<int>(clicked_det->box.x + clicked_det->box.width / 2.0f);
+    int center_y = static_cast<int>(clicked_det->box.y + clicked_det->box.height / 2.0f);
     
-    if (roi.width <= 0 || roi.height <= 0) {
-        error_message = "Invalid detection box dimensions";
+    // Sample 5x5 pixel square from the center
+    const int sample_size = 5;
+    const int half_size = sample_size / 2;
+    
+    std::vector<float> hue_samples;
+    std::vector<float> sat_samples;
+    
+    for (int dy = -half_size; dy <= half_size; ++dy) {
+        for (int dx = -half_size; dx <= half_size; ++dx) {
+            int x = center_x + dx;
+            int y = center_y + dy;
+            
+            // Check bounds
+            if (x >= 0 && x < hsv_frame.cols && y >= 0 && y < hsv_frame.rows) {
+                cv::Vec3b hsv = hsv_frame.at<cv::Vec3b>(y, x);
+                hue_samples.push_back(static_cast<float>(hsv[0]));
+                sat_samples.push_back(static_cast<float>(hsv[1]));
+            }
+        }
+    }
+    
+    if (hue_samples.empty()) {
+        error_message = "Could not sample pixels from bounding box center";
         return false;
     }
     
-    cv::Mat roi_hsv = hsv_frame(roi);
+    // Calculate average hue and saturation
+    float avg_hue = 0.0f;
+    float avg_sat = 0.0f;
     
-    // Calculate mean HSV values
-    cv::Scalar mean;
-    cv::meanStdDev(roi_hsv, mean, cv::noArray());
+    for (float h : hue_samples) avg_hue += h;
+    for (float s : sat_samples) avg_sat += s;
     
-    // Simple calibration: average hue ± 20 on either side
-    // Keep saturation and value ranges wide for robustness
-    const float hue_tolerance = 20.0f;
-    const float sat_min = 50.0f;   // Minimum saturation to avoid white/gray
-    const float val_min = 50.0f;   // Minimum value to avoid black
-    
-    cv::Scalar min_hsv(
-        std::max(0.0, mean[0] - hue_tolerance),
-        sat_min,
-        val_min
-    );
-    
-    cv::Scalar max_hsv(
-        std::min(180.0, mean[0] + hue_tolerance),
-        255.0,  // Max saturation
-        255.0   // Max value
-    );
+    avg_hue /= hue_samples.size();
+    avg_sat /= sat_samples.size();
     
     // Find and update color profile
     for (auto& profile : color_profiles_) {
         if (profile.name == color_name) {
-            profile.min_hsv = min_hsv;
-            profile.max_hsv = max_hsv;
+            profile.avg_hue = avg_hue;
+            profile.avg_saturation = avg_sat;
+            
+            // LEGACY: Also update min/max ranges for backward compatibility
+            const float hue_tolerance = 20.0f;
+            const float sat_min = 50.0f;
+            const float val_min = 50.0f;
+            
+            profile.min_hsv = cv::Scalar(
+                std::max(0.0f, avg_hue - hue_tolerance),
+                sat_min,
+                val_min
+            );
+            
+            profile.max_hsv = cv::Scalar(
+                std::min(180.0f, avg_hue + hue_tolerance),
+                255.0f,
+                255.0f
+            );
             
             saveSettings();
             
             std::cout << "[SimpleBallTracker] Calibrated color '" << color_name << "'" << std::endl;
-            std::cout << "  H: [" << min_hsv[0] << ", " << max_hsv[0] << "]" << std::endl;
-            std::cout << "  S: [" << min_hsv[1] << ", " << max_hsv[1] << "]" << std::endl;
-            std::cout << "  V: [" << min_hsv[2] << ", " << max_hsv[2] << "]" << std::endl;
+            std::cout << "  Average Hue: " << avg_hue << std::endl;
+            std::cout << "  Average Saturation: " << avg_sat << std::endl;
+            std::cout << "  Legacy H range: [" << profile.min_hsv[0] << ", " << profile.max_hsv[0] << "]" << std::endl;
             
             return true;
         }

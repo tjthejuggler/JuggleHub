@@ -992,67 +992,66 @@ if PYQT_AVAILABLE:
                 self.ball_checkboxes[ball_name] = checkbox
                 ball_layout.addWidget(checkbox, 0, 0, 1, 3)
                 
-                # Get current HSV values - use the actual hue values from ball_settings.json
+                # Get current calibration values
                 hsv_data = self.ball_profiles[ball_name]
-                min_hsv = hsv_data.get('min_hsv', [0, 0, 0])
-                max_hsv = hsv_data.get('max_hsv', [180, 255, 255])
+                avg_hue = hsv_data.get('avg_hue', -1.0)
+                avg_sat = hsv_data.get('avg_saturation', -1.0)
                 
-                print(f"🔍 DEBUG {ball_name}: hsv_data = {hsv_data}")
-                print(f"🔍 DEBUG {ball_name}: min_hsv = {min_hsv}, max_hsv = {max_hsv}")
+                # Display calibrated values (read-only)
+                row = 1
                 
-                # Extract hue values (first element of HSV arrays)
-                min_hue_value = int(min_hsv[0])
-                max_hue_value = int(max_hsv[0])
+                # Average Hue display
+                ball_layout.addWidget(QLabel("Average Hue:"), row, 0)
+                if avg_hue >= 0:
+                    hue_value_label = QLabel(f"{avg_hue:.1f}°")
+                    hue_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+                else:
+                    hue_value_label = QLabel("Not calibrated")
+                    hue_value_label.setStyleSheet("color: #f44336;")
+                ball_layout.addWidget(hue_value_label, row, 1, 1, 2)
+                row += 1
                 
-                print(f"🔍 DEBUG {ball_name}: Setting sliders to min={min_hue_value}, max={max_hue_value}")
+                # Average Saturation display
+                ball_layout.addWidget(QLabel("Average Saturation:"), row, 0)
+                if avg_sat >= 0:
+                    sat_value_label = QLabel(f"{avg_sat:.1f}")
+                    sat_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+                else:
+                    sat_value_label = QLabel("Not calibrated")
+                    sat_value_label.setStyleSheet("color: #f44336;")
+                ball_layout.addWidget(sat_value_label, row, 1, 1, 2)
+                row += 1
                 
-                # Min Hue slider
-                ball_layout.addWidget(QLabel("Min Hue:"), 1, 0)
-                min_hue_slider = QSlider(Qt.Orientation.Horizontal)
-                min_hue_slider.setRange(0, 180)
-                min_hue_slider.setValue(min_hue_value)
-                ball_layout.addWidget(min_hue_slider, 1, 1)
-                
-                print(f"🔍 DEBUG {ball_name}: Min slider actual value after setValue: {min_hue_slider.value()}")
-                
-                min_hue_label = QLabel(f"{min_hue_value}")
-                min_hue_label.setMinimumWidth(40)
-                ball_layout.addWidget(min_hue_label, 1, 2)
-                
-                # Max Hue slider
-                ball_layout.addWidget(QLabel("Max Hue:"), 2, 0)
-                max_hue_slider = QSlider(Qt.Orientation.Horizontal)
-                max_hue_slider.setRange(0, 180)
-                max_hue_slider.setValue(max_hue_value)
-                ball_layout.addWidget(max_hue_slider, 2, 1)
-                
-                print(f"🔍 DEBUG {ball_name}: Max slider actual value after setValue: {max_hue_slider.value()}")
-                
-                max_hue_label = QLabel(f"{max_hue_value}")
-                max_hue_label.setMinimumWidth(40)
-                ball_layout.addWidget(max_hue_label, 2, 2)
-                
-                # Connect sliders to update functions
-                min_hue_slider.valueChanged.connect(
-                    lambda value, name=ball_name, label=min_hue_label: self.update_ball_hue(name, 'min', value, label)
-                )
-                max_hue_slider.valueChanged.connect(
-                    lambda value, name=ball_name, label=max_hue_label: self.update_ball_hue(name, 'max', value, label)
-                )
-                
-                # Store slider references
-                self.ball_hue_sliders[ball_name] = {
-                    'min': min_hue_slider,
-                    'max': max_hue_slider,
-                    'min_label': min_hue_label,
-                    'max_label': max_hue_label
+                # Store label references for updates
+                if not hasattr(self, 'ball_calibration_labels'):
+                    self.ball_calibration_labels = {}
+                self.ball_calibration_labels[ball_name] = {
+                    'hue': hue_value_label,
+                    'saturation': sat_value_label
                 }
                 
-                # Info label about wrapping
-                info_label = QLabel("ℹ️ Hue wraps: if max < min, uses values outside the range")
+                # Calibrate button
+                calibrate_button = QPushButton("🎯 Calibrate Color")
+                calibrate_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #2196F3;
+                        color: white;
+                        padding: 8px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover { background-color: #1976D2; }
+                    QPushButton:pressed { background-color: #0D47A1; }
+                """)
+                calibrate_button.clicked.connect(lambda checked, name=ball_name: self.start_color_calibration(name))
+                ball_layout.addWidget(calibrate_button, row, 0, 1, 3)
+                row += 1
+                
+                # Info label
+                info_label = QLabel("ℹ️ Click on a ball in the video feed to calibrate")
                 info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
                 info_label.setWordWrap(True)
-                ball_layout.addWidget(info_label, 3, 0, 1, 3)
+                ball_layout.addWidget(info_label, row, 0, 1, 3)
                 
                 layout.addWidget(ball_group)
             
@@ -1094,26 +1093,24 @@ if PYQT_AVAILABLE:
             if not self._loading_settings:
                 self.save_settings()
 
-        def update_ball_hue(self, ball_name: str, hue_type: str, value: int, label: QLabel):
-            """Update hue value for a ball profile"""
-            label.setText(str(value))
+        def start_color_calibration(self, ball_name: str):
+            """Start color calibration for a specific ball"""
+            print(f"🎯 Starting color calibration for {ball_name}")
+            print(f"   Please click on a {ball_name} ball in the video feed")
             
-            # Update the ball_profiles dict
-            if ball_name in self.ball_profiles:
-                if hue_type == 'min':
-                    self.ball_profiles[ball_name]['min_hsv'][0] = float(value)
-                else:
-                    self.ball_profiles[ball_name]['max_hsv'][0] = float(value)
-                
-                # Send to engine
-                self.udp_client.send_setting(f"{ball_name}_{hue_type}_hue", value)
-                
-                # Save ball_settings.json
-                self.save_ball_settings()
-                
-                # Auto-save calibration settings
-                if not self._loading_settings:
-                    self.save_settings()
+            # TODO: This would typically trigger a mode in the UI where the next click
+            # on the video feed is captured and sent to the engine for calibration
+            # For now, just show a message
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "Color Calibration",
+                f"Color calibration for {ball_name} ball:\n\n"
+                f"1. Make sure a {ball_name} ball is visible in the video feed\n"
+                f"2. Click directly on the ball in the video window\n"
+                f"3. The system will sample the center pixels and calibrate\n\n"
+                f"Note: This feature requires the video overlay to be active."
+            )
 
         def save_ball_settings(self):
             """Save ball profiles to ball_settings.json"""
@@ -1175,82 +1172,31 @@ if PYQT_AVAILABLE:
                 
                 print(f"📖 Loaded ball profiles: {list(self.ball_profiles.keys())}")
                 
-                # Update slider values AND send to engine
-                for ball_name, sliders in self.ball_hue_sliders.items():
-                    if ball_name in self.ball_profiles:
-                        hsv_data = self.ball_profiles[ball_name]
-                        min_hsv = hsv_data.get('min_hsv', [0, 0, 0])
-                        max_hsv = hsv_data.get('max_hsv', [180, 255, 255])
-                        
-                        min_hue_value = int(min_hsv[0])
-                        max_hue_value = int(max_hsv[0])
-                        
-                        print(f"🎨 Updating {ball_name}: min_hue={min_hue_value}, max_hue={max_hue_value}")
-                        
-                        # CRITICAL FIX: Block signals during update to prevent triggering valueChanged
-                        # which would send UDP messages and potentially cause recursion
-                        sliders['min'].blockSignals(True)
-                        sliders['max'].blockSignals(True)
-                        
-                        # Get current values to check if they're already correct
-                        current_min = sliders['min'].value()
-                        current_max = sliders['max'].value()
-                        print(f"   Current slider values BEFORE update: min={current_min}, max={current_max}")
-                        
-                        # CRITICAL: If values are already correct, Qt won't update the visual
-                        # So we MUST set to a different value first to force a visual change
-                        if current_min == min_hue_value and current_max == max_hue_value:
-                            print(f"   ⚠️ Values already match! Forcing visual update by resetting range...")
-                        
-                        # NUCLEAR OPTION: Reset the entire range to force Qt to recalculate everything
-                        # This is the most aggressive way to force a visual update
-                        sliders['min'].setRange(0, 180)  # Reset range
-                        sliders['max'].setRange(0, 180)
-                        
-                        # Set to a completely different value first
-                        sliders['min'].setValue(90)  # Middle value
-                        sliders['max'].setValue(90)
-                        sliders['min'].setSliderPosition(90)
-                        sliders['max'].setSliderPosition(90)
-                        
-                        # Force render of the middle position
-                        sliders['min'].update()
-                        sliders['max'].update()
-                        QApplication.processEvents()
-                        
-                        # Now set to the actual target values
-                        sliders['min'].setValue(min_hue_value)
-                        sliders['max'].setValue(max_hue_value)
-                        sliders['min'].setSliderPosition(min_hue_value)
-                        sliders['max'].setSliderPosition(max_hue_value)
-                        sliders['min_label'].setText(str(min_hue_value))
-                        sliders['max_label'].setText(str(max_hue_value))
-                        
-                        # Re-enable signals
-                        sliders['min'].blockSignals(False)
-                        sliders['max'].blockSignals(False)
-                        
-                        # Force immediate visual update with multiple refresh calls
-                        sliders['min'].update()
-                        sliders['max'].update()
-                        sliders['min'].repaint()
-                        sliders['max'].repaint()
-                        sliders['min_label'].update()
-                        sliders['max_label'].update()
-                        sliders['min'].style().unpolish(sliders['min'])
-                        sliders['min'].style().polish(sliders['min'])
-                        sliders['max'].style().unpolish(sliders['max'])
-                        sliders['max'].style().polish(sliders['max'])
-                        QApplication.processEvents()
-                        
-                        print(f"   Slider values after update: min={sliders['min'].value()}, max={sliders['max'].value()}")
-                        print(f"   Slider positions after update: min={sliders['min'].sliderPosition()}, max={sliders['max'].sliderPosition()}")
-                        
-                        # CRITICAL FIX: Send the updated hue values to the engine
-                        # This ensures the engine uses the calibrated values immediately
-                        self.udp_client.send_setting(f"{ball_name}_min_hue", min_hue_value)
-                        self.udp_client.send_setting(f"{ball_name}_max_hue", max_hue_value)
-                        print(f"📤 Sent calibrated hue range to engine: {ball_name} min={min_hue_value}, max={max_hue_value}")
+                # Update calibration value displays
+                if hasattr(self, 'ball_calibration_labels'):
+                    for ball_name, labels in self.ball_calibration_labels.items():
+                        if ball_name in self.ball_profiles:
+                            hsv_data = self.ball_profiles[ball_name]
+                            avg_hue = hsv_data.get('avg_hue', -1.0)
+                            avg_sat = hsv_data.get('avg_saturation', -1.0)
+                            
+                            print(f"🎨 Updating {ball_name}: avg_hue={avg_hue}, avg_sat={avg_sat}")
+                            
+                            # Update hue label
+                            if avg_hue >= 0:
+                                labels['hue'].setText(f"{avg_hue:.1f}°")
+                                labels['hue'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+                            else:
+                                labels['hue'].setText("Not calibrated")
+                                labels['hue'].setStyleSheet("color: #f44336;")
+                            
+                            # Update saturation label
+                            if avg_sat >= 0:
+                                labels['saturation'].setText(f"{avg_sat:.1f}")
+                                labels['saturation'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+                            else:
+                                labels['saturation'].setText("Not calibrated")
+                                labels['saturation'].setStyleSheet("color: #f44336;")
                 
                 print("✅ Ball profiles reloaded and sent to engine")
             except Exception as e:

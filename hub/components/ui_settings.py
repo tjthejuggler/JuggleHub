@@ -512,6 +512,56 @@ if PYQT_AVAILABLE:
                 QPushButton:pressed { background-color: #2e7d32; }
             """)
             layout.addWidget(self.tc_test_throw_sound_button, row, 2)
+            row += 1
+            
+            # Name on catches toggle with test button
+            self.tc_name_on_catch_toggle = QPushButton("Name on Catches")
+            self.tc_name_on_catch_toggle.setCheckable(True)
+            self.tc_name_on_catch_toggle.setChecked(False)
+            self.tc_name_on_catch_toggle.clicked.connect(lambda: self.update_setting('tc_name_on_catch', 1 if self.tc_name_on_catch_toggle.isChecked() else 0))
+            layout.addWidget(self.tc_name_on_catch_toggle, row, 0, 1, 2)
+            
+            # Test catch name button
+            self.tc_test_catch_name_button = QPushButton("🔊 Test")
+            self.tc_test_catch_name_button.setMaximumWidth(80)
+            self.tc_test_catch_name_button.clicked.connect(self.test_catch_name)
+            self.tc_test_catch_name_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 5px;
+                    border-radius: 3px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #45a049; }
+                QPushButton:pressed { background-color: #2e7d32; }
+            """)
+            layout.addWidget(self.tc_test_catch_name_button, row, 2)
+            row += 1
+            
+            # Name on throws toggle with test button
+            self.tc_name_on_throw_toggle = QPushButton("Name on Throws")
+            self.tc_name_on_throw_toggle.setCheckable(True)
+            self.tc_name_on_throw_toggle.setChecked(False)
+            self.tc_name_on_throw_toggle.clicked.connect(lambda: self.update_setting('tc_name_on_throw', 1 if self.tc_name_on_throw_toggle.isChecked() else 0))
+            layout.addWidget(self.tc_name_on_throw_toggle, row, 0, 1, 2)
+            
+            # Test throw name button
+            self.tc_test_throw_name_button = QPushButton("🔊 Test")
+            self.tc_test_throw_name_button.setMaximumWidth(80)
+            self.tc_test_throw_name_button.clicked.connect(self.test_throw_name)
+            self.tc_test_throw_name_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 5px;
+                    border-radius: 3px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #45a049; }
+                QPushButton:pressed { background-color: #2e7d32; }
+            """)
+            layout.addWidget(self.tc_test_throw_name_button, row, 2)
             
             return section
         
@@ -1656,6 +1706,57 @@ if PYQT_AVAILABLE:
         
         def test_throw_sound(self):
             """Play a test sound for throw events"""
+        def test_catch_name(self):
+            """Play a test color name for catch events"""
+            # Play a random color name as test
+            test_color = 'red'  # Default test color
+            self.play_color_name(test_color)
+            print(f"🔊 Playing catch test name: {test_color}")
+        
+        def test_throw_name(self):
+            """Play a test color name for throw events"""
+            # Play a random color name as test
+            test_color = 'blue'  # Default test color
+            self.play_color_name(test_color)
+            print(f"🔊 Playing throw test name: {test_color}")
+        
+        def play_color_name(self, color_name: str):
+            """Play audio file for the given color name"""
+            def play_in_thread():
+                try:
+                    # Path to audio files: hub/audio/color_names/{color}.mp3
+                    audio_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio", "color_names")
+                    audio_file = os.path.join(audio_dir, f"{color_name.lower()}.mp3")
+                    
+                    if not os.path.exists(audio_file):
+                        print(f"⚠️ Audio file not found: {audio_file}")
+                        print(f"   Please add {color_name}.mp3 to hub/audio/color_names/")
+                        return
+                    
+                    system = platform.system()
+                    if system == "Linux":
+                        # Use mpg123 or ffplay for MP3 playback
+                        try:
+                            subprocess.run(['mpg123', '-q', audio_file], timeout=2, check=False)
+                        except FileNotFoundError:
+                            # Fallback to ffplay if mpg123 not available
+                            try:
+                                subprocess.run(['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', audio_file], 
+                                             timeout=2, check=False)
+                            except FileNotFoundError:
+                                print("⚠️ Neither mpg123 nor ffplay found. Install with: sudo apt install mpg123")
+                    elif system == "Darwin":  # macOS
+                        subprocess.run(['afplay', audio_file], timeout=2, check=False)
+                    elif system == "Windows":
+                        # Use Windows Media Player
+                        import winsound
+                        winsound.PlaySound(audio_file, winsound.SND_FILENAME)
+                except Exception as e:
+                    print(f"⚠️ Could not play color name audio: {e}")
+            
+            # Play sound in background thread to avoid blocking UI
+            threading.Thread(target=play_in_thread, daemon=True).start()
+        
             self.play_system_sound(frequency=1200, duration=100)
             # Also send to engine
             self.update_setting('tc_test_throw_sound', 1)

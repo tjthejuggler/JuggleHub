@@ -616,6 +616,7 @@ Usage Examples:
 
 # Full example with all options
 ./scripts/deploy_model.sh V8_balls_held -p ~/Downloads/best.pt -s nano --deploy
+./scripts/deploy_model.sh V9_1_1small_targeted -p ~/Downloads/best.pt -s small --deploy
 
 What the script does:
 Validates inputs and checks if the PT file exists

@@ -56,7 +56,7 @@ This runs **every frame** (30-60 times per second) and is CPU-intensive.
 
 ## Optimization Options
 
-### Option 1: Use RealSense Processing Blocks (RECOMMENDED)
+### Option 1: Use RealSense Processing Blocks (RECOMMENDED) **NO NOTICABLE IMPROVMENT WHEN APPLIED**
 
 RealSense SDK provides optimized processing blocks that can leverage hardware acceleration:
 
@@ -78,7 +78,7 @@ auto aligned = align_to_color.process(temporal);
 **Risk:** Low - these are official RealSense optimizations
 **Trade-off:** Slightly smoother depth (may help tracking)
 
-### Option 2: Reduce Alignment Frequency
+### Option 2: Reduce Alignment Frequency **NO NOTICABLE IMPROVMENT WHEN APPLIED**
 
 Only align every Nth frame, use previous alignment for intermediate frames:
 
@@ -99,7 +99,7 @@ auto depth_frame = last_aligned_frames.get_depth_frame();
 **Risk:** Medium - may cause jitter in 3D positions
 **Trade-off:** Slightly less accurate 3D tracking
 
-### Option 3: Lower Depth Resolution
+### Option 3: Lower Depth Resolution **NO NOTICABLE IMPROVMENT WHEN APPLIED**
 
 Use lower resolution for depth (e.g., 424x240) while keeping color at 640x480:
 
@@ -208,10 +208,38 @@ auto aligned_frames = align_to_color_.process(processed_frames);
 ## Next Steps
 
 1. ✅ Profiling complete - identified bottleneck
-2. ⏳ Implement Option 1 (processing blocks)
-3. ⏳ Profile and measure improvement
-4. ⏳ If needed, implement Option 4 (lower FPS)
-5. ⏳ Document final performance gains
+2. ✅ Tested Option 1 (processing blocks) - No improvement
+3. ✅ Tested Option 2 (reduce alignment frequency) - No improvement
+4. ✅ Tested Option 3 (lower depth resolution) - No improvement
+5. ✅ Implemented Option 4 (reduce FPS to 30) - **CURRENT SOLUTION**
+6. ⏳ Test and measure improvement
+7. ⏳ Document final performance gains
+
+## Implementation Summary (2025-10-08)
+
+After testing Options 1-3 without success, implemented **Option 4: Reduce Frame Rate to 30 FPS**.
+
+**Rationale:**
+- System was configured for 60 FPS but only achieving ~40 FPS
+- RealSense alignment (77% CPU) is the bottleneck
+- Options 1-3 don't address the fundamental issue
+- 30 FPS is perfectly adequate for juggling tracking
+- Reduces alignment overhead by 50% (30 frames/sec vs 60)
+
+**Change Made:**
+- Modified [`Engine.cpp:36`](engine/src/Engine.cpp:36): `camera_fps_(60)` → `camera_fps_(30)`
+
+**Expected Results:**
+- Stable 30 FPS operation (vs unstable 40 FPS)
+- Reduced CPU load from alignment
+- No impact on tracking quality (30 FPS is sufficient)
+- Eliminated frame backlog/drops
+
+**Testing Required:**
+1. Rebuild engine: `./scripts/build_engine.sh`
+2. Run with profiling: `./scripts/profile_engine.sh --duration 30`
+3. Verify stable 30 FPS
+4. Confirm tracking quality maintained
 
 ## References
 

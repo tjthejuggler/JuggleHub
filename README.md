@@ -2227,6 +2227,335 @@ This architecture provides a foundation for many advanced features:
 - Reduce model input resolution for speed vs accuracy trade-off
 - Consider model quantization for embedded deployment
 
+## 🔬 Performance Profiling with `perf`
+
+**Last Updated:** 2025-10-08 14:30:00 CEST
+
+JuggleHub includes comprehensive performance profiling tools using Linux `perf` to identify bottlenecks and optimize the engine. This is essential for understanding where CPU time is spent and making data-driven optimization decisions.
+
+### What is `perf`?
+
+`perf` is a powerful performance analysis tool built into the Linux kernel. It samples your program thousands of times per second and provides statistical reports showing where your program spends the most CPU time. These high-traffic areas are your "hotspots" - the functions you should optimize first for maximum impact.
+
+### Quick Start
+
+#### 1. Install `perf` Tools
+
+The perf tools are already installed on your system. If you need to reinstall or update them:
+
+```bash
+sudo apt update
+sudo apt install linux-tools-common linux-tools-$(uname -r)
+```
+
+#### 2. Build Engine with Debug Symbols
+
+For `perf` to show human-readable function names, you need to compile with debug symbols. The CMakeLists.txt is already configured to support this:
+
+```bash
+# Build with RelWithDebInfo (optimizations + debug symbols)
+cd engine/build
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+make -j$(nproc)
+```
+
+**Important:** `RelWithDebInfo` provides full optimizations (`-O2`) AND debug symbols (`-g`). This is perfect for profiling - your code runs at full speed while `perf` can still show function names.
+
+#### 3. Profile Your Engine
+
+Use the provided profiling script to capture performance data:
+
+```bash
+# Basic profiling - runs for 30 seconds
+./scripts/profile_engine.sh --rebuild
+
+# Profile with custom duration
+./scripts/profile_engine.sh --duration 60
+
+# Profile with specific engine arguments
+./scripts/profile_engine.sh --engine-args "--verbose --device=GPU"
+
+# Profile and save to custom file
+./scripts/profile_engine.sh --output profile_gpu.data --engine-args "--device=GPU"
+```
+
+The script will:
+1. Optionally rebuild the engine with debug symbols
+2. Run the engine with `perf record` for the specified duration
+3. Automatically show the performance report when done
+
+#### 4. Analyze the Results
+
+The profiling script automatically shows an interactive report. You can also analyze results later:
+
+```bash
+# Interactive report (navigate with arrow keys, 'q' to quit)
+./scripts/analyze_perf.sh --type report
+
+# Quick summary of top hotspots
+./scripts/analyze_perf.sh --type summary
+
+# Show top 20 functions
+./scripts/analyze_perf.sh --type top
+
+# Line-by-line source code analysis
+./scripts/analyze_perf.sh --type annotate
+
+# Generate flame graph (if tools installed)
+./scripts/analyze_perf.sh --type flamegraph
+```
+
+### Understanding the Report
+
+When you run `perf report`, you'll see output like this:
+
+```
+Overhead  Command          Shared Object        Symbol
++  34.51%  juggle_engine   juggle_engine       [.] cv::resize(...)
++  21.80%  juggle_engine   juggle_engine       [.] SimpleBallTracker::processFrame(...)
++  15.10%  juggle_engine   libc.so.6            [.] memcpy
++   8.75%  juggle_engine   juggle_engine       [.] main
++   5.02%  juggle_engine   juggle_engine       [.] Image::convertToRGB()
+```
+
+**How to Read This:**
+
+- **Overhead**: Percentage of total CPU time spent in this function
+- **Command**: Your program name
+- **Shared Object**: Library or executable containing the function
+- **Symbol**: The function name (thanks to debug symbols!)
+
+**The functions at the top are your bottlenecks.** In this example, `cv::resize()` takes 34.51% of CPU time - optimizing this function would have the biggest impact.
+
+### Profiling Workflow
+
+#### Step 1: Identify Hotspots
+
+```bash
+# Run profiling
+./scripts/profile_engine.sh --duration 30 --rebuild
+
+# Get quick summary
+./scripts/analyze_perf.sh --type summary
+```
+
+Look for functions with >5% overhead - these are your optimization targets.
+
+#### Step 2: Analyze Function Details
+
+```bash
+# Drill down into specific functions
+./scripts/analyze_perf.sh --type annotate
+```
+
+This shows line-by-line performance data, helping you identify exactly which lines are slow.
+
+#### Step 3: Make Optimizations
+
+Based on the profiling data, optimize the hotspot functions. Common optimizations:
+
+- **Reduce function calls**: Inline hot functions or reduce call frequency
+- **Optimize algorithms**: Use faster algorithms (e.g., O(n) instead of O(n²))
+- **Cache results**: Avoid recalculating the same values
+- **Vectorize operations**: Use SIMD instructions for data processing
+- **Reduce memory allocations**: Reuse buffers instead of allocating new ones
+
+#### Step 4: Verify Improvements
+
+```bash
+# Profile again after optimization
+./scripts/profile_engine.sh --output after_optimization.data
+
+# Compare results
+./scripts/analyze_perf.sh --input after_optimization.data --type summary
+```
+
+### Advanced Profiling
+
+#### Profiling Specific Scenarios
+
+```bash
+# Profile GPU inference
+./scripts/profile_engine.sh --engine-args "--device=GPU --use-dnn-tracker"
+
+# Profile with high FPS mode
+./scripts/profile_engine.sh --engine-args "--high-fps"
+
+# Profile with specific model
+./scripts/profile_engine.sh --engine-args "--model yolo11s --use-dnn-tracker"
+```
+
+#### Flame Graphs
+
+Flame graphs provide a visual representation of where time is spent:
+
+```bash
+# Generate flame graph (requires flamegraph tools)
+./scripts/analyze_perf.sh --type flamegraph
+
+# Install flamegraph tools if needed
+git clone https://github.com/brendangregg/FlameGraph
+sudo cp FlameGraph/*.pl /usr/local/bin/
+```
+
+#### Call Graph Analysis
+
+```bash
+# View call graph to see function relationships
+sudo perf report -i perf.data --stdio --call-graph
+```
+
+### Profiling Script Options
+
+#### [`profile_engine.sh`](scripts/profile_engine.sh)
+
+```bash
+# Full options
+./scripts/profile_engine.sh \
+  --duration 60 \              # Profile for 60 seconds
+  --output custom.data \       # Save to custom file
+  --frequency 999 \            # Sampling frequency (Hz)
+  --rebuild \                  # Rebuild with debug symbols first
+  --no-report \                # Don't show report automatically
+  --engine-args "ARGS"         # Arguments to pass to engine
+```
+
+#### [`analyze_perf.sh`](scripts/analyze_perf.sh)
+
+```bash
+# Analysis types
+./scripts/analyze_perf.sh --input perf.data --type TYPE
+
+# Available types:
+#   report      - Interactive performance report (default)
+#   top         - Show top functions by overhead
+#   annotate    - Line-by-line source code analysis
+#   stat        - Show performance statistics
+#   script      - Dump raw trace data
+#   flamegraph  - Generate flame graph visualization
+#   summary     - Quick text summary of hotspots
+```
+
+### Common Profiling Scenarios
+
+#### Finding Frame Processing Bottlenecks
+
+```bash
+# Profile normal operation
+./scripts/profile_engine.sh --duration 30
+
+# Look for these common hotspots:
+# - Image processing (cv::resize, cv::cvtColor)
+# - Ball detection (color thresholding, contour finding)
+# - Tracking algorithms (Kalman filter, ByteTrack)
+# - Network communication (ZMQ, UDP)
+```
+
+#### Comparing Different Configurations
+
+```bash
+# Profile CPU inference
+./scripts/profile_engine.sh --output cpu.data --engine-args "--device=CPU"
+
+# Profile GPU inference
+./scripts/profile_engine.sh --output gpu.data --engine-args "--device=GPU"
+
+# Compare results
+./scripts/analyze_perf.sh --input cpu.data --type summary
+./scripts/analyze_perf.sh --input gpu.data --type summary
+```
+
+#### Profiling Memory Operations
+
+```bash
+# Profile with focus on memory operations
+sudo perf record -e cache-misses,cache-references -g -- ./engine/build/juggle_engine
+sudo perf report
+```
+
+### Troubleshooting
+
+**"perf not found"**
+```bash
+sudo apt install linux-tools-common linux-tools-$(uname -r)
+```
+
+**"No debug symbols found"**
+```bash
+# Rebuild with debug symbols
+cd engine/build
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+make clean && make -j$(nproc)
+```
+
+**"Permission denied"**
+```bash
+# perf requires sudo for kernel access
+sudo ./scripts/profile_engine.sh
+```
+
+**"Samples lost"**
+```bash
+# Increase buffer size
+sudo sysctl -w kernel.perf_event_mlock_kb=2048
+```
+
+### Best Practices
+
+1. **Profile Real Workloads**: Use actual juggling scenarios, not synthetic tests
+2. **Profile Long Enough**: 30-60 seconds provides statistically significant data
+3. **Focus on Top Functions**: Optimize the top 3-5 functions first
+4. **Measure Impact**: Always profile before and after optimizations
+5. **Use RelWithDebInfo**: Get full optimization + debug symbols
+6. **Profile Different Scenarios**: Test various configurations (CPU/GPU, different models)
+7. **Document Findings**: Keep notes on what you optimized and the impact
+
+### Integration with Development Workflow
+
+```bash
+# 1. Identify bottleneck
+./scripts/profile_engine.sh --rebuild
+./scripts/analyze_perf.sh --type summary
+
+# 2. Make optimization in code
+vim engine/src/SimpleBallTracker.cpp
+
+# 3. Rebuild and verify
+./scripts/build_engine.sh
+./scripts/profile_engine.sh --output after.data
+
+# 4. Compare results
+./scripts/analyze_perf.sh --input after.data --type summary
+```
+
+### Example Optimization Session
+
+```bash
+# Initial profiling
+$ ./scripts/profile_engine.sh --duration 30 --rebuild
+# Result: cv::resize takes 35% of CPU time
+
+# Optimization: Reduce resize operations by caching
+# Edit code to cache resized frames
+
+# Rebuild and re-profile
+$ ./scripts/build_engine.sh
+$ ./scripts/profile_engine.sh --duration 30 --output optimized.data
+
+# Compare
+$ ./scripts/analyze_perf.sh --input optimized.data --type summary
+# Result: cv::resize now takes 15% - 20% improvement!
+```
+
+### Resources
+
+- **perf Documentation**: `man perf`
+- **perf Tutorial**: https://perf.wiki.kernel.org/index.php/Tutorial
+- **Flame Graphs**: https://www.brendangregg.com/flamegraphs.html
+- **Performance Analysis**: https://easyperf.net/blog/
+
+**Last Updated:** 2025-10-08 14:30:00 CEST
+
 ## 🔍 Troubleshooting
 
 ### Common Issues

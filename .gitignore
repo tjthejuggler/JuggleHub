@@ -68,3 +68,5 @@ temp/
 
 runs/
 data_augmentation/config.py
+
+perf.data

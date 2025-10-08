@@ -173,6 +173,10 @@ struct TrackingSettings {
     // Maximum distance a ball tracker can move between frames (prevents flickering to far away balls)
     float max_tracker_distance_per_frame = 0.50f;  // 50cm - maximum distance ball can move in one frame
     
+    // Euclidean color matching temporal consistency settings
+    float temporal_consistency_bonus = 0.25f;  // Bonus to reduce distance for detections near previous position (prevents identity swaps)
+    float spatial_threshold = 0.40f;  // Maximum distance (m) to apply temporal consistency bonus
+    
     TrackingSettings() = default;
 };
 

@@ -778,6 +778,44 @@ if PYQT_AVAILABLE:
             layout.addWidget(self.ct_override_require_ball_toggle, row, 0, 1, 3)
             row += 1
             
+            # Separator for euclidean matching settings
+            layout.addWidget(QLabel("Euclidean Matching Temporal Consistency:"), row, 0, 1, 3)
+            row += 1
+            
+            # Temporal Consistency Bonus
+            self.ct_temporal_consistency_bonus_slider, self.ct_temporal_consistency_bonus_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Temporal Consistency Bonus",
+                tooltip_text="Bonus to reduce effective distance for detections near previous position.\n"
+                             "Range: 0.0-1.0. Default: 0.25.\n"
+                             "Higher values create stronger 'stickiness' to prevent identity swaps.\n"
+                             "⚠️ Increase to 0.40-0.50 to fix the yellow ball tracking issue!",
+                range_min=0,
+                range_max=100,
+                initial_value=25,
+                update_func=lambda v: self.update_setting('temporal_consistency_bonus', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Spatial Threshold
+            self.ct_spatial_threshold_slider, self.ct_spatial_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Spatial Threshold (cm)",
+                tooltip_text="Maximum distance to apply temporal consistency bonus.\n"
+                             "Range: 10-100cm. Default: 40cm.\n"
+                             "Larger values apply the bonus over greater distances.\n"
+                             "⚠️ Increase to 60-70cm to fix the yellow ball tracking issue!",
+                range_min=10,
+                range_max=100,
+                initial_value=40,
+                update_func=lambda v: self.update_setting('spatial_threshold', v / 100.0),  # Convert cm to m
+                is_float=False
+            )
+            row += 1
+            
             # Add explanation
             explanation_label = QLabel(
                 "💡 <b>How it works:</b><br>"
@@ -1403,6 +1441,9 @@ if PYQT_AVAILABLE:
                 'override_color_threshold': self._safe_get_slider_value(self.ct_override_color_slider, 80) / 100.0 if hasattr(self, 'ct_override_color_slider') else 0.8,
                 'override_require_ball_class': self.ct_override_require_ball_toggle.isChecked() if hasattr(self, 'ct_override_require_ball_toggle') else True,
                 
+                # Euclidean Matching Temporal Consistency
+                'temporal_consistency_bonus': self._safe_get_slider_value(self.ct_temporal_consistency_bonus_slider, 25) / 100.0 if hasattr(self, 'ct_temporal_consistency_bonus_slider') else 0.25,
+                'spatial_threshold': self._safe_get_slider_value(self.ct_spatial_threshold_slider, 40) / 100.0 if hasattr(self, 'ct_spatial_threshold_slider') else 0.40,
             }
             
             # Add ball profile settings
@@ -1561,6 +1602,13 @@ if PYQT_AVAILABLE:
             
             if 'override_require_ball_class' in settings and hasattr(self, 'ct_override_require_ball_toggle'):
                 self.ct_override_require_ball_toggle.setChecked(settings['override_require_ball_class'])
+            
+            # Euclidean Matching Temporal Consistency settings
+            if 'temporal_consistency_bonus' in settings and hasattr(self, 'ct_temporal_consistency_bonus_slider'):
+                self.ct_temporal_consistency_bonus_slider.setValue(int(settings['temporal_consistency_bonus'] * 100))
+            
+            if 'spatial_threshold' in settings and hasattr(self, 'ct_spatial_threshold_slider'):
+                self.ct_spatial_threshold_slider.setValue(int(settings['spatial_threshold'] * 100))  # m to cm
             
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:
@@ -1726,6 +1774,13 @@ if PYQT_AVAILABLE:
             
             if 'override_require_ball_class' in settings:
                 self.udp_client.send_setting('override_require_ball_class', 1 if settings['override_require_ball_class'] else 0)
+            
+            # Euclidean Matching Temporal Consistency
+            if 'temporal_consistency_bonus' in settings:
+                self.udp_client.send_setting('temporal_consistency_bonus', settings['temporal_consistency_bonus'])
+            
+            if 'spatial_threshold' in settings:
+                self.udp_client.send_setting('spatial_threshold', settings['spatial_threshold'])
             
             # Ball tracking enabled states
             if 'ball_tracking_enabled' in settings:

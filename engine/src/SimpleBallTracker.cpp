@@ -319,6 +319,14 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.max_tracker_distance_per_frame = std::stof(value);
             return true;
         }
+        else if (key == "temporal_consistency_bonus") {
+            tracking_settings_.temporal_consistency_bonus = std::stof(value);
+            return true;
+        }
+        else if (key == "spatial_threshold") {
+            tracking_settings_.spatial_threshold = std::stof(value);
+            return true;
+        }
     } catch (const std::exception& e) {
         return false;
     }
@@ -1593,8 +1601,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         // CRITICAL FIX: Add temporal consistency bonus to prevent flip-flopping
         // If a ball was matched to a detection in the previous frame, give it a bonus
         // This creates "stickiness" that prevents rapid reassignment when distances are similar
-        const float TEMPORAL_CONSISTENCY_BONUS = 0.25f;  // Reduces effective distance by this amount (increased from 0.15 to reduce flickering)
-        const float SPATIAL_THRESHOLD = 0.40f;  // Maximum distance to apply bonus (increased from 0.30m to reduce flickering)
+        const float TEMPORAL_CONSISTENCY_BONUS = tracking_settings_.temporal_consistency_bonus;
+        const float SPATIAL_THRESHOLD = tracking_settings_.spatial_threshold;
         
         DEBUG_LOG(euclidean_log, {
             OPEN_DEBUG_LOG(euclidean_log);

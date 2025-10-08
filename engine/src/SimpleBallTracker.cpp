@@ -2084,6 +2084,49 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         }
     }
     
+    // CRITICAL: Update held ball positions to follow hands
+    // If a ball is marked as held, it must move with the hand
+    for (auto& ball : balls_) {
+        if (ball.is_held && ball.held_by_hand_id >= 0) {
+            // Find the hand that's holding this ball
+            for (const auto& hand : hands) {
+                if (hand.id == ball.held_by_hand_id && hand.is_visible) {
+                    // Check if ball is still close enough to be held
+                    float dist = cv::norm(ball.position - hand.wrist_pos_3d);
+                    
+                    // If ball has drifted too far from hand, it's not actually held
+                    if (dist > tracking_settings_.wrist_proximity_threshold * 2.0f) {
+                        // Ball is too far - mark as not held
+                        ball.is_held = false;
+                        ball.held_by_hand_id = -1;
+                        ball.yolo_class_id = 0;  // Mark as in-air
+                        
+                        DEBUG_LOG(drift_log, {
+                            OPEN_DEBUG_LOG(drift_log);
+                            drift_log << "\n[DRIFT] Ball " << ball.id << " drifted " << dist
+                                     << "m from hand " << hand.id << " - marking as NOT HELD" << std::endl;
+                        });
+                    } else {
+                        // Ball is close enough - update position to follow hand
+                        ball.position = hand.wrist_pos_3d;
+                        ball.pixel_pos = project_3d_to_2d(hand.wrist_pos_3d, intrinsics);
+                        
+                        // Update color predictor with hand position
+                        ball.color_predictor.addDetection(ball.position);
+                        
+                        DEBUG_LOG(follow_log, {
+                            OPEN_DEBUG_LOG(follow_log);
+                            follow_log << "\n[FOLLOW] Ball " << ball.id << " following hand " << hand.id
+                                      << " at (" << ball.position.x << ", " << ball.position.y << ", "
+                                      << ball.position.z << ") dist=" << dist << "m" << std::endl;
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
     // Detect ball states and events
     std::vector<BallEvent> events = detectStatesAndEvents(balls_, hands);
     

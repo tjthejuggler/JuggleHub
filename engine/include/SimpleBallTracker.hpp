@@ -90,6 +90,7 @@ struct SimpleBall {
     bool is_held;                    // In hand or in flight
     bool previous_is_held;           // Previous frame state
     int held_by_hand_id;             // -1 if not held, 0=left, 1=right
+    int previous_held_by_hand_id;    // Previous frame's hand ID (for detecting hand switches)
     int state_change_counter;        // For debouncing state changes
     float distance_to_nearest_wrist; // Distance to nearest wrist in meters
     
@@ -118,7 +119,8 @@ struct SimpleBall {
     std::vector<DetectionEvaluation> detection_evaluations;
     
     SimpleBall() : id(-1), is_held(false), previous_is_held(false),
-                   held_by_hand_id(-1), state_change_counter(0),
+                   held_by_hand_id(-1), previous_held_by_hand_id(-1),
+                   state_change_counter(0),
                    distance_to_nearest_wrist(-1.0f),
                    has_yolo_detection(false), frames_without_yolo(0),
                    yolo_confidence(0.0f), color_match_score(0.0f),

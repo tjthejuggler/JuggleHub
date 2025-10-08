@@ -1018,6 +1018,7 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
             debug_log << "  Frames without YOLO: " << ball.frames_without_yolo << std::endl;
             debug_log << "  Distance to nearest wrist: " << ball.distance_to_nearest_wrist << "m" << std::endl;
             debug_log << "  Held by hand ID: " << ball.held_by_hand_id << std::endl;
+            debug_log << "  Previous held by hand ID: " << ball.previous_held_by_hand_id << std::endl;
             debug_log << "  State change counter: " << ball.state_change_counter << std::endl;
         });
         
@@ -1050,7 +1051,26 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                     debug_log << "  OLD state (ball.is_held): " << (old_state_was_held ? "HELD" : "IN_AIR") << std::endl;
                     debug_log << "  NEW state (now_held): " << (now_held ? "HELD" : "IN_AIR") << std::endl;
                     debug_log << "  held_by_hand_id: " << ball.held_by_hand_id << std::endl;
+                    debug_log << "  previous_held_by_hand_id: " << ball.previous_held_by_hand_id << std::endl;
                 });
+                
+                // CRITICAL: Check for rapid hand-to-hand transfer
+                // If ball was held and is still held, but the hand changed, this is a fast throw+catch
+                bool is_hand_switch = old_state_was_held && now_held &&
+                                     ball.previous_held_by_hand_id >= 0 &&
+                                     ball.held_by_hand_id >= 0 &&
+                                     ball.previous_held_by_hand_id != ball.held_by_hand_id;
+                
+                if (is_hand_switch) {
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  *** RAPID HAND SWITCH DETECTED ***" << std::endl;
+                        debug_log << "  Ball switched from hand " << ball.previous_held_by_hand_id
+                                 << " (" << (ball.previous_held_by_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                                 << " to hand " << ball.held_by_hand_id
+                                 << " (" << (ball.held_by_hand_id == 0 ? "LEFT" : "RIGHT") << ")" << std::endl;
+                    });
+                }
                 
                 ball.is_held = now_held;  // Update to new state
                 ball.state_change_counter = 0;
@@ -1062,7 +1082,77 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                 });
                 
                 // Generate event based on transition
-                if (old_state_was_held && !now_held) {
+                if (is_hand_switch) {
+                    // RAPID HAND-TO-HAND TRANSFER: Generate both THROW and CATCH events
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  >>> GENERATING THROW EVENT (from hand " << ball.previous_held_by_hand_id << ") <<<" << std::endl;
+                    });
+                    
+                    // Estimate throw velocity from color predictor history
+                    auto estimated_velocity = ball.color_predictor.getVelocity();
+                    if (estimated_velocity.z != 0.0f) {
+                        auto& state = ball.kalman.get_state();
+                        state(3) = estimated_velocity.x;
+                        state(4) = estimated_velocity.y;
+                        state(5) = estimated_velocity.z;
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  THROW VELOCITY INITIALIZED: ("
+                                     << estimated_velocity.x << ", "
+                                     << estimated_velocity.y << ", "
+                                     << estimated_velocity.z << ") m/s" << std::endl;
+                        });
+                    }
+                    
+                    events.push_back({
+                        BallEvent::THROW,
+                        ball.id,
+                        ball.previous_held_by_hand_id,
+                        getCurrentTimestamp()
+                    });
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  >>> THROW EVENT GENERATED <<<" << std::endl;
+                        debug_log << "  >>> GENERATING CATCH EVENT (by hand " << ball.held_by_hand_id << ") <<<" << std::endl;
+                    });
+                    
+                    events.push_back({
+                        BallEvent::CATCH,
+                        ball.id,
+                        ball.held_by_hand_id,
+                        getCurrentTimestamp()
+                    });
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  >>> CATCH EVENT GENERATED <<<" << std::endl;
+                    });
+                    
+                    // Log to console and debug file
+                    DEBUG_LOG_WRITE({
+                        OPEN_DEBUG_LOG(hand_switch_log);
+                        hand_switch_log << "\n[HAND_SWITCH] Ball " << ball.id
+                                       << " | THROW from hand " << ball.previous_held_by_hand_id;
+                        if (ball.previous_held_by_hand_id == 0) {
+                            hand_switch_log << " (LEFT)";
+                        } else if (ball.previous_held_by_hand_id == 1) {
+                            hand_switch_log << " (RIGHT)";
+                        }
+                        hand_switch_log << " | CATCH by hand " << ball.held_by_hand_id;
+                        if (ball.held_by_hand_id == 0) {
+                            hand_switch_log << " (LEFT)";
+                        } else if (ball.held_by_hand_id == 1) {
+                            hand_switch_log << " (RIGHT)";
+                        }
+                        hand_switch_log << " | velocity=(" << estimated_velocity.x << ", "
+                                       << estimated_velocity.y << ", " << estimated_velocity.z << ") m/s"
+                                       << std::endl;
+                    });
+                }
+                else if (old_state_was_held && !now_held) {
                     // Was held, now in air = THROW
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
@@ -1180,7 +1270,91 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                 }
             });
             ball.state_change_counter = 0;
+            
+            // CRITICAL: Check for hand switch even when state is stable (HELD → HELD with different hand)
+            // This catches fast hand-to-hand transfers that happen so quickly the ball never appears "in-air"
+            if (ball.is_held && now_held &&
+                ball.previous_held_by_hand_id >= 0 &&
+                ball.held_by_hand_id >= 0 &&
+                ball.previous_held_by_hand_id != ball.held_by_hand_id) {
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  *** STABLE STATE HAND SWITCH DETECTED ***" << std::endl;
+                    debug_log << "  Ball switched from hand " << ball.previous_held_by_hand_id
+                             << " (" << (ball.previous_held_by_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                             << " to hand " << ball.held_by_hand_id
+                             << " (" << (ball.held_by_hand_id == 0 ? "LEFT" : "RIGHT") << ")" << std::endl;
+                });
+                
+                // Generate THROW from previous hand
+                auto estimated_velocity = ball.color_predictor.getVelocity();
+                if (estimated_velocity.z != 0.0f) {
+                    auto& state = ball.kalman.get_state();
+                    state(3) = estimated_velocity.x;
+                    state(4) = estimated_velocity.y;
+                    state(5) = estimated_velocity.z;
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  THROW VELOCITY INITIALIZED: ("
+                                 << estimated_velocity.x << ", "
+                                 << estimated_velocity.y << ", "
+                                 << estimated_velocity.z << ") m/s" << std::endl;
+                    });
+                }
+                
+                events.push_back({
+                    BallEvent::THROW,
+                    ball.id,
+                    ball.previous_held_by_hand_id,
+                    getCurrentTimestamp()
+                });
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  >>> THROW EVENT GENERATED (stable state) <<<" << std::endl;
+                });
+                
+                // Generate CATCH by current hand
+                events.push_back({
+                    BallEvent::CATCH,
+                    ball.id,
+                    ball.held_by_hand_id,
+                    getCurrentTimestamp()
+                });
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  >>> CATCH EVENT GENERATED (stable state) <<<" << std::endl;
+                });
+                
+                // Log to console and debug file
+                DEBUG_LOG_WRITE({
+                    OPEN_DEBUG_LOG(stable_hand_switch_log);
+                    stable_hand_switch_log << "\n[STABLE_HAND_SWITCH] Ball " << ball.id
+                                          << " | THROW from hand " << ball.previous_held_by_hand_id;
+                    if (ball.previous_held_by_hand_id == 0) {
+                        stable_hand_switch_log << " (LEFT)";
+                    } else if (ball.previous_held_by_hand_id == 1) {
+                        stable_hand_switch_log << " (RIGHT)";
+                    }
+                    stable_hand_switch_log << " | CATCH by hand " << ball.held_by_hand_id;
+                    if (ball.held_by_hand_id == 0) {
+                        stable_hand_switch_log << " (LEFT)";
+                    } else if (ball.held_by_hand_id == 1) {
+                        stable_hand_switch_log << " (RIGHT)";
+                    }
+                    stable_hand_switch_log << " | velocity=(" << estimated_velocity.x << ", "
+                                          << estimated_velocity.y << ", " << estimated_velocity.z << ") m/s"
+                                          << std::endl;
+                });
+            }
         }
+        
+        // CRITICAL: Update previous_held_by_hand_id for next frame's hand switch detection
+        // This must be done AFTER all state changes are processed
+        ball.previous_held_by_hand_id = ball.held_by_hand_id;
     }
     
     DEBUG_LOG(debug_log, {

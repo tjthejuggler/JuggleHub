@@ -251,6 +251,7 @@ message CommandRequest {
     CALIBRATE_COLOR = 13; // Calibrate a color profile by clicking on a ball
     ENABLE_FEATURE = 14; // Enable an engine feature for apps
     DISABLE_FEATURE = 15; // Disable an engine feature for apps
+    SET_VIDEO_FEED_ENABLED = 16; // Enable or disable video feed encoding
   }
   
   CommandType type = 1;
@@ -280,6 +281,9 @@ message CommandRequest {
   
   // For ENABLE_FEATURE / DISABLE_FEATURE
   string feature_name = 18;         // Name of the feature to enable/disable
+  
+  // For SET_VIDEO_FEED_ENABLED
+  bool video_feed_enabled = 20;     // Whether to encode video feed
 }
 
 // Visualization states for recording with overlays

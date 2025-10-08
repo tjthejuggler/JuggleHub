@@ -463,8 +463,8 @@ if PYQT_AVAILABLE:
             self.hide_video_feed_toggle = QPushButton("Hide Video Feed")
             self.hide_video_feed_toggle.setCheckable(True)
             self.hide_video_feed_toggle.setChecked(False)
-            self.hide_video_feed_toggle.clicked.connect(self.toggle_overlays)
-            self.hide_video_feed_toggle.setToolTip("Hide the video feed but keep overlays visible")
+            self.hide_video_feed_toggle.clicked.connect(self.toggle_video_feed)
+            self.hide_video_feed_toggle.setToolTip("Hide the video feed but keep overlays visible (FPS boost)")
             self.hide_video_feed_toggle.setMaximumWidth(140)
             toggles_row5.addWidget(self.hide_video_feed_toggle)
             
@@ -832,7 +832,6 @@ if PYQT_AVAILABLE:
             if len(self.frame_timestamps) > self.fps_window_size:
                 self.frame_timestamps.pop(0)
             
-            self.log_message(f"UI received frame {frame_data.frame_number} with {len(frame_data.balls)} balls.")
             
             # Check for throw/catch events and play sounds if enabled
             if hasattr(frame_data, 'throw_catch_events'):
@@ -957,11 +956,10 @@ if PYQT_AVAILABLE:
 
             self.ball_list.setHtml(ball_html)
 
-            # Always try to update the video feed if the widget is visible
-            if self.video_group.isVisible() and frame_data.color_image_b64:
-                self.update_video_feed(frame_data)
-            elif self.video_group.isVisible():
-                self.log_message(f"UI: Video feed is visible but frame {frame_data.frame_number} has no image data.")
+            # Always try to update the video feed if the widget is visible AND video feed is not hidden
+            if self.video_group.isVisible() and not self.hide_video_feed_toggle.isChecked():
+                if frame_data.color_image_b64:
+                    self.update_video_feed(frame_data)
             
             if self.settings_widget:
                 is_camera_running = "Running" in self.settings_widget.camera_status_label.text()
@@ -1031,44 +1029,51 @@ if PYQT_AVAILABLE:
 
         def toggle_overlays(self):
             if self.last_frame_data: self.update_video_feed(self.last_frame_data)
+        
+        def toggle_video_feed(self):
+            """Toggle video feed encoding on/off for FPS optimization."""
+            is_hidden = self.hide_video_feed_toggle.isChecked()
+            
+            # Send command to engine to enable/disable video feed encoding
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.SET_VIDEO_FEED_ENABLED
+            command.video_feed_enabled = not is_hidden  # Inverted: hidden = disabled encoding
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    self.log_message(f"✅ Video feed encoding {'disabled' if is_hidden else 'enabled'}: {response.message}")
+                else:
+                    self.log_message(f"❌ Failed to toggle video feed: {response.message}")
+            except Exception as e:
+                self.log_message(f"❌ Error toggling video feed: {e}")
+            
+            # Update the display
+            if self.last_frame_data:
+                self.update_video_feed(self.last_frame_data)
 
         def update_video_feed(self, frame_data: juggler_pb2.FrameData):
-            self.log_message(f"UI: update_video_feed called for frame {frame_data.frame_number}.")
-            self.log_message(f"UI: Frame has {len(frame_data.hands)} hands, {len(frame_data.balls)} balls")
+            # Check if video feed should be hidden - skip all rendering if so
+            if self.hide_video_feed_toggle.isChecked():
+                return
+            
             if not frame_data.color_image_b64:
-                self.log_message(f"UI ERROR: Frame {frame_data.frame_number} has no color_image_b64 data.")
                 return
 
             image = QImage()
             load_success = image.loadFromData(frame_data.color_image_b64, "JPEG")
 
             if not load_success:
-                self.log_message(f"UI ERROR: QImage.loadFromData failed for frame {frame_data.frame_number}. Image data size: {len(frame_data.color_image_b64)} bytes.")
-                # Optionally, save the bad frame for debugging
-                # with open(f"bad_frame_{frame_data.frame_number}.jpg", "wb") as f:
-                #     f.write(frame_data.color_image_b64)
                 return
-            
-            self.log_message(f"UI: Frame {frame_data.frame_number} loaded into QImage successfully. Size: {image.width()}x{image.height()}.")
 
-            # Check if video feed should be hidden
-            if self.hide_video_feed_toggle.isChecked():
-                # Create a blank black image with the same dimensions
-                pixmap = QPixmap(image.width(), image.height())
-                pixmap.fill(QColor(0, 0, 0))  # Fill with black
-            else:
-                # Use the actual video frame
-                pixmap = QPixmap.fromImage(image)
+            # Use the actual video frame
+            pixmap = QPixmap.fromImage(image)
             
             painter = QPainter(pixmap)
             
             # --- Draw Kalman Predictions (Step 2) ---
             # NEW: Matches the saved visualization style from Engine.cpp
             if self.show_kalman_predictions_toggle.isChecked():
-                # Debug logging
-                if len(frame_data.kalman_predictions) > 0:
-                    self.log_message(f"[KALMAN VIZ] Rendering {len(frame_data.kalman_predictions)} Kalman predictions")
-                
                 # Get camera intrinsics
                 fx = 385.0  # Approximate D455 intrinsics
                 fy = 385.0
@@ -1082,9 +1087,6 @@ if PYQT_AVAILABLE:
                     
                     pred_x = int((pred.predicted_pos.x * fx) / pred.predicted_pos.z + ppx)
                     pred_y = int((pred.predicted_pos.y * fy) / pred.predicted_pos.z + ppy)
-                    
-                    if i == 0:  # Log first prediction for debugging
-                        self.log_message(f"[KALMAN VIZ]   Pred {i}: 3D({pred.predicted_pos.x:.3f}, {pred.predicted_pos.y:.3f}, {pred.predicted_pos.z:.3f}) -> 2D({pred_x}, {pred_y})")
                     
                     # Get prediction radius - use a default if not available
                     # The radius represents the search region uncertainty in meters
@@ -1154,10 +1156,6 @@ if PYQT_AVAILABLE:
                 painter.setPen(QPen(QColor(0, 255, 0, 200), 2))  # Green lines
                 painter.setFont(QFont("Arial", 9, QFont.Weight.Bold))
                 
-                # Debug logging
-                if len(frame_data.tracker_associations) > 0:
-                    self.log_message(f"[3D MATCH VIZ] Rendering {len(frame_data.tracker_associations)} associations")
-                
                 for i, assoc in enumerate(frame_data.tracker_associations):
                     # Project 3D positions to 2D for visualization
                     # Get camera intrinsics
@@ -1179,10 +1177,6 @@ if PYQT_AVAILABLE:
                         det_y = int((assoc.detection_pos.y * fy) / assoc.detection_pos.z + ppy)
                     else:
                         continue
-                    
-                    if i == 0:  # Log first association for debugging
-                        self.log_message(f"[3D MATCH VIZ]   Assoc {i}: Tracker {assoc.tracker_id} -> Det {assoc.detection_index}, dist={assoc.distance_3d:.3f}m")
-                        self.log_message(f"[3D MATCH VIZ]   Tracker 2D: ({tracker_x}, {tracker_y}), Det 2D: ({det_x}, {det_y})")
                     
                     # Draw line from tracker to detection
                     painter.drawLine(tracker_x, tracker_y, det_x, det_y)
@@ -1405,8 +1399,6 @@ if PYQT_AVAILABLE:
 
             # --- Draw Pose Skeleton (Step 10) ---
             if self.show_skeleton_toggle.isChecked():
-                self.log_message(f"UI: Drawing skeleton for {len(frame_data.hands)} hands")
-                
                 # Get frame dimensions for bounds checking
                 frame_width = pixmap.width()
                 frame_height = pixmap.height()
@@ -1436,17 +1428,13 @@ if PYQT_AVAILABLE:
                 painter.setPen(QPen(QColor(0, 255, 255, 200), 3)) # Cyan for skeleton
                 painter.setBrush(QBrush(QColor(0, 255, 255, 150)))
                 for hand in frame_data.hands:
-                    self.log_message(f"UI: Hand has {len(hand.keypoints)} keypoints")
                     for i, kp in enumerate(hand.keypoints):
                         # Validate keypoint position and confidence
                         if kp.confidence > 0.3 and \
                            kp.pos_2d.x > 0 and kp.pos_2d.y > 0 and \
                            kp.pos_2d.x < frame_width and kp.pos_2d.y < frame_height:
-                            self.log_message(f"UI: Drawing keypoint {i} at ({kp.pos_2d.x:.1f}, {kp.pos_2d.y:.1f})")
                             # Draw filled circle for keypoint
                             painter.drawEllipse(int(kp.pos_2d.x) - 4, int(kp.pos_2d.y) - 4, 8, 8)
-                        else:
-                            self.log_message(f"UI: Skipping keypoint {i} (confidence {kp.confidence:.2f} or invalid position)")
                     
                     # Draw skeleton connections if we have enough keypoints
                     if len(hand.keypoints) >= 17:  # YOLO pose has 17 keypoints

@@ -130,6 +130,7 @@ private:
     // Recording with bounding boxes state
     std::atomic<bool> record_with_yolo_boxes_;
     std::atomic<bool> record_with_bytetrack_boxes_;
+    std::atomic<bool> video_feed_enabled_;  // Whether to encode JPG for video feed
     juggler::v1::VisualizationStates visualization_states_;  // Store current visualization states
     std::vector<Detection> last_raw_detections_; // Keep for calibration
     std::vector<TrackedObject> last_tracked_objects_; // Keep for calibration

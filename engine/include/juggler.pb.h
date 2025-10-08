@@ -255,12 +255,13 @@ enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_CALIBRATE_COLOR = 13,
   CommandRequest_CommandType_ENABLE_FEATURE = 14,
   CommandRequest_CommandType_DISABLE_FEATURE = 15,
+  CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED = 16,
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool CommandRequest_CommandType_IsValid(int value);
 constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MIN = CommandRequest_CommandType_UNKNOWN;
-constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_DISABLE_FEATURE;
+constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED;
 constexpr int CommandRequest_CommandType_CommandType_ARRAYSIZE = CommandRequest_CommandType_CommandType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor();
@@ -5245,6 +5246,8 @@ class CommandRequest final :
     CommandRequest_CommandType_ENABLE_FEATURE;
   static constexpr CommandType DISABLE_FEATURE =
     CommandRequest_CommandType_DISABLE_FEATURE;
+  static constexpr CommandType SET_VIDEO_FEED_ENABLED =
+    CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED;
   static inline bool CommandType_IsValid(int value) {
     return CommandRequest_CommandType_IsValid(value);
   }
@@ -5290,6 +5293,7 @@ class CommandRequest final :
     kRecordWithYoloBoxesFieldNumber = 12,
     kRecordWithBytetrackBoxesFieldNumber = 13,
     kPoseModelEnabledFieldNumber = 14,
+    kVideoFeedEnabledFieldNumber = 20,
     kClickXFieldNumber = 16,
     kClickYFieldNumber = 17,
   };
@@ -5501,6 +5505,15 @@ class CommandRequest final :
   void _internal_set_pose_model_enabled(bool value);
   public:
 
+  // bool video_feed_enabled = 20;
+  void clear_video_feed_enabled();
+  bool video_feed_enabled() const;
+  void set_video_feed_enabled(bool value);
+  private:
+  bool _internal_video_feed_enabled() const;
+  void _internal_set_video_feed_enabled(bool value);
+  public:
+
   // int32 click_x = 16;
   void clear_click_x();
   int32_t click_x() const;
@@ -5548,6 +5561,7 @@ class CommandRequest final :
     bool record_with_yolo_boxes_;
     bool record_with_bytetrack_boxes_;
     bool pose_model_enabled_;
+    bool video_feed_enabled_;
     int32_t click_x_;
     int32_t click_y_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
@@ -12058,6 +12072,26 @@ inline void CommandRequest::set_allocated_feature_name(std::string* feature_name
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.feature_name)
+}
+
+// bool video_feed_enabled = 20;
+inline void CommandRequest::clear_video_feed_enabled() {
+  _impl_.video_feed_enabled_ = false;
+}
+inline bool CommandRequest::_internal_video_feed_enabled() const {
+  return _impl_.video_feed_enabled_;
+}
+inline bool CommandRequest::video_feed_enabled() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.video_feed_enabled)
+  return _internal_video_feed_enabled();
+}
+inline void CommandRequest::_internal_set_video_feed_enabled(bool value) {
+  
+  _impl_.video_feed_enabled_ = value;
+}
+inline void CommandRequest::set_video_feed_enabled(bool value) {
+  _internal_set_video_feed_enabled(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.video_feed_enabled)
 }
 
 // -------------------------------------------------------------------

@@ -35,7 +35,8 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       camera_height_(480),
       camera_fps_(60),
       record_with_yolo_boxes_(false),
-      record_with_bytetrack_boxes_(false) {
+      record_with_bytetrack_boxes_(false),
+      video_feed_enabled_(true) {  // Start with video feed enabled by default
    DEBUG_LOG("[LOG] Engine constructor called.");
    DEBUG_LOG("[LOG] Initial camera settings: ", camera_width_, "x", camera_height_, " @ ", camera_fps_, " FPS");
    // Bind ZMQ sockets
@@ -118,10 +119,15 @@ void Engine::run() {
             std::chrono::system_clock::now().time_since_epoch()).count());
         frame_data.set_frame_number(frame_counter_++);
 
-        std::vector<uchar> buf;
-        cv::imencode(".jpg", color_image, buf);
-        DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": Encoded color image to JPG, size: ", buf.size(), " bytes.");
-        frame_data.set_color_image_b64(buf.data(), buf.size());
+        // Only encode JPG if video feed is enabled (FPS optimization)
+        if (video_feed_enabled_) {
+            std::vector<uchar> buf;
+            cv::imencode(".jpg", color_image, buf);
+            DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": Encoded color image to JPG, size: ", buf.size(), " bytes.");
+            frame_data.set_color_image_b64(buf.data(), buf.size());
+        } else {
+            DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": Skipping JPG encoding (video feed disabled).");
+        }
         frame_data.set_ir_projector_active(ir_projector_active_);
 
         // --- BALL TRACKING CODE ---
@@ -534,6 +540,11 @@ void Engine::processCommands() {
                     // Throw/catch events are always sent, so just acknowledge
                     response.set_message("Feature '" + command.feature_name() + "' disabled (events always sent)");
                     DEBUG_LOG("Feature disabled: ", command.feature_name());
+                    break;
+                case juggler::v1::CommandRequest::SET_VIDEO_FEED_ENABLED:
+                    video_feed_enabled_ = command.video_feed_enabled();
+                    response.set_message(std::string("Video feed encoding ") + (video_feed_enabled_ ? "enabled" : "disabled"));
+                    DEBUG_LOG("Video feed encoding ", (video_feed_enabled_ ? "enabled" : "disabled"));
                     break;
                 default:
                     response.set_success(false);

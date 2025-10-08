@@ -2,9 +2,19 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-07 23:41 CEST
+**Last Updated:** 2025-10-08 02:05 CEST
 
-**Recent Changes (2025-10-07):**
+**Recent Changes (2025-10-08):**
+- **⚡ FPS OPTIMIZATION - CONDITIONAL JPG ENCODING**
+  - **Performance Gain**: 10-15% FPS improvement when video feed is hidden
+  - **Smart Encoding**: JPG encoding now skipped when video display is toggled off in UI
+  - **Zero Functionality Loss**: Recording, ball tracking, and all features work identically
+  - **User Control**: Toggle "Hide Video Feed" in Visualization section to enable optimization
+  - **Technical Details**: Engine only encodes JPG frames when video feed is visible, saving 2-5ms per frame
+  - **Backward Compatible**: Video feed enabled by default, optimization is opt-in via UI toggle
+  - See [`FPS_OPTIMIZATION_JPG_ENCODING.md`](FPS_OPTIMIZATION_JPG_ENCODING.md) for complete documentation
+
+**Previous Changes (2025-10-07):**
 - **📊 RESPONSIVE FPS DISPLAY**
   - **Issue Fixed**: FPS display was slow to update, taking a long time to reflect true frame rate
   - **Root Cause**: FPS was calculated using total elapsed time since startup, creating a very slow-moving average

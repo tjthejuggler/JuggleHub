@@ -17,16 +17,6 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--help") {
-            std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
-            std::cout << "Options:" << std::endl;
-            std::cout << "  --help                        Show this help message" << std::endl;
-            std::cout << "  --use-dnn-tracker             Enable the DNN tracker" << std::endl;
-            std::cout << "  --verbose                     Enable verbose output" << std::endl;
-            std::cout << "  --debug-log                   Enable debug logging to engine_debug.log" << std::endl;
-            std::cout << "  --device=<device>             Set the inference device (e.g., CPU, GPU, NPU, AUTO)" << std::endl;
-            std::cout << "  --camera-settings=<path>      Path to camera settings JSON file" << std::endl;
-            std::cout << "  --model=<model_name>          Specify the model name (e.g., yolo11s)" << std::endl;
-            std::cout << "  --pose-model=<model_name>     Specify the pose model name (e.g., yolo-pose)" << std::endl;
             return EXIT_SUCCESS;
         } else if (arg == "--output-format=simple") {
             format = Engine::OutputFormat::SIMPLE;
@@ -65,7 +55,6 @@ int main(int argc, char* argv[]) {
         Engine engine(camera_settings_path, device_name, model_name, pose_model_name, format, use_dnn_tracker, verbose);
         engine.run();
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

@@ -37,8 +37,6 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       record_with_yolo_boxes_(false),
       record_with_bytetrack_boxes_(false),
       video_feed_enabled_(true) {  // Start with video feed enabled by default
-   DEBUG_LOG("[LOG] Engine constructor called.");
-   DEBUG_LOG("[LOG] Initial camera settings: ", camera_width_, "x", camera_height_, " @ ", camera_fps_, " FPS");
    // Bind ZMQ sockets
    zmq_publisher_.bind("tcp://127.0.0.1:5555");
     zmq_commander_.bind("tcp://127.0.0.1:5565");
@@ -49,9 +47,7 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
         const std::string pose_model_path = "engine/models/" + pose_model_name + ".xml";
         simple_tracker_ = std::make_shared<SimpleBallTracker>(
             ball_model_path, pose_model_path, device_name, "hub/ball_settings.json");
-        DEBUG_LOG("[LOG] SimpleBallTracker initialized successfully");
     } catch (const std::exception& e) {
-        ERROR_LOG("FATAL ERROR: Failed to initialize SimpleBallTracker: ", e.what());
         return;
     }
 
@@ -65,15 +61,11 @@ Engine::~Engine() {
 
 void Engine::run() {
     running_ = true;
-    DEBUG_LOG("[LOG] Engine::run() called. Starting main loop.");
-
     // Start command processing thread
     std::thread command_thread(&Engine::processCommands, this);
     
     // Initialize and start the camera with default settings.
-    DEBUG_LOG("[LOG] Calling initializeCamera() from run().");
     initializeCamera();
-    DEBUG_LOG("[LOG] Performing initial camera start from run().");
     startCamera();
 
     // Initialize settings module with SimpleBallTracker
@@ -91,7 +83,6 @@ void Engine::run() {
         try {
             frames = pipe_.wait_for_frames(1000); // 1 second timeout
         } catch (const rs2::error& e) {
-            DEBUG_LOG("Camera frame timeout or error: ", e.what());
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
@@ -101,11 +92,8 @@ void Engine::run() {
         auto depth_frame = aligned_frames.get_depth_frame();
 
         if (!color_frame || !depth_frame) {
-            DEBUG_LOG("[LOG] Dropping frame: missing color or depth.");
             continue;
         }
-
-        DEBUG_LOG("[LOG] Frame ", frame_counter_, ": Received color and depth frames.");
 
         cv::Mat color_image(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
         cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
@@ -123,10 +111,8 @@ void Engine::run() {
         if (video_feed_enabled_) {
             std::vector<uchar> buf;
             cv::imencode(".jpg", color_image, buf);
-            DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": Encoded color image to JPG, size: ", buf.size(), " bytes.");
             frame_data.set_color_image_b64(buf.data(), buf.size());
         } else {
-            DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": Skipping JPG encoding (video feed disabled).");
         }
         frame_data.set_ir_projector_active(ir_projector_active_);
 
@@ -147,10 +133,6 @@ void Engine::run() {
             // Get the raw detections for recording/visualization
             last_raw_detections_ = simple_tracker_->getLastRawDetections();
             
-            DEBUG_LOG("[LOG] Frame ", frame_data.frame_number(), ": SimpleBallTracker returned ",
-                      tracked_balls.size(), " balls, ",
-                      ball_events.size(), " events, and ",
-                      tracked_hands.size(), " hands.");
 
             // Populate hands
             for (const auto& hand_obj : tracked_hands) {
@@ -377,9 +359,6 @@ void Engine::run() {
             
             event_pb->set_confidence(confidence);
             
-            DEBUG_LOG("[EVENT] ", (event.type == BallEvent::THROW ? "THROW" : "CATCH"),
-                     " - Ball ", event.ball_id, " Hand ", event.hand_id,
-                     " at (", ball_position.x, ", ", ball_position.y, ", ", ball_position.z, ")");
         }
 
         if (active_module_) {
@@ -390,10 +369,7 @@ void Engine::run() {
 
         // Publish FrameData
         std::string serialized_data;
-        DEBUG_LOG("DEBUG: C++ sending ", frame_data.balls_size(), " balls.");
         frame_data.SerializeToString(&serialized_data);
-
-        DEBUG_LOG("Serialized FrameData size: ", serialized_data.size(), " bytes");
 
         zmq::message_t message(serialized_data.size());
         memcpy(message.data(), serialized_data.c_str(), serialized_data.size());
@@ -420,8 +396,6 @@ void Engine::processCommands() {
             juggler::v1::CommandRequest command;
             command.ParseFromArray(request.data(), request.size());
             
-            DEBUG_LOG("Received external command: ", command.type());
-
             juggler::v1::CommandResponse response;
             response.set_success(true);
 
@@ -482,24 +456,20 @@ void Engine::processCommands() {
                     response.set_message("Camera feed stopped");
                     break;
                 case juggler::v1::CommandRequest::CAMERA_START:
-                    DEBUG_LOG("[LOG] CAMERA_START command received.");
                     if (!command.camera_settings_file().empty()) {
                         // Check if camera parameters are provided from UI
                         if (command.camera_width() > 0 && command.camera_height() > 0 && command.camera_fps() > 0) {
-                            DEBUG_LOG("[LOG] Calling startCameraWithSettings with new resolution.");
                             // Use UI-provided parameters
                             startCameraWithSettings(command.camera_settings_file(), command.camera_width(), command.camera_height(), command.camera_fps());
                             response.set_message("Camera started with settings: " + command.camera_settings_file() +
                                                " at " + std::to_string(command.camera_width()) + "x" + std::to_string(command.camera_height()) +
                                                " @ " + std::to_string(command.camera_fps()) + " FPS");
                         } else {
-                            DEBUG_LOG("[LOG] Calling startCameraWithSettings with settings file only.");
                             // Use original method without parameters (backward compatibility)
                             startCameraWithSettings(command.camera_settings_file());
                             response.set_message("Camera started with settings: " + command.camera_settings_file());
                         }
                     } else {
-                        DEBUG_LOG("[LOG] Calling startCamera() with current settings.");
                         startCamera();
                         response.set_message("Camera started with current settings");
                     }
@@ -534,17 +504,14 @@ void Engine::processCommands() {
                 case juggler::v1::CommandRequest::ENABLE_FEATURE:
                     // Throw/catch events are always sent, so just acknowledge
                     response.set_message("Feature '" + command.feature_name() + "' enabled (events always sent)");
-                    DEBUG_LOG("Feature enabled: ", command.feature_name());
                     break;
                 case juggler::v1::CommandRequest::DISABLE_FEATURE:
                     // Throw/catch events are always sent, so just acknowledge
                     response.set_message("Feature '" + command.feature_name() + "' disabled (events always sent)");
-                    DEBUG_LOG("Feature disabled: ", command.feature_name());
                     break;
                 case juggler::v1::CommandRequest::SET_VIDEO_FEED_ENABLED:
                     video_feed_enabled_ = command.video_feed_enabled();
                     response.set_message(std::string("Video feed encoding ") + (video_feed_enabled_ ? "enabled" : "disabled"));
-                    DEBUG_LOG("Video feed encoding ", (video_feed_enabled_ ? "enabled" : "disabled"));
                     break;
                 default:
                     response.set_success(false);
@@ -573,8 +540,6 @@ void Engine::processCommands() {
         }
 
         if (command_found) {
-            DEBUG_LOG("Processing internal command: ", internal_command.type());
-
             switch (internal_command.type()) {
                 case juggler::v1::CommandRequest::SEND_COLOR_COMMAND:
                     if (color_module_) {
@@ -610,11 +575,9 @@ std::unique_ptr<ModuleBase> Engine::create_module(const juggler::v1::CommandRequ
 }
 
 void Engine::saveRecording() {
-    DEBUG_LOG("DEBUG: saveRecording() called.");
     std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
     
     if (frame_buffer_.empty()) {
-        DEBUG_LOG("DEBUG: Frame buffer is empty. Nothing to save.");
         return;
     }
 
@@ -628,8 +591,6 @@ void Engine::saveRecording() {
     fs::path recording_dir = data_dir / ss.str();
     
     fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
-
-    DEBUG_LOG("DEBUG: Attempting to create directory: ", recording_dir_no_boxes.string());
 
     try {
         fs::create_directories(recording_dir_no_boxes);
@@ -693,15 +654,11 @@ void Engine::saveRecording() {
         }
 
     } catch (const fs::filesystem_error& e) {
-        ERROR_LOG("Error creating directory or saving frames: ", e.what());
     }
 }
 
 void Engine::startContinuousRecording() {
-    DEBUG_LOG("DEBUG: startContinuousRecording() called.");
-
     if (continuous_recording_) {
-        DEBUG_LOG("DEBUG: Continuous recording already active.");
         return;
     }
     
@@ -725,10 +682,7 @@ void Engine::startContinuousRecording() {
 }
 
 void Engine::stopContinuousRecording() {
-    DEBUG_LOG("DEBUG: stopContinuousRecording() called.");
-
     if (!continuous_recording_) {
-        DEBUG_LOG("DEBUG: No continuous recording active.");
         return;
     }
     
@@ -737,7 +691,6 @@ void Engine::stopContinuousRecording() {
     std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
     
     if (continuous_frame_buffer_.empty()) {
-        DEBUG_LOG("DEBUG: Continuous frame buffer is empty. Nothing to save.");
         return;
     }
     
@@ -745,8 +698,6 @@ void Engine::stopContinuousRecording() {
     fs::path recording_dir = data_dir / continuous_recording_session_;
     fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
 
-    DEBUG_LOG("DEBUG: Attempting to create directory: ", recording_dir_no_boxes.string());
-    
     try {
         fs::create_directories(recording_dir_no_boxes);
         
@@ -811,27 +762,19 @@ void Engine::stopContinuousRecording() {
         continuous_frame_buffer_.clear();
         
     } catch (const fs::filesystem_error& e) {
-        ERROR_LOG("Error creating directory or saving frames: ", e.what());
     }
 }
 
 void Engine::initializeCamera() {
-    DEBUG_LOG("[LOG] Engine::initializeCamera() called.");
     // Load camera settings from JSON file first
     if (!camera_settings_path_.empty()) {
-        DEBUG_LOG("[LOG] Loading camera settings from: ", camera_settings_path_);
         loadCameraSettingsFromJson(camera_settings_path_);
-    } else {
-        DEBUG_LOG("[LOG] No camera settings path provided.");
     }
 
     // Configure camera streams but do not start them
-     DEBUG_LOG("[LOG] Configuring camera streams: ",
-               camera_width_, "x", camera_height_, " @ ", camera_fps_, " FPS");
     rs_config_.enable_stream(RS2_STREAM_COLOR, camera_width_, camera_height_, RS2_FORMAT_BGR8, camera_fps_);
     rs_config_.enable_stream(RS2_STREAM_DEPTH, camera_width_, camera_height_, RS2_FORMAT_Z16, camera_fps_);
     
-    DEBUG_LOG("[LOG] Camera configured.");
 }
 
 void Engine::loadCameraSettingsFromJson(const std::string& json_path) {
@@ -848,51 +791,37 @@ void Engine::loadCameraSettingsFromJson(const std::string& json_path) {
         
         INFO_LOG("Loaded camera settings from: ", json_path);
     } catch (const std::exception& e) {
-        ERROR_LOG("Error loading camera settings: ", e.what());
         throw;
     }
 }
 
 void Engine::applyCameraSettings() {
-    DEBUG_LOG("[LOG] Engine::applyCameraSettings() called.");
     if (json_content_.empty()) {
-        DEBUG_LOG("[LOG] No JSON content, skipping settings application.");
         return;
     }
 
     try {
         if (!camera_running_) {
-            DEBUG_LOG("[LOG] Camera not running, settings will be applied on start.");
             return;
         }
 
-        DEBUG_LOG("[LOG] Applying camera settings from JSON...");
-        
         auto profile = pipe_.get_active_profile();
         rs2::device dev = profile.get_device();
 
         if (dev.is<rs2::serializable_device>()) {
             rs2::serializable_device serializable_dev = dev.as<rs2::serializable_device>();
             serializable_dev.load_json(json_content_);
-            DEBUG_LOG("[LOG] Camera settings applied successfully.");
         } else {
-            DEBUG_LOG("[LOG] Device does not support advanced settings.");
         }
     } catch (const rs2::error& e) {
-        ERROR_LOG("[ERROR] RealSense error in applyCameraSettings: ", e.what());
     } catch (const std::exception& e) {
-        ERROR_LOG("[ERROR] General error in applyCameraSettings: ", e.what());
     }
 }
 
 void Engine::stopCamera() {
-    DEBUG_LOG("[LOG] Engine::stopCamera() called.");
     if (!camera_running_) {
-        DEBUG_LOG("[LOG] Camera already stopped.");
         return;
     }
-
-    DEBUG_LOG("[LOG] Attempting to stop camera...");
 
     try {
         pipe_.stop();
@@ -900,14 +829,11 @@ void Engine::stopCamera() {
         camera_running_ = false;
         ir_projector_active_ = false;
     } catch (const rs2::error& e) {
-        ERROR_LOG("[ERROR] Error stopping camera: ", e.what());
     }
 }
 
 void Engine::startCamera() {
-    DEBUG_LOG("[LOG] Engine::startCamera() called.");
     if (camera_running_) {
-        DEBUG_LOG("[LOG] Camera is already running.");
         return;
     }
 
@@ -925,9 +851,6 @@ void Engine::startCamera() {
         camera_intrinsics_.fy = intrinsics.fy;
         camera_intrinsics_.ppx = intrinsics.ppx;
         camera_intrinsics_.ppy = intrinsics.ppy;
-        DEBUG_LOG("[LOG] Stored camera intrinsics: fx=", camera_intrinsics_.fx,
-                  ", fy=", camera_intrinsics_.fy, ", ppx=", camera_intrinsics_.ppx,
-                  ", ppy=", camera_intrinsics_.ppy);
 
         // Wait for a moment to ensure the device is ready.
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -941,21 +864,17 @@ void Engine::startCamera() {
             if (sensor.supports(RS2_OPTION_EMITTER_ENABLED)) {
                 sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 1.f); // 1.f is for ON
                 ir_projector_active_ = true;
-                DEBUG_LOG("[LOG] IR Emitter enabled programmatically.");
             }
         } catch (const rs2::error& e) {
-            WARN_LOG("[WARNING] Could not set IR emitter option: ", e.what());
             ir_projector_active_ = false;
         }
 
     } catch (const rs2::error& e) {
-        ERROR_LOG("[ERROR] Error starting camera: ", e.what());
         camera_running_ = false;
     }
 }
 
 void Engine::startCameraWithSettings(const std::string& settings_file) {
-    DEBUG_LOG("[LOG] startCameraWithSettings(settings_file) called.");
     startCameraWithSettings(settings_file, camera_width_, camera_height_, camera_fps_);
 }
 

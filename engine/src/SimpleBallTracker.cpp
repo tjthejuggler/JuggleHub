@@ -56,14 +56,10 @@ SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
                                     const std::string& settings_file)
     : settings_file_(settings_file) {
     
-    std::cout << "[SimpleBallTracker] Initializing..." << std::endl;
-    
     // Load OpenVINO models
-    std::cout << "[SimpleBallTracker] Loading ball model: " << ball_model_path << std::endl;
     ball_model_ = core_.compile_model(ball_model_path, device_name);
     ball_infer_ = ball_model_.create_infer_request();
     
-    std::cout << "[SimpleBallTracker] Loading pose model: " << pose_model_path << std::endl;
     pose_model_ = core_.compile_model(pose_model_path, device_name);
     pose_infer_ = pose_model_.create_infer_request();
     
@@ -71,7 +67,6 @@ SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
     
     // Load color profiles from settings file
     if (!loadSettings()) {
-        std::cerr << "[SimpleBallTracker] Failed to load settings, using defaults" << std::endl;
         // Set up default color profiles
         color_profiles_.push_back(ColorProfile("green", -1.0f, -1.0f, cv::Scalar(45, 100, 100), cv::Scalar(75, 255, 255)));
         color_profiles_.push_back(ColorProfile("pink", -1.0f, -1.0f, cv::Scalar(140, 100, 100), cv::Scalar(175, 255, 255)));
@@ -96,7 +91,6 @@ SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
         }
     }
     
-    std::cout << "[SimpleBallTracker] Initialized with " << balls_.size() << " balls" << std::endl;
 }
 
 bool SimpleBallTracker::loadSettings() {
@@ -114,8 +108,6 @@ bool SimpleBallTracker::loadSettings() {
         // ball_settings.json format: top-level keys are color names
         for (auto& [color_name, color_data] : j.items()) {
             bool enabled = color_data.value("enabled", true);
-            
-            std::cout << "[SimpleBallTracker] Loading color profile: " << color_name << std::endl;
             
             cv::Scalar min_hsv(
                 color_data["min_hsv"][0],
@@ -154,14 +146,11 @@ bool SimpleBallTracker::loadSettings() {
             
             color_profiles_.push_back(ColorProfile(color_name, avg_hue, avg_sat, min_hsv, max_hsv, min_hsv2, max_hsv2, enabled));
             
-            std::cout << "[SimpleBallTracker] Loaded color '" << color_name << "' enabled=" << enabled << std::endl;
         }
         
-        std::cout << "[SimpleBallTracker] Loaded " << color_profiles_.size() << " color profiles" << std::endl;
         return true;
         
     } catch (const std::exception& e) {
-        std::cerr << "[SimpleBallTracker] Error loading settings: " << e.what() << std::endl;
         return false;
     }
 }
@@ -198,10 +187,7 @@ void SimpleBallTracker::saveSettings() {
         std::ofstream file(settings_file_);
         file << j.dump(4);  // Pretty print with 4-space indent
         
-        std::cout << "[SimpleBallTracker] Settings saved to " << settings_file_ << std::endl;
-        
     } catch (const std::exception& e) {
-        std::cerr << "[SimpleBallTracker] Error saving settings: " << e.what() << std::endl;
     }
 }
 
@@ -211,28 +197,22 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         std::string color_name = key.substr(6);  // Remove "track_" prefix
         bool enable = (value == "true" || value == "1");
         
-        std::cout << "[SimpleBallTracker] Received track setting: " << key << "=" << value << std::endl;
-        std::cout << "[SimpleBallTracker] Color: " << color_name << ", Enable: " << enable << std::endl;
-        
         bool found = false;
         for (auto& profile : color_profiles_) {
             if (profile.name == color_name) {
                 profile.enabled = enable;
                 found = true;
-                std::cout << "[SimpleBallTracker] Updated profile '" << color_name << "' enabled=" << enable << std::endl;
                 break;
             }
         }
         
         if (!found) {
-            std::cerr << "[SimpleBallTracker] WARNING: Color profile '" << color_name << "' not found!" << std::endl;
             return false;
         }
         
         saveSettings();
         
         // CRITICAL: Reinitialize balls list based on new enabled profiles
-        std::cout << "[SimpleBallTracker] Reinitializing balls based on enabled profiles..." << std::endl;
         balls_.clear();
         int ball_id = 0;
         for (const auto& profile : color_profiles_) {
@@ -248,11 +228,8 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
                 ball.color_predictor.setSettings(pred_settings);
                 
                 balls_.push_back(ball);
-                std::cout << "[SimpleBallTracker]   Added ball " << ball.id << " for color '" << ball.color_name << "'" << std::endl;
             }
         }
-        std::cout << "[SimpleBallTracker] Now tracking " << balls_.size() << " balls" << std::endl;
-        
         return true;
     }
     
@@ -260,32 +237,26 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
     try {
         if (key == "ml_ball_weight") {
             tracking_settings_.ml_ball_weight = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated ml_ball_weight to " << value << std::endl;
             return true;
         }
         else if (key == "ml_ball_held_weight") {
             tracking_settings_.ml_ball_held_weight = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated ml_ball_held_weight to " << value << std::endl;
             return true;
         }
         else if (key == "wrist_proximity_weight") {
             tracking_settings_.wrist_proximity_weight = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated wrist_proximity_weight to " << value << std::endl;
             return true;
         }
         else if (key == "wrist_proximity_threshold") {
             tracking_settings_.wrist_proximity_threshold = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated wrist_proximity_threshold to " << value << "m" << std::endl;
             return true;
         }
         else if (key == "undetected_near_hand_threshold") {
             tracking_settings_.undetected_near_hand_threshold = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated undetected_near_hand_threshold to " << value << "m" << std::endl;
             return true;
         }
         else if (key == "min_frames_for_state_change") {
             tracking_settings_.min_frames_for_state_change = std::stoi(value);
-            std::cout << "[SimpleBallTracker] Updated min_frames_for_state_change to " << value << std::endl;
             return true;
         }
         else if (key == "prediction_history_frames") {
@@ -296,7 +267,6 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
                 settings.history_frames = tracking_settings_.prediction_history_frames;
                 ball.color_predictor.setSettings(settings);
             }
-            std::cout << "[SimpleBallTracker] Updated prediction_history_frames to " << value << std::endl;
             return true;
         }
         else if (key == "prediction_radius_m") {
@@ -307,52 +277,42 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
                 settings.prediction_radius_m = tracking_settings_.prediction_radius_m;
                 ball.color_predictor.setSettings(settings);
             }
-            std::cout << "[SimpleBallTracker] Updated prediction_radius_m to " << value << "m" << std::endl;
             return true;
         }
         // Color tracker matching weights
         else if (key == "yolo_confidence_weight") {
             tracking_settings_.yolo_confidence_weight = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated yolo_confidence_weight to " << value << std::endl;
             return true;
         }
         else if (key == "yolo_class_weight") {
             tracking_settings_.yolo_class_weight = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated yolo_class_weight to " << value << std::endl;
             return true;
         }
         else if (key == "color_match_weight") {
             tracking_settings_.color_match_weight = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated color_match_weight to " << value << std::endl;
             return true;
         }
         else if (key == "kalman_proximity_weight") {
             tracking_settings_.kalman_proximity_weight = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated kalman_proximity_weight to " << value << std::endl;
             return true;
         }
         else if (key == "min_yolo_score_threshold") {
             tracking_settings_.min_yolo_score_threshold = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated min_yolo_score_threshold to " << value << std::endl;
             return true;
         }
         else if (key == "override_confidence_threshold") {
             tracking_settings_.override_confidence_threshold = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated override_confidence_threshold to " << value << std::endl;
             return true;
         }
         else if (key == "override_color_threshold") {
             tracking_settings_.override_color_threshold = std::stof(value);
-            std::cout << "[SimpleBallTracker] Updated override_color_threshold to " << value << std::endl;
             return true;
         }
         else if (key == "override_require_ball_class") {
             tracking_settings_.override_require_ball_class = (value == "true" || value == "1");
-            std::cout << "[SimpleBallTracker] Updated override_require_ball_class to " << value << std::endl;
             return true;
         }
     } catch (const std::exception& e) {
-        std::cerr << "[SimpleBallTracker] Error parsing setting " << key << "=" << value << ": " << e.what() << std::endl;
         return false;
     }
     
@@ -1096,10 +1056,6 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                                      << estimated_velocity.y << ", "
                                      << estimated_velocity.z << ") m/s" << std::endl;
                         });
-                        std::cout << "[SimpleBallTracker] Throw velocity: ("
-                                 << estimated_velocity.x << ", "
-                                 << estimated_velocity.y << ", "
-                                 << estimated_velocity.z << ") m/s" << std::endl;
                     } else {
                         DEBUG_LOG(debug_log, {
                             OPEN_DEBUG_LOG(debug_log);
@@ -1120,9 +1076,6 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                     });
                     
                     // Log to both console and debug log file
-                    std::cout << "[SimpleBallTracker] THROW detected: Ball " << ball.id
-                             << " from hand " << ball.held_by_hand_id << std::endl;
-                    
                     DEBUG_LOG_WRITE({
                         OPEN_DEBUG_LOG(throw_log);
                         throw_log << "\n[THROW] Ball " << ball.id
@@ -1161,9 +1114,6 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                     });
                     
                     // Log to both console and debug log file
-                    std::cout << "[SimpleBallTracker] CATCH detected: Ball " << ball.id
-                             << " by hand " << ball.held_by_hand_id << std::endl;
-                    
                     DEBUG_LOG_WRITE({
                         OPEN_DEBUG_LOG(catch_log);
                         catch_log << "\n[CATCH] Ball " << ball.id
@@ -1556,15 +1506,12 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         }
         
         if (!profile) {
-            std::cout << "[SimpleBallTracker] WARNING: No enabled profile found for ball '" << ball.color_name << "'" << std::endl;
             continue;
         }
         
         // CRITICAL: Only process balls with calibrated colors
         // If not calibrated, skip this ball entirely (no legacy matching)
         if (profile->avg_hue < 0.0f || profile->avg_saturation < 0.0f) {
-            std::cout << "[SimpleBallTracker] WARNING: Ball '" << ball.color_name
-                     << "' not calibrated (no avg_hue/avg_saturation) - skipping" << std::endl;
             ball.has_yolo_detection = false;
             ball.frames_without_yolo++;
             continue;
@@ -2032,11 +1979,6 @@ bool SimpleBallTracker::calibrateColor(const std::string& color_name,
             );
             
             saveSettings();
-            
-            std::cout << "[SimpleBallTracker] Calibrated color '" << color_name << "'" << std::endl;
-            std::cout << "  Average Hue: " << avg_hue << std::endl;
-            std::cout << "  Average Saturation: " << avg_sat << std::endl;
-            std::cout << "  Legacy H range: [" << profile.min_hsv[0] << ", " << profile.max_hsv[0] << "]" << std::endl;
             
             return true;
         }

@@ -461,6 +461,27 @@ if PYQT_AVAILABLE:
             row += 1
             
             # Separator
+            layout.addWidget(QLabel("Tracker Distance Limits:"), row, 0, 1, 3)
+            row += 1
+            
+            # Max tracker distance per frame
+            self.tc_max_tracker_distance_slider, self.tc_max_tracker_distance_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Max Tracker Distance (cm)",
+                tooltip_text="Maximum distance a ball tracker can move between frames.\n"
+                             "Range: 10-200cm. Default: 50cm.\n"
+                             "Prevents trackers from flickering to far away balls.\n"
+                             "Lower = stricter tracking, Higher = allows faster movement.",
+                range_min=10,
+                range_max=200,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('max_tracker_distance_per_frame', v / 100.0),  # Convert cm to m
+                is_float=False  # Display as integer cm
+            )
+            row += 1
+            
+            # Separator
             layout.addWidget(QLabel("Sound Effects:"), row, 0, 1, 3)
             row += 1
             
@@ -1321,6 +1342,7 @@ if PYQT_AVAILABLE:
                 'tc_wrist_proximity_weight_slider',
                 # Distance and state sliders
                 'tc_wrist_proximity_slider', 'tc_undetected_near_hand_slider', 'tc_min_frames_slider',
+                'tc_max_tracker_distance_slider',
                 # Throw/catch sound toggles
                 'tc_sound_on_catch_toggle', 'tc_sound_on_throw_toggle'
             ]
@@ -1348,6 +1370,7 @@ if PYQT_AVAILABLE:
                 'wrist_proximity_threshold': self.tc_wrist_proximity_slider.value() / 100.0,  # cm to m
                 'undetected_near_hand_threshold': self.tc_undetected_near_hand_slider.value() / 100.0,  # cm to m
                 'min_frames_for_state_change': self.tc_min_frames_slider.value(),
+                'max_tracker_distance_per_frame': self.tc_max_tracker_distance_slider.value() / 100.0,  # cm to m
                 'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked(),
                 'tc_sound_on_throw': self.tc_sound_on_throw_toggle.isChecked(),
                 'tc_name_on_catch': self.tc_name_on_catch_toggle.isChecked(),
@@ -1461,6 +1484,9 @@ if PYQT_AVAILABLE:
             
             if 'min_frames_for_state_change' in settings:
                 self.tc_min_frames_slider.setValue(settings['min_frames_for_state_change'])
+            
+            if 'max_tracker_distance_per_frame' in settings:
+                self.tc_max_tracker_distance_slider.setValue(int(settings['max_tracker_distance_per_frame'] * 100))  # m to cm
             
             if 'tc_sound_on_catch' in settings:
                 self.tc_sound_on_catch_toggle.setChecked(settings['tc_sound_on_catch'])
@@ -1652,6 +1678,9 @@ if PYQT_AVAILABLE:
             
             if 'min_frames_for_state_change' in settings:
                 self.udp_client.send_setting('min_frames_for_state_change', settings['min_frames_for_state_change'])
+            
+            if 'max_tracker_distance_per_frame' in settings:
+                self.udp_client.send_setting('max_tracker_distance_per_frame', settings['max_tracker_distance_per_frame'])
             
             if 'tc_sound_on_catch' in settings:
                 self.udp_client.send_setting('tc_sound_on_catch', 1 if settings['tc_sound_on_catch'] else 0)

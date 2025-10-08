@@ -315,6 +315,10 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.override_require_ball_class = (value == "true" || value == "1");
             return true;
         }
+        else if (key == "max_tracker_distance_per_frame") {
+            tracking_settings_.max_tracker_distance_per_frame = std::stof(value);
+            return true;
+        }
     } catch (const std::exception& e) {
         return false;
     }
@@ -1493,6 +1497,25 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                      << (det.world_pos.z < MIN_DEPTH ? MIN_DEPTH : MAX_DEPTH) << "m" << std::endl;
                     });
                     continue;
+                }
+                
+                // CRITICAL: Check if detection is within max distance from ball's previous position
+                // This prevents trackers from flickering to far away balls
+                if (ball.has_yolo_detection && ball.frames_without_yolo == 0) {
+                    float dx = det.world_pos.x - ball.position.x;
+                    float dy = det.world_pos.y - ball.position.y;
+                    float dz = det.world_pos.z - ball.position.z;
+                    float distance_from_previous = std::sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    if (distance_from_previous > tracking_settings_.max_tracker_distance_per_frame) {
+                        DEBUG_LOG(euclidean_log, {
+                            OPEN_DEBUG_LOG(euclidean_log);
+                            euclidean_log << "  Det#" << det.index << " REJECTED: Distance " << distance_from_previous
+                                         << "m from previous position exceeds max_tracker_distance_per_frame="
+                                         << tracking_settings_.max_tracker_distance_per_frame << "m" << std::endl;
+                        });
+                        continue;
+                    }
                 }
                 
                 // Sample 5x5 pixels from detection center

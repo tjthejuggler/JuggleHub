@@ -170,6 +170,9 @@ struct TrackingSettings {
     float override_color_threshold = 0.8f;       // Minimum color match score for override
     bool override_require_ball_class = true;     // Only override if ML class is 'ball' (not 'ball_held')
     
+    // Maximum distance a ball tracker can move between frames (prevents flickering to far away balls)
+    float max_tracker_distance_per_frame = 0.50f;  // 50cm - maximum distance ball can move in one frame
+    
     TrackingSettings() = default;
 };
 

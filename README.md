@@ -2,9 +2,20 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-08 03:21 CEST
+**Last Updated:** 2025-10-08 16:47 CEST
 
 **Recent Changes (2025-10-08):**
+- **🎯 CATCH INFERENCE DETECTION**
+  - **New Feature**: Automatic catch detection when ball vanishes from YOLO with hand nearby
+  - **Smart Inference**: If ball disappears from YOLO detection and a hand is within 25cm, system infers a catch
+  - **Physics-Based Logic**: Balls can't just vanish - if YOLO loses sight with hand nearby, it's likely caught
+  - **Immediate Response**: Detection happens on first frame of disappearance (frames_without_yolo == 1)
+  - **Hand Association**: Ball is immediately associated with the nearest hand
+  - **Tracking Continuity**: Ball position snaps to hand location, maintaining tracking through occlusion
+  - **Use Case**: Handles fast catches where ball is briefly hidden by hand before YOLO can detect it as held
+  - See [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:1883-1927) for implementation
+
+**Previous Changes (2025-10-08):**
 - **🎮 GAMEMODE INTEGRATION FOR BETTER FPS**
   - **Performance Gain**: Automatic GameMode integration for improved FPS performance
   - **Smart Detection**: Script automatically detects if GameMode is installed

@@ -1880,6 +1880,55 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 ball.tracking_reason = "YOLO rejected: " + last_rejection_reason_;
             }
             
+            // CATCH DETECTION: If ball just vanished from YOLO (frames_without_yolo == 1)
+            // and a hand is nearby, infer that the ball was caught
+            if (ball.frames_without_yolo == 1 && !ball.is_held) {
+                // Check if any hand is near the ball's last known position
+                float min_hand_dist = std::numeric_limits<float>::max();
+                int closest_hand_id = -1;
+                cv::Point3f closest_hand_pos(0, 0, 0);
+                
+                for (const auto& hand : hands) {
+                    if (!hand.is_visible) continue;
+                    float dist = cv::norm(ball.position - hand.wrist_pos_3d);
+                    if (dist < min_hand_dist) {
+                        min_hand_dist = dist;
+                        closest_hand_id = hand.id;
+                        closest_hand_pos = hand.wrist_pos_3d;
+                    }
+                }
+                
+                // If a hand is within catch distance when ball vanishes, infer catch
+                const float CATCH_INFERENCE_DISTANCE = 0.25f;  // 25cm - generous for catch detection
+                if (min_hand_dist < CATCH_INFERENCE_DISTANCE) {
+                    DEBUG_LOG(catch_inference_log, {
+                        OPEN_DEBUG_LOG(catch_inference_log);
+                        catch_inference_log << "\n[CATCH_INFERENCE] Ball " << ball.id
+                                           << " vanished from YOLO with hand " << closest_hand_id
+                                           << " (" << (closest_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                                           << " at distance " << min_hand_dist << "m"
+                                           << " - INFERRING CATCH" << std::endl;
+                    });
+                    
+                    // Mark ball as held by this hand
+                    ball.held_by_hand_id = closest_hand_id;
+                    ball.yolo_class_id = 1;  // Mark as held
+                    ball.position = closest_hand_pos;
+                    ball.pixel_pos = project_3d_to_2d(closest_hand_pos, intrinsics);
+                    
+                    char reason[128];
+                    snprintf(reason, sizeof(reason), "CATCH_INFERRED@Hand[%c] d=%.2fm",
+                             closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
+                    ball.tracking_reason = reason;
+                    
+                    // Update color predictor with hand position
+                    ball.color_predictor.addDetection(ball.position);
+                    
+                    // Continue to next ball - skip normal fallback logic
+                    continue;
+                }
+            }
+            
             // If we have a valid Kalman prediction, try fallback strategies
             if (has_prediction && ball.frames_without_yolo < 5) {
                 // Check if Kalman prediction is near any hand

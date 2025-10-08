@@ -319,13 +319,23 @@ fi
 
 # No longer need to change directories. Execute from project root.
 set -m
+
+# Check if gamemode is available
+GAMEMODE_CMD=""
+if command -v gamemoderun &> /dev/null; then
+    GAMEMODE_CMD="gamemoderun"
+    echo -e "${GREEN}🎮 GameMode detected - will use for better FPS performance${NC}"
+else
+    echo -e "${YELLOW}⚠️ GameMode not found - install with 'sudo apt install gamemode' for better FPS${NC}"
+fi
+
 # Redirect engine output based on --engine-log flag
 if [ "$ENGINE_LOG" = true ]; then
     echo -e "${YELLOW}📝 Engine logging enabled - output will be written to engine.log and engine_debug.log${NC}"
-    "$ENGINE_EXECUTABLE" "${ENGINE_ARGS[@]}" > "$PROJECT_ROOT/engine.log" 2>&1 &
+    $GAMEMODE_CMD "$ENGINE_EXECUTABLE" "${ENGINE_ARGS[@]}" > "$PROJECT_ROOT/engine.log" 2>&1 &
 else
     # Discard engine output by default
-    "$ENGINE_EXECUTABLE" "${ENGINE_ARGS[@]}" > /dev/null 2>&1 &
+    $GAMEMODE_CMD "$ENGINE_EXECUTABLE" "${ENGINE_ARGS[@]}" > /dev/null 2>&1 &
 fi
 ENGINE_PID=$!
 set +m

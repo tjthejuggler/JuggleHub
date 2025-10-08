@@ -450,10 +450,10 @@ if PYQT_AVAILABLE:
                 row=row,
                 label_text="State Change Frames",
                 tooltip_text="Number of consecutive frames required to confirm state change (held/in-air).\n"
-                             "Range: 1-10 frames. Default: 3.\n"
+                             "Range: 1-50 frames. Default: 3.\n"
                              "Higher values = more stable detection, slower response.",
                 range_min=1,
-                range_max=10,
+                range_max=50,
                 initial_value=3,
                 update_func=lambda v: self.update_setting('min_frames_for_state_change', v),
                 is_float=False

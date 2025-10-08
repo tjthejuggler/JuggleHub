@@ -220,23 +220,23 @@ private:
                                              const cv::Mat& depth_frame,
                                              const CameraIntrinsics& intrinsics);
     
-    // Color matching
-    float matchColor(const Detection& det, const ColorProfile& profile, const cv::Mat& hsv_frame);
+    // Color matching (OPTIMIZED: now takes color_frame and converts only ROIs to HSV)
+    float matchColor(const Detection& det, const ColorProfile& profile, const cv::Mat& color_frame);
     const Detection* findBestColorMatch(const std::vector<Detection>& detections,
                                        const ColorProfile& profile,
-                                       const cv::Mat& hsv_frame,
+                                       const cv::Mat& color_frame,
                                        const std::set<int>& used_indices,
                                        const cv::Point3f& kalman_prediction = cv::Point3f(0, 0, 0));
     
     // State detection
     bool isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands);
-    std::vector<BallEvent> detectStatesAndEvents(std::vector<SimpleBall>& balls, 
+    std::vector<BallEvent> detectStatesAndEvents(std::vector<SimpleBall>& balls,
                                                  const std::vector<SimpleHand>& hands);
     
-    // Fallback tracking
-    cv::Point2f searchForColorBlob(const cv::Mat& hsv_frame, 
+    // Fallback tracking (OPTIMIZED: now takes color_frame and converts only ROI to HSV)
+    cv::Point2f searchForColorBlob(const cv::Mat& color_frame,
                                    const ColorProfile& profile,
-                                   const cv::Point2f& search_center, 
+                                   const cv::Point2f& search_center,
                                    int radius);
     
     // Utility

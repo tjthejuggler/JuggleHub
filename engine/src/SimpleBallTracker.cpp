@@ -2044,13 +2044,21 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                      closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
                         ball.tracking_reason = reason;
                         
-                        // CRITICAL: DO NOT update Kalman with hand snap positions!
-                        // Only add to color predictor
-                        ball.color_predictor.addDetection(ball.position);
+                        // CRITICAL FIX: Reset Kalman velocity when snapping to prevent velocity corruption
+                        // Snapping creates teleportation, not real motion - velocity should be zero
+                        auto& state = ball.kalman.get_state();
+                        state(3) = 0.0f;  // vx = 0
+                        state(4) = 0.0f;  // vy = 0
+                        state(5) = 0.0f;  // vz = 0
+                        
+                        // CRITICAL FIX: DO NOT add snapped positions to color predictor!
+                        // Snapping creates teleportation, not real motion
+                        // This corrupts velocity estimates used for predictions
+                        // ball.color_predictor.addDetection(ball.position);  // REMOVED
                         
                         DEBUG_LOG(fallback_log, {
                             OPEN_DEBUG_LOG(fallback_log);
-                            fallback_log << "  -> Snapped to wrist (last resort)" << std::endl;
+                            fallback_log << "  -> Snapped to wrist (last resort) - velocity reset to zero" << std::endl;
                         });
                         continue;
                     }
@@ -2238,20 +2246,41 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                 }
                             }
                             
-                            // PRIORITY 2: No color blob found - snap to wrist (ALWAYS show tracker when held)
-                            ball.position = hand.wrist_pos_3d;
-                            ball.pixel_pos = hand_2d;
-                            ball.tracking_reason = "Held_Snap@Wrist";
-                            
-                            // Update color predictor with hand position
-                            ball.color_predictor.addDetection(ball.position);
-                            
-                            DEBUG_LOG(held_snap_log, {
-                                OPEN_DEBUG_LOG(held_snap_log);
-                                held_snap_log << "\n[HELD_SNAP] Ball " << ball.id << " snapped to wrist of hand " << hand.id
-                                             << " at (" << ball.position.x << ", " << ball.position.y << ", "
-                                             << ball.position.z << ")" << std::endl;
-                            });
+                            // PRIORITY 2: No color blob found - snap to wrist ONLY if no good YOLO detection exists
+                            // CRITICAL FIX: Don't override valid YOLO detections during hand-to-hand throws!
+                            // Only snap to wrist when ball is truly occluded (no YOLO detection)
+                            if (!ball.has_yolo_detection || ball.yolo_confidence < 0.5f) {
+                                ball.position = hand.wrist_pos_3d;
+                                ball.pixel_pos = hand_2d;
+                                ball.tracking_reason = "Held_Snap@Wrist";
+                                
+                                // CRITICAL FIX: Reset Kalman velocity when snapping to prevent velocity corruption
+                                // Snapping creates teleportation, not real motion - velocity should be zero
+                                auto& state = ball.kalman.get_state();
+                                state(3) = 0.0f;  // vx = 0
+                                state(4) = 0.0f;  // vy = 0
+                                state(5) = 0.0f;  // vz = 0
+                                
+                                // CRITICAL FIX: DO NOT add snapped positions to color predictor!
+                                // Snapping creates teleportation, not real motion
+                                // This corrupts velocity estimates used for predictions
+                                // ball.color_predictor.addDetection(ball.position);  // REMOVED
+                                
+                                DEBUG_LOG(held_snap_log, {
+                                    OPEN_DEBUG_LOG(held_snap_log);
+                                    held_snap_log << "\n[HELD_SNAP] Ball " << ball.id << " snapped to wrist of hand " << hand.id
+                                                 << " at (" << ball.position.x << ", " << ball.position.y << ", "
+                                                 << ball.position.z << ") - velocity reset to zero" << std::endl;
+                                });
+                            } else {
+                                DEBUG_LOG(held_snap_reject_log, {
+                                    OPEN_DEBUG_LOG(held_snap_reject_log);
+                                    held_snap_reject_log << "\n[HELD_SNAP_REJECT] Ball " << ball.id
+                                                        << " NOT snapped to wrist - YOLO has good detection"
+                                                        << " | yolo_conf=" << ball.yolo_confidence
+                                                        << " | Trusting YOLO position instead" << std::endl;
+                                });
+                            }
                         } else {
                             // Hand is off-screen - mark ball as off-screen too
                             ball.position = cv::Point3f(0, 0, 0);

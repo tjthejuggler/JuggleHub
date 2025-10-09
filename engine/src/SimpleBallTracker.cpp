@@ -348,6 +348,14 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.spatial_threshold = std::stof(value);
             return true;
         }
+        else if (key == "kalman_prediction_bonus") {
+            tracking_settings_.kalman_prediction_bonus = std::stof(value);
+            return true;
+        }
+        else if (key == "kalman_prediction_threshold") {
+            tracking_settings_.kalman_prediction_threshold = std::stof(value);
+            return true;
+        }
         // Override detection thresholds
         else if (key == "override_min_confidence_tracked") {
             tracking_settings_.override_min_confidence_tracked = std::stof(value);
@@ -1418,20 +1426,59 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         const float TEMPORAL_CONSISTENCY_BONUS = tracking_settings_.temporal_consistency_bonus;
         const float SPATIAL_THRESHOLD = tracking_settings_.spatial_threshold;
         
+        // NEW: KALMAN PREDICTION BONUS - Give HUGE bonus to detections near Kalman prediction
+        // This is the PRIMARY signal for where the ball should be when YOLO fails temporarily
+        const float KALMAN_PREDICTION_BONUS = tracking_settings_.kalman_prediction_bonus;
+        const float KALMAN_PREDICTION_THRESHOLD = tracking_settings_.kalman_prediction_threshold;
+        
         DEBUG_LOG(euclidean_log, {
             OPEN_DEBUG_LOG(euclidean_log);
-            euclidean_log << "\nApplying temporal consistency bonus (bonus=" << TEMPORAL_CONSISTENCY_BONUS
-                         << ", spatial_threshold=" << SPATIAL_THRESHOLD << "m):" << std::endl;
+            euclidean_log << "\nApplying bonuses:" << std::endl;
+            euclidean_log << "  Temporal consistency bonus=" << TEMPORAL_CONSISTENCY_BONUS
+                         << ", spatial_threshold=" << SPATIAL_THRESHOLD << "m" << std::endl;
+            euclidean_log << "  Kalman prediction bonus=" << KALMAN_PREDICTION_BONUS
+                         << ", kalman_threshold=" << KALMAN_PREDICTION_THRESHOLD << "m" << std::endl;
         });
+        
         for (auto& match : matches) {
             auto& ball = balls_[match.ball_idx];
+            const auto& det = yolo_detections[match.det_idx];
+            float original_dist = match.euclidean_distance;
             
-            // Check if this ball had a YOLO detection in the previous frame
-            // and if the detection index is still valid
-            if (ball.has_yolo_detection && ball.frames_without_yolo == 0) {
-                // Ball had a detection last frame - check if this detection is close to the previous position
-                const auto& det = yolo_detections[match.det_idx];
+            // PRIORITY 1: KALMAN PREDICTION BONUS (strongest signal)
+            // If ball has valid Kalman prediction and detection is near it, apply huge bonus
+            if (ball.kalman.get_state()(2) > 0.01f) {  // Kalman is initialized
+                auto kalman_state = ball.kalman.get_state();
+                cv::Point3f kalman_pred(kalman_state(0), kalman_state(1), kalman_state(2));
                 
+                // Calculate distance from detection to Kalman prediction
+                float dx = det.world_pos.x - kalman_pred.x;
+                float dy = det.world_pos.y - kalman_pred.y;
+                float dz = det.world_pos.z - kalman_pred.z;
+                float kalman_dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+                
+                if (kalman_dist < KALMAN_PREDICTION_THRESHOLD) {
+                    // Apply scaled bonus: closer to prediction = stronger bonus
+                    float proximity_factor = 1.0f - (kalman_dist / KALMAN_PREDICTION_THRESHOLD);
+                    float scaled_bonus = KALMAN_PREDICTION_BONUS * proximity_factor;
+                    match.euclidean_distance -= scaled_bonus;
+                    
+                    DEBUG_LOG(euclidean_log, {
+                        OPEN_DEBUG_LOG(euclidean_log);
+                        euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color
+                                     << ") <-> Det[" << match.det_idx << "]: KALMAN BONUS"
+                                     << " | kalman_dist=" << kalman_dist << "m"
+                                     << ", proximity_factor=" << proximity_factor
+                                     << ", bonus=" << scaled_bonus
+                                     << " | " << original_dist << " -> " << match.euclidean_distance << std::endl;
+                    });
+                    original_dist = match.euclidean_distance;  // Update for next bonus
+                }
+            }
+            
+            // PRIORITY 2: Temporal consistency bonus (prevents identity swaps)
+            // Check if this ball had a YOLO detection in the previous frame
+            if (ball.has_yolo_detection && ball.frames_without_yolo == 0) {
                 // Calculate 3D distance from current detection to ball's previous position
                 float dx = det.world_pos.x - ball.position.x;
                 float dy = det.world_pos.y - ball.position.y;
@@ -1439,18 +1486,17 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 float spatial_dist = std::sqrt(dx*dx + dy*dy + dz*dz);
                 
                 // If detection is close to where the ball was, apply bonus
-                // Use larger threshold to handle fast-moving balls during juggling
                 if (spatial_dist < SPATIAL_THRESHOLD) {
-                    float original_dist = match.euclidean_distance;
-                    // Scale bonus based on proximity: closer = stronger bonus
                     float proximity_factor = 1.0f - (spatial_dist / SPATIAL_THRESHOLD);
                     float scaled_bonus = TEMPORAL_CONSISTENCY_BONUS * proximity_factor;
                     match.euclidean_distance -= scaled_bonus;
+                    
                     DEBUG_LOG(euclidean_log, {
                         OPEN_DEBUG_LOG(euclidean_log);
                         euclidean_log << "  Ball[" << match.ball_idx << "](" << match.ball_color
-                                     << ") <-> Det[" << match.det_idx << "]: spatial_dist=" << spatial_dist
-                                     << "m, proximity_factor=" << proximity_factor
+                                     << ") <-> Det[" << match.det_idx << "]: TEMPORAL BONUS"
+                                     << " | spatial_dist=" << spatial_dist << "m"
+                                     << ", proximity_factor=" << proximity_factor
                                      << ", bonus=" << scaled_bonus
                                      << " | " << original_dist << " -> " << match.euclidean_distance << std::endl;
                     });
@@ -1526,9 +1572,34 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             snprintf(reason, sizeof(reason), "Euclidean dist=%.3f", match.euclidean_distance);
             ball.tracking_reason = reason;
             
-            // Update Kalman
-            ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                ball.position.x, ball.position.y, ball.position.z));
+            // CRITICAL: Validate detection before updating Kalman to prevent corruption
+            bool should_update_kalman = true;
+            
+            // Check for suspicious depth jumps (likely sensor errors)
+            if (ball.kalman.get_state()(2) > 0.01f) {  // Kalman is initialized
+                float prev_depth = ball.kalman.get_state()(2);
+                float depth_change = std::abs(det.world_pos.z - prev_depth);
+                const float MAX_DEPTH_JUMP = 0.30f;  // 30cm max depth change per frame
+                
+                if (depth_change > MAX_DEPTH_JUMP) {
+                    should_update_kalman = false;
+                    DEBUG_LOG(depth_jump_reject_log, {
+                        OPEN_DEBUG_LOG(depth_jump_reject_log);
+                        depth_jump_reject_log << "\n[DEPTH_JUMP_REJECT] Ball " << ball.id
+                                             << " | Detection rejected for Kalman update"
+                                             << " | depth_change=" << depth_change << "m"
+                                             << " | prev_depth=" << prev_depth << "m"
+                                             << " | new_depth=" << det.world_pos.z << "m"
+                                             << " | Exceeds MAX_DEPTH_JUMP=" << MAX_DEPTH_JUMP << "m" << std::endl;
+                    });
+                }
+            }
+            
+            // Update Kalman only if detection passes validation
+            if (should_update_kalman) {
+                ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                    ball.position.x, ball.position.y, ball.position.z));
+            }
             ball.color_predictor.addDetection(ball.position);
             
             DEBUG_LOG(euclidean_log, {
@@ -1665,9 +1736,34 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                      best_det->confidence, ball.color_match_score);
             ball.tracking_reason = reason;
             
-            // Update Kalman
-            ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                ball.position.x, ball.position.y, ball.position.z));
+            // CRITICAL: Validate detection before updating Kalman to prevent corruption
+            bool should_update_kalman = true;
+            
+            // Check for suspicious depth jumps (likely sensor errors)
+            if (ball.kalman.get_state()(2) > 0.01f) {  // Kalman is initialized
+                float prev_depth = ball.kalman.get_state()(2);
+                float depth_change = std::abs(best_det->world_pos.z - prev_depth);
+                const float MAX_DEPTH_JUMP = 0.30f;  // 30cm max depth change per frame
+                
+                if (depth_change > MAX_DEPTH_JUMP) {
+                    should_update_kalman = false;
+                    DEBUG_LOG(depth_jump_reject_log, {
+                        OPEN_DEBUG_LOG(depth_jump_reject_log);
+                        depth_jump_reject_log << "\n[DEPTH_JUMP_REJECT_OVERRIDE] Ball " << ball.id
+                                             << " | Override detection rejected for Kalman update"
+                                             << " | depth_change=" << depth_change << "m"
+                                             << " | prev_depth=" << prev_depth << "m"
+                                             << " | new_depth=" << best_det->world_pos.z << "m"
+                                             << " | Exceeds MAX_DEPTH_JUMP=" << MAX_DEPTH_JUMP << "m" << std::endl;
+                    });
+                }
+            }
+            
+            // Update Kalman only if detection passes validation
+            if (should_update_kalman) {
+                ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                    ball.position.x, ball.position.y, ball.position.z));
+            }
             ball.color_predictor.addDetection(ball.position);
             
             // Mark detection as used
@@ -1710,6 +1806,32 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         if (ball.kalman.get_state()(2) > 0.01f) {  // Only if Kalman has been initialized (z > 0)
             // SAVE the current Kalman state before prediction
             auto saved_state = ball.kalman.get_state();
+            
+            // CRITICAL: Clamp velocity to realistic juggling speeds before prediction
+            // This prevents corrupted Kalman states from causing wild predictions
+            const float MAX_VELOCITY = 8.0f;  // 8 m/s max velocity (realistic for juggling)
+            float vx = saved_state(3);
+            float vy = saved_state(4);
+            float vz = saved_state(5);
+            float velocity_mag = std::sqrt(vx*vx + vy*vy + vz*vz);
+            
+            if (velocity_mag > MAX_VELOCITY) {
+                // Scale velocity down to max
+                float scale = MAX_VELOCITY / velocity_mag;
+                saved_state(3) = vx * scale;
+                saved_state(4) = vy * scale;
+                saved_state(5) = vz * scale;
+                ball.kalman.get_state() = saved_state;
+                
+                DEBUG_LOG(velocity_clamp_log, {
+                    OPEN_DEBUG_LOG(velocity_clamp_log);
+                    velocity_clamp_log << "\n[VELOCITY_CLAMP] Ball " << ball.id
+                                      << " | Velocity clamped from " << velocity_mag << " m/s"
+                                      << " to " << MAX_VELOCITY << " m/s"
+                                      << " | Original: (" << vx << ", " << vy << ", " << vz << ")"
+                                      << " | Clamped: (" << saved_state(3) << ", " << saved_state(4) << ", " << saved_state(5) << ")" << std::endl;
+                });
+            }
             
             // Temporarily predict to see where Kalman thinks the ball should be
             ball.kalman.predict(dt);
@@ -1836,9 +1958,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 }
             }
             
-            // CATCH DETECTION: If ball just vanished from YOLO (frames_without_yolo == 1)
+            // CATCH DETECTION: If ball recently vanished from YOLO (frames_without_yolo <= 3)
             // and a hand is nearby OR a hand swiped through the ball's position, infer catch
-            if (ball.frames_without_yolo == 1 && !ball.is_held) {
+            // Extended window catches balls that were lost for a few frames before snapping to hand
+            if (ball.frames_without_yolo >= 1 && ball.frames_without_yolo <= 3 && !ball.is_held) {
                 // Check if any hand is near the ball's last known position
                 float min_hand_dist = std::numeric_limits<float>::max();
                 int closest_hand_id = -1;
@@ -2034,9 +2157,30 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                          closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
                                 ball.tracking_reason = reason;
                                 
-                                // Update Kalman with color detection
-                                ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                                    color_pos.x, color_pos.y, color_pos.z));
+                                // CRITICAL: Validate detection before updating Kalman
+                                bool should_update_kalman = true;
+                                
+                                if (ball.kalman.get_state()(2) > 0.01f) {
+                                    float prev_depth = ball.kalman.get_state()(2);
+                                    float depth_change = std::abs(color_pos.z - prev_depth);
+                                    const float MAX_DEPTH_JUMP = 0.30f;
+                                    
+                                    if (depth_change > MAX_DEPTH_JUMP) {
+                                        should_update_kalman = false;
+                                        DEBUG_LOG(depth_jump_reject_log, {
+                                            OPEN_DEBUG_LOG(depth_jump_reject_log);
+                                            depth_jump_reject_log << "\n[DEPTH_JUMP_REJECT_COLOR] Ball " << ball.id
+                                                                 << " | Color blob rejected for Kalman update"
+                                                                 << " | depth_change=" << depth_change << "m" << std::endl;
+                                        });
+                                    }
+                                }
+                                
+                                // Update Kalman only if detection passes validation
+                                if (should_update_kalman) {
+                                    ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                                        color_pos.x, color_pos.y, color_pos.z));
+                                }
                                 ball.color_predictor.addDetection(color_pos);
                                 
                                 DEBUG_LOG(fallback_log, {
@@ -2095,6 +2239,34 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         ball.pixel_pos = hand_pixel;
                         ball.held_by_hand_id = closest_hand_id;
                         ball.yolo_class_id = 1;  // Mark as held
+                        
+                        // CRITICAL FIX: Immediately set is_held state when snapping to hand
+                        // This bypasses debouncing and ensures catch is detected immediately
+                        bool was_not_held = !ball.is_held;
+                        if (was_not_held) {
+                            ball.is_held = true;
+                            ball.state_change_counter = 0;  // Reset debouncing counter
+                            ball.previous_held_by_hand_id = closest_hand_id;
+                            
+                            // CRITICAL: Generate CATCH event immediately when snapping to hand
+                            // This ensures catches are never missed when ball snaps to wrist
+                            std::vector<BallEvent> snap_events;
+                            snap_events.push_back({
+                                BallEvent::CATCH,
+                                ball.id,
+                                closest_hand_id,
+                                getCurrentTimestamp()
+                            });
+                            
+                            DEBUG_LOG(snap_catch_log, {
+                                OPEN_DEBUG_LOG(snap_catch_log);
+                                snap_catch_log << "\n[SNAP_CATCH] Ball " << ball.id
+                                              << " snapped to hand " << closest_hand_id
+                                              << " (" << (closest_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                                              << " - IMMEDIATE state change to HELD + CATCH EVENT" << std::endl;
+                            });
+                        }
+                        
                         char reason[128];
                         snprintf(reason, sizeof(reason), "Snap→Hand[%c] d=%.2fm",
                                      closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
@@ -2162,9 +2334,30 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                         color_score, depth_diff);
                                 ball.tracking_reason = reason;
                                 
-                                // Update Kalman with color detection
-                                ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                                    color_pos.x, color_pos.y, color_pos.z));
+                                // CRITICAL: Validate detection before updating Kalman
+                                bool should_update_kalman_glob = true;
+                                
+                                if (ball.kalman.get_state()(2) > 0.01f) {
+                                    float prev_depth = ball.kalman.get_state()(2);
+                                    float depth_change = std::abs(color_pos.z - prev_depth);
+                                    const float MAX_DEPTH_JUMP = 0.30f;
+                                    
+                                    if (depth_change > MAX_DEPTH_JUMP) {
+                                        should_update_kalman_glob = false;
+                                        DEBUG_LOG(depth_jump_reject_log, {
+                                            OPEN_DEBUG_LOG(depth_jump_reject_log);
+                                            depth_jump_reject_log << "\n[DEPTH_JUMP_REJECT_KALMAN_GLOB] Ball " << ball.id
+                                                                 << " | Kalman glob rejected for Kalman update"
+                                                                 << " | depth_change=" << depth_change << "m" << std::endl;
+                                        });
+                                    }
+                                }
+                                
+                                // Update Kalman only if detection passes validation
+                                if (should_update_kalman_glob) {
+                                    ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                                        color_pos.x, color_pos.y, color_pos.z));
+                                }
                                 ball.color_predictor.addDetection(color_pos);
                                 ball.frames_without_yolo = 0;
                                 
@@ -2222,10 +2415,32 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 // The Kalman filter should only be updated with real measurements
                 // The prediction uncertainty (P matrix) naturally grows over time
                 
-                // CRITICAL FIX: DO add to color predictor to maintain history continuity
-                // The color predictor needs continuous position updates to maintain velocity estimates
-                // This allows the history to continue even when YOLO detections are missing
-                ball.color_predictor.addDetection(ball.position);
+                // CRITICAL FIX: Validate position before adding to color predictor
+                // Only add if position change is reasonable (not a teleportation)
+                if (ball.color_predictor.getHistorySize() > 0) {
+                    auto history = ball.color_predictor.getHistory();
+                    cv::Point3f last_pos = history.back().position;
+                    float dx = ball.position.x - last_pos.x;
+                    float dy = ball.position.y - last_pos.y;
+                    float dz = ball.position.z - last_pos.z;
+                    float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    // Only add if movement is reasonable (< 0.5m per frame)
+                    const float MAX_POSITION_JUMP = 0.5f;
+                    if (distance < MAX_POSITION_JUMP) {
+                        ball.color_predictor.addDetection(ball.position);
+                    } else {
+                        DEBUG_LOG(color_pred_reject_log, {
+                            OPEN_DEBUG_LOG(color_pred_reject_log);
+                            color_pred_reject_log << "\n[COLOR_PRED_REJECT] Ball " << ball.id
+                                                 << " | Position jump " << distance << "m rejected"
+                                                 << " | Exceeds MAX_POSITION_JUMP=" << MAX_POSITION_JUMP << "m" << std::endl;
+                        });
+                    }
+                } else {
+                    // First position, always add
+                    ball.color_predictor.addDetection(ball.position);
+                }
                 
                 // Update yolo_class_id based on proximity to hands
                 bool near_any_hand = false;
@@ -2323,8 +2538,19 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                                     color_score, dist_from_hand);
                                             ball.tracking_reason = reason;
                                             
-                                            // Update color predictor with color detection
-                                            ball.color_predictor.addDetection(color_pos);
+                                            // CRITICAL: Validate before adding to color predictor
+                                            if (ball.color_predictor.getHistorySize() > 0) {
+                                                auto history = ball.color_predictor.getHistory();
+                                                cv::Point3f last_pos = history.back().position;
+                                                float distance = cv::norm(color_pos - last_pos);
+                                                const float MAX_POSITION_JUMP = 0.5f;
+                                                
+                                                if (distance < MAX_POSITION_JUMP) {
+                                                    ball.color_predictor.addDetection(color_pos);
+                                                }
+                                            } else {
+                                                ball.color_predictor.addDetection(color_pos);
+                                            }
                                             
                                             DEBUG_LOG(held_color_log, {
                                                 OPEN_DEBUG_LOG(held_color_log);
@@ -2405,7 +2631,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                             ball.position = hand.wrist_pos_3d;
                             ball.pixel_pos = hand_2d;
                             ball.tracking_reason = "Held_NoProfile@Wrist";
-                            ball.color_predictor.addDetection(ball.position);
+                            // DO NOT add snapped positions to color predictor - causes corruption
                         } else {
                             ball.position = cv::Point3f(0, 0, 0);
                             ball.pixel_pos = cv::Point2f(-1, -1);

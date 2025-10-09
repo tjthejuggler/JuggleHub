@@ -158,6 +158,10 @@ struct TrackingSettings {
     float temporal_consistency_bonus = 0.25f;  // Bonus to reduce distance for detections near previous position (prevents identity swaps)
     float spatial_threshold = 0.40f;  // Maximum distance (m) to apply temporal consistency bonus
     
+    // Kalman prediction bonus - STRONGEST signal for tracker placement
+    float kalman_prediction_bonus = 0.50f;  // Huge bonus for detections near Kalman prediction (default: 0.50)
+    float kalman_prediction_threshold = 0.30f;  // Maximum distance (m) from Kalman prediction to apply bonus (default: 0.30m)
+    
     // Override detection thresholds - force tracker placement when conditions are met
     // These settings ensure trackers never disappear when high-confidence detections exist
     

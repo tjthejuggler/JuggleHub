@@ -816,6 +816,27 @@ if PYQT_AVAILABLE:
             )
             row += 1
             
+            # Color Sample Radius
+            self.ct_color_sample_radius_slider, self.ct_color_sample_radius_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Color Sample Radius (pixels)",
+                tooltip_text="Radius for color sampling from detection center in the euclidean color matching system.\n"
+                             "Range: 1-5 pixels. Default: 1 (3x3 sample).\n"
+                             "Radius of 1 = 3x3 pixel sample (9 pixels total)\n"
+                             "Radius of 2 = 5x5 pixel sample (25 pixels total)\n"
+                             "Radius of 3 = 7x7 pixel sample (49 pixels total)\n"
+                             "Lower values = faster processing and more precise color detection from exact center.\n"
+                             "Higher values = more robust to noise but slower and may include surrounding colors.\n"
+                             "⚠️ Increasing this will reduce FPS! Only increase if color detection is unreliable.",
+                range_min=1,
+                range_max=5,
+                initial_value=1,
+                update_func=lambda v: self.update_setting('color_sample_radius', v),
+                is_float=False
+            )
+            row += 1
+            
             # Add explanation
             explanation_label = QLabel(
                 "💡 <b>How it works:</b><br>"
@@ -1444,6 +1465,9 @@ if PYQT_AVAILABLE:
                 # Euclidean Matching Temporal Consistency
                 'temporal_consistency_bonus': self._safe_get_slider_value(self.ct_temporal_consistency_bonus_slider, 25) / 100.0 if hasattr(self, 'ct_temporal_consistency_bonus_slider') else 0.25,
                 'spatial_threshold': self._safe_get_slider_value(self.ct_spatial_threshold_slider, 40) / 100.0 if hasattr(self, 'ct_spatial_threshold_slider') else 0.40,
+                
+                # Color Sample Radius
+                'color_sample_radius': self._safe_get_slider_value(self.ct_color_sample_radius_slider, 1) if hasattr(self, 'ct_color_sample_radius_slider') else 1,
             }
             
             # Add ball profile settings
@@ -1609,6 +1633,10 @@ if PYQT_AVAILABLE:
             
             if 'spatial_threshold' in settings and hasattr(self, 'ct_spatial_threshold_slider'):
                 self.ct_spatial_threshold_slider.setValue(int(settings['spatial_threshold'] * 100))  # m to cm
+            
+            # Color Sample Radius
+            if 'color_sample_radius' in settings and hasattr(self, 'ct_color_sample_radius_slider'):
+                self.ct_color_sample_radius_slider.setValue(settings['color_sample_radius'])
             
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:
@@ -1781,6 +1809,10 @@ if PYQT_AVAILABLE:
             
             if 'spatial_threshold' in settings:
                 self.udp_client.send_setting('spatial_threshold', settings['spatial_threshold'])
+            
+            # Color Sample Radius
+            if 'color_sample_radius' in settings:
+                self.udp_client.send_setting('color_sample_radius', settings['color_sample_radius'])
             
             # Ball tracking enabled states
             if 'ball_tracking_enabled' in settings:

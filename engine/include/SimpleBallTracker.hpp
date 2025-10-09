@@ -159,6 +159,7 @@ struct TrackingSettings {
     float yolo_class_weight = 3.0f;        // Weight for YOLO class (ball vs ball_held)
     float color_match_weight = 1.0f;       // Weight for color matching score
     float kalman_proximity_weight = 0.0f;  // Weight for proximity to Kalman prediction (0=disabled)
+    int color_sample_radius = 1;           // Radius for color sampling from detection center (1=3x3, 2=5x5, etc.)
     
     // Minimum score threshold for using YOLO detection as color tracker
     // If best YOLO detection score is below this, use Kalman prediction instead

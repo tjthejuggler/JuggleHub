@@ -299,6 +299,10 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.kalman_proximity_weight = std::stof(value);
             return true;
         }
+        else if (key == "color_sample_radius") {
+            tracking_settings_.color_sample_radius = std::stoi(value);
+            return true;
+        }
         else if (key == "min_yolo_score_threshold") {
             tracking_settings_.min_yolo_score_threshold = std::stof(value);
             return true;
@@ -1528,7 +1532,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     }
                 }
                 
-                // Sample 5x5 pixels from detection center
+                // Sample 3x3 pixels from detection center
                 cv::Point2f center(det.box.x + det.box.width / 2.0f,
                                   det.box.y + det.box.height / 2.0f);
                 
@@ -1536,7 +1540,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     center.y < 0 || center.y >= color_frame.rows) continue;
                 
                 // OPTIMIZATION: Convert only small ROI for sampling
-                const int sample_radius = 2;  // 5x5
+                const int sample_radius = tracking_settings_.color_sample_radius;
                 int roi_x = std::max(0, static_cast<int>(center.x) - sample_radius);
                 int roi_y = std::max(0, static_cast<int>(center.y) - sample_radius);
                 int roi_width = std::min(color_frame.cols - roi_x, sample_radius * 2 + 1);

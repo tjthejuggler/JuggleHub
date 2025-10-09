@@ -250,8 +250,10 @@ private:
     // Model parameters
     int input_width_ = 640;
     int input_height_ = 640;
-    float confidence_threshold_ = 0.25f;
+    float ball_confidence_threshold_ = 0.25f;      // Confidence threshold for 'ball' class (class_id=0)
+    float ball_held_confidence_threshold_ = 0.25f; // Confidence threshold for 'ball_held' class (class_id=1)
     float nms_threshold_ = 0.5f;
+    bool show_raw_yolo_detections_ = false;        // Toggle for showing raw YOLO detections in visualization
     const int num_classes_ = 2;  // ball, ball_held
     
     // Parameters

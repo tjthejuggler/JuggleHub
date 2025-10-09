@@ -226,24 +226,53 @@ if PYQT_AVAILABLE:
             section = CollapsibleGroupBox("🎯 YOLO Tracker Settings", collapsed=False)
             dnn_layout = QGridLayout()
             section.get_content_layout().addLayout(dnn_layout)
-
-            self.confidence_slider, self.confidence_value_label = self._create_slider_widget(
+    
+            # Class-specific confidence thresholds
+            row = 0
+            
+            # Info label
+            info_label = QLabel("ℹ️ Set confidence thresholds per class type")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            info_label.setWordWrap(True)
+            dnn_layout.addWidget(info_label, row, 0, 1, 3)
+            row += 1
+            
+            # Ball (in-air) confidence threshold
+            self.ball_confidence_slider, self.ball_confidence_value_label = self._create_slider_widget(
                 parent_layout=dnn_layout,
-                row=0,
-                label_text="Confidence Threshold",
-                tooltip_text="Minimum confidence for an object to be detected by YOLO.\n"
+                row=row,
+                label_text="'Ball' Confidence",
+                tooltip_text="Minimum confidence for 'ball' (in-air) detections.\n"
                              "Range: 0.00 to 1.00. Default: 0.25.\n"
-                             "Lower values detect more objects but increase false positives.",
+                             "Lower values detect more balls but increase false positives.",
                 range_min=0,
                 range_max=100,
                 initial_value=25,
-                update_func=lambda v: self.update_setting('confidence_threshold', v / 100.0),
+                update_func=lambda v: self.update_setting('ball_confidence_threshold', v / 100.0),
                 is_float=True
             )
-
+            row += 1
+            
+            # Ball_held confidence threshold
+            self.ball_held_confidence_slider, self.ball_held_confidence_value_label = self._create_slider_widget(
+                parent_layout=dnn_layout,
+                row=row,
+                label_text="'Ball Held' Confidence",
+                tooltip_text="Minimum confidence for 'ball_held' detections.\n"
+                             "Range: 0.00 to 1.00. Default: 0.25.\n"
+                             "Lower values detect more held balls but increase false positives.",
+                range_min=0,
+                range_max=100,
+                initial_value=25,
+                update_func=lambda v: self.update_setting('ball_held_confidence_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+    
+            # NMS threshold (applies to all classes)
             self.nms_slider, self.nms_value_label = self._create_slider_widget(
                 parent_layout=dnn_layout,
-                row=1,
+                row=row,
                 label_text="NMS Threshold",
                 tooltip_text="Non-Maximum Suppression threshold for merging overlapping boxes.\n"
                              "Range: 0.00 to 1.00. Default: 0.50.\n"
@@ -254,6 +283,21 @@ if PYQT_AVAILABLE:
                 update_func=lambda v: self.update_setting('nms_threshold', v / 100.0),
                 is_float=True
             )
+            row += 1
+            
+            # Visualization toggle for raw detections
+            self.show_raw_yolo_toggle = QPushButton("Show Raw YOLO Detections")
+            self.show_raw_yolo_toggle.setCheckable(True)
+            self.show_raw_yolo_toggle.setChecked(False)
+            self.show_raw_yolo_toggle.clicked.connect(lambda: self.update_setting('show_raw_yolo_detections', 1 if self.show_raw_yolo_toggle.isChecked() else 0))
+            dnn_layout.addWidget(self.show_raw_yolo_toggle, row, 0, 1, 3)
+            row += 1
+            
+            # Info about visualization
+            viz_info_label = QLabel("ℹ️ Raw detections shown as darker red squares (larger)")
+            viz_info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+            viz_info_label.setWordWrap(True)
+            dnn_layout.addWidget(viz_info_label, row, 0, 1, 3)
             
             return section
 
@@ -1185,7 +1229,7 @@ if PYQT_AVAILABLE:
             """Get current calibration settings as a dictionary."""
             # Check if ALL UI elements exist before accessing them
             required_attrs = [
-                'confidence_slider', 'nms_slider',
+                'ball_confidence_slider', 'ball_held_confidence_slider', 'nms_slider',
                 'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo',
                 # Tracking weight sliders
                 'tc_ml_ball_weight_slider', 'tc_ml_ball_held_weight_slider',
@@ -1205,8 +1249,10 @@ if PYQT_AVAILABLE:
                 'camera_settings_profile': self.camera_settings_combo.currentData(),
                 'resolution': self.resolution_combo.currentText(),
                 'fps': self.fps_combo.currentData(),
-                'confidence_threshold': self.confidence_slider.value() / 100.0,
+                'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0,
+                'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0,
                 'nms_threshold': self.nms_slider.value() / 100.0,
+                'show_raw_yolo_detections': self.show_raw_yolo_toggle.isChecked() if hasattr(self, 'show_raw_yolo_toggle') else False,
                 'pose_model_enabled': self.pose_model_toggle.isChecked(),
                 
                 # Tracking Detection settings
@@ -1282,11 +1328,17 @@ if PYQT_AVAILABLE:
                     self.fps_combo.setCurrentIndex(index)
             
             # DNN Tracker settings
-            if 'confidence_threshold' in settings:
-                self.confidence_slider.setValue(int(settings['confidence_threshold'] * 100))
+            if 'ball_confidence_threshold' in settings:
+                self.ball_confidence_slider.setValue(int(settings['ball_confidence_threshold'] * 100))
+            
+            if 'ball_held_confidence_threshold' in settings:
+                self.ball_held_confidence_slider.setValue(int(settings['ball_held_confidence_threshold'] * 100))
             
             if 'nms_threshold' in settings:
                 self.nms_slider.setValue(int(settings['nms_threshold'] * 100))
+            
+            if 'show_raw_yolo_detections' in settings and hasattr(self, 'show_raw_yolo_toggle'):
+                self.show_raw_yolo_toggle.setChecked(settings['show_raw_yolo_detections'])
             
             # Pose model
             if 'pose_model_enabled' in settings:
@@ -1448,11 +1500,17 @@ if PYQT_AVAILABLE:
             all configuration values, not just the UI slider positions.
             """
             # YOLO Tracker settings
-            if 'confidence_threshold' in settings:
-                self.udp_client.send_setting('confidence_threshold', settings['confidence_threshold'])
+            if 'ball_confidence_threshold' in settings:
+                self.udp_client.send_setting('ball_confidence_threshold', settings['ball_confidence_threshold'])
+            
+            if 'ball_held_confidence_threshold' in settings:
+                self.udp_client.send_setting('ball_held_confidence_threshold', settings['ball_held_confidence_threshold'])
             
             if 'nms_threshold' in settings:
                 self.udp_client.send_setting('nms_threshold', settings['nms_threshold'])
+            
+            if 'show_raw_yolo_detections' in settings:
+                self.udp_client.send_setting('show_raw_yolo_detections', 1 if settings['show_raw_yolo_detections'] else 0)
             
             # Throw/Catch Detection settings
             if 'ml_ball_weight' in settings:

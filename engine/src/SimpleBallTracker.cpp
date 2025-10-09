@@ -236,9 +236,26 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         return true;
     }
     
-    // Handle tracking settings
+    // Handle YOLO detection settings
     try {
-        if (key == "ml_ball_weight") {
+        if (key == "ball_confidence_threshold") {
+            ball_confidence_threshold_ = std::stof(value);
+            return true;
+        }
+        else if (key == "ball_held_confidence_threshold") {
+            ball_held_confidence_threshold_ = std::stof(value);
+            return true;
+        }
+        else if (key == "nms_threshold") {
+            nms_threshold_ = std::stof(value);
+            return true;
+        }
+        else if (key == "show_raw_yolo_detections") {
+            show_raw_yolo_detections_ = (value == "true" || value == "1");
+            return true;
+        }
+        // Handle tracking settings
+        else if (key == "ml_ball_weight") {
             tracking_settings_.ml_ball_weight = std::stof(value);
             return true;
         }
@@ -1460,6 +1477,12 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         ball.has_yolo_detection = false;
         ball.frames_without_yolo++;
         
+        DEBUG_LOG(fallback_log, {
+            OPEN_DEBUG_LOG(fallback_log);
+            fallback_log << "\n[FALLBACK] Ball " << ball.id << " (" << ball.color_name
+                        << ") lost YOLO detection (frames_without_yolo=" << ball.frames_without_yolo << ")" << std::endl;
+        });
+        
         // Get Kalman prediction for fallback tracking
         cv::Point3f kalman_pred(0, 0, 0);
         bool has_prediction = false;
@@ -1744,8 +1767,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 }
             }
             
-            // If we have a valid Kalman prediction, try fallback strategies
-            if (has_prediction && ball.frames_without_yolo < 5) {
+            // CRITICAL FIX: Always try fallback strategies regardless of frames_without_yolo
+            // Tracker should only disappear when ball goes off-screen, not after a time threshold
+            if (has_prediction) {
                 // Check if Kalman prediction is near any hand
                 float min_hand_dist = std::numeric_limits<float>::max();
                 int closest_hand_id = -1;
@@ -1761,57 +1785,111 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     }
                 }
                 
-                // If prediction is very close to a hand (within wrist proximity threshold),
-                // attach tracker to hand and search for color blob near hand
+                // CRITICAL FIX: Prioritize color blob search near wrist FIRST
+                // Check if prediction is near any hand
                 if (min_hand_dist < tracking_settings_.wrist_proximity_threshold) {
                     // Project hand position to 2D
                     cv::Point2f hand_2d = project_3d_to_2d(closest_hand_pos, intrinsics);
                     
-                    // Search for color blob near the hand (smaller radius for hand-attached search)
-                    cv::Point2f color_blob = searchForColorBlob(color_frame, *profile, hand_2d, 80);
+                    // PRIORITY 1: Search for color blob near the hand (larger radius for better detection)
+                    cv::Point2f color_blob = searchForColorBlob(color_frame, *profile, hand_2d, 120);
                     
                     if (color_blob.x > 0 && color_blob.y > 0) {
                         // Found color blob near hand - use it!
                         float depth = getDepthAtPoint(depth_frame, color_blob);
                         if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
                             cv::Point3f color_pos = deprojectToWorld(color_blob, depth, intrinsics);
-                            ball.position = color_pos;
-                            ball.pixel_pos = color_blob;
-                            ball.held_by_hand_id = closest_hand_id;
-                            ball.yolo_class_id = 1;  // Mark as held
-                            char reason[128];
-                            snprintf(reason, sizeof(reason), "Color@Hand[%c] d=%.2fm",
-                                     closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
-                            ball.tracking_reason = reason;
                             
-                            // Update Kalman with color detection
-                            ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                                color_pos.x, color_pos.y, color_pos.z));
-                            ball.color_predictor.addDetection(color_pos);
-                            ball.frames_without_yolo = 0;
-                            continue;
+                            // Validate position is on-screen
+                            cv::Point2f pixel_check = project_3d_to_2d(color_pos, intrinsics);
+                            if (pixel_check.x >= 0 && pixel_check.x < color_frame.cols &&
+                                pixel_check.y >= 0 && pixel_check.y < color_frame.rows) {
+                                
+                                ball.position = color_pos;
+                                ball.pixel_pos = color_blob;
+                                ball.held_by_hand_id = closest_hand_id;
+                                ball.yolo_class_id = 1;  // Mark as held
+                                char reason[128];
+                                snprintf(reason, sizeof(reason), "Color@Hand[%c] d=%.2fm",
+                                         closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
+                                ball.tracking_reason = reason;
+                                
+                                // Update Kalman with color detection
+                                ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                                    color_pos.x, color_pos.y, color_pos.z));
+                                ball.color_predictor.addDetection(color_pos);
+                                
+                                DEBUG_LOG(fallback_log, {
+                                    OPEN_DEBUG_LOG(fallback_log);
+                                    fallback_log << "  -> Found color blob near hand at (" << color_pos.x << ", "
+                                                << color_pos.y << ", " << color_pos.z << ")" << std::endl;
+                                });
+                                continue;
+                            }
                         }
                     }
                     
-                    // No color blob found - snap directly to hand position
-                    ball.position = closest_hand_pos;
-                    ball.pixel_pos = hand_2d;
-                    ball.held_by_hand_id = closest_hand_id;
-                    ball.yolo_class_id = 1;  // Mark as held
-                    char reason[128];
-                    snprintf(reason, sizeof(reason), "Snap→Hand[%c] d=%.2fm",
-                             closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
-                    ball.tracking_reason = reason;
+                    // PRIORITY 2: Check for ML-detected ball_held near hand
+                    float min_ml_dist = std::numeric_limits<float>::max();
+                    const Detection* closest_ml_det = nullptr;
                     
-                    // CRITICAL FIX: DO NOT update Kalman with hand snap positions!
-                    // Hand positions are not accurate ball positions and corrupt the Kalman state
-                    // This causes bad predictions when the ball is thrown
-                    // Only update Kalman with real YOLO or color detections
+                    for (const auto& det : yolo_detections) {
+                        if (det.class_id == 1) {  // ball_held class
+                            float dist = cv::norm(det.world_pos - closest_hand_pos);
+                            if (dist < min_ml_dist && dist < 0.25f) {  // Within 25cm of hand
+                                min_ml_dist = dist;
+                                closest_ml_det = &det;
+                            }
+                        }
+                    }
                     
-                    // ALWAYS add position to color predictor - we consider the ball to be here
-                    ball.color_predictor.addDetection(ball.position);
-                    ball.frames_without_yolo = 0;
-                    continue;
+                    if (closest_ml_det) {
+                        // Found ML ball_held near hand - use it!
+                        ball.position = closest_ml_det->world_pos;
+                        ball.pixel_pos = cv::Point2f(closest_ml_det->box.x + closest_ml_det->box.width / 2.0f,
+                                                     closest_ml_det->box.y + closest_ml_det->box.height / 2.0f);
+                        ball.held_by_hand_id = closest_hand_id;
+                        ball.yolo_class_id = 1;
+                        char reason[128];
+                        snprintf(reason, sizeof(reason), "ML_held@Hand[%c] d=%.2fm",
+                                 closest_hand_id == 0 ? 'L' : 'R', min_ml_dist);
+                        ball.tracking_reason = reason;
+                        
+                        ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                            ball.position.x, ball.position.y, ball.position.z));
+                        ball.color_predictor.addDetection(ball.position);
+                        
+                        DEBUG_LOG(fallback_log, {
+                            OPEN_DEBUG_LOG(fallback_log);
+                            fallback_log << "  -> Found ML ball_held near hand" << std::endl;
+                        });
+                        continue;
+                    }
+                    
+                    // PRIORITY 3: Snap to wrist as last resort (only if hand is on-screen)
+                    cv::Point2f hand_pixel = project_3d_to_2d(closest_hand_pos, intrinsics);
+                    if (hand_pixel.x >= 0 && hand_pixel.x < color_frame.cols &&
+                        hand_pixel.y >= 0 && hand_pixel.y < color_frame.rows) {
+                        
+                        ball.position = closest_hand_pos;
+                        ball.pixel_pos = hand_pixel;
+                        ball.held_by_hand_id = closest_hand_id;
+                        ball.yolo_class_id = 1;  // Mark as held
+                        char reason[128];
+                        snprintf(reason, sizeof(reason), "Snap→Hand[%c] d=%.2fm",
+                                     closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
+                        ball.tracking_reason = reason;
+                        
+                        // CRITICAL: DO NOT update Kalman with hand snap positions!
+                        // Only add to color predictor
+                        ball.color_predictor.addDetection(ball.position);
+                        
+                        DEBUG_LOG(fallback_log, {
+                            OPEN_DEBUG_LOG(fallback_log);
+                            fallback_log << "  -> Snapped to wrist (last resort)" << std::endl;
+                        });
+                        continue;
+                    }
                 }
                 
                 // Prediction is NOT near a hand - try color tracking at prediction point
@@ -1840,9 +1918,28 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 // If color tracking failed, fall through to Kalman-only prediction below
             }
             
-            // CRITICAL FIX: Use Kalman prediction but DON'T update with it
-            // Updating Kalman with its own predictions causes drift to compound
-            if (has_prediction && ball.frames_without_yolo < MAX_FRAMES_WITHOUT_YOLO) {
+            // CRITICAL FIX: Always use Kalman prediction if available (no time limit)
+            // Tracker should only disappear when ball goes off-screen
+            if (has_prediction) {
+                // Check if Kalman prediction is on-screen
+                cv::Point2f pred_pixel = project_3d_to_2d(kalman_pred, intrinsics);
+                bool is_on_screen = (pred_pixel.x >= 0 && pred_pixel.x < color_frame.cols &&
+                                    pred_pixel.y >= 0 && pred_pixel.y < color_frame.rows);
+                
+                if (!is_on_screen) {
+                    // Ball has gone off-screen - this is the ONLY reason to stop tracking
+                    DEBUG_LOG(fallback_log, {
+                        OPEN_DEBUG_LOG(fallback_log);
+                        fallback_log << "  -> Ball went OFF-SCREEN at pixel (" << pred_pixel.x << ", "
+                                    << pred_pixel.y << ") - STOPPING TRACKER" << std::endl;
+                    });
+                    // Mark ball as invalid by setting position to zero
+                    ball.position = cv::Point3f(0, 0, 0);
+                    ball.pixel_pos = cv::Point2f(-1, -1);
+                    ball.tracking_reason = "OFF-SCREEN";
+                    continue;
+                }
+                
                 // Use Kalman prediction as the ball position for display
                 auto state = ball.kalman.get_state();
                 ball.position = cv::Point3f(state(0), state(1), state(2));
@@ -1881,8 +1978,14 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     ball.yolo_class_id = 0;
                     ball.tracking_reason = "Kalman pred";
                 }
+                
+                DEBUG_LOG(fallback_log, {
+                    OPEN_DEBUG_LOG(fallback_log);
+                    fallback_log << "  -> Using Kalman prediction at (" << ball.position.x << ", "
+                                << ball.position.y << ", " << ball.position.z << ")" << std::endl;
+                });
             }
-            else if (!has_prediction && ball.frames_without_yolo < MAX_FRAMES_WITHOUT_YOLO) {
+            else if (!has_prediction) {
                 // LEGACY FALLBACK: Only used when Kalman is not initialized
                 // This should rarely happen in normal operation
                 
@@ -2167,8 +2270,12 @@ std::vector<Detection> SimpleBallTracker::runBallDetection(
         cv::minMaxLoc(class_scores, nullptr, &max_class_score, nullptr, &class_id_point);
         
         float confidence = static_cast<float>(max_class_score);
+        int class_id = class_id_point.x;
         
-        if (confidence > confidence_threshold_) {
+        // Apply class-specific confidence thresholds
+        float threshold = (class_id == 0) ? ball_confidence_threshold_ : ball_held_confidence_threshold_;
+        
+        if (confidence > threshold) {
             float cx = output_buffer.at<float>(i, 0);
             float cy = output_buffer.at<float>(i, 1);
             float w = output_buffer.at<float>(i, 2);
@@ -2181,7 +2288,7 @@ std::vector<Detection> SimpleBallTracker::runBallDetection(
             
             boxes.push_back(cv::Rect(left, top, width, height));
             confidences.push_back(confidence);
-            class_ids.push_back(class_id_point.x);
+            class_ids.push_back(class_id);
             
             // Calculate 3D position
             cv::Point2f center_pixel(left + width / 2.0f, top + height / 2.0f);
@@ -2197,15 +2304,16 @@ std::vector<Detection> SimpleBallTracker::runBallDetection(
             det.box = cv::Rect_<float>(left, top, width, height);
             det.world_pos = world_pos;
             det.confidence = confidence;
-            det.class_id = class_id_point.x;
+            det.class_id = class_id;
             det.index = raw_detections.size();
             raw_detections.push_back(det);
         }
     }
     
-    // Apply NMS
+    // Apply NMS - use minimum of both thresholds for NMS filtering
     std::vector<int> nms_indices;
-    cv::dnn::NMSBoxes(boxes, confidences, confidence_threshold_, nms_threshold_, nms_indices);
+    float min_threshold = std::min(ball_confidence_threshold_, ball_held_confidence_threshold_);
+    cv::dnn::NMSBoxes(boxes, confidences, min_threshold, nms_threshold_, nms_indices);
     
     // Filter detections by NMS results
     std::vector<Detection> filtered_detections;

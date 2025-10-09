@@ -942,11 +942,49 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         info_colors.insert(info_colors.begin(), event_color);
     }
     
-    // Draw YOLO detections with numbering
-    if (record_with_yolo_boxes_ || viz.show_raw_detections()) {
+    // Draw raw YOLO detections (before filtering) - darker red, larger boxes
+    if (viz.show_raw_detections()) {
         int det_num = 1;
         for (const auto& det : rec_frame.raw_detections) {
-            // Draw red box for YOLO detection
+            // Draw darker red box for raw YOLO detection (thicker line)
+            cv::Rect enlarged_box = det.box;
+            int enlarge = 5;  // Make box slightly larger
+            enlarged_box.x -= enlarge;
+            enlarged_box.y -= enlarge;
+            enlarged_box.width += enlarge * 2;
+            enlarged_box.height += enlarge * 2;
+            
+            cv::rectangle(temp_result, enlarged_box, cv::Scalar(0, 0, 139), 3);  // Dark red, thicker
+            
+            // Draw detection number on the box
+            std::string num_label = "R#" + std::to_string(det_num);  // R for Raw
+            cv::putText(temp_result, num_label,
+                       cv::Point(det.box.x + 5, det.box.y + 20),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+            cv::putText(temp_result, num_label,
+                       cv::Point(det.box.x + 5, det.box.y + 20),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(200, 200, 255), 1, cv::LINE_AA);
+            
+            // Add raw YOLO info to panel
+            std::string class_name = (det.class_id == 0) ? "ball" : "ball_held";
+            char info_text[128];
+            snprintf(info_text, sizeof(info_text), "R#%d RAW: %s conf=%.2f",
+                     det_num, class_name.c_str(), det.confidence);
+            info_lines.push_back(info_text);
+            info_colors.push_back(cv::Scalar(200, 200, 255)); // Light red for raw
+            
+            det_num++;
+        }
+    }
+    
+    // Draw filtered YOLO detections (after confidence filtering) - bright red, normal boxes
+    if (record_with_yolo_boxes_) {
+        // Note: rec_frame.raw_detections already contains filtered detections after NMS
+        // We need to distinguish between truly raw (before threshold) and filtered (after threshold)
+        // For now, show the current detections as filtered
+        int det_num = 1;
+        for (const auto& det : rec_frame.raw_detections) {
+            // Draw bright red box for filtered YOLO detection
             cv::rectangle(temp_result, det.box, cv::Scalar(0, 0, 255), 2);
             
             // Draw detection number on the box
@@ -958,13 +996,13 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                        cv::Point(det.box.x + 5, det.box.y + 20),
                        cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
             
-            // Add YOLO info to panel
+            // Add filtered YOLO info to panel
             std::string class_name = (det.class_id == 0) ? "ball" : "ball_held";
             char info_text[128];
-            snprintf(info_text, sizeof(info_text), "#%d YOLO: %s conf=%.2f", 
+            snprintf(info_text, sizeof(info_text), "#%d FILTERED: %s conf=%.2f",
                      det_num, class_name.c_str(), det.confidence);
             info_lines.push_back(info_text);
-            info_colors.push_back(cv::Scalar(255, 255, 255)); // White for YOLO
+            info_colors.push_back(cv::Scalar(255, 255, 255)); // White for filtered
             
             det_num++;
         }

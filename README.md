@@ -2,9 +2,16 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-08 16:47 CEST
+**Last Updated:** 2025-10-09 12:18 CEST
 
-**Recent Changes (2025-10-08):**
+**Recent Changes (2025-10-09):**
+- **🧹 BYTETRACK SETTINGS REMOVED**
+  - **Cleanup**: Removed obsolete ByteTrack settings section from UI
+  - **Reason**: JuggleHub uses SimpleBallTracker, not ByteTrack for tracking
+  - **Impact**: Cleaner UI with only relevant settings displayed
+  - **Files Modified**: [`hub/components/ui_settings.py`](hub/components/ui_settings.py), [`UI_SETTINGS_CHANGE_CHECKLIST.md`](UI_SETTINGS_CHANGE_CHECKLIST.md)
+
+**Previous Changes (2025-10-08):**
 - **🎯 CATCH INFERENCE DETECTION**
   - **New Feature**: Automatic catch detection when ball vanishes from YOLO with hand nearby
   - **Smart Inference**: If ball disappears from YOLO detection and a hand is within 25cm, system infers a catch
@@ -73,7 +80,7 @@ A high-performance monorepo combining C++ real-time ball tracking with Python-ba
   - **Root Cause**: Settings were only sent to engine when sliders changed, not when loaded from file
   - **Solution**: Added `_send_all_settings_to_engine()` method that sends all loaded settings to engine after loading
   - **Impact**: All calibration settings now properly persist between sessions - no need to re-adjust sliders
-  - **Affected Settings**: YOLO tracker, ByteTrack, throw/catch detection, Kalman prediction, color tracker weights, adaptive color, and ball profiles
+  - **Affected Settings**: YOLO tracker, throw/catch detection, Kalman prediction, color tracker weights, adaptive color, and ball profiles
   - See [`hub/components/ui_settings.py`](hub/components/ui_settings.py:1650-1677,1679-1800) for implementation
 
 **Previous Changes (2025-10-06):**
@@ -1028,11 +1035,6 @@ The hub UI provides real-time control over the DNN-based tracking system. These 
 - **Confidence Threshold**: Adjusts the minimum confidence level for a detected object to be considered a valid detection. Higher values reduce false positives but may miss less clear objects.
 - **NMS Threshold**: Controls the "non-maximum suppression" threshold, which merges overlapping bounding boxes. Higher values allow more overlap, while lower values are stricter.
 
-#### ByteTrack Settings
-- **Track Buffer (Frames)**: Defines how many frames a "lost" track is kept in memory before being deleted. Increasing this value helps maintain consistent IDs for objects that are temporarily occluded.
-- **Track Threshold**: The confidence threshold required to initiate a new track.
-- **High Confidence Threshold**: The confidence threshold for the first association step, where high-confidence detections are matched to existing tracks.
-- **Match Threshold**: The IoU (Intersection over Union) threshold for associating detections with existing tracks. A lower value makes it easier to associate a detection with a track, even if they don't perfectly overlap.
 
 ## 🤖 DNN-Based Tracking System
 

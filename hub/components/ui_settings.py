@@ -107,9 +107,6 @@ if PYQT_AVAILABLE:
             self.yolo_section = self.create_yolo_section()
             container_layout.addWidget(self.yolo_section)
             
-            self.bytetrack_section = self.create_bytetrack_section()
-            container_layout.addWidget(self.bytetrack_section)
-            
             self.pose_section = self.create_pose_section()
             container_layout.addWidget(self.pose_section)
             
@@ -258,69 +255,6 @@ if PYQT_AVAILABLE:
                 is_float=True
             )
             
-            return section
-
-        def create_bytetrack_section(self):
-            """Create the ByteTrack Settings section"""
-            section = CollapsibleGroupBox("🔍 ByteTrack Settings", collapsed=False)
-            bytetrack_layout = QGridLayout()
-            section.get_content_layout().addLayout(bytetrack_layout)
-
-            self.track_buffer_slider, self.track_buffer_value_label = self._create_slider_widget(
-                parent_layout=bytetrack_layout,
-                row=0,
-                label_text="Track Buffer (Frames)",
-                tooltip_text="How long (in frames) ByteTrack remembers a lost object.\n"
-                             "Range: 1 to 600. Default: 300.\n"
-                             "Higher values keep tracks alive longer during occlusions.",
-                range_min=1,
-                range_max=600,
-                initial_value=300,
-                update_func=lambda v: self.update_setting('track_buffer', v)
-            )
-
-            self.track_thresh_slider, self.track_thresh_value_label = self._create_slider_widget(
-                parent_layout=bytetrack_layout,
-                row=1,
-                label_text="Track Threshold",
-                tooltip_text="Confidence score needed to start a new track.\n"
-                             "Range: 0.00 to 1.00. Default: 0.10.\n"
-                             "Lower values allow tracking of less confident detections.",
-                range_min=0,
-                range_max=100,
-                initial_value=10,
-                update_func=lambda v: self.update_setting('track_thresh', v / 100.0),
-                is_float=True
-            )
-
-            self.high_thresh_slider, self.high_thresh_value_label = self._create_slider_widget(
-                parent_layout=bytetrack_layout,
-                row=2,
-                label_text="High Confidence Threshold",
-                tooltip_text="Confidence score for a detection to be considered 'high confidence'.\n"
-                             "Range: 0.00 to 1.00. Default: 0.40.\n"
-                             "Lower values treat more detections as high confidence.",
-                range_min=0,
-                range_max=100,
-                initial_value=40,
-                update_func=lambda v: self.update_setting('high_thresh', v / 100.0),
-                is_float=True
-            )
-
-            self.match_thresh_slider, self.match_thresh_value_label = self._create_slider_widget(
-                parent_layout=bytetrack_layout,
-                row=3,
-                label_text="Match Threshold (IoU)",
-                tooltip_text="The minimum Intersection over Union (IoU) to match a detection to a track.\n"
-                             "Range: 0.00 to 1.00. Default: 0.50.\n"
-                             "Lower values make it easier to maintain tracks with fast-moving objects.",
-                range_min=0,
-                range_max=100,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('match_thresh', v / 100.0),
-                is_float=True
-            )
-
             return section
 
         def create_pose_section(self):
@@ -1393,8 +1327,7 @@ if PYQT_AVAILABLE:
             """Get current calibration settings as a dictionary."""
             # Check if ALL UI elements exist before accessing them
             required_attrs = [
-                'confidence_slider', 'nms_slider', 'track_buffer_slider',
-                'track_thresh_slider', 'high_thresh_slider', 'match_thresh_slider',
+                'confidence_slider', 'nms_slider',
                 'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo',
                 # Tracking weight sliders
                 'tc_ml_ball_weight_slider', 'tc_ml_ball_held_weight_slider',
@@ -1416,10 +1349,6 @@ if PYQT_AVAILABLE:
                 'fps': self.fps_combo.currentData(),
                 'confidence_threshold': self.confidence_slider.value() / 100.0,
                 'nms_threshold': self.nms_slider.value() / 100.0,
-                'track_buffer': self.track_buffer_slider.value(),
-                'track_thresh': self.track_thresh_slider.value() / 100.0,
-                'high_thresh': self.high_thresh_slider.value() / 100.0,
-                'match_thresh': self.match_thresh_slider.value() / 100.0,
                 'pose_model_enabled': self.pose_model_toggle.isChecked(),
                 
                 # Tracking Detection settings
@@ -1438,7 +1367,6 @@ if PYQT_AVAILABLE:
                 # Collapsed states for UI persistence
                 'collapsed_camera': self.camera_section.is_collapsed,
                 'collapsed_yolo': self.yolo_section.is_collapsed,
-                'collapsed_bytetrack': self.bytetrack_section.is_collapsed,
                 'collapsed_pose': self.pose_section.is_collapsed,
                 'collapsed_throw_catch': self.throw_catch_section.is_collapsed,
                 'collapsed_kalman_prediction': self.kalman_prediction_section.is_collapsed if hasattr(self, 'kalman_prediction_section') and self.kalman_prediction_section else False,
@@ -1514,19 +1442,6 @@ if PYQT_AVAILABLE:
             if 'nms_threshold' in settings:
                 self.nms_slider.setValue(int(settings['nms_threshold'] * 100))
             
-            # ByteTrack settings
-            if 'track_buffer' in settings:
-                self.track_buffer_slider.setValue(settings['track_buffer'])
-            
-            if 'track_thresh' in settings:
-                self.track_thresh_slider.setValue(int(settings['track_thresh'] * 100))
-            
-            if 'high_thresh' in settings:
-                self.high_thresh_slider.setValue(int(settings['high_thresh'] * 100))
-            
-            if 'match_thresh' in settings:
-                self.match_thresh_slider.setValue(int(settings['match_thresh'] * 100))
-            
             # Pose model
             if 'pose_model_enabled' in settings:
                 self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
@@ -1573,10 +1488,6 @@ if PYQT_AVAILABLE:
             if 'collapsed_yolo' in settings:
                 if settings['collapsed_yolo'] != self.yolo_section.is_collapsed:
                     self.yolo_section.toggle_collapsed()
-            
-            if 'collapsed_bytetrack' in settings:
-                if settings['collapsed_bytetrack'] != self.bytetrack_section.is_collapsed:
-                    self.bytetrack_section.toggle_collapsed()
             
             if 'collapsed_pose' in settings:
                 if settings['collapsed_pose'] != self.pose_section.is_collapsed:
@@ -1722,19 +1633,6 @@ if PYQT_AVAILABLE:
             
             if 'nms_threshold' in settings:
                 self.udp_client.send_setting('nms_threshold', settings['nms_threshold'])
-            
-            # ByteTrack settings
-            if 'track_buffer' in settings:
-                self.udp_client.send_setting('track_buffer', settings['track_buffer'])
-            
-            if 'track_thresh' in settings:
-                self.udp_client.send_setting('track_thresh', settings['track_thresh'])
-            
-            if 'high_thresh' in settings:
-                self.udp_client.send_setting('high_thresh', settings['high_thresh'])
-            
-            if 'match_thresh' in settings:
-                self.udp_client.send_setting('match_thresh', settings['match_thresh'])
             
             # Throw/Catch Detection settings
             if 'ml_ball_weight' in settings:

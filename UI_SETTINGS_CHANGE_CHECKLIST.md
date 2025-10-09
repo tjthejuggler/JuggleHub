@@ -2,7 +2,7 @@
 
 This checklist ensures all necessary code changes are made when adding or removing settings from the JuggleHub UI.
 
-**Last Updated:** 2025-01-09
+**Last Updated:** 2025-01-09 (ByteTrack settings removed)
 
 ---
 
@@ -172,7 +172,7 @@ if 'color_sample_radius' in settings:
 - `ct_` = Color Tracker Weights
 - `tc_` = Throw/Catch (Ball State Detection)
 - `kp_` = Kalman Prediction
-- No prefix = Camera, YOLO, ByteTrack, or Pose settings
+- No prefix = Camera, YOLO, or Pose settings
 
 ---
 

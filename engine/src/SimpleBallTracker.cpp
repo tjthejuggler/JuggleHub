@@ -348,6 +348,36 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.spatial_threshold = std::stof(value);
             return true;
         }
+        // Override detection thresholds
+        else if (key == "override_min_confidence_tracked") {
+            tracking_settings_.override_min_confidence_tracked = std::stof(value);
+            return true;
+        }
+        else if (key == "override_min_color_score_tracked") {
+            tracking_settings_.override_min_color_score_tracked = std::stof(value);
+            return true;
+        }
+        else if (key == "override_min_confidence_missing") {
+            tracking_settings_.override_min_confidence_missing = std::stof(value);
+            return true;
+        }
+        else if (key == "override_min_color_score_missing") {
+            tracking_settings_.override_min_color_score_missing = std::stof(value);
+            return true;
+        }
+        // Held ball color blob detection settings
+        else if (key == "held_color_search_radius") {
+            tracking_settings_.held_color_search_radius = std::stoi(value);
+            return true;
+        }
+        else if (key == "held_color_min_score") {
+            tracking_settings_.held_color_min_score = std::stof(value);
+            return true;
+        }
+        else if (key == "held_color_max_distance") {
+            tracking_settings_.held_color_max_distance = std::stof(value);
+            return true;
+        }
     } catch (const std::exception& e) {
         return false;
     }
@@ -1432,6 +1462,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             ball.yolo_class_id = det.class_id;
             ball.color_match_score = std::exp(-match.euclidean_distance * 10.0f);  // For display
             
+            // Store matched detection confidence scores for UI display
+            ball.matched_detection_confidence = det.confidence;
+            ball.matched_detection_color_score = ball.color_match_score;
+            
             char reason[128];
             snprintf(reason, sizeof(reason), "Euclidean dist=%.3f", match.euclidean_distance);
             ball.tracking_reason = reason;
@@ -1465,6 +1499,136 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             euclidean_log.close();
         });
     }
+    
+    // OVERRIDE DETECTION: Force tracker placement for high-confidence detections
+    // This ensures trackers never disappear when good detections exist
+    DEBUG_LOG(override_log, {
+        OPEN_DEBUG_LOG(override_log);
+        override_log << "\n=== FRAME " << frame_counter_ << " - OVERRIDE DETECTION CHECK ===" << std::endl;
+    });
+    
+    for (size_t ball_idx = 0; ball_idx < balls_.size(); ++ball_idx) {
+        auto& ball = balls_[ball_idx];
+        
+        // Determine which thresholds to use based on whether ball currently has a tracker
+        bool ball_has_tracker = (ball.position.z > 0.01f);  // Ball has valid position
+        float min_confidence = ball_has_tracker ?
+            tracking_settings_.override_min_confidence_tracked :
+            tracking_settings_.override_min_confidence_missing;
+        float min_color_score = ball_has_tracker ?
+            tracking_settings_.override_min_color_score_tracked :
+            tracking_settings_.override_min_color_score_missing;
+        
+        DEBUG_LOG(override_log, {
+            OPEN_DEBUG_LOG(override_log);
+            override_log << "\nBall[" << ball_idx << "] '" << ball.color_name << "' "
+                        << (ball_has_tracker ? "HAS tracker" : "MISSING tracker") << std::endl;
+            override_log << "  Thresholds: conf>=" << min_confidence << ", color>=" << min_color_score << std::endl;
+        });
+        
+        // Skip if ball was already matched by euclidean system
+        if (ball.has_yolo_detection && ball.frames_without_yolo == 0) {
+            DEBUG_LOG(override_log, {
+                OPEN_DEBUG_LOG(override_log);
+                override_log << "  SKIP: Already matched by euclidean system" << std::endl;
+            });
+            continue;
+        }
+        
+        // Find color profile
+        const ColorProfile* profile = nullptr;
+        for (const auto& p : color_profiles_) {
+            if (p.name == ball.color_name && p.enabled) {
+                profile = &p;
+                break;
+            }
+        }
+        
+        if (!profile) continue;
+        
+        // Search for high-confidence detection matching this ball's color
+        float best_score = -1.0f;
+        const Detection* best_det = nullptr;
+        
+        for (const auto& det : yolo_detections) {
+            // Skip if already used
+            if (used_detections.find(det.index) != used_detections.end()) continue;
+            
+            // Skip if invalid depth
+            if (det.world_pos.z < MIN_DEPTH || det.world_pos.z > MAX_DEPTH) continue;
+            
+            // Check confidence threshold
+            if (det.confidence < min_confidence) continue;
+            
+            // Calculate color match score
+            float color_score = matchColor(det, *profile, color_frame);
+            
+            // Check color threshold
+            if (color_score < min_color_score) continue;
+            
+            // Calculate combined score (confidence * color_score)
+            float combined_score = det.confidence * color_score;
+            
+            DEBUG_LOG(override_log, {
+                OPEN_DEBUG_LOG(override_log);
+                override_log << "  Det#" << det.index << ": conf=" << det.confidence
+                            << ", color=" << color_score << ", combined=" << combined_score << std::endl;
+            });
+            
+            if (combined_score > best_score) {
+                best_score = combined_score;
+                best_det = &det;
+            }
+        }
+        
+        if (best_det) {
+            DEBUG_LOG(override_log, {
+                OPEN_DEBUG_LOG(override_log);
+                override_log << "  *** OVERRIDE: Forcing tracker to Det#" << best_det->index
+                            << " (conf=" << best_det->confidence << ", color="
+                            << matchColor(*best_det, *profile, color_frame) << ") ***" << std::endl;
+            });
+            
+            // Force tracker to this detection
+            ball.position = best_det->world_pos;
+            ball.pixel_pos = cv::Point2f(best_det->box.x + best_det->box.width / 2.0f,
+                                         best_det->box.y + best_det->box.height / 2.0f);
+            ball.bbox = best_det->box;
+            ball.has_yolo_detection = true;
+            ball.frames_without_yolo = 0;
+            ball.yolo_confidence = best_det->confidence;
+            ball.yolo_class_id = best_det->class_id;
+            ball.color_match_score = matchColor(*best_det, *profile, color_frame);
+            
+            // Store matched detection confidence scores
+            ball.matched_detection_confidence = best_det->confidence;
+            ball.matched_detection_color_score = ball.color_match_score;
+            
+            char reason[128];
+            snprintf(reason, sizeof(reason), "OVERRIDE conf=%.2f color=%.2f",
+                     best_det->confidence, ball.color_match_score);
+            ball.tracking_reason = reason;
+            
+            // Update Kalman
+            ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                ball.position.x, ball.position.y, ball.position.z));
+            ball.color_predictor.addDetection(ball.position);
+            
+            // Mark detection as used
+            used_detections.insert(best_det->index);
+        } else {
+            DEBUG_LOG(override_log, {
+                OPEN_DEBUG_LOG(override_log);
+                override_log << "  No override detection found" << std::endl;
+            });
+        }
+    }
+    
+    DEBUG_LOG(override_log, {
+        OPEN_DEBUG_LOG(override_log);
+        override_log << "=== END OVERRIDE DETECTION ===" << std::endl;
+        override_log.close();
+    });
     
     // Handle unmatched balls with fallback strategies (Kalman prediction, color tracking, hand snapping)
     for (auto& ball : balls_) {
@@ -1985,108 +2149,137 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                 << ball.position.y << ", " << ball.position.z << ")" << std::endl;
                 });
             }
-            else if (!has_prediction) {
-                // LEGACY FALLBACK: Only used when Kalman is not initialized
-                // This should rarely happen in normal operation
-                
-                // Use current Kalman state as fallback
-                auto predicted_state = ball.kalman.get_state();
-                cv::Point3f predicted_pos(predicted_state(0), predicted_state(1), predicted_state(2));
-                
-                // Check if predicted position is near any hand
-                bool trajectory_near_hand = false;
-                int closest_hand_id = -1;
-                float closest_predicted_dist = std::numeric_limits<float>::max();
-                
-                for (const auto& hand : hands) {
-                    if (!hand.is_visible) continue;
-                    
-                    // Check distance from PREDICTED position to hand (not current position)
-                    float dist_to_predicted = cv::norm(predicted_pos - hand.wrist_pos_3d);
-                    
-                    // Only consider this hand if trajectory is heading toward it
-                    if (dist_to_predicted < tracking_settings_.undetected_near_hand_threshold) {
-                        if (dist_to_predicted < closest_predicted_dist) {
-                            closest_predicted_dist = dist_to_predicted;
-                            closest_hand_id = hand.id;
-                            trajectory_near_hand = true;
-                        }
-                    }
-                }
-                
-                if (trajectory_near_hand) {
-                    // Trajectory indicates ball is approaching/at this hand
-                    // Snap to hand position
-                    for (const auto& hand : hands) {
-                        if (hand.id == closest_hand_id) {
-                            ball.position = hand.wrist_pos_3d;
-                            ball.held_by_hand_id = hand.id;
-                            ball.yolo_class_id = 1;  // Mark as held
-                            char reason[128];
-                            snprintf(reason, sizeof(reason), "Traj→[%c] d=%.2fm",
-                                     hand.id == 0 ? 'L' : 'R', closest_predicted_dist);
-                            ball.tracking_reason = reason;
-                            
-                            // CRITICAL FIX: DO NOT update Kalman when snapping to hands
-                            // Hand positions corrupt the Kalman state and cause bad predictions
-                            
-                            // ALWAYS add position to color predictor - we consider the ball to be here
-                            ball.color_predictor.addDetection(ball.position);
-                            break;
-                        }
-                    }
-                } else {
-                    // Trajectory does NOT lead to any hand - ball is in free flight
-                    // Use Kalman prediction, do NOT snap to hands
-                    ball.position = predicted_pos;
-                    ball.yolo_class_id = 0;  // Mark as in-air
-                    ball.held_by_hand_id = -1;
-                    ball.tracking_reason = "Traj→Flight";
-                    
-                    // CRITICAL: Update color predictor with flight prediction
-                    // This keeps the history active and velocity calculation accurate
-                    ball.color_predictor.addDetection(ball.position);
-                }
-            }
         }
     }
     
     // CRITICAL: Update held ball positions to follow hands
     // If a ball is marked as held, it must move with the hand
+    // PRIORITY: 1) Color blob near hand, 2) Snap to wrist
     for (auto& ball : balls_) {
         if (ball.is_held && ball.held_by_hand_id >= 0) {
             // Find the hand that's holding this ball
             for (const auto& hand : hands) {
                 if (hand.id == ball.held_by_hand_id && hand.is_visible) {
-                    // Check if ball is still close enough to be held
-                    float dist = cv::norm(ball.position - hand.wrist_pos_3d);
+                    // Find color profile for this ball
+                    const ColorProfile* profile = nullptr;
+                    for (const auto& p : color_profiles_) {
+                        if (p.name == ball.color_name && p.enabled) {
+                            profile = &p;
+                            break;
+                        }
+                    }
                     
-                    // If ball has drifted too far from hand, it's not actually held
-                    if (dist > tracking_settings_.wrist_proximity_threshold * 2.0f) {
-                        // Ball is too far - mark as not held
-                        ball.is_held = false;
-                        ball.held_by_hand_id = -1;
-                        ball.yolo_class_id = 0;  // Mark as in-air
+                    if (profile) {
+                        // Project hand position to 2D
+                        cv::Point2f hand_2d = project_3d_to_2d(hand.wrist_pos_3d, intrinsics);
                         
-                        DEBUG_LOG(drift_log, {
-                            OPEN_DEBUG_LOG(drift_log);
-                            drift_log << "\n[DRIFT] Ball " << ball.id << " drifted " << dist
-                                     << "m from hand " << hand.id << " - marking as NOT HELD" << std::endl;
-                        });
+                        // Check if hand is on-screen
+                        bool hand_on_screen = (hand_2d.x >= 0 && hand_2d.x < color_frame.cols &&
+                                              hand_2d.y >= 0 && hand_2d.y < color_frame.rows);
+                        
+                        if (hand_on_screen) {
+                            // PRIORITY 1: Search for color blob near the hand (using configurable radius)
+                            cv::Point2f color_blob = searchForColorBlob(color_frame, *profile, hand_2d,
+                                                                       tracking_settings_.held_color_search_radius);
+                            
+                            if (color_blob.x > 0 && color_blob.y > 0) {
+                                // Found color blob near hand - validate it before using
+                                float depth = getDepthAtPoint(depth_frame, color_blob);
+                                if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
+                                    cv::Point3f color_pos = deprojectToWorld(color_blob, depth, intrinsics);
+                                    
+                                    // Validate position is on-screen
+                                    cv::Point2f pixel_check = project_3d_to_2d(color_pos, intrinsics);
+                                    if (pixel_check.x >= 0 && pixel_check.x < color_frame.cols &&
+                                        pixel_check.y >= 0 && pixel_check.y < color_frame.rows) {
+                                        
+                                        // CRITICAL: Validate color match score to prevent tracking wrong objects
+                                        Detection temp_det;
+                                        temp_det.box = cv::Rect_<float>(color_blob.x - 15, color_blob.y - 15, 30, 30);
+                                        float color_score = matchColor(temp_det, *profile, color_frame);
+                                        
+                                        // CRITICAL: Validate distance from hand to prevent tracking distant objects
+                                        float dist_from_hand = cv::norm(color_pos - hand.wrist_pos_3d);
+                                        
+                                        // Only accept if color match is good AND blob is close to hand
+                                        if (color_score >= tracking_settings_.held_color_min_score &&
+                                            dist_from_hand <= tracking_settings_.held_color_max_distance) {
+                                            
+                                            ball.position = color_pos;
+                                            ball.pixel_pos = color_blob;
+                                            ball.color_match_score = color_score;
+                                            char reason[128];
+                                            snprintf(reason, sizeof(reason), "Held_Color@Hand(%.2f,%.2fm)",
+                                                    color_score, dist_from_hand);
+                                            ball.tracking_reason = reason;
+                                            
+                                            // Update color predictor with color detection
+                                            ball.color_predictor.addDetection(color_pos);
+                                            
+                                            DEBUG_LOG(held_color_log, {
+                                                OPEN_DEBUG_LOG(held_color_log);
+                                                held_color_log << "\n[HELD_COLOR] Ball " << ball.id << " found color blob near hand " << hand.id
+                                                              << " at (" << color_pos.x << ", " << color_pos.y << ", " << color_pos.z << ")"
+                                                              << " | color_score=" << color_score << ", dist=" << dist_from_hand << "m" << std::endl;
+                                            });
+                                            break;  // Found valid color blob, done with this ball
+                                        } else {
+                                            DEBUG_LOG(held_color_reject_log, {
+                                                OPEN_DEBUG_LOG(held_color_reject_log);
+                                                held_color_reject_log << "\n[HELD_COLOR_REJECT] Ball " << ball.id
+                                                                     << " rejected color blob near hand " << hand.id
+                                                                     << " | color_score=" << color_score
+                                                                     << " (min=" << tracking_settings_.held_color_min_score << ")"
+                                                                     << " | dist=" << dist_from_hand << "m"
+                                                                     << " (max=" << tracking_settings_.held_color_max_distance << "m)" << std::endl;
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // PRIORITY 2: No color blob found - snap to wrist (ALWAYS show tracker when held)
+                            ball.position = hand.wrist_pos_3d;
+                            ball.pixel_pos = hand_2d;
+                            ball.tracking_reason = "Held_Snap@Wrist";
+                            
+                            // Update color predictor with hand position
+                            ball.color_predictor.addDetection(ball.position);
+                            
+                            DEBUG_LOG(held_snap_log, {
+                                OPEN_DEBUG_LOG(held_snap_log);
+                                held_snap_log << "\n[HELD_SNAP] Ball " << ball.id << " snapped to wrist of hand " << hand.id
+                                             << " at (" << ball.position.x << ", " << ball.position.y << ", "
+                                             << ball.position.z << ")" << std::endl;
+                            });
+                        } else {
+                            // Hand is off-screen - mark ball as off-screen too
+                            ball.position = cv::Point3f(0, 0, 0);
+                            ball.pixel_pos = cv::Point2f(-1, -1);
+                            ball.tracking_reason = "Held_OFF-SCREEN";
+                            
+                            DEBUG_LOG(held_offscreen_log, {
+                                OPEN_DEBUG_LOG(held_offscreen_log);
+                                held_offscreen_log << "\n[HELD_OFFSCREEN] Ball " << ball.id << " held by hand " << hand.id
+                                                  << " which is off-screen" << std::endl;
+                            });
+                        }
                     } else {
-                        // Ball is close enough - update position to follow hand
-                        ball.position = hand.wrist_pos_3d;
-                        ball.pixel_pos = project_3d_to_2d(hand.wrist_pos_3d, intrinsics);
+                        // No color profile found - fallback to wrist snap
+                        cv::Point2f hand_2d = project_3d_to_2d(hand.wrist_pos_3d, intrinsics);
+                        bool hand_on_screen = (hand_2d.x >= 0 && hand_2d.x < color_frame.cols &&
+                                              hand_2d.y >= 0 && hand_2d.y < color_frame.rows);
                         
-                        // Update color predictor with hand position
-                        ball.color_predictor.addDetection(ball.position);
-                        
-                        DEBUG_LOG(follow_log, {
-                            OPEN_DEBUG_LOG(follow_log);
-                            follow_log << "\n[FOLLOW] Ball " << ball.id << " following hand " << hand.id
-                                      << " at (" << ball.position.x << ", " << ball.position.y << ", "
-                                      << ball.position.z << ") dist=" << dist << "m" << std::endl;
-                        });
+                        if (hand_on_screen) {
+                            ball.position = hand.wrist_pos_3d;
+                            ball.pixel_pos = hand_2d;
+                            ball.tracking_reason = "Held_NoProfile@Wrist";
+                            ball.color_predictor.addDetection(ball.position);
+                        } else {
+                            ball.position = cv::Point3f(0, 0, 0);
+                            ball.pixel_pos = cv::Point2f(-1, -1);
+                            ball.tracking_reason = "Held_OFF-SCREEN";
+                        }
                     }
                     break;
                 }

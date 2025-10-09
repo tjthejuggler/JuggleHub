@@ -932,6 +932,13 @@ if PYQT_AVAILABLE:
                 
                 ball_html += f'&nbsp;&nbsp;ML Detection: {ml_status}<br>'
                 
+                # Add confidence scores if available
+                if hasattr(ball, 'matched_detection_confidence') and ball.matched_detection_confidence > 0:
+                    ball_html += f'&nbsp;&nbsp;YOLO Confidence: {ball.matched_detection_confidence:.2f}<br>'
+                
+                if hasattr(ball, 'matched_detection_color_score') and ball.matched_detection_color_score > 0:
+                    ball_html += f'&nbsp;&nbsp;Color Match Score: {ball.matched_detection_color_score:.2f}<br>'
+                
                 # Add distance to nearest wrist
                 if hasattr(ball, 'distance_to_nearest_wrist') and ball.distance_to_nearest_wrist >= 0:
                     dist_cm = ball.distance_to_nearest_wrist * 100  # Convert m to cm

@@ -119,6 +119,12 @@ if PYQT_AVAILABLE:
             self.color_tracker_weights_section = self.create_color_tracker_weights_section()
             container_layout.addWidget(self.color_tracker_weights_section)
             
+            self.override_detection_section = self.create_override_detection_section()
+            container_layout.addWidget(self.override_detection_section)
+            
+            self.held_color_blob_section = self.create_held_color_blob_section()
+            container_layout.addWidget(self.held_color_blob_section)
+            
             self.ball_profiles_section = self.create_ball_profiles_section()
             container_layout.addWidget(self.ball_profiles_section)
             
@@ -689,6 +695,188 @@ if PYQT_AVAILABLE:
             
             return section
         
+        def create_override_detection_section(self):
+            """Create the Override Detection Settings section"""
+            section = CollapsibleGroupBox("⚡ Override Detection", collapsed=False)
+            layout = QGridLayout()
+            section.get_content_layout().addLayout(layout)
+            
+            row = 0
+            
+            # Info label
+            info_label = QLabel("ℹ️ Force tracker placement when high-confidence detections exist\n"
+                               "Prevents trackers from disappearing when balls are clearly visible")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label, row, 0, 1, 3)
+            row += 1
+            
+            # Separator for tracked ball settings
+            layout.addWidget(QLabel("When Ball IS Being Tracked:"), row, 0, 1, 3)
+            row += 1
+            
+            # Override min confidence (tracked)
+            self.od_min_confidence_tracked_slider, self.od_min_confidence_tracked_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min YOLO Confidence",
+                tooltip_text="Minimum YOLO confidence to force tracker placement when ball is already tracked.\n"
+                             "Range: 0.00-1.00. Default: 0.50.\n"
+                             "Lower values = more aggressive tracker placement.\n"
+                             "Use this to prevent trackers from disappearing during brief occlusions.",
+                range_min=0,
+                range_max=100,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('override_min_confidence_tracked', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Override min color score (tracked)
+            self.od_min_color_score_tracked_slider, self.od_min_color_score_tracked_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Color Match Score",
+                tooltip_text="Minimum color match score to force tracker placement when ball is already tracked.\n"
+                             "Range: 0.00-1.00. Default: 0.60.\n"
+                             "Lower values = more lenient color matching.\n"
+                             "Combine with YOLO confidence for robust detection.",
+                range_min=0,
+                range_max=100,
+                initial_value=60,
+                update_func=lambda v: self.update_setting('override_min_color_score_tracked', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Separator for missing ball settings
+            layout.addWidget(QLabel("When Ball is NOT Being Tracked:"), row, 0, 1, 3)
+            row += 1
+            
+            # Override min confidence (missing)
+            self.od_min_confidence_missing_slider, self.od_min_confidence_missing_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min YOLO Confidence",
+                tooltip_text="Minimum YOLO confidence to create new tracker when ball is not currently tracked.\n"
+                             "Range: 0.00-1.00. Default: 0.70.\n"
+                             "Higher threshold prevents false positives when creating new trackers.\n"
+                             "Lower this if trackers are not appearing when they should.",
+                range_min=0,
+                range_max=100,
+                initial_value=70,
+                update_func=lambda v: self.update_setting('override_min_confidence_missing', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Override min color score (missing)
+            self.od_min_color_score_missing_slider, self.od_min_color_score_missing_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Color Match Score",
+                tooltip_text="Minimum color match score to create new tracker when ball is not currently tracked.\n"
+                             "Range: 0.00-1.00. Default: 0.80.\n"
+                             "Higher threshold ensures only well-matched colors create trackers.\n"
+                             "Lower this if correct-color balls are not being tracked.",
+                range_min=0,
+                range_max=100,
+                initial_value=80,
+                update_func=lambda v: self.update_setting('override_min_color_score_missing', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Info about how it works
+            how_it_works_label = QLabel("💡 How it works: After normal euclidean matching, the system checks for any "
+                                        "high-confidence detections that match a ball's color. If found, it forces "
+                                        "the tracker to that position, preventing disappearance.")
+            how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
+            how_it_works_label.setWordWrap(True)
+            layout.addWidget(how_it_works_label, row, 0, 1, 3)
+            
+            return section
+        
+        def create_held_color_blob_section(self):
+            """Create the Held Color Blob Detection section"""
+            section = CollapsibleGroupBox("🤲 Held Ball Color Detection", collapsed=False)
+            layout = QGridLayout()
+            section.get_content_layout().addLayout(layout)
+            
+            row = 0
+            
+            # Info label
+            info_label = QLabel("ℹ️ Control how the system searches for color blobs when a ball is marked as held\n"
+                               "These settings prevent trackers from jumping to wrong objects (like pants)")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label, row, 0, 1, 3)
+            row += 1
+            
+            # Search radius
+            self.hcb_search_radius_slider, self.hcb_search_radius_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Search Radius (pixels)",
+                tooltip_text="Radius in pixels to search for color blob around hand when ball is held.\n"
+                             "Range: 40-200 pixels. Default: 120 pixels.\n"
+                             "Larger values search wider area but may find wrong objects.\n"
+                             "Smaller values are more precise but may miss the ball.\n"
+                             "⚠️ Reduce to 80-100px if tracker jumps to wrong objects!",
+                range_min=40,
+                range_max=200,
+                initial_value=120,
+                update_func=lambda v: self.update_setting('held_color_search_radius', v),
+                is_float=False
+            )
+            row += 1
+            
+            # Minimum color score
+            self.hcb_min_color_score_slider, self.hcb_min_color_score_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Color Match Score",
+                tooltip_text="Minimum color match score to accept a color blob when ball is held.\n"
+                             "Range: 0.00-1.00. Default: 0.30.\n"
+                             "Higher values = stricter color matching (fewer false positives).\n"
+                             "Lower values = more lenient (may track wrong objects).\n"
+                             "⚠️ Increase to 0.40-0.50 if tracker jumps to pants/clothing!",
+                range_min=0,
+                range_max=100,
+                initial_value=30,
+                update_func=lambda v: self.update_setting('held_color_min_score', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Maximum distance from hand
+            self.hcb_max_distance_slider, self.hcb_max_distance_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Max Distance from Hand (cm)",
+                tooltip_text="Maximum distance from hand to accept a color blob when ball is held.\n"
+                             "Range: 10-50cm. Default: 25cm.\n"
+                             "Prevents tracking distant objects that match the color.\n"
+                             "Lower values = stricter proximity requirement.\n"
+                             "⚠️ Reduce to 15-20cm if tracker jumps to distant objects!",
+                range_min=10,
+                range_max=50,
+                initial_value=25,
+                update_func=lambda v: self.update_setting('held_color_max_distance', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Info about how it works
+            how_it_works_label = QLabel("💡 How it works: When a ball is marked as held, the system searches for "
+                                        "a color blob near the hand. These settings ensure it only accepts blobs "
+                                        "that match the ball's color well AND are close to the hand, preventing "
+                                        "false matches with clothing or other objects.")
+            how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
+            how_it_works_label.setWordWrap(True)
+            layout.addWidget(how_it_works_label, row, 0, 1, 3)
+            
+            return section
 
         def _calculate_hsv_range_from_rgb(self, rgb):
             """Calculate appropriate HSV range from RGB color values."""
@@ -1276,6 +1464,8 @@ if PYQT_AVAILABLE:
                 'collapsed_kalman_prediction': self.kalman_prediction_section.is_collapsed if hasattr(self, 'kalman_prediction_section') and self.kalman_prediction_section else False,
                 'collapsed_color_tracker_weights': self.color_tracker_weights_section.is_collapsed if hasattr(self, 'color_tracker_weights_section') and self.color_tracker_weights_section else False,
                 'collapsed_adaptive_color': self.adaptive_color_section.is_collapsed if hasattr(self, 'adaptive_color_section') else False,
+                'collapsed_override_detection': self.override_detection_section.is_collapsed if hasattr(self, 'override_detection_section') else False,
+                'collapsed_held_color_blob': self.held_color_blob_section.is_collapsed if hasattr(self, 'held_color_blob_section') else False,
                 'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False,
                 
                 # Kalman Prediction settings
@@ -1288,6 +1478,17 @@ if PYQT_AVAILABLE:
                 
                 # Color Sample Radius
                 'color_sample_radius': self._safe_get_slider_value(self.ct_color_sample_radius_slider, 1) if hasattr(self, 'ct_color_sample_radius_slider') else 1,
+                
+                # Override Detection settings
+                'override_min_confidence_tracked': self._safe_get_slider_value(self.od_min_confidence_tracked_slider, 50) / 100.0 if hasattr(self, 'od_min_confidence_tracked_slider') else 0.50,
+                'override_min_color_score_tracked': self._safe_get_slider_value(self.od_min_color_score_tracked_slider, 60) / 100.0 if hasattr(self, 'od_min_color_score_tracked_slider') else 0.60,
+                'override_min_confidence_missing': self._safe_get_slider_value(self.od_min_confidence_missing_slider, 70) / 100.0 if hasattr(self, 'od_min_confidence_missing_slider') else 0.70,
+                'override_min_color_score_missing': self._safe_get_slider_value(self.od_min_color_score_missing_slider, 80) / 100.0 if hasattr(self, 'od_min_color_score_missing_slider') else 0.80,
+                
+                # Held Color Blob Detection settings
+                'held_color_search_radius': self._safe_get_slider_value(self.hcb_search_radius_slider, 120) if hasattr(self, 'hcb_search_radius_slider') else 120,
+                'held_color_min_score': self._safe_get_slider_value(self.hcb_min_color_score_slider, 30) / 100.0 if hasattr(self, 'hcb_min_color_score_slider') else 0.30,
+                'held_color_max_distance': self._safe_get_slider_value(self.hcb_max_distance_slider, 25) / 100.0 if hasattr(self, 'hcb_max_distance_slider') else 0.25,
             }
             
             # Add ball profile settings
@@ -1421,9 +1622,40 @@ if PYQT_AVAILABLE:
             if 'color_sample_radius' in settings and hasattr(self, 'ct_color_sample_radius_slider'):
                 self.ct_color_sample_radius_slider.setValue(settings['color_sample_radius'])
             
+            # Override Detection settings
+            if 'override_min_confidence_tracked' in settings and hasattr(self, 'od_min_confidence_tracked_slider'):
+                self.od_min_confidence_tracked_slider.setValue(int(settings['override_min_confidence_tracked'] * 100))
+            
+            if 'override_min_color_score_tracked' in settings and hasattr(self, 'od_min_color_score_tracked_slider'):
+                self.od_min_color_score_tracked_slider.setValue(int(settings['override_min_color_score_tracked'] * 100))
+            
+            if 'override_min_confidence_missing' in settings and hasattr(self, 'od_min_confidence_missing_slider'):
+                self.od_min_confidence_missing_slider.setValue(int(settings['override_min_confidence_missing'] * 100))
+            
+            if 'override_min_color_score_missing' in settings and hasattr(self, 'od_min_color_score_missing_slider'):
+                self.od_min_color_score_missing_slider.setValue(int(settings['override_min_color_score_missing'] * 100))
+            
+            # Held Color Blob Detection settings
+            if 'held_color_search_radius' in settings and hasattr(self, 'hcb_search_radius_slider'):
+                self.hcb_search_radius_slider.setValue(settings['held_color_search_radius'])
+            
+            if 'held_color_min_score' in settings and hasattr(self, 'hcb_min_color_score_slider'):
+                self.hcb_min_color_score_slider.setValue(int(settings['held_color_min_score'] * 100))
+            
+            if 'held_color_max_distance' in settings and hasattr(self, 'hcb_max_distance_slider'):
+                self.hcb_max_distance_slider.setValue(int(settings['held_color_max_distance'] * 100))  # m to cm
+            
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:
                     self.adaptive_color_section.toggle_collapsed()
+            
+            if 'collapsed_override_detection' in settings and hasattr(self, 'override_detection_section'):
+                if settings['collapsed_override_detection'] != self.override_detection_section.is_collapsed:
+                    self.override_detection_section.toggle_collapsed()
+            
+            if 'collapsed_held_color_blob' in settings and hasattr(self, 'held_color_blob_section'):
+                if settings['collapsed_held_color_blob'] != self.held_color_blob_section.is_collapsed:
+                    self.held_color_blob_section.toggle_collapsed()
             
             if 'collapsed_ball_profiles' in settings and hasattr(self, 'ball_profiles_section'):
                 if settings['collapsed_ball_profiles'] != self.ball_profiles_section.is_collapsed:
@@ -1563,6 +1795,29 @@ if PYQT_AVAILABLE:
             # Color Sample Radius
             if 'color_sample_radius' in settings:
                 self.udp_client.send_setting('color_sample_radius', settings['color_sample_radius'])
+            
+            # Override Detection settings
+            if 'override_min_confidence_tracked' in settings:
+                self.udp_client.send_setting('override_min_confidence_tracked', settings['override_min_confidence_tracked'])
+            
+            if 'override_min_color_score_tracked' in settings:
+                self.udp_client.send_setting('override_min_color_score_tracked', settings['override_min_color_score_tracked'])
+            
+            if 'override_min_confidence_missing' in settings:
+                self.udp_client.send_setting('override_min_confidence_missing', settings['override_min_confidence_missing'])
+            
+            if 'override_min_color_score_missing' in settings:
+                self.udp_client.send_setting('override_min_color_score_missing', settings['override_min_color_score_missing'])
+            
+            # Held Color Blob Detection settings
+            if 'held_color_search_radius' in settings:
+                self.udp_client.send_setting('held_color_search_radius', settings['held_color_search_radius'])
+            
+            if 'held_color_min_score' in settings:
+                self.udp_client.send_setting('held_color_min_score', settings['held_color_min_score'])
+            
+            if 'held_color_max_distance' in settings:
+                self.udp_client.send_setting('held_color_max_distance', settings['held_color_max_distance'])
             
             # Ball tracking enabled states
             if 'ball_tracking_enabled' in settings:

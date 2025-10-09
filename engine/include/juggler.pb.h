@@ -1336,6 +1336,8 @@ class Ball final :
     kStatusFieldNumber = 5,
     kLogicalIdFieldNumber = 7,
     kDistanceToNearestWristFieldNumber = 8,
+    kMatchedDetectionConfidenceFieldNumber = 9,
+    kMatchedDetectionColorScoreFieldNumber = 10,
   };
   // string class_name = 4;
   void clear_class_name();
@@ -1441,6 +1443,24 @@ class Ball final :
   void _internal_set_distance_to_nearest_wrist(float value);
   public:
 
+  // float matched_detection_confidence = 9;
+  void clear_matched_detection_confidence();
+  float matched_detection_confidence() const;
+  void set_matched_detection_confidence(float value);
+  private:
+  float _internal_matched_detection_confidence() const;
+  void _internal_set_matched_detection_confidence(float value);
+  public:
+
+  // float matched_detection_color_score = 10;
+  void clear_matched_detection_color_score();
+  float matched_detection_color_score() const;
+  void set_matched_detection_color_score(float value);
+  private:
+  float _internal_matched_detection_color_score() const;
+  void _internal_set_matched_detection_color_score(float value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.Ball)
  private:
   class _Internal;
@@ -1457,6 +1477,8 @@ class Ball final :
     int status_;
     int32_t logical_id_;
     float distance_to_nearest_wrist_;
+    float matched_detection_confidence_;
+    float matched_detection_color_score_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -7147,6 +7169,46 @@ inline void Ball::_internal_set_distance_to_nearest_wrist(float value) {
 inline void Ball::set_distance_to_nearest_wrist(float value) {
   _internal_set_distance_to_nearest_wrist(value);
   // @@protoc_insertion_point(field_set:juggler.v1.Ball.distance_to_nearest_wrist)
+}
+
+// float matched_detection_confidence = 9;
+inline void Ball::clear_matched_detection_confidence() {
+  _impl_.matched_detection_confidence_ = 0;
+}
+inline float Ball::_internal_matched_detection_confidence() const {
+  return _impl_.matched_detection_confidence_;
+}
+inline float Ball::matched_detection_confidence() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.Ball.matched_detection_confidence)
+  return _internal_matched_detection_confidence();
+}
+inline void Ball::_internal_set_matched_detection_confidence(float value) {
+  
+  _impl_.matched_detection_confidence_ = value;
+}
+inline void Ball::set_matched_detection_confidence(float value) {
+  _internal_set_matched_detection_confidence(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.Ball.matched_detection_confidence)
+}
+
+// float matched_detection_color_score = 10;
+inline void Ball::clear_matched_detection_color_score() {
+  _impl_.matched_detection_color_score_ = 0;
+}
+inline float Ball::_internal_matched_detection_color_score() const {
+  return _impl_.matched_detection_color_score_;
+}
+inline float Ball::matched_detection_color_score() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.Ball.matched_detection_color_score)
+  return _internal_matched_detection_color_score();
+}
+inline void Ball::_internal_set_matched_detection_color_score(float value) {
+  
+  _impl_.matched_detection_color_score_ = value;
+}
+inline void Ball::set_matched_detection_color_score(float value) {
+  _internal_set_matched_detection_color_score(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.Ball.matched_detection_color_score)
 }
 
 // -------------------------------------------------------------------

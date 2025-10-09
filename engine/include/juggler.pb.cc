@@ -109,6 +109,8 @@ PROTOBUF_CONSTEXPR Ball::Ball(
   , /*decltype(_impl_.status_)*/0
   , /*decltype(_impl_.logical_id_)*/0
   , /*decltype(_impl_.distance_to_nearest_wrist_)*/0
+  , /*decltype(_impl_.matched_detection_confidence_)*/0
+  , /*decltype(_impl_.matched_detection_color_score_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct BallDefaultTypeInternal {
   PROTOBUF_CONSTEXPR BallDefaultTypeInternal()
@@ -565,6 +567,8 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Ball, _impl_.projected_pos_2d_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Ball, _impl_.logical_id_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Ball, _impl_.distance_to_nearest_wrist_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Ball, _impl_.matched_detection_confidence_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Ball, _impl_.matched_detection_color_score_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorTrackedBall, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -836,26 +840,26 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 26, -1, -1, sizeof(::juggler::v1::HSVRange)},
   { 34, -1, -1, sizeof(::juggler::v1::BoundingBox2D)},
   { 47, -1, -1, sizeof(::juggler::v1::Ball)},
-  { 61, -1, -1, sizeof(::juggler::v1::ColorTrackedBall)},
-  { 74, -1, -1, sizeof(::juggler::v1::KeyPoint)},
-  { 83, -1, -1, sizeof(::juggler::v1::Hand)},
-  { 97, -1, -1, sizeof(::juggler::v1::IMUData)},
-  { 112, -1, -1, sizeof(::juggler::v1::ThrowCatchEvent)},
-  { 124, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
-  { 135, -1, -1, sizeof(::juggler::v1::SystemStatus)},
-  { 148, -1, -1, sizeof(::juggler::v1::KalmanPrediction)},
-  { 158, -1, -1, sizeof(::juggler::v1::FilteredDetection)},
-  { 167, -1, -1, sizeof(::juggler::v1::TrackerAssociation)},
-  { 178, -1, -1, sizeof(::juggler::v1::NewTracker)},
-  { 188, -1, -1, sizeof(::juggler::v1::BallState)},
-  { 199, -1, -1, sizeof(::juggler::v1::OcclusionState)},
-  { 209, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
-  { 222, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 251, 259, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 261, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 287, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
-  { 307, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 315, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 63, -1, -1, sizeof(::juggler::v1::ColorTrackedBall)},
+  { 76, -1, -1, sizeof(::juggler::v1::KeyPoint)},
+  { 85, -1, -1, sizeof(::juggler::v1::Hand)},
+  { 99, -1, -1, sizeof(::juggler::v1::IMUData)},
+  { 114, -1, -1, sizeof(::juggler::v1::ThrowCatchEvent)},
+  { 126, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
+  { 137, -1, -1, sizeof(::juggler::v1::SystemStatus)},
+  { 150, -1, -1, sizeof(::juggler::v1::KalmanPrediction)},
+  { 160, -1, -1, sizeof(::juggler::v1::FilteredDetection)},
+  { 169, -1, -1, sizeof(::juggler::v1::TrackerAssociation)},
+  { 180, -1, -1, sizeof(::juggler::v1::NewTracker)},
+  { 190, -1, -1, sizeof(::juggler::v1::BallState)},
+  { 201, -1, -1, sizeof(::juggler::v1::OcclusionState)},
+  { 211, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
+  { 224, -1, -1, sizeof(::juggler::v1::FrameData)},
+  { 253, 261, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 263, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 289, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
+  { 309, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 317, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -897,146 +901,147 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "undingBox2D\022\t\n\001x\030\001 \001(\002\022\t\n\001y\030\002 \001(\002\022\r\n\005wid"
   "th\030\003 \001(\002\022\016\n\006height\030\004 \001(\002\022\022\n\nconfidence\030\005"
   " \001(\002\022\020\n\010class_id\030\006 \001(\005\022\022\n\nclass_name\030\007 \001"
-  "(\t\"\304\002\n\004Ball\022\n\n\002id\030\001 \001(\005\022%\n\010position\030\002 \001("
+  "(\t\"\221\003\n\004Ball\022\n\n\002id\030\001 \001(\005\022%\n\010position\030\002 \001("
   "\0132\023.juggler.v1.Vector3\0222\n\017bounding_box_2"
   "d\030\003 \001(\0132\031.juggler.v1.BoundingBox2D\022\022\n\ncl"
   "ass_name\030\004 \001(\t\022\'\n\006status\030\005 \001(\0162\027.juggler"
   ".v1.Ball.Status\022-\n\020projected_pos_2d\030\006 \001("
   "\0132\023.juggler.v1.Vector2\022\022\n\nlogical_id\030\007 \001"
-  "(\005\022!\n\031distance_to_nearest_wrist\030\010 \001(\002\"2\n"
-  "\006Status\022\013\n\007TRACKED\020\000\022\r\n\tPREDICTED\020\001\022\014\n\010O"
-  "CCLUDED\020\002\"\325\001\n\020ColorTrackedBall\022\022\n\nlogica"
-  "l_id\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022&\n\tpixel_"
-  "pos\030\003 \001(\0132\023.juggler.v1.Vector2\022&\n\tworld_"
-  "pos\030\004 \001(\0132\023.juggler.v1.Vector3\022\021\n\tis_act"
-  "ive\030\005 \001(\010\022\033\n\023associated_wrist_id\030\006 \001(\005\022\031"
-  "\n\021frames_since_seen\030\007 \001(\005\"h\n\010KeyPoint\022#\n"
-  "\006pos_2d\030\001 \001(\0132\023.juggler.v1.Vector2\022#\n\006po"
-  "s_3d\030\002 \001(\0132\023.juggler.v1.Vector3\022\022\n\nconfi"
-  "dence\030\003 \001(\002\"\360\001\n\004Hand\022\n\n\002id\030\001 \001(\005\022(\n\013posi"
-  "tion_2d\030\002 \001(\0132\023.juggler.v1.Vector2\022)\n\014wr"
-  "ist_pos_3d\030\003 \001(\0132\023.juggler.v1.Vector3\022\022\n"
-  "\nconfidence\030\004 \001(\001\022\022\n\nis_visible\030\005 \001(\010\022\'\n"
-  "\tkeypoints\030\006 \003(\0132\024.juggler.v1.KeyPoint\022\014"
-  "\n\004side\030\007 \001(\t\022(\n\013position_3d\030\010 \001(\0132\023.jugg"
-  "ler.v1.Vector3\"\211\002\n\007IMUData\022\022\n\nwatch_name"
-  "\030\001 \001(\t\022\020\n\010watch_ip\030\002 \001(\t\022)\n\014acceleration"
-  "\030\003 \001(\0132\023.juggler.v1.Vector3\022&\n\tgyroscope"
-  "\030\004 \001(\0132\023.juggler.v1.Vector3\022)\n\014magnetome"
-  "ter\030\005 \001(\0132\023.juggler.v1.Vector3\022\027\n\017accel_"
-  "magnitude\030\006 \001(\001\022\026\n\016gyro_magnitude\030\007 \001(\001\022"
-  "\024\n\014timestamp_us\030\010 \001(\004\022\023\n\013data_age_ms\030\t \001"
-  "(\001\"\334\001\n\017ThrowCatchEvent\0223\n\004type\030\001 \001(\0162%.j"
-  "uggler.v1.ThrowCatchEvent.EventType\022\017\n\007b"
-  "all_id\030\002 \001(\005\022\017\n\007hand_id\030\003 \001(\005\022\024\n\014timesta"
-  "mp_us\030\004 \001(\004\022%\n\010position\030\005 \001(\0132\023.juggler."
-  "v1.Vector3\022\022\n\nconfidence\030\006 \001(\002\"!\n\tEventT"
-  "ype\022\t\n\005THROW\020\000\022\t\n\005CATCH\020\001\"Y\n\020CameraIntri"
-  "nsics\022\n\n\002fx\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003ppx\030\003 \001"
-  "(\001\022\013\n\003ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001\"\235\001\n"
-  "\014SystemStatus\022\030\n\020camera_connected\030\001 \001(\010\022"
-  "\026\n\016engine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001(\001\022\023\n\013"
-  "frame_count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\rerror"
-  "_message\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001(\004\"\231\001\n"
-  "\020KalmanPrediction\022\022\n\nlogical_id\030\001 \001(\005\022*\n"
-  "\rpredicted_pos\030\002 \001(\0132\023.juggler.v1.Vector"
-  "3\022-\n\020predicted_pos_2d\030\003 \001(\0132\023.juggler.v1"
-  ".Vector2\022\026\n\016is_in_freefall\030\004 \001(\010\"`\n\021Filt"
-  "eredDetection\022&\n\003box\030\001 \001(\0132\031.juggler.v1."
-  "BoundingBox2D\022\016\n\006reason\030\002 \001(\t\022\023\n\013depth_v"
-  "alue\030\003 \001(\002\"\254\001\n\022TrackerAssociation\022\022\n\ntra"
-  "cker_id\030\001 \001(\005\022\027\n\017detection_index\030\002 \001(\005\022\023"
-  "\n\013distance_3d\030\003 \001(\002\022(\n\013tracker_pos\030\004 \001(\013"
-  "2\023.juggler.v1.Vector3\022*\n\rdetection_pos\030\005"
-  " \001(\0132\023.juggler.v1.Vector3\"\220\001\n\nNewTracker"
-  "\022\022\n\nlogical_id\030\001 \001(\005\022(\n\013initial_pos\030\002 \001("
-  "\0132\023.juggler.v1.Vector3\022+\n\016initial_pos_2d"
-  "\030\003 \001(\0132\023.juggler.v1.Vector2\022\027\n\017detection"
-  "_index\030\004 \001(\005\"\311\001\n\tBallState\022\022\n\nlogical_id"
-  "\030\001 \001(\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1.BallS"
-  "tate.State\022\032\n\022associated_hand_id\030\003 \001(\005\022\022"
-  "\n\nconfidence\030\004 \001(\002\022\027\n\017frames_in_state\030\005 "
-  "\001(\005\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRANSITIO"
-  "NING\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022\022\n\nlo"
-  "gical_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010\022\031\n\021o"
-  "ccluding_hand_id\030\003 \001(\005\022\030\n\020distance_to_ha"
-  "nd\030\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nlogica"
-  "l_id\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rsearch"
-  "_center\030\003 \001(\0132\023.juggler.v1.Vector2\022\025\n\rse"
-  "arch_radius\030\004 \001(\002\022(\n\013blob_center\030\005 \001(\0132\023"
-  ".juggler.v1.Vector2\022\021\n\tblob_area\030\006 \001(\002\022\r"
-  "\n\005found\030\007 \001(\010\"\327\007\n\tFrameData\022\024\n\014timestamp"
-  "_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler.v1.Ba"
-  "ll\022\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand\022%\n\010i"
-  "mu_data\030\004 \003(\0132\023.juggler.v1.IMUData\0220\n\nin"
-  "trinsics\030\005 \001(\0132\034.juggler.v1.CameraIntrin"
-  "sics\022(\n\006status\030\006 \001(\0132\030.juggler.v1.System"
-  "Status\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014frame_hei"
-  "ght\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016raw_d"
-  "etections\030\n \003(\0132\031.juggler.v1.BoundingBox"
-  "2D\0227\n\024unmatched_detections\030\020 \003(\0132\031.juggl"
-  "er.v1.BoundingBox2D\022\027\n\017color_image_b64\030\013"
-  " \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir_proj"
-  "ector_active\030\r \001(\010\0229\n\023color_tracked_ball"
-  "s\030\016 \003(\0132\034.juggler.v1.ColorTrackedBall\0227\n"
-  "\022throw_catch_events\030\017 \003(\0132\033.juggler.v1.T"
-  "hrowCatchEvent\0228\n\022kalman_predictions\030\021 \003"
-  "(\0132\034.juggler.v1.KalmanPrediction\022:\n\023filt"
-  "ered_detections\030\022 \003(\0132\035.juggler.v1.Filte"
-  "redDetection\022<\n\024tracker_associations\030\023 \003"
-  "(\0132\036.juggler.v1.TrackerAssociation\022,\n\014ne"
-  "w_trackers\030\024 \003(\0132\026.juggler.v1.NewTracker"
-  "\022*\n\013ball_states\030\025 \003(\0132\025.juggler.v1.BallS"
-  "tate\0224\n\020occlusion_states\030\026 \003(\0132\032.juggler"
-  ".v1.OcclusionState\022;\n\024color_search_regio"
-  "ns\030\027 \003(\0132\035.juggler.v1.ColorSearchRegion\""
-  "\335\010\n\016CommandRequest\0224\n\004type\030\001 \001(\0162&.juggl"
-  "er.v1.CommandRequest.CommandType\022\023\n\013modu"
-  "le_name\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/\n\rc"
-  "olor_command\030\004 \001(\0132\030.juggler.v1.ColorCom"
-  "mand\022\?\n\013module_args\030\005 \003(\0132*.juggler.v1.C"
-  "ommandRequest.ModuleArgsEntry\022\034\n\024camera_"
-  "settings_file\030\006 \001(\t\022\024\n\014camera_width\030\007 \001("
-  "\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n\ncamera_fps\030\t"
-  " \001(\r\022\037\n\027logical_id_to_calibrate\030\n \001(\005\0222\n"
-  "\025calibration_pixel_pos\030\013 \001(\0132\023.juggler.v"
-  "1.Vector2\022\036\n\026record_with_yolo_boxes\030\014 \001("
-  "\010\022#\n\033record_with_bytetrack_boxes\030\r \001(\010\022\032"
-  "\n\022pose_model_enabled\030\016 \001(\010\022=\n\024visualizat"
-  "ion_states\030\023 \001(\0132\037.juggler.v1.Visualizat"
-  "ionStates\022\022\n\ncolor_name\030\017 \001(\t\022\017\n\007click_x"
-  "\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014feature_name\030"
-  "\022 \001(\t\022\032\n\022video_feed_enabled\030\024 \001(\010\0321\n\017Mod"
-  "uleArgsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t"
-  ":\0028\001\"\210\003\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOA"
-  "D_MODULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_CO"
-  "LOR_COMMAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014R"
-  "ECORD_START\020\005\022\033\n\027RECORD_CONTINUOUS_START"
-  "\020\006\022\032\n\026RECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTAR"
-  "T_WITH_CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020"
-  "\t\022\020\n\014CAMERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020"
-  "\013\022\032\n\026SET_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRA"
-  "TE_COLOR\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABL"
-  "E_FEATURE\020\017\022\032\n\026SET_VIDEO_FEED_ENABLED\020\020\""
-  "\232\003\n\023VisualizationStates\022\037\n\027show_kalman_p"
-  "redictions\030\001 \001(\010\022\033\n\023show_raw_detections\030"
-  "\002 \001(\010\022 \n\030show_filtered_detections\030\003 \001(\010\022"
-  "\031\n\021show_associations\030\004 \001(\010\022\031\n\021show_new_t"
-  "rackers\030\005 \001(\010\022\032\n\022show_hand_tracking\030\006 \001("
-  "\010\022\030\n\020show_ball_states\030\007 \001(\010\022\026\n\016show_occl"
-  "usion\030\010 \001(\010\022\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021sh"
-  "ow_color_search\030\n \001(\010\022\032\n\022show_color_trac"
-  "ker\030\013 \001(\010\022\032\n\022show_tracked_boxes\030\014 \001(\010\022!\n"
-  "\031show_unmatched_detections\030\r \001(\010\022\022\n\nshow"
-  "_tails\030\016 \001(\010\"A\n\014ColorCommand\022\017\n\007ball_id\030"
-  "\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color\""
-  "I\n\017CommandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007m"
-  "essage\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006prot"
-  "o3"
+  "(\005\022!\n\031distance_to_nearest_wrist\030\010 \001(\002\022$\n"
+  "\034matched_detection_confidence\030\t \001(\002\022%\n\035m"
+  "atched_detection_color_score\030\n \001(\002\"2\n\006St"
+  "atus\022\013\n\007TRACKED\020\000\022\r\n\tPREDICTED\020\001\022\014\n\010OCCL"
+  "UDED\020\002\"\325\001\n\020ColorTrackedBall\022\022\n\nlogical_i"
+  "d\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022&\n\tpixel_pos"
+  "\030\003 \001(\0132\023.juggler.v1.Vector2\022&\n\tworld_pos"
+  "\030\004 \001(\0132\023.juggler.v1.Vector3\022\021\n\tis_active"
+  "\030\005 \001(\010\022\033\n\023associated_wrist_id\030\006 \001(\005\022\031\n\021f"
+  "rames_since_seen\030\007 \001(\005\"h\n\010KeyPoint\022#\n\006po"
+  "s_2d\030\001 \001(\0132\023.juggler.v1.Vector2\022#\n\006pos_3"
+  "d\030\002 \001(\0132\023.juggler.v1.Vector3\022\022\n\nconfiden"
+  "ce\030\003 \001(\002\"\360\001\n\004Hand\022\n\n\002id\030\001 \001(\005\022(\n\013positio"
+  "n_2d\030\002 \001(\0132\023.juggler.v1.Vector2\022)\n\014wrist"
+  "_pos_3d\030\003 \001(\0132\023.juggler.v1.Vector3\022\022\n\nco"
+  "nfidence\030\004 \001(\001\022\022\n\nis_visible\030\005 \001(\010\022\'\n\tke"
+  "ypoints\030\006 \003(\0132\024.juggler.v1.KeyPoint\022\014\n\004s"
+  "ide\030\007 \001(\t\022(\n\013position_3d\030\010 \001(\0132\023.juggler"
+  ".v1.Vector3\"\211\002\n\007IMUData\022\022\n\nwatch_name\030\001 "
+  "\001(\t\022\020\n\010watch_ip\030\002 \001(\t\022)\n\014acceleration\030\003 "
+  "\001(\0132\023.juggler.v1.Vector3\022&\n\tgyroscope\030\004 "
+  "\001(\0132\023.juggler.v1.Vector3\022)\n\014magnetometer"
+  "\030\005 \001(\0132\023.juggler.v1.Vector3\022\027\n\017accel_mag"
+  "nitude\030\006 \001(\001\022\026\n\016gyro_magnitude\030\007 \001(\001\022\024\n\014"
+  "timestamp_us\030\010 \001(\004\022\023\n\013data_age_ms\030\t \001(\001\""
+  "\334\001\n\017ThrowCatchEvent\0223\n\004type\030\001 \001(\0162%.jugg"
+  "ler.v1.ThrowCatchEvent.EventType\022\017\n\007ball"
+  "_id\030\002 \001(\005\022\017\n\007hand_id\030\003 \001(\005\022\024\n\014timestamp_"
+  "us\030\004 \001(\004\022%\n\010position\030\005 \001(\0132\023.juggler.v1."
+  "Vector3\022\022\n\nconfidence\030\006 \001(\002\"!\n\tEventType"
+  "\022\t\n\005THROW\020\000\022\t\n\005CATCH\020\001\"Y\n\020CameraIntrinsi"
+  "cs\022\n\n\002fx\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003ppx\030\003 \001(\001\022"
+  "\013\n\003ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001\"\235\001\n\014Sy"
+  "stemStatus\022\030\n\020camera_connected\030\001 \001(\010\022\026\n\016"
+  "engine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001(\001\022\023\n\013fra"
+  "me_count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\rerror_me"
+  "ssage\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001(\004\"\231\001\n\020Ka"
+  "lmanPrediction\022\022\n\nlogical_id\030\001 \001(\005\022*\n\rpr"
+  "edicted_pos\030\002 \001(\0132\023.juggler.v1.Vector3\022-"
+  "\n\020predicted_pos_2d\030\003 \001(\0132\023.juggler.v1.Ve"
+  "ctor2\022\026\n\016is_in_freefall\030\004 \001(\010\"`\n\021Filtere"
+  "dDetection\022&\n\003box\030\001 \001(\0132\031.juggler.v1.Bou"
+  "ndingBox2D\022\016\n\006reason\030\002 \001(\t\022\023\n\013depth_valu"
+  "e\030\003 \001(\002\"\254\001\n\022TrackerAssociation\022\022\n\ntracke"
+  "r_id\030\001 \001(\005\022\027\n\017detection_index\030\002 \001(\005\022\023\n\013d"
+  "istance_3d\030\003 \001(\002\022(\n\013tracker_pos\030\004 \001(\0132\023."
+  "juggler.v1.Vector3\022*\n\rdetection_pos\030\005 \001("
+  "\0132\023.juggler.v1.Vector3\"\220\001\n\nNewTracker\022\022\n"
+  "\nlogical_id\030\001 \001(\005\022(\n\013initial_pos\030\002 \001(\0132\023"
+  ".juggler.v1.Vector3\022+\n\016initial_pos_2d\030\003 "
+  "\001(\0132\023.juggler.v1.Vector2\022\027\n\017detection_in"
+  "dex\030\004 \001(\005\"\311\001\n\tBallState\022\022\n\nlogical_id\030\001 "
+  "\001(\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1.BallStat"
+  "e.State\022\032\n\022associated_hand_id\030\003 \001(\005\022\022\n\nc"
+  "onfidence\030\004 \001(\002\022\027\n\017frames_in_state\030\005 \001(\005"
+  "\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRANSITIONIN"
+  "G\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022\022\n\nlogic"
+  "al_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010\022\031\n\021occl"
+  "uding_hand_id\030\003 \001(\005\022\030\n\020distance_to_hand\030"
+  "\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nlogical_i"
+  "d\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rsearch_ce"
+  "nter\030\003 \001(\0132\023.juggler.v1.Vector2\022\025\n\rsearc"
+  "h_radius\030\004 \001(\002\022(\n\013blob_center\030\005 \001(\0132\023.ju"
+  "ggler.v1.Vector2\022\021\n\tblob_area\030\006 \001(\002\022\r\n\005f"
+  "ound\030\007 \001(\010\"\327\007\n\tFrameData\022\024\n\014timestamp_us"
+  "\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler.v1.Ball\022"
+  "\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand\022%\n\010imu_"
+  "data\030\004 \003(\0132\023.juggler.v1.IMUData\0220\n\nintri"
+  "nsics\030\005 \001(\0132\034.juggler.v1.CameraIntrinsic"
+  "s\022(\n\006status\030\006 \001(\0132\030.juggler.v1.SystemSta"
+  "tus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014frame_height"
+  "\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016raw_dete"
+  "ctions\030\n \003(\0132\031.juggler.v1.BoundingBox2D\022"
+  "7\n\024unmatched_detections\030\020 \003(\0132\031.juggler."
+  "v1.BoundingBox2D\022\027\n\017color_image_b64\030\013 \001("
+  "\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir_project"
+  "or_active\030\r \001(\010\0229\n\023color_tracked_balls\030\016"
+  " \003(\0132\034.juggler.v1.ColorTrackedBall\0227\n\022th"
+  "row_catch_events\030\017 \003(\0132\033.juggler.v1.Thro"
+  "wCatchEvent\0228\n\022kalman_predictions\030\021 \003(\0132"
+  "\034.juggler.v1.KalmanPrediction\022:\n\023filtere"
+  "d_detections\030\022 \003(\0132\035.juggler.v1.Filtered"
+  "Detection\022<\n\024tracker_associations\030\023 \003(\0132"
+  "\036.juggler.v1.TrackerAssociation\022,\n\014new_t"
+  "rackers\030\024 \003(\0132\026.juggler.v1.NewTracker\022*\n"
+  "\013ball_states\030\025 \003(\0132\025.juggler.v1.BallStat"
+  "e\0224\n\020occlusion_states\030\026 \003(\0132\032.juggler.v1"
+  ".OcclusionState\022;\n\024color_search_regions\030"
+  "\027 \003(\0132\035.juggler.v1.ColorSearchRegion\"\335\010\n"
+  "\016CommandRequest\0224\n\004type\030\001 \001(\0162&.juggler."
+  "v1.CommandRequest.CommandType\022\023\n\013module_"
+  "name\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/\n\rcolo"
+  "r_command\030\004 \001(\0132\030.juggler.v1.ColorComman"
+  "d\022\?\n\013module_args\030\005 \003(\0132*.juggler.v1.Comm"
+  "andRequest.ModuleArgsEntry\022\034\n\024camera_set"
+  "tings_file\030\006 \001(\t\022\024\n\014camera_width\030\007 \001(\r\022\025"
+  "\n\rcamera_height\030\010 \001(\r\022\022\n\ncamera_fps\030\t \001("
+  "\r\022\037\n\027logical_id_to_calibrate\030\n \001(\005\0222\n\025ca"
+  "libration_pixel_pos\030\013 \001(\0132\023.juggler.v1.V"
+  "ector2\022\036\n\026record_with_yolo_boxes\030\014 \001(\010\022#"
+  "\n\033record_with_bytetrack_boxes\030\r \001(\010\022\032\n\022p"
+  "ose_model_enabled\030\016 \001(\010\022=\n\024visualization"
+  "_states\030\023 \001(\0132\037.juggler.v1.Visualization"
+  "States\022\022\n\ncolor_name\030\017 \001(\t\022\017\n\007click_x\030\020 "
+  "\001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014feature_name\030\022 \001"
+  "(\t\022\032\n\022video_feed_enabled\030\024 \001(\010\0321\n\017Module"
+  "ArgsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028"
+  "\001\"\210\003\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_M"
+  "ODULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR"
+  "_COMMAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECO"
+  "RD_START\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022"
+  "\032\n\026RECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_W"
+  "ITH_CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020"
+  "\n\014CAMERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032"
+  "\n\026SET_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_"
+  "COLOR\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_F"
+  "EATURE\020\017\022\032\n\026SET_VIDEO_FEED_ENABLED\020\020\"\232\003\n"
+  "\023VisualizationStates\022\037\n\027show_kalman_pred"
+  "ictions\030\001 \001(\010\022\033\n\023show_raw_detections\030\002 \001"
+  "(\010\022 \n\030show_filtered_detections\030\003 \001(\010\022\031\n\021"
+  "show_associations\030\004 \001(\010\022\031\n\021show_new_trac"
+  "kers\030\005 \001(\010\022\032\n\022show_hand_tracking\030\006 \001(\010\022\030"
+  "\n\020show_ball_states\030\007 \001(\010\022\026\n\016show_occlusi"
+  "on\030\010 \001(\010\022\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021show_"
+  "color_search\030\n \001(\010\022\032\n\022show_color_tracker"
+  "\030\013 \001(\010\022\032\n\022show_tracked_boxes\030\014 \001(\010\022!\n\031sh"
+  "ow_unmatched_detections\030\r \001(\010\022\022\n\nshow_ta"
+  "ils\030\016 \001(\010\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001"
+  "(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017"
+  "CommandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007mess"
+  "age\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 5762, descriptor_table_protodef_juggler_2eproto,
+    false, false, 5839, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 26,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -2608,6 +2613,8 @@ Ball::Ball(const Ball& from)
     , decltype(_impl_.status_){}
     , decltype(_impl_.logical_id_){}
     , decltype(_impl_.distance_to_nearest_wrist_){}
+    , decltype(_impl_.matched_detection_confidence_){}
+    , decltype(_impl_.matched_detection_color_score_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -2629,8 +2636,8 @@ Ball::Ball(const Ball& from)
     _this->_impl_.projected_pos_2d_ = new ::juggler::v1::Vector2(*from._impl_.projected_pos_2d_);
   }
   ::memcpy(&_impl_.id_, &from._impl_.id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.distance_to_nearest_wrist_) -
-    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.distance_to_nearest_wrist_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.matched_detection_color_score_) -
+    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.matched_detection_color_score_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.Ball)
 }
 
@@ -2647,6 +2654,8 @@ inline void Ball::SharedCtor(
     , decltype(_impl_.status_){0}
     , decltype(_impl_.logical_id_){0}
     , decltype(_impl_.distance_to_nearest_wrist_){0}
+    , decltype(_impl_.matched_detection_confidence_){0}
+    , decltype(_impl_.matched_detection_color_score_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.class_name_.InitDefault();
@@ -2696,8 +2705,8 @@ void Ball::Clear() {
   }
   _impl_.projected_pos_2d_ = nullptr;
   ::memset(&_impl_.id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.distance_to_nearest_wrist_) -
-      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.distance_to_nearest_wrist_));
+      reinterpret_cast<char*>(&_impl_.matched_detection_color_score_) -
+      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.matched_detection_color_score_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2770,6 +2779,22 @@ const char* Ball::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
       case 8:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 69)) {
           _impl_.distance_to_nearest_wrist_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      // float matched_detection_confidence = 9;
+      case 9:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 77)) {
+          _impl_.matched_detection_confidence_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      // float matched_detection_color_score = 10;
+      case 10:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 85)) {
+          _impl_.matched_detection_color_score_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
           ptr += sizeof(float);
         } else
           goto handle_unusual;
@@ -2863,6 +2888,26 @@ uint8_t* Ball::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteFloatToArray(8, this->_internal_distance_to_nearest_wrist(), target);
   }
 
+  // float matched_detection_confidence = 9;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_matched_detection_confidence = this->_internal_matched_detection_confidence();
+  uint32_t raw_matched_detection_confidence;
+  memcpy(&raw_matched_detection_confidence, &tmp_matched_detection_confidence, sizeof(tmp_matched_detection_confidence));
+  if (raw_matched_detection_confidence != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(9, this->_internal_matched_detection_confidence(), target);
+  }
+
+  // float matched_detection_color_score = 10;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_matched_detection_color_score = this->_internal_matched_detection_color_score();
+  uint32_t raw_matched_detection_color_score;
+  memcpy(&raw_matched_detection_color_score, &tmp_matched_detection_color_score, sizeof(tmp_matched_detection_color_score));
+  if (raw_matched_detection_color_score != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(10, this->_internal_matched_detection_color_score(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -2932,6 +2977,24 @@ size_t Ball::ByteSizeLong() const {
     total_size += 1 + 4;
   }
 
+  // float matched_detection_confidence = 9;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_matched_detection_confidence = this->_internal_matched_detection_confidence();
+  uint32_t raw_matched_detection_confidence;
+  memcpy(&raw_matched_detection_confidence, &tmp_matched_detection_confidence, sizeof(tmp_matched_detection_confidence));
+  if (raw_matched_detection_confidence != 0) {
+    total_size += 1 + 4;
+  }
+
+  // float matched_detection_color_score = 10;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_matched_detection_color_score = this->_internal_matched_detection_color_score();
+  uint32_t raw_matched_detection_color_score;
+  memcpy(&raw_matched_detection_color_score, &tmp_matched_detection_color_score, sizeof(tmp_matched_detection_color_score));
+  if (raw_matched_detection_color_score != 0) {
+    total_size += 1 + 4;
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -2981,6 +3044,20 @@ void Ball::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_
   if (raw_distance_to_nearest_wrist != 0) {
     _this->_internal_set_distance_to_nearest_wrist(from._internal_distance_to_nearest_wrist());
   }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_matched_detection_confidence = from._internal_matched_detection_confidence();
+  uint32_t raw_matched_detection_confidence;
+  memcpy(&raw_matched_detection_confidence, &tmp_matched_detection_confidence, sizeof(tmp_matched_detection_confidence));
+  if (raw_matched_detection_confidence != 0) {
+    _this->_internal_set_matched_detection_confidence(from._internal_matched_detection_confidence());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_matched_detection_color_score = from._internal_matched_detection_color_score();
+  uint32_t raw_matched_detection_color_score;
+  memcpy(&raw_matched_detection_color_score, &tmp_matched_detection_color_score, sizeof(tmp_matched_detection_color_score));
+  if (raw_matched_detection_color_score != 0) {
+    _this->_internal_set_matched_detection_color_score(from._internal_matched_detection_color_score());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -3005,8 +3082,8 @@ void Ball::InternalSwap(Ball* other) {
       &other->_impl_.class_name_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(Ball, _impl_.distance_to_nearest_wrist_)
-      + sizeof(Ball::_impl_.distance_to_nearest_wrist_)
+      PROTOBUF_FIELD_OFFSET(Ball, _impl_.matched_detection_color_score_)
+      + sizeof(Ball::_impl_.matched_detection_color_score_)
       - PROTOBUF_FIELD_OFFSET(Ball, _impl_.position_)>(
           reinterpret_cast<char*>(&_impl_.position_),
           reinterpret_cast<char*>(&other->_impl_.position_));

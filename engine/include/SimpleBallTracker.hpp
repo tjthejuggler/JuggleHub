@@ -85,10 +85,12 @@ struct SimpleBall {
     KalmanFilter3D kalman;           // Only used when YOLO fails (legacy)
     ColorBasedPredictor color_predictor;  // NEW: Color-based prediction for visualization
     
-    // Confidence
-    float yolo_confidence;           // YOLO detection confidence
-    float color_match_score;         // How well it matches assigned color
+    // Confidence scores (for UI display and override detection)
+    float yolo_confidence;           // YOLO detection confidence (0.0-1.0)
+    float color_match_score;         // How well it matches assigned color (0.0-1.0)
     int yolo_class_id;               // 0=ball, 1=ball_held
+    float matched_detection_confidence;  // Confidence of the YOLO detection used for this tracker
+    float matched_detection_color_score; // Color match score of the YOLO detection used for this tracker
     
     // Debug info for visualization
     std::string tracking_reason;     // Why this position was chosen (for debugging)
@@ -99,7 +101,10 @@ struct SimpleBall {
                    distance_to_nearest_wrist(-1.0f),
                    has_yolo_detection(false), frames_without_yolo(0),
                    yolo_confidence(0.0f), color_match_score(0.0f),
-                   yolo_class_id(0), tracking_reason("") {}
+                   yolo_class_id(0),
+                   matched_detection_confidence(0.0f),
+                   matched_detection_color_score(0.0f),
+                   tracking_reason("") {}
 };
 
 // Ball event (throw/catch)
@@ -152,6 +157,23 @@ struct TrackingSettings {
     // Euclidean color matching temporal consistency settings
     float temporal_consistency_bonus = 0.25f;  // Bonus to reduce distance for detections near previous position (prevents identity swaps)
     float spatial_threshold = 0.40f;  // Maximum distance (m) to apply temporal consistency bonus
+    
+    // Override detection thresholds - force tracker placement when conditions are met
+    // These settings ensure trackers never disappear when high-confidence detections exist
+    
+    // When tracker EXISTS (ball currently being tracked):
+    float override_min_confidence_tracked = 0.50f;     // Minimum YOLO confidence to force tracker placement (default: 0.50)
+    float override_min_color_score_tracked = 0.60f;    // Minimum color match score to force tracker placement (default: 0.60)
+    
+    // When tracker MISSING (no tracker for this color currently):
+    float override_min_confidence_missing = 0.70f;     // Minimum YOLO confidence to create tracker (default: 0.70)
+    float override_min_color_score_missing = 0.80f;    // Minimum color match score to create tracker (default: 0.80)
+    
+    // Held ball color blob detection settings
+    // These control how the system searches for color blobs when a ball is marked as held
+    int held_color_search_radius = 120;                // Search radius in pixels around hand when ball is held (default: 120px)
+    float held_color_min_score = 0.30f;                // Minimum color match score to accept color blob when held (default: 0.30)
+    float held_color_max_distance = 0.25f;             // Maximum distance (m) from hand to accept color blob when held (default: 0.25m)
     
     TrackingSettings() = default;
 };

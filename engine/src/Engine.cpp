@@ -930,7 +930,17 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     for (const auto& event : rec_frame.ball_events) {
         std::string hand_side = event.hand_id == 0 ? "LEFT" : "RIGHT";
         std::string event_type = event.type == BallEvent::THROW ? "THROW" : "CATCH";
-        std::string event_text = event_type + " " + hand_side;
+        
+        // Find the ball to get its color name
+        std::string ball_color = "UNKNOWN";
+        for (const auto& ball : rec_frame.tracked_balls) {
+            if (ball.id == event.ball_id) {
+                ball_color = ball.color_name;
+                break;
+            }
+        }
+        
+        std::string event_text = event_type + " " + hand_side + " (" + ball_color + ")";
         
         // Add to the beginning of info lines
         info_lines.insert(info_lines.begin(), event_text);
@@ -944,6 +954,29 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     
     // Draw raw YOLO detections (before filtering) - darker red, larger boxes
     if (viz.show_raw_detections()) {
+        // Load color profiles for distance calculation
+        std::vector<ColorProfile> color_profiles;
+        try {
+            std::ifstream color_file("hub/color_profiles.json");
+            if (color_file.is_open()) {
+                nlohmann::json color_profiles_json;
+                color_file >> color_profiles_json;
+                
+                for (const auto& profile : color_profiles_json) {
+                    if (profile["enabled"]) {
+                        ColorProfile cp;
+                        cp.name = profile["name"];
+                        cp.enabled = true;
+                        cp.avg_hue = profile["avg_hue"];
+                        cp.avg_saturation = profile["avg_saturation"];
+                        color_profiles.push_back(cp);
+                    }
+                }
+            }
+        } catch (...) {
+            // If loading fails, continue without color distance info
+        }
+        
         int det_num = 1;
         for (const auto& det : rec_frame.raw_detections) {
             // Draw darker red box for raw YOLO detection (thicker line)
@@ -965,11 +998,53 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                        cv::Point(det.box.x + 5, det.box.y + 20),
                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(200, 200, 255), 1, cv::LINE_AA);
             
-            // Add raw YOLO info to panel
+            // Calculate color distances if we have color profiles
+            std::string closest_color = "N/A";
+            float min_distance = 999.0f;
+            
+            if (!color_profiles.empty()) {
+                // Sample color at detection center
+                int center_x = static_cast<int>(det.box.x + det.box.width / 2);
+                int center_y = static_cast<int>(det.box.y + det.box.height / 2);
+                
+                if (center_x >= 0 && center_x < frame.cols && center_y >= 0 && center_y < frame.rows) {
+                    // Convert BGR to HSV for the detection center
+                    cv::Mat roi = frame(cv::Rect(center_x, center_y, 1, 1));
+                    cv::Mat hsv_roi;
+                    cv::cvtColor(roi, hsv_roi, cv::COLOR_BGR2HSV);
+                    cv::Vec3b hsv_pixel = hsv_roi.at<cv::Vec3b>(0, 0);
+                    float det_hue = hsv_pixel[0];
+                    float det_sat = hsv_pixel[1];
+                    
+                    // Calculate euclidean distance to each color profile
+                    for (const auto& profile : color_profiles) {
+                        // Handle hue wrap-around (0-180 scale)
+                        float hue_diff = std::abs(det_hue - profile.avg_hue);
+                        if (hue_diff > 90.0f) {
+                            hue_diff = 180.0f - hue_diff;
+                        }
+                        
+                        float sat_diff = det_sat - profile.avg_saturation;
+                        float distance = std::sqrt(hue_diff * hue_diff + sat_diff * sat_diff);
+                        
+                        if (distance < min_distance) {
+                            min_distance = distance;
+                            closest_color = profile.name;
+                        }
+                    }
+                }
+            }
+            
+            // Add raw YOLO info to panel with color distance
             std::string class_name = (det.class_id == 0) ? "ball" : "ball_held";
-            char info_text[128];
-            snprintf(info_text, sizeof(info_text), "R#%d RAW: %s conf=%.2f",
-                     det_num, class_name.c_str(), det.confidence);
+            char info_text[256];
+            if (min_distance < 999.0f) {
+                snprintf(info_text, sizeof(info_text), "R#%d RAW: %s conf=%.2f | closest=%s dist=%.1f",
+                         det_num, class_name.c_str(), det.confidence, closest_color.c_str(), min_distance);
+            } else {
+                snprintf(info_text, sizeof(info_text), "R#%d RAW: %s conf=%.2f",
+                         det_num, class_name.c_str(), det.confidence);
+            }
             info_lines.push_back(info_text);
             info_colors.push_back(cv::Scalar(200, 200, 255)); // Light red for raw
             
@@ -979,6 +1054,29 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     
     // Draw filtered YOLO detections (after confidence filtering) - bright red, normal boxes
     if (record_with_yolo_boxes_) {
+        // Load color profiles for distance calculation
+        std::vector<ColorProfile> color_profiles;
+        try {
+            std::ifstream color_file("hub/color_profiles.json");
+            if (color_file.is_open()) {
+                nlohmann::json color_profiles_json;
+                color_file >> color_profiles_json;
+                
+                for (const auto& profile : color_profiles_json) {
+                    if (profile["enabled"]) {
+                        ColorProfile cp;
+                        cp.name = profile["name"];
+                        cp.enabled = true;
+                        cp.avg_hue = profile["avg_hue"];
+                        cp.avg_saturation = profile["avg_saturation"];
+                        color_profiles.push_back(cp);
+                    }
+                }
+            }
+        } catch (...) {
+            // If loading fails, continue without color distance info
+        }
+        
         // Note: rec_frame.raw_detections already contains filtered detections after NMS
         // We need to distinguish between truly raw (before threshold) and filtered (after threshold)
         // For now, show the current detections as filtered
@@ -996,11 +1094,53 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                        cv::Point(det.box.x + 5, det.box.y + 20),
                        cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
             
-            // Add filtered YOLO info to panel
+            // Calculate color distances if we have color profiles
+            std::string closest_color = "N/A";
+            float min_distance = 999.0f;
+            
+            if (!color_profiles.empty()) {
+                // Sample color at detection center
+                int center_x = static_cast<int>(det.box.x + det.box.width / 2);
+                int center_y = static_cast<int>(det.box.y + det.box.height / 2);
+                
+                if (center_x >= 0 && center_x < frame.cols && center_y >= 0 && center_y < frame.rows) {
+                    // Convert BGR to HSV for the detection center
+                    cv::Mat roi = frame(cv::Rect(center_x, center_y, 1, 1));
+                    cv::Mat hsv_roi;
+                    cv::cvtColor(roi, hsv_roi, cv::COLOR_BGR2HSV);
+                    cv::Vec3b hsv_pixel = hsv_roi.at<cv::Vec3b>(0, 0);
+                    float det_hue = hsv_pixel[0];
+                    float det_sat = hsv_pixel[1];
+                    
+                    // Calculate euclidean distance to each color profile
+                    for (const auto& profile : color_profiles) {
+                        // Handle hue wrap-around (0-180 scale)
+                        float hue_diff = std::abs(det_hue - profile.avg_hue);
+                        if (hue_diff > 90.0f) {
+                            hue_diff = 180.0f - hue_diff;
+                        }
+                        
+                        float sat_diff = det_sat - profile.avg_saturation;
+                        float distance = std::sqrt(hue_diff * hue_diff + sat_diff * sat_diff);
+                        
+                        if (distance < min_distance) {
+                            min_distance = distance;
+                            closest_color = profile.name;
+                        }
+                    }
+                }
+            }
+            
+            // Add filtered YOLO info to panel with color distance
             std::string class_name = (det.class_id == 0) ? "ball" : "ball_held";
-            char info_text[128];
-            snprintf(info_text, sizeof(info_text), "#%d FILTERED: %s conf=%.2f",
-                     det_num, class_name.c_str(), det.confidence);
+            char info_text[256];
+            if (min_distance < 999.0f) {
+                snprintf(info_text, sizeof(info_text), "#%d FILTERED: %s conf=%.2f | closest=%s dist=%.1f",
+                         det_num, class_name.c_str(), det.confidence, closest_color.c_str(), min_distance);
+            } else {
+                snprintf(info_text, sizeof(info_text), "#%d FILTERED: %s conf=%.2f",
+                         det_num, class_name.c_str(), det.confidence);
+            }
             info_lines.push_back(info_text);
             info_colors.push_back(cv::Scalar(255, 255, 255)); // White for filtered
             

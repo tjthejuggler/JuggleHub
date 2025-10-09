@@ -175,6 +175,13 @@ struct TrackingSettings {
     float held_color_min_score = 0.30f;                // Minimum color match score to accept color blob when held (default: 0.30)
     float held_color_max_distance = 0.25f;             // Maximum distance (m) from hand to accept color blob when held (default: 0.25m)
     
+    // Kalman glob detection settings
+    // These control color blob search near Kalman prediction when YOLO detection is missing
+    bool kalman_glob_detection_enabled = true;         // Enable color blob search at Kalman prediction (default: true)
+    int kalman_glob_search_radius = 100;               // Search radius in pixels around Kalman prediction (default: 100px)
+    float kalman_glob_min_color_score = 0.50f;         // Minimum color match score to accept color blob at Kalman prediction (default: 0.50)
+    float kalman_glob_max_depth_diff = 0.30f;          // Maximum depth difference (m) from Kalman prediction to accept blob (default: 0.30m)
+    
     TrackingSettings() = default;
 };
 
@@ -258,6 +265,7 @@ private:
     std::vector<ColorProfile> color_profiles_;
     std::vector<SimpleBall> balls_;
     std::vector<SimpleHand> hands_;
+    std::vector<SimpleHand> last_known_hands_;  // Store last known hand positions for persistence
     std::vector<Detection> last_raw_detections_;
     std::string settings_file_;
     cv::Mat last_color_frame_;  // For calibration

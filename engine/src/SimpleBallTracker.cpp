@@ -378,6 +378,23 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.held_color_max_distance = std::stof(value);
             return true;
         }
+        // Kalman glob detection settings
+        else if (key == "kalman_glob_detection_enabled") {
+            tracking_settings_.kalman_glob_detection_enabled = (value == "true" || value == "1");
+            return true;
+        }
+        else if (key == "kalman_glob_search_radius") {
+            tracking_settings_.kalman_glob_search_radius = std::stoi(value);
+            return true;
+        }
+        else if (key == "kalman_glob_min_color_score") {
+            tracking_settings_.kalman_glob_min_color_score = std::stof(value);
+            return true;
+        }
+        else if (key == "kalman_glob_max_depth_diff") {
+            tracking_settings_.kalman_glob_max_depth_diff = std::stof(value);
+            return true;
+        }
     } catch (const std::exception& e) {
         return false;
     }
@@ -1169,6 +1186,44 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
 
     // Run pose estimation
     std::vector<SimpleHand> hands = runPoseEstimation(color_frame, depth_frame, intrinsics);
+    
+    // HAND PERSISTENCE: Fill in missing hands with last known positions
+    // This prevents tracking issues when a hand temporarily disappears from pose detection
+    std::set<int> detected_hand_ids;
+    for (const auto& hand : hands) {
+        detected_hand_ids.insert(hand.id);
+    }
+    
+    // Check if we have last known hands and if any are missing
+    if (!last_known_hands_.empty()) {
+        for (const auto& last_hand : last_known_hands_) {
+            // If this hand wasn't detected this frame, add it with last known position
+            if (detected_hand_ids.find(last_hand.id) == detected_hand_ids.end()) {
+                SimpleHand persisted_hand = last_hand;
+                persisted_hand.is_visible = false;  // Mark as not freshly detected
+                hands.push_back(persisted_hand);
+                
+                DEBUG_LOG(hand_persist_log, {
+                    OPEN_DEBUG_LOG(hand_persist_log);
+                    hand_persist_log << "\n[HAND_PERSIST] Frame " << frame_counter_
+                                    << " | Hand " << last_hand.id << " (" << (last_hand.id == 0 ? "LEFT" : "RIGHT") << ")"
+                                    << " not detected - using last known position: ("
+                                    << last_hand.wrist_pos_3d.x << ", "
+                                    << last_hand.wrist_pos_3d.y << ", "
+                                    << last_hand.wrist_pos_3d.z << ") m" << std::endl;
+                });
+            }
+        }
+    }
+    
+    // Update last known hands with current detections (only freshly detected ones)
+    last_known_hands_.clear();
+    for (const auto& hand : hands) {
+        if (hand.is_visible) {  // Only store freshly detected hands
+            last_known_hands_.push_back(hand);
+        }
+    }
+    
     hands_ = hands;  // Store for getters
 
     DEBUG_LOG(debug_log, {
@@ -1177,7 +1232,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         for (const auto& hand : hands) {
             debug_log << "  Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT")
                      << "): pos=(" << hand.wrist_pos_3d.x << ", " << hand.wrist_pos_3d.y
-                     << ", " << hand.wrist_pos_3d.z << "), visible=" << hand.is_visible << std::endl;
+                     << ", " << hand.wrist_pos_3d.z << "), visible=" << hand.is_visible
+                     << (hand.is_visible ? " (FRESH)" : " (PERSISTED)") << std::endl;
         }
         debug_log.close();
     });
@@ -2064,26 +2120,72 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     }
                 }
                 
-                // Prediction is NOT near a hand - try color tracking at prediction point
-                cv::Point2f pred_2d = project_3d_to_2d(kalman_pred, intrinsics);
-                cv::Point2f color_blob = searchForColorBlob(color_frame, *profile, pred_2d, COLOR_SEARCH_RADIUS);
-                
-                if (color_blob.x > 0 && color_blob.y > 0) {
-                    // Found color blob at predicted location - use it!
-                    float depth = getDepthAtPoint(depth_frame, color_blob);
-                    if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
-                        cv::Point3f color_pos = deprojectToWorld(color_blob, depth, intrinsics);
-                        
-                        ball.position = color_pos;
-                        ball.pixel_pos = color_blob;
-                        ball.tracking_reason = "Color@Kalman";
-                        
-                        // Update Kalman with color detection
-                        ball.kalman.update(KalmanFilter3D::MeasurementVector(
-                            color_pos.x, color_pos.y, color_pos.z));
-                        ball.color_predictor.addDetection(color_pos);
-                        ball.frames_without_yolo = 0;
-                        continue;
+                // Prediction is NOT near a hand - try Kalman glob detection if enabled
+                if (tracking_settings_.kalman_glob_detection_enabled) {
+                    cv::Point2f pred_2d = project_3d_to_2d(kalman_pred, intrinsics);
+                    cv::Point2f color_blob = searchForColorBlob(color_frame, *profile, pred_2d,
+                                                                tracking_settings_.kalman_glob_search_radius);
+                    
+                    if (color_blob.x > 0 && color_blob.y > 0) {
+                        // Found color blob at predicted location - validate it
+                        float depth = getDepthAtPoint(depth_frame, color_blob);
+                        if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
+                            cv::Point3f color_pos = deprojectToWorld(color_blob, depth, intrinsics);
+                            
+                            // CRITICAL: Validate depth is close to Kalman prediction
+                            float depth_diff = std::abs(color_pos.z - kalman_pred.z);
+                            
+                            // CRITICAL: Validate color match score
+                            Detection temp_det;
+                            temp_det.box = cv::Rect_<float>(color_blob.x - 15, color_blob.y - 15, 30, 30);
+                            float color_score = matchColor(temp_det, *profile, color_frame);
+                            
+                            DEBUG_LOG(kalman_glob_log, {
+                                OPEN_DEBUG_LOG(kalman_glob_log);
+                                kalman_glob_log << "\n[KALMAN_GLOB] Ball " << ball.id << " (" << ball.color_name << ")"
+                                               << " | blob found at (" << color_pos.x << ", " << color_pos.y << ", " << color_pos.z << ")"
+                                               << " | Kalman pred depth: " << kalman_pred.z << "m"
+                                               << " | depth_diff: " << depth_diff << "m (max=" << tracking_settings_.kalman_glob_max_depth_diff << "m)"
+                                               << " | color_score: " << color_score << " (min=" << tracking_settings_.kalman_glob_min_color_score << ")"
+                                               << std::endl;
+                            });
+                            
+                            // Accept blob only if depth and color match are good
+                            if (depth_diff <= tracking_settings_.kalman_glob_max_depth_diff &&
+                                color_score >= tracking_settings_.kalman_glob_min_color_score) {
+                                
+                                ball.position = color_pos;
+                                ball.pixel_pos = color_blob;
+                                ball.color_match_score = color_score;
+                                char reason[128];
+                                snprintf(reason, sizeof(reason), "KalmanGlob(c=%.2f,d=%.2fm)",
+                                        color_score, depth_diff);
+                                ball.tracking_reason = reason;
+                                
+                                // Update Kalman with color detection
+                                ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                                    color_pos.x, color_pos.y, color_pos.z));
+                                ball.color_predictor.addDetection(color_pos);
+                                ball.frames_without_yolo = 0;
+                                
+                                DEBUG_LOG(kalman_glob_accept_log, {
+                                    OPEN_DEBUG_LOG(kalman_glob_accept_log);
+                                    kalman_glob_accept_log << "[KALMAN_GLOB_ACCEPT] Ball " << ball.id
+                                                          << " using color blob at Kalman prediction" << std::endl;
+                                });
+                                continue;
+                            } else {
+                                DEBUG_LOG(kalman_glob_reject_log, {
+                                    OPEN_DEBUG_LOG(kalman_glob_reject_log);
+                                    kalman_glob_reject_log << "[KALMAN_GLOB_REJECT] Ball " << ball.id
+                                                          << " rejected: depth_diff=" << depth_diff
+                                                          << "m > max=" << tracking_settings_.kalman_glob_max_depth_diff
+                                                          << "m OR color_score=" << color_score
+                                                          << " < min=" << tracking_settings_.kalman_glob_min_color_score
+                                                          << std::endl;
+                                });
+                            }
+                        }
                     }
                 }
                 

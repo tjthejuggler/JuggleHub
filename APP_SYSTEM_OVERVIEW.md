@@ -1,6 +1,6 @@
 # JuggleHub App System - Quick Overview
 
-**Last Updated:** 2025-10-02 18:45:00 CEST
+**Last Updated:** 2025-10-08 22:11:00 CEST
 
 ## 🎯 What is the App System?
 
@@ -81,12 +81,12 @@ The App Manager shows all available apps in a beautiful grid:
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │  ┌──────────────────┐    ┌──────────────────┐            │
-│  │ 🎯 Catch Counter │    │ 📊 Pattern       │            │
-│  │                  │    │    Analyzer      │            │
-│  │ Simple catch     │    │                  │            │
-│  │ counting app     │    │ Analyze juggling │            │
-│  │                  │    │ patterns         │            │
-│  │ v1.0.0 • training│    │ v1.0.0 • analysis│            │
+│  │ 🎯 Catch Counter │    │ 🔢 Siteswap ID   │            │
+│  │                  │    │                  │            │
+│  │ Simple catch     │    │ Identifies       │            │
+│  │ counting app     │    │ siteswap patterns│            │
+│  │                  │    │ from throws      │            │
+│  │ v1.0.0 • analytics│   │ v1.0.0 • analytics│           │
 │  │                  │    │                  │            │
 │  │    [Launch]      │    │    [Launch]      │            │
 │  └──────────────────┘    └──────────────────┘            │
@@ -238,13 +238,16 @@ Apps can enable/disable these features:
 - **Mobile Apps:** Control apps from phone/tablet
 - **Cloud Sync:** Sync app data across devices
 
+### Available Apps:
+- **Catch Counter:** Simple catch counting for tracking progress
+- **Siteswap ID:** Identifies siteswap patterns from throw/catch sequences
+
 ### Planned Apps:
-- **Pattern Analyzer:** Identify and analyze juggling patterns
+- **Pattern Analyzer:** Advanced pattern analysis and visualization
 - **Training Coach:** Real-time feedback and coaching
 - **Performance Metrics:** Track progress over time
 - **LED Ball Controller:** Control ball colors based on tracking
 - **Video Recorder:** Record sessions with overlays
-- **Siteswap Calculator:** Calculate and visualize siteswaps
 
 ## 🤝 Contributing
 

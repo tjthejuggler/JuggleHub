@@ -1,6 +1,6 @@
 # JuggleHub App Developer Guide
 
-**Last Updated**: 2025-10-02
+**Last Updated**: 2025-10-08
 
 This guide provides complete instructions for developing apps for the JuggleHub platform. Apps are independent applications that run in separate windows and communicate with the JuggleHub engine via ZeroMQ.
 
@@ -609,6 +609,18 @@ Features:
 - Large display with restart button
 - Thread-safe UI updates
 - Feature control (enables throw_catch_detection)
+
+### Siteswap ID (Advanced Analytics)
+
+Location: `hub/apps/siteswap_id/`
+
+Features:
+- Identifies siteswap patterns from throw/catch sequences
+- Tracks which hands throw which balls
+- Calculates flight times and dwell times
+- Real-time pattern detection
+- Comprehensive statistics display
+- Event log with timestamps
 
 ### Creating More Apps
 

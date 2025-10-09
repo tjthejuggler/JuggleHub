@@ -2480,8 +2480,30 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // CRITICAL: Update held ball positions to follow hands
     // If a ball is marked as held, it must move with the hand
     // PRIORITY: 1) Color blob near hand, 2) Snap to wrist
+    // IMPORTANT: Only override if ball doesn't have a good YOLO detection from euclidean matching
     for (auto& ball : balls_) {
         if (ball.is_held && ball.held_by_hand_id >= 0) {
+            // CRITICAL FIX: Don't override good euclidean matches!
+            // Only search for color blobs if:
+            // 1. Ball has NO YOLO detection, OR
+            // 2. YOLO confidence is low (< 0.5), OR
+            // 3. Color match score is poor (< 0.3)
+            bool needs_fallback_tracking = !ball.has_yolo_detection ||
+                                          ball.yolo_confidence < 0.5f ||
+                                          ball.color_match_score < 0.3f;
+            
+            if (!needs_fallback_tracking) {
+                // Ball has a good euclidean match - trust it and skip held ball override
+                DEBUG_LOG(held_skip_log, {
+                    OPEN_DEBUG_LOG(held_skip_log);
+                    held_skip_log << "\n[HELD_SKIP] Ball " << ball.id << " has good euclidean match"
+                                 << " | yolo_conf=" << ball.yolo_confidence
+                                 << ", color_score=" << ball.color_match_score
+                                 << " - SKIPPING held ball override" << std::endl;
+                });
+                continue;  // Skip to next ball
+            }
+            
             // Find the hand that's holding this ball
             for (const auto& hand : hands) {
                 if (hand.id == ball.held_by_hand_id && hand.is_visible) {

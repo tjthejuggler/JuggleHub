@@ -1097,31 +1097,6 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 info_lines.push_back(info_text);
                 info_colors.push_back(ball_color);
             }
-            
-            // Add detection evaluation details for this ball (ALWAYS, even if no tracker)
-            if (!ball.detection_evaluations.empty()) {
-                for (const auto& eval : ball.detection_evaluations) {
-                    char eval_text[256];
-                    if (eval.passed_filters) {
-                        // Show full scoring for detections that passed filters
-                        snprintf(eval_text, sizeof(eval_text),
-                                "  Det#%d: %s (%.2f = cls:%.2f+conf:%.2f+col:%.2f+kal:%.2f)",
-                                eval.detection_index, eval.result.c_str(), eval.total_score,
-                                eval.class_score, eval.confidence_score, eval.color_score, eval.kalman_score);
-                    } else {
-                        // Show rejection reason for filtered detections
-                        if (eval.distance_to_prediction >= 0) {
-                            snprintf(eval_text, sizeof(eval_text), "  Det#%d: %s (d=%.2fm)",
-                                    eval.detection_index, eval.result.c_str(), eval.distance_to_prediction);
-                        } else {
-                            snprintf(eval_text, sizeof(eval_text), "  Det#%d: %s",
-                                    eval.detection_index, eval.result.c_str());
-                        }
-                    }
-                    info_lines.push_back(eval_text);
-                    info_colors.push_back(cv::Scalar(200, 200, 200)); // Light gray for details
-                }
-            }
         }
     }
     

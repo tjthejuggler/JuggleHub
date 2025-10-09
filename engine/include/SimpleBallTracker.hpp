@@ -54,21 +54,6 @@ struct Detection {
     int index;  // Index in detection array
 };
 
-// Detection evaluation result (for debug visualization)
-struct DetectionEvaluation {
-    int detection_index;
-    std::string result;  // "SELECTED", "REJECTED: reason", or "SCORED: X.XX"
-    float total_score;
-    float class_score;
-    float confidence_score;
-    float color_score;
-    float kalman_score;
-    float distance_to_prediction;
-    bool passed_filters;
-    bool override_applied;           // Whether override was used for this detection
-    bool override_qualified;         // Whether detection qualified for override
-};
-
 // Simple hand state
 struct SimpleHand {
     int id;                    // 0=left, 1=right
@@ -107,16 +92,6 @@ struct SimpleBall {
     
     // Debug info for visualization
     std::string tracking_reason;     // Why this position was chosen (for debugging)
-    
-    // Scoring components for color tracker (for visualization)
-    float score_class = 0.0f;        // YOLO class score component
-    float score_confidence = 0.0f;   // YOLO confidence score component
-    float score_color = 0.0f;        // Color match score component
-    float score_kalman = 0.0f;       // Kalman proximity score component
-    float score_total = 0.0f;        // Total combined score
-    
-    // Detection evaluations for this ball (for visualization)
-    std::vector<DetectionEvaluation> detection_evaluations;
     
     SimpleBall() : id(-1), is_held(false), previous_is_held(false),
                    held_by_hand_id(-1), previous_held_by_hand_id(-1),
@@ -232,11 +207,6 @@ private:
     
     // Color matching (OPTIMIZED: now takes color_frame and converts only ROIs to HSV)
     float matchColor(const Detection& det, const ColorProfile& profile, const cv::Mat& color_frame);
-    const Detection* findBestColorMatch(const std::vector<Detection>& detections,
-                                       const ColorProfile& profile,
-                                       const cv::Mat& color_frame,
-                                       const std::set<int>& used_indices,
-                                       const cv::Point3f& kalman_prediction = cv::Point3f(0, 0, 0));
     
     // State detection
     bool isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands);
@@ -270,15 +240,6 @@ private:
     std::string settings_file_;
     cv::Mat last_color_frame_;  // For calibration
     TrackingSettings tracking_settings_;  // Tracking configuration
-    
-    // Last match scoring components (for visualization)
-    float last_match_class_score_ = 0.0f;
-    float last_match_confidence_score_ = 0.0f;
-    float last_match_color_score_ = 0.0f;
-    float last_match_kalman_score_ = 0.0f;
-    float last_match_total_score_ = 0.0f;
-    std::string last_rejection_reason_ = "";  // Why detection was rejected
-    std::vector<DetectionEvaluation> last_detection_evaluations_;  // Evaluation of all detections
     
     // Timing
     std::chrono::steady_clock::time_point last_update_time_;

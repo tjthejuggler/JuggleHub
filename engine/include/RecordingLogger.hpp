@@ -228,34 +228,6 @@ public:
                 log_file_ << "    Kalman fallback is INACTIVE (using YOLO)\n";
             }
             log_file_ << "\n";
-            
-            // Detection evaluations (scoring details)
-            if (!ball.detection_evaluations.empty()) {
-                log_file_ << "  DETECTION EVALUATIONS:\n";
-                log_file_ << "    Number of detections evaluated: " << ball.detection_evaluations.size() << "\n";
-                for (const auto& eval : ball.detection_evaluations) {
-                    log_file_ << "    Detection #" << eval.detection_index << ":\n";
-                    log_file_ << "      Result: " << eval.result << "\n";
-                    log_file_ << "      Passed filters: " << (eval.passed_filters ? "YES" : "NO") << "\n";
-                    if (eval.passed_filters) {
-                        log_file_ << "      Total score: " << std::setprecision(4) << eval.total_score << "\n";
-                        log_file_ << "      Class score: " << eval.class_score << "\n";
-                        log_file_ << "      Confidence score: " << eval.confidence_score << "\n";
-                        log_file_ << "      Color score: " << eval.color_score << "\n";
-                        log_file_ << "      Kalman score: " << eval.kalman_score << "\n";
-                    }
-                    if (eval.distance_to_prediction >= 0) {
-                        log_file_ << "      Distance to prediction: "
-                                 << std::setprecision(4) << eval.distance_to_prediction << " m\n";
-                    }
-                    // Override information
-                    if (eval.override_qualified) {
-                        log_file_ << "      Override qualified: YES\n";
-                        log_file_ << "      Override applied: " << (eval.override_applied ? "YES" : "NO") << "\n";
-                    }
-                }
-            }
-            log_file_ << "\n";
         }
         
         log_file_ << "\n";

@@ -283,6 +283,10 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.min_frames_for_state_change = std::stoi(value);
             return true;
         }
+        else if (key == "min_throw_distance") {
+            tracking_settings_.min_throw_distance = std::stof(value);
+            return true;
+        }
         else if (key == "prediction_history_frames") {
             tracking_settings_.prediction_history_frames = std::stoi(value);
             // Update all ball predictors
@@ -405,6 +409,23 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         }
         else if (key == "kalman_glob_max_depth_diff") {
             tracking_settings_.kalman_glob_max_depth_diff = std::stof(value);
+            return true;
+        }
+        // Identity swap prevention settings
+        else if (key == "max_euclidean_distance") {
+            tracking_settings_.max_euclidean_distance = std::stof(value);
+            return true;
+        }
+        else if (key == "min_euclidean_color_score") {
+            tracking_settings_.min_euclidean_color_score = std::stof(value);
+            return true;
+        }
+        else if (key == "max_kalman_prediction_jump") {
+            tracking_settings_.max_kalman_prediction_jump = std::stof(value);
+            return true;
+        }
+        else if (key == "max_depth_jump_strict") {
+            tracking_settings_.max_depth_jump_strict = std::stof(value);
             return true;
         }
     } catch (const std::exception& e) {
@@ -915,12 +936,31 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                 }
                 else if (old_state_was_held && !now_held) {
                     // Was held, now in air = THROW
+                    // CRITICAL: Validate ball moved far enough from wrist to count as real throw
+                    float dist_from_wrist = ball.distance_to_nearest_wrist;
+                    bool is_real_throw = (dist_from_wrist < 0 || dist_from_wrist >= tracking_settings_.min_throw_distance);
+                    
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
                         debug_log << "  Condition check: old_state_was_held=" << old_state_was_held
                                  << " && !now_held=" << !now_held << std::endl;
-                        debug_log << "  >>> GENERATING THROW EVENT <<<" << std::endl;
+                        debug_log << "  Distance from wrist: " << dist_from_wrist << "m"
+                                 << " (min_throw_distance=" << tracking_settings_.min_throw_distance << "m)" << std::endl;
+                        debug_log << "  Is real throw: " << (is_real_throw ? "YES" : "NO (too close to wrist)") << std::endl;
+                        if (is_real_throw) {
+                            debug_log << "  >>> GENERATING THROW EVENT <<<" << std::endl;
+                        } else {
+                            debug_log << "  >>> THROW EVENT SUPPRESSED (ball too close to wrist) <<<" << std::endl;
+                        }
                     });
+                    
+                    // CRITICAL: Only generate event if distance is sufficient, but always update state
+                    if (!is_real_throw) {
+                        // Ball is too close to wrist - suppress event but allow state update
+                        ball.is_held = now_held;
+                        ball.state_change_counter = 0;
+                        continue;  // Skip event generation
+                    }
                     
                     // CRITICAL FIX: Estimate throw velocity from color predictor history
                     // This prevents Kalman from immediately predicting downward motion
@@ -977,40 +1017,57 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                 }
                 else if (!old_state_was_held && now_held) {
                     // Was in air, now held = CATCH
+                    // CRITICAL: Validate ball moved far enough from wrist to count as real catch
+                    float dist_from_wrist = ball.distance_to_nearest_wrist;
+                    bool is_real_catch = (dist_from_wrist < 0 || dist_from_wrist >= tracking_settings_.min_throw_distance);
+                    
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
                         debug_log << "  Condition check: !old_state_was_held=" << !old_state_was_held
                                  << " && now_held=" << now_held << std::endl;
-                        debug_log << "  >>> GENERATING CATCH EVENT <<<" << std::endl;
-                    });
-                    
-                    events.push_back({
-                        BallEvent::CATCH,
-                        ball.id,
-                        ball.held_by_hand_id,
-                        getCurrentTimestamp()
-                    });
-                    
-                    DEBUG_LOG(debug_log, {
-                        OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  >>> CATCH EVENT GENERATED <<<" << std::endl;
-                    });
-                    
-                    // Log to both console and debug log file
-                    DEBUG_LOG_WRITE({
-                        OPEN_DEBUG_LOG(catch_log);
-                        catch_log << "\n[CATCH] Ball " << ball.id
-                                  << " caught by hand " << ball.held_by_hand_id;
-                        if (ball.held_by_hand_id == 0) {
-                            catch_log << " (LEFT)";
-                        } else if (ball.held_by_hand_id == 1) {
-                            catch_log << " (RIGHT)";
+                        debug_log << "  Distance from wrist: " << dist_from_wrist << "m"
+                                 << " (min_throw_distance=" << tracking_settings_.min_throw_distance << "m)" << std::endl;
+                        debug_log << "  Is real catch: " << (is_real_catch ? "YES" : "NO (too close to wrist)") << std::endl;
+                        if (is_real_catch) {
+                            debug_log << "  >>> GENERATING CATCH EVENT <<<" << std::endl;
                         } else {
-                            catch_log << " (UNKNOWN/NOT_SET)";
+                            debug_log << "  >>> CATCH EVENT SUPPRESSED (ball too close to wrist) <<<" << std::endl;
                         }
-                        catch_log << " | ball_color=" << ball.color_name
-                                  << std::endl;
                     });
+                    
+                    // CRITICAL: Always update state, but only generate event if distance is sufficient
+                    ball.is_held = now_held;
+                    ball.state_change_counter = 0;
+                    
+                    if (is_real_catch) {
+                        events.push_back({
+                            BallEvent::CATCH,
+                            ball.id,
+                            ball.held_by_hand_id,
+                            getCurrentTimestamp()
+                        });
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  >>> CATCH EVENT GENERATED <<<" << std::endl;
+                        });
+                        
+                        // Log to both console and debug log file
+                        DEBUG_LOG_WRITE({
+                            OPEN_DEBUG_LOG(catch_log);
+                            catch_log << "\n[CATCH] Ball " << ball.id
+                                      << " caught by hand " << ball.held_by_hand_id;
+                            if (ball.held_by_hand_id == 0) {
+                                catch_log << " (LEFT)";
+                            } else if (ball.held_by_hand_id == 1) {
+                                catch_log << " (RIGHT)";
+                            } else {
+                                catch_log << " (UNKNOWN/NOT_SET)";
+                            }
+                            catch_log << " | ball_color=" << ball.color_name
+                                      << std::endl;
+                        });
+                    }
                 }
                 else {
                     DEBUG_LOG(debug_log, {
@@ -1304,9 +1361,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 
                 // CRITICAL: Check if detection is within max distance from ball's previous position
                 // This prevents trackers from flickering to far away balls
-                // Apply this constraint if the ball had ANY position in the previous frame
-                // (whether from YOLO, Kalman, color tracking, or hand snapping)
-                if (ball.position.z > 0.01f) {  // Ball has a valid previous position
+                // IMPORTANT: Only apply strict distance check if ball had YOLO in previous frame
+                // If ball was using fallback (Kalman/hand snap), allow larger jumps to reacquire
+                if (ball.position.z > 0.01f && ball.frames_without_yolo == 0) {  // Ball has valid position AND had YOLO last frame
                     float dx = det.world_pos.x - ball.position.x;
                     float dy = det.world_pos.y - ball.position.y;
                     float dz = det.world_pos.z - ball.position.z;
@@ -1321,6 +1378,13 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         });
                         continue;
                     }
+                } else if (ball.position.z > 0.01f && ball.frames_without_yolo > 0) {
+                    // Ball lost YOLO and is using fallback - log that we're allowing larger jumps
+                    DEBUG_LOG(euclidean_log, {
+                        OPEN_DEBUG_LOG(euclidean_log);
+                        euclidean_log << "  Ball[" << ball_idx << "] lost YOLO (frames_without_yolo="
+                                     << ball.frames_without_yolo << ") - allowing large distance jumps for reacquisition" << std::endl;
+                    });
                 }
                 
                 // Sample 3x3 pixels from detection center
@@ -1374,6 +1438,32 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 
                 float distance = std::sqrt(hue_diff * hue_diff + sat_diff * sat_diff);
                 
+                // CRITICAL: Apply quality thresholds to prevent identity swaps
+                // Reject matches with poor euclidean distance or color score
+                if (tracking_settings_.max_euclidean_distance > 0.0f &&
+                    distance > tracking_settings_.max_euclidean_distance) {
+                    DEBUG_LOG(euclidean_log, {
+                        OPEN_DEBUG_LOG(euclidean_log);
+                        euclidean_log << "  Det#" << det.index << " -> " << ball.color_name
+                                     << " REJECTED: euclidean distance " << distance
+                                     << " > max_euclidean_distance=" << tracking_settings_.max_euclidean_distance << std::endl;
+                    });
+                    continue;
+                }
+                
+                // Convert distance to color score for threshold check
+                float color_score = std::exp(-distance * 10.0f);
+                if (tracking_settings_.min_euclidean_color_score > 0.0f &&
+                    color_score < tracking_settings_.min_euclidean_color_score) {
+                    DEBUG_LOG(euclidean_log, {
+                        OPEN_DEBUG_LOG(euclidean_log);
+                        euclidean_log << "  Det#" << det.index << " -> " << ball.color_name
+                                     << " REJECTED: color score " << color_score
+                                     << " < min_euclidean_color_score=" << tracking_settings_.min_euclidean_color_score << std::endl;
+                    });
+                    continue;
+                }
+                
                 BallDetectionMatch match;
                 match.ball_idx = static_cast<int>(ball_idx);
                 match.det_idx = static_cast<int>(det_idx);
@@ -1388,7 +1478,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     euclidean_log << "  Det#" << det.index << " -> " << ball.color_name
                                  << ": measured H=" << avg_hue << ", S=" << avg_sat
                                  << " | target H=" << profile->avg_hue << ", S=" << profile->avg_saturation
-                                 << " | dist=" << distance << std::endl;
+                                 << " | dist=" << distance << ", color_score=" << color_score << std::endl;
                 });
             }
         }
@@ -1552,7 +1642,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             if (ball.kalman.get_state()(2) > 0.01f) {  // Kalman is initialized
                 float prev_depth = ball.kalman.get_state()(2);
                 float depth_change = std::abs(det.world_pos.z - prev_depth);
-                const float MAX_DEPTH_JUMP = 0.30f;  // 30cm max depth change per frame
+                // Use configurable strict threshold if set, otherwise fall back to default
+                const float MAX_DEPTH_JUMP = (tracking_settings_.max_depth_jump_strict > 0.0f)
+                    ? tracking_settings_.max_depth_jump_strict
+                    : 0.30f;  // Default: 30cm max depth change per frame
                 
                 if (depth_change > MAX_DEPTH_JUMP) {
                     should_update_kalman = false;
@@ -1716,7 +1809,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             if (ball.kalman.get_state()(2) > 0.01f) {  // Kalman is initialized
                 float prev_depth = ball.kalman.get_state()(2);
                 float depth_change = std::abs(best_det->world_pos.z - prev_depth);
-                const float MAX_DEPTH_JUMP = 0.30f;  // 30cm max depth change per frame
+                // Use configurable strict threshold if set, otherwise fall back to default
+                const float MAX_DEPTH_JUMP = (tracking_settings_.max_depth_jump_strict > 0.0f)
+                    ? tracking_settings_.max_depth_jump_strict
+                    : 0.30f;  // Default: 30cm max depth change per frame
                 
                 if (depth_change > MAX_DEPTH_JUMP) {
                     should_update_kalman = false;
@@ -1779,6 +1875,35 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         if (ball.kalman.get_state()(2) > 0.01f) {  // Only if Kalman has been initialized (z > 0)
             // SAVE the current Kalman state before prediction
             auto saved_state = ball.kalman.get_state();
+            
+            // CRITICAL: Check for suspicious Kalman prediction jumps
+            // If prediction jumps too far from last known position, reset Kalman
+            if (ball.position.z > 0.01f && tracking_settings_.max_kalman_prediction_jump > 0.0f) {
+                float dx = saved_state(0) - ball.position.x;
+                float dy = saved_state(1) - ball.position.y;
+                float dz = saved_state(2) - ball.position.z;
+                float prediction_jump = std::sqrt(dx*dx + dy*dy + dz*dz);
+                
+                if (prediction_jump > tracking_settings_.max_kalman_prediction_jump) {
+                    DEBUG_LOG(kalman_reset_log, {
+                        OPEN_DEBUG_LOG(kalman_reset_log);
+                        kalman_reset_log << "\n[KALMAN_RESET] Ball " << ball.id
+                                        << " | Kalman prediction jumped " << prediction_jump << "m"
+                                        << " from last known position"
+                                        << " | Exceeds max_kalman_prediction_jump=" << tracking_settings_.max_kalman_prediction_jump << "m"
+                                        << " | RESETTING Kalman filter" << std::endl;
+                    });
+                    
+                    // Reset Kalman to last known position with zero velocity
+                    saved_state(0) = ball.position.x;
+                    saved_state(1) = ball.position.y;
+                    saved_state(2) = ball.position.z;
+                    saved_state(3) = 0.0f;  // vx = 0
+                    saved_state(4) = 0.0f;  // vy = 0
+                    saved_state(5) = 0.0f;  // vz = 0
+                    ball.kalman.get_state() = saved_state;
+                }
+            }
             
             // CRITICAL: Clamp velocity to realistic juggling speeds before prediction
             // This prevents corrupted Kalman states from causing wild predictions
@@ -1923,7 +2048,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                              swipe_hand_id == 0 ? 'L' : 'R');
                     ball.tracking_reason = reason;
                     
-                    // Update color predictor with hand position
+                    // CRITICAL: Update color predictor for PERMANENCE
+                    // Even though snapping creates teleportation, we need to maintain
+                    // tracker visibility and prevent stale history
                     ball.color_predictor.addDetection(ball.position);
                     
                     // Continue to next ball - skip normal fallback logic
@@ -2019,7 +2146,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 }
                 
                 // Prioritize swipe detection over proximity
-                const float CATCH_INFERENCE_DISTANCE = 0.25f;  // 25cm - generous for catch detection
+                const float CATCH_INFERENCE_DISTANCE = 0.18f;  // 18cm - tighter threshold to prevent false catches
                 
                 if (swipe_detected) {
                     // SWIPE-THROUGH CATCH DETECTED
@@ -2045,41 +2172,82 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                              swipe_hand_id == 0 ? 'L' : 'R');
                     ball.tracking_reason = reason;
                     
-                    // Update color predictor with hand position
+                    // CRITICAL: Update color predictor for PERMANENCE
+                    // Even though swipe catch creates teleportation, we need to maintain
+                    // tracker visibility and prevent stale history
                     ball.color_predictor.addDetection(ball.position);
                     
                     // Continue to next ball - skip normal fallback logic
                     continue;
                 }
                 else if (min_hand_dist < CATCH_INFERENCE_DISTANCE) {
-                    // PROXIMITY-BASED CATCH DETECTED
-                    DEBUG_LOG(catch_inference_log, {
-                        OPEN_DEBUG_LOG(catch_inference_log);
-                        catch_inference_log << "\n[CATCH_INFERENCE_PROXIMITY] Ball " << ball.id
-                                           << " vanished from YOLO with hand " << closest_hand_id
-                                           << " (" << (closest_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
-                                           << " at distance " << min_hand_dist << "m"
-                                           << " - INFERRING CATCH" << std::endl;
-                    });
+                    // PROXIMITY-BASED CATCH - Additional validation required
+                    // Check if ball was moving toward the hand (not just passing by)
+                    bool moving_toward_hand = false;
                     
-                    // CRITICAL: Mark ball as HELD so it follows the hand
-                    ball.is_held = true;
-                    ball.held_by_hand_id = closest_hand_id;
-                    ball.previous_held_by_hand_id = closest_hand_id;
-                    ball.yolo_class_id = 1;  // Mark as held
-                    ball.position = closest_hand_pos;
-                    ball.pixel_pos = project_3d_to_2d(closest_hand_pos, intrinsics);
+                    if (ball.color_predictor.getHistorySize() >= 2) {
+                        auto history = ball.color_predictor.getHistory();
+                        cv::Point3f ball_prev_pos = history[history.size() - 2].position;
+                        cv::Point3f ball_curr_pos = ball.position;
+                        
+                        // Calculate if ball is moving toward hand
+                        cv::Point3f ball_movement = ball_curr_pos - ball_prev_pos;
+                        cv::Point3f to_hand = closest_hand_pos - ball_curr_pos;
+                        
+                        // Dot product > 0 means moving toward hand
+                        float dot = ball_movement.dot(to_hand);
+                        moving_toward_hand = (dot > 0);
+                        
+                        DEBUG_LOG(catch_validation_log, {
+                            OPEN_DEBUG_LOG(catch_validation_log);
+                            catch_validation_log << "\n[CATCH_VALIDATION] Ball " << ball.id
+                                                << " | hand_dist=" << min_hand_dist << "m"
+                                                << " | dot=" << dot
+                                                << " | moving_toward=" << (moving_toward_hand ? "YES" : "NO") << std::endl;
+                        });
+                    }
                     
-                    char reason[128];
-                    snprintf(reason, sizeof(reason), "CATCH_PROX@Hand[%c] d=%.2fm",
-                             closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
-                    ball.tracking_reason = reason;
-                    
-                    // Update color predictor with hand position
-                    ball.color_predictor.addDetection(ball.position);
-                    
-                    // Continue to next ball - skip normal fallback logic
-                    continue;
+                    // Only infer catch if ball was moving toward hand OR very close
+                    if (moving_toward_hand || min_hand_dist < 0.12f) {
+                        // PROXIMITY-BASED CATCH DETECTED
+                        DEBUG_LOG(catch_inference_log, {
+                            OPEN_DEBUG_LOG(catch_inference_log);
+                            catch_inference_log << "\n[CATCH_INFERENCE_PROXIMITY] Ball " << ball.id
+                                               << " vanished from YOLO with hand " << closest_hand_id
+                                               << " (" << (closest_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                                               << " at distance " << min_hand_dist << "m"
+                                               << " | moving_toward=" << moving_toward_hand
+                                               << " - INFERRING CATCH" << std::endl;
+                        });
+                        
+                        // CRITICAL: Mark ball as HELD so it follows the hand
+                        ball.is_held = true;
+                        ball.held_by_hand_id = closest_hand_id;
+                        ball.previous_held_by_hand_id = closest_hand_id;
+                        ball.yolo_class_id = 1;  // Mark as held
+                        ball.position = closest_hand_pos;
+                        ball.pixel_pos = project_3d_to_2d(closest_hand_pos, intrinsics);
+                        
+                        char reason[128];
+                        snprintf(reason, sizeof(reason), "CATCH_PROX@Hand[%c] d=%.2fm",
+                                 closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
+                        ball.tracking_reason = reason;
+                        
+                        // CRITICAL: Update color predictor for PERMANENCE
+                        // Even though proximity catch creates teleportation, we need to maintain
+                        // tracker visibility and prevent stale history
+                        ball.color_predictor.addDetection(ball.position);
+                        
+                        // Continue to next ball - skip normal fallback logic
+                        continue;
+                    } else {
+                        DEBUG_LOG(catch_reject_log, {
+                            OPEN_DEBUG_LOG(catch_reject_log);
+                            catch_reject_log << "\n[CATCH_REJECT] Ball " << ball.id
+                                            << " near hand but NOT moving toward it"
+                                            << " | dist=" << min_hand_dist << "m - NOT inferring catch" << std::endl;
+                        });
+                    }
                 }
             }
             
@@ -2194,6 +2362,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         
                         ball.kalman.update(KalmanFilter3D::MeasurementVector(
                             ball.position.x, ball.position.y, ball.position.z));
+                        
+                        // CRITICAL: Update color predictor for PERMANENCE
                         ball.color_predictor.addDetection(ball.position);
                         
                         DEBUG_LOG(fallback_log, {
@@ -2252,10 +2422,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         state(4) = 0.0f;  // vy = 0
                         state(5) = 0.0f;  // vz = 0
                         
-                        // CRITICAL FIX: DO NOT add snapped positions to color predictor!
-                        // Snapping creates teleportation, not real motion
-                        // This corrupts velocity estimates used for predictions
-                        // ball.color_predictor.addDetection(ball.position);  // REMOVED
+                        // CRITICAL: Update color predictor for PERMANENCE
+                        // Even though snapping creates teleportation, we need to maintain
+                        // tracker visibility and prevent stale history
+                        ball.color_predictor.addDetection(ball.position);
                         
                         DEBUG_LOG(fallback_log, {
                             OPEN_DEBUG_LOG(fallback_log);
@@ -2359,7 +2529,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             }
             
             // CRITICAL FIX: Always use Kalman prediction if available (no time limit)
-            // Tracker should only disappear when ball goes off-screen
+            // Tracker should only disappear when ball goes off-screen AND not held
             if (has_prediction) {
                 // Check if Kalman prediction is on-screen
                 cv::Point2f pred_pixel = project_3d_to_2d(kalman_pred, intrinsics);
@@ -2367,16 +2537,26 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                     pred_pixel.y >= 0 && pred_pixel.y < color_frame.rows);
                 
                 if (!is_on_screen) {
-                    // Ball has gone off-screen - this is the ONLY reason to stop tracking
-                    DEBUG_LOG(fallback_log, {
-                        OPEN_DEBUG_LOG(fallback_log);
-                        fallback_log << "  -> Ball went OFF-SCREEN at pixel (" << pred_pixel.x << ", "
-                                    << pred_pixel.y << ") - STOPPING TRACKER" << std::endl;
-                    });
-                    // Mark ball as invalid by setting position to zero
-                    ball.position = cv::Point3f(0, 0, 0);
-                    ball.pixel_pos = cv::Point2f(-1, -1);
-                    ball.tracking_reason = "OFF-SCREEN";
+                    // CRITICAL: Don't zero out position if ball is held - it will follow hand
+                    if (!ball.is_held) {
+                        // Ball has gone off-screen - this is the ONLY reason to stop tracking
+                        DEBUG_LOG(fallback_log, {
+                            OPEN_DEBUG_LOG(fallback_log);
+                            fallback_log << "  -> Ball went OFF-SCREEN at pixel (" << pred_pixel.x << ", "
+                                        << pred_pixel.y << ") - STOPPING TRACKER" << std::endl;
+                        });
+                        // Mark ball as invalid by setting position to zero
+                        ball.position = cv::Point3f(0, 0, 0);
+                        ball.pixel_pos = cv::Point2f(-1, -1);
+                        ball.tracking_reason = "OFF-SCREEN";
+                    } else {
+                        // Ball is held - keep last position, will be updated by held ball tracking
+                        DEBUG_LOG(fallback_log, {
+                            OPEN_DEBUG_LOG(fallback_log);
+                            fallback_log << "  -> Ball prediction OFF-SCREEN but HELD - will follow hand" << std::endl;
+                        });
+                        ball.tracking_reason = "HELD_PRED_OFFSCREEN";
+                    }
                     continue;
                 }
                 
@@ -2451,21 +2631,18 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     }
     
     // CRITICAL: Update held ball positions to follow hands
-    // If a ball is marked as held, it must move with the hand
-    // PRIORITY: 1) Color blob near hand, 2) Snap to wrist
-    // IMPORTANT: Only override if ball doesn't have a good YOLO detection from euclidean matching
+    // If a ball is marked as held, it must ALWAYS be placed somewhere
+    // PRIORITY: 1) ML detection near hand, 2) Color blob near hand, 3) Snap to wrist
+    // PERMANENCE: Held balls should NEVER disappear - they follow the hand
     for (auto& ball : balls_) {
         if (ball.is_held && ball.held_by_hand_id >= 0) {
-            // CRITICAL FIX: Don't override good euclidean matches!
-            // Only search for color blobs if:
-            // 1. Ball has NO YOLO detection, OR
-            // 2. YOLO confidence is low (< 0.5), OR
-            // 3. Color match score is poor (< 0.3)
-            bool needs_fallback_tracking = !ball.has_yolo_detection ||
-                                          ball.yolo_confidence < 0.5f ||
-                                          ball.color_match_score < 0.3f;
+            // CRITICAL: If ball has a good euclidean match from YOLO, trust it
+            // But still ensure it's placed somewhere if YOLO fails
+            bool has_good_yolo = ball.has_yolo_detection &&
+                                ball.yolo_confidence >= 0.5f &&
+                                ball.color_match_score >= 0.3f;
             
-            if (!needs_fallback_tracking) {
+            if (has_good_yolo) {
                 // Ball has a good euclidean match - trust it and skip held ball override
                 DEBUG_LOG(held_skip_log, {
                     OPEN_DEBUG_LOG(held_skip_log);
@@ -2476,6 +2653,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 });
                 continue;  // Skip to next ball
             }
+            
+            // Ball needs fallback tracking - ensure it's placed somewhere
             
             // Find the hand that's holding this ball
             for (const auto& hand : hands) {
@@ -2534,14 +2713,25 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                             ball.tracking_reason = reason;
                                             
                                             // CRITICAL: Validate before adding to color predictor
+                                            // EXTRA STRICT for held balls to prevent snap→color blob jumps
                                             if (ball.color_predictor.getHistorySize() > 0) {
                                                 auto history = ball.color_predictor.getHistory();
                                                 cv::Point3f last_pos = history.back().position;
                                                 float distance = cv::norm(color_pos - last_pos);
-                                                const float MAX_POSITION_JUMP = 0.5f;
+                                                // STRICTER threshold for held balls (0.15m vs 0.5m)
+                                                // This prevents snap→color blob velocity corruption
+                                                const float MAX_POSITION_JUMP = 0.15f;
                                                 
                                                 if (distance < MAX_POSITION_JUMP) {
                                                     ball.color_predictor.addDetection(color_pos);
+                                                } else {
+                                                    DEBUG_LOG(held_color_jump_reject_log, {
+                                                        OPEN_DEBUG_LOG(held_color_jump_reject_log);
+                                                        held_color_jump_reject_log << "\n[HELD_COLOR_JUMP_REJECT] Ball " << ball.id
+                                                                                  << " | Color blob position jump " << distance << "m rejected"
+                                                                                  << " | Exceeds MAX_POSITION_JUMP=" << MAX_POSITION_JUMP << "m"
+                                                                                  << " | Likely snap→color blob transition" << std::endl;
+                                                    });
                                                 }
                                             } else {
                                                 ball.color_predictor.addDetection(color_pos);
@@ -2569,10 +2759,49 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                 }
                             }
                             
-                            // PRIORITY 2: No color blob found - snap to wrist ONLY if no good YOLO detection exists
-                            // CRITICAL FIX: Don't override valid YOLO detections during hand-to-hand throws!
-                            // Only snap to wrist when ball is truly occluded (no YOLO detection)
-                            if (!ball.has_yolo_detection || ball.yolo_confidence < 0.5f) {
+                            // PRIORITY 2: Check for ANY YOLO detection near hand before snapping to wrist
+                            // PERMANENCE: Use any available detection at hand position
+                            const Detection* any_det_near_hand = nullptr;
+                            float min_det_dist = std::numeric_limits<float>::max();
+                            
+                            for (const auto& det : yolo_detections) {
+                                // Skip if already used
+                                if (used_detections.find(det.index) != used_detections.end()) continue;
+                                
+                                // Check distance from hand
+                                float dist = cv::norm(det.world_pos - hand.wrist_pos_3d);
+                                if (dist < 0.25f && dist < min_det_dist) {  // Within 25cm of hand
+                                    min_det_dist = dist;
+                                    any_det_near_hand = &det;
+                                }
+                            }
+                            
+                            if (any_det_near_hand) {
+                                // Found ANY detection near hand - use it!
+                                ball.position = any_det_near_hand->world_pos;
+                                ball.pixel_pos = cv::Point2f(any_det_near_hand->box.x + any_det_near_hand->box.width / 2.0f,
+                                                             any_det_near_hand->box.y + any_det_near_hand->box.height / 2.0f);
+                                ball.bbox = any_det_near_hand->box;
+                                ball.yolo_confidence = any_det_near_hand->confidence;
+                                ball.yolo_class_id = any_det_near_hand->class_id;
+                                ball.tracking_reason = "Held_AnyYOLO@Hand";
+                                
+                                // Update Kalman and color predictor
+                                ball.kalman.update(KalmanFilter3D::MeasurementVector(
+                                    ball.position.x, ball.position.y, ball.position.z));
+                                ball.color_predictor.addDetection(ball.position);
+                                
+                                // Mark detection as used
+                                used_detections.insert(any_det_near_hand->index);
+                                
+                                DEBUG_LOG(held_any_yolo_log, {
+                                    OPEN_DEBUG_LOG(held_any_yolo_log);
+                                    held_any_yolo_log << "\n[HELD_ANY_YOLO] Ball " << ball.id << " using ANY YOLO near hand " << hand.id
+                                                     << " at dist=" << min_det_dist << "m" << std::endl;
+                                });
+                            } else {
+                                // PRIORITY 3: No detection found - snap to wrist as absolute last resort
+                                // PERMANENCE: Held balls must ALWAYS be placed somewhere
                                 ball.position = hand.wrist_pos_3d;
                                 ball.pixel_pos = hand_2d;
                                 ball.tracking_reason = "Held_Snap@Wrist";
@@ -2584,36 +2813,27 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                 state(4) = 0.0f;  // vy = 0
                                 state(5) = 0.0f;  // vz = 0
                                 
-                                // CRITICAL FIX: DO NOT add snapped positions to color predictor!
-                                // Snapping creates teleportation, not real motion
-                                // This corrupts velocity estimates used for predictions
-                                // ball.color_predictor.addDetection(ball.position);  // REMOVED
+                                // CRITICAL: Update color predictor for PERMANENCE
+                                // Even though snapping creates teleportation, we need to maintain
+                                // tracker visibility and prevent stale history
+                                ball.color_predictor.addDetection(ball.position);
                                 
                                 DEBUG_LOG(held_snap_log, {
                                     OPEN_DEBUG_LOG(held_snap_log);
                                     held_snap_log << "\n[HELD_SNAP] Ball " << ball.id << " snapped to wrist of hand " << hand.id
                                                  << " at (" << ball.position.x << ", " << ball.position.y << ", "
-                                                 << ball.position.z << ") - velocity reset to zero" << std::endl;
-                                });
-                            } else {
-                                DEBUG_LOG(held_snap_reject_log, {
-                                    OPEN_DEBUG_LOG(held_snap_reject_log);
-                                    held_snap_reject_log << "\n[HELD_SNAP_REJECT] Ball " << ball.id
-                                                        << " NOT snapped to wrist - YOLO has good detection"
-                                                        << " | yolo_conf=" << ball.yolo_confidence
-                                                        << " | Trusting YOLO position instead" << std::endl;
+                                                 << ball.position.z << ") - velocity reset, color predictor updated" << std::endl;
                                 });
                             }
                         } else {
-                            // Hand is off-screen - mark ball as off-screen too
-                            ball.position = cv::Point3f(0, 0, 0);
-                            ball.pixel_pos = cv::Point2f(-1, -1);
-                            ball.tracking_reason = "Held_OFF-SCREEN";
+                            // Hand is off-screen - keep last known position but mark as off-screen
+                            // PERMANENCE: Don't zero out position, just mark it
+                            ball.tracking_reason = "Held_Hand_OFFSCREEN";
                             
                             DEBUG_LOG(held_offscreen_log, {
                                 OPEN_DEBUG_LOG(held_offscreen_log);
                                 held_offscreen_log << "\n[HELD_OFFSCREEN] Ball " << ball.id << " held by hand " << hand.id
-                                                  << " which is off-screen" << std::endl;
+                                                  << " which is off-screen - keeping last position" << std::endl;
                             });
                         }
                     } else {
@@ -2626,11 +2846,11 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                             ball.position = hand.wrist_pos_3d;
                             ball.pixel_pos = hand_2d;
                             ball.tracking_reason = "Held_NoProfile@Wrist";
-                            // DO NOT add snapped positions to color predictor - causes corruption
+                            // Update color predictor for permanence
+                            ball.color_predictor.addDetection(ball.position);
                         } else {
-                            ball.position = cv::Point3f(0, 0, 0);
-                            ball.pixel_pos = cv::Point2f(-1, -1);
-                            ball.tracking_reason = "Held_OFF-SCREEN";
+                            // Keep last position when hand goes off-screen
+                            ball.tracking_reason = "Held_NoProfile_OFFSCREEN";
                         }
                     }
                     break;

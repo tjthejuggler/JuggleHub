@@ -130,6 +130,7 @@ struct TrackingSettings {
     
     // State change parameters
     int min_frames_for_state_change = 2;   // Frames needed to confirm state change (REDUCED from 3 to 2)
+    float min_throw_distance = 0.20f;      // Minimum distance (m) ball must move from wrist to count as throw (default: 0.20m = 20cm)
     
     // Color-based prediction settings
     int prediction_history_frames = 5;     // Number of frames to use for prediction
@@ -186,6 +187,14 @@ struct TrackingSettings {
     int kalman_glob_search_radius = 100;               // Search radius in pixels around Kalman prediction (default: 100px)
     float kalman_glob_min_color_score = 0.50f;         // Minimum color match score to accept color blob at Kalman prediction (default: 0.50)
     float kalman_glob_max_depth_diff = 0.30f;          // Maximum depth difference (m) from Kalman prediction to accept blob (default: 0.30m)
+    
+    // Euclidean matching quality thresholds (prevents identity swaps)
+    float max_euclidean_distance = 0.15f;              // Maximum color distance to accept match (default: 0.15) - rejects terrible color matches
+    float min_euclidean_color_score = 0.30f;           // Minimum color similarity required (default: 0.30) - ensures decent color match
+    
+    // Kalman validation thresholds (prevents corruption)
+    float max_kalman_prediction_jump = 0.50f;          // Maximum jump from last known position (default: 0.50m) - resets corrupted Kalman
+    float max_depth_jump_strict = 0.20f;               // Stricter depth jump threshold (default: 0.20m, was 0.30m) - prevents depth sensor errors
     
     TrackingSettings() = default;
 };

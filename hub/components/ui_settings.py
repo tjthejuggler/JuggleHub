@@ -446,6 +446,25 @@ if PYQT_AVAILABLE:
                 is_float=False
             )
             row += 1
+
+            # Min Throw Distance
+            self.tc_min_throw_distance_slider, self.tc_min_throw_distance_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Throw Distance (cm)",
+                tooltip_text="Minimum distance ball must move from wrist to count as a throw/catch.\n"
+                             "Range: 5-50 cm. Default: 20 cm.\n"
+                             "Prevents false throw/catch events when ball is just being held.\n"
+                             "Lower = more sensitive (may trigger false events)\n"
+                             "Higher = less sensitive (may miss real throws)\n"
+                             "⚠️ Set this based on your juggling style and hand movements!",
+                range_min=5,
+                range_max=50,
+                initial_value=20,
+                update_func=lambda v: self.update_setting('min_throw_distance', v / 100.0),
+                is_float=False
+            )
+            row += 1
             
             # Separator
             layout.addWidget(QLabel("Tracker Distance Limits:"), row, 0, 1, 3)
@@ -779,6 +798,86 @@ if PYQT_AVAILABLE:
                 range_max=5,
                 initial_value=1,
                 update_func=lambda v: self.update_setting('color_sample_radius', v),
+                is_float=False
+            )
+            row += 1
+            
+            # Separator for identity swap prevention settings
+            layout.addWidget(QLabel("Identity Swap Prevention:"), row, 0, 1, 3)
+            row += 1
+            
+            # Max Euclidean Distance
+            self.ct_max_euclidean_distance_slider, self.ct_max_euclidean_distance_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Max Euclidean Distance",
+                tooltip_text="Maximum euclidean color distance to accept a match.\n"
+                             "Range: 0.00-0.50. Default: 0.15.\n"
+                             "Rejects matches with poor color similarity.\n"
+                             "Lower = stricter color matching (prevents identity swaps).\n"
+                             "Set to 0 to disable this check.\n"
+                             "⚠️ Increase to 0.15-0.20 to prevent trackers from swapping identities!",
+                range_min=0,
+                range_max=50,
+                initial_value=15,
+                update_func=lambda v: self.update_setting('max_euclidean_distance', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Min Euclidean Color Score
+            self.ct_min_euclidean_color_score_slider, self.ct_min_euclidean_color_score_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Euclidean Color Score",
+                tooltip_text="Minimum color match score to accept a euclidean match.\n"
+                             "Range: 0.00-1.00. Default: 0.30.\n"
+                             "Requires at least 30% color similarity.\n"
+                             "Higher = stricter color matching (prevents identity swaps).\n"
+                             "Set to 0 to disable this check.\n"
+                             "⚠️ Increase to 0.30-0.40 to prevent trackers from swapping identities!",
+                range_min=0,
+                range_max=100,
+                initial_value=30,
+                update_func=lambda v: self.update_setting('min_euclidean_color_score', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Max Kalman Prediction Jump
+            self.ct_max_kalman_prediction_jump_slider, self.ct_max_kalman_prediction_jump_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Max Kalman Prediction Jump (cm)",
+                tooltip_text="Maximum distance Kalman prediction can jump from last known position.\n"
+                             "Range: 0-100cm. Default: 50cm.\n"
+                             "Resets Kalman filter if prediction jumps too far.\n"
+                             "Prevents corrupted Kalman from causing wild predictions.\n"
+                             "Set to 0 to disable this check.\n"
+                             "⚠️ Set to 50cm to prevent Kalman corruption from causing identity swaps!",
+                range_min=0,
+                range_max=100,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('max_kalman_prediction_jump', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Max Depth Jump Strict
+            self.ct_max_depth_jump_strict_slider, self.ct_max_depth_jump_strict_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Max Depth Jump Strict (cm)",
+                tooltip_text="Stricter maximum depth change per frame for Kalman updates.\n"
+                             "Range: 0-50cm. Default: 20cm.\n"
+                             "Rejects detections with suspicious depth jumps.\n"
+                             "Prevents sensor errors from corrupting Kalman filter.\n"
+                             "Set to 0 to use default 30cm threshold.\n"
+                             "⚠️ Set to 20cm for stricter depth validation!",
+                range_min=0,
+                range_max=50,
+                initial_value=20,
+                update_func=lambda v: self.update_setting('max_depth_jump_strict', v / 100.0),
                 is_float=False
             )
             row += 1
@@ -1540,6 +1639,7 @@ if PYQT_AVAILABLE:
                 'wrist_proximity_threshold': self.tc_wrist_proximity_slider.value() / 100.0,  # cm to m
                 'undetected_near_hand_threshold': self.tc_undetected_near_hand_slider.value() / 100.0,  # cm to m
                 'min_frames_for_state_change': self.tc_min_frames_slider.value(),
+                'min_throw_distance': self.tc_min_throw_distance_slider.value() / 100.0 if hasattr(self, 'tc_min_throw_distance_slider') else 0.20,  # cm to m
                 'max_tracker_distance_per_frame': self.tc_max_tracker_distance_slider.value() / 100.0,  # cm to m
                 'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked(),
                 'tc_sound_on_throw': self.tc_sound_on_throw_toggle.isChecked(),
@@ -1568,6 +1668,12 @@ if PYQT_AVAILABLE:
                 
                 # Color Sample Radius
                 'color_sample_radius': self._safe_get_slider_value(self.ct_color_sample_radius_slider, 1) if hasattr(self, 'ct_color_sample_radius_slider') else 1,
+                
+                # Identity Swap Prevention settings
+                'max_euclidean_distance': self._safe_get_slider_value(self.ct_max_euclidean_distance_slider, 15) / 100.0 if hasattr(self, 'ct_max_euclidean_distance_slider') else 0.15,
+                'min_euclidean_color_score': self._safe_get_slider_value(self.ct_min_euclidean_color_score_slider, 30) / 100.0 if hasattr(self, 'ct_min_euclidean_color_score_slider') else 0.30,
+                'max_kalman_prediction_jump': self._safe_get_slider_value(self.ct_max_kalman_prediction_jump_slider, 50) / 100.0 if hasattr(self, 'ct_max_kalman_prediction_jump_slider') else 0.50,
+                'max_depth_jump_strict': self._safe_get_slider_value(self.ct_max_depth_jump_strict_slider, 20) / 100.0 if hasattr(self, 'ct_max_depth_jump_strict_slider') else 0.20,
                 
                 # Override Detection settings
                 'override_min_confidence_tracked': self._safe_get_slider_value(self.od_min_confidence_tracked_slider, 50) / 100.0 if hasattr(self, 'od_min_confidence_tracked_slider') else 0.50,
@@ -1659,7 +1765,10 @@ if PYQT_AVAILABLE:
             
             if 'min_frames_for_state_change' in settings:
                 self.tc_min_frames_slider.setValue(settings['min_frames_for_state_change'])
-            
+
+            if 'min_throw_distance' in settings and hasattr(self, 'tc_min_throw_distance_slider'):
+                self.tc_min_throw_distance_slider.setValue(int(settings['min_throw_distance'] * 100))  # m to cm
+
             if 'max_tracker_distance_per_frame' in settings:
                 self.tc_max_tracker_distance_slider.setValue(int(settings['max_tracker_distance_per_frame'] * 100))  # m to cm
             
@@ -1721,6 +1830,19 @@ if PYQT_AVAILABLE:
             # Color Sample Radius
             if 'color_sample_radius' in settings and hasattr(self, 'ct_color_sample_radius_slider'):
                 self.ct_color_sample_radius_slider.setValue(settings['color_sample_radius'])
+            
+            # Identity Swap Prevention settings
+            if 'max_euclidean_distance' in settings and hasattr(self, 'ct_max_euclidean_distance_slider'):
+                self.ct_max_euclidean_distance_slider.setValue(int(settings['max_euclidean_distance'] * 100))
+            
+            if 'min_euclidean_color_score' in settings and hasattr(self, 'ct_min_euclidean_color_score_slider'):
+                self.ct_min_euclidean_color_score_slider.setValue(int(settings['min_euclidean_color_score'] * 100))
+            
+            if 'max_kalman_prediction_jump' in settings and hasattr(self, 'ct_max_kalman_prediction_jump_slider'):
+                self.ct_max_kalman_prediction_jump_slider.setValue(int(settings['max_kalman_prediction_jump'] * 100))
+            
+            if 'max_depth_jump_strict' in settings and hasattr(self, 'ct_max_depth_jump_strict_slider'):
+                self.ct_max_depth_jump_strict_slider.setValue(int(settings['max_depth_jump_strict'] * 100))
             
             # Override Detection settings
             if 'override_min_confidence_tracked' in settings and hasattr(self, 'od_min_confidence_tracked_slider'):
@@ -1875,7 +1997,10 @@ if PYQT_AVAILABLE:
             
             if 'min_frames_for_state_change' in settings:
                 self.udp_client.send_setting('min_frames_for_state_change', settings['min_frames_for_state_change'])
-            
+
+            if 'min_throw_distance' in settings:
+                self.udp_client.send_setting('min_throw_distance', settings['min_throw_distance'])
+
             if 'max_tracker_distance_per_frame' in settings:
                 self.udp_client.send_setting('max_tracker_distance_per_frame', settings['max_tracker_distance_per_frame'])
             
@@ -1908,6 +2033,19 @@ if PYQT_AVAILABLE:
             # Color Sample Radius
             if 'color_sample_radius' in settings:
                 self.udp_client.send_setting('color_sample_radius', settings['color_sample_radius'])
+            
+            # Identity Swap Prevention settings
+            if 'max_euclidean_distance' in settings:
+                self.udp_client.send_setting('max_euclidean_distance', settings['max_euclidean_distance'])
+            
+            if 'min_euclidean_color_score' in settings:
+                self.udp_client.send_setting('min_euclidean_color_score', settings['min_euclidean_color_score'])
+            
+            if 'max_kalman_prediction_jump' in settings:
+                self.udp_client.send_setting('max_kalman_prediction_jump', settings['max_kalman_prediction_jump'])
+            
+            if 'max_depth_jump_strict' in settings:
+                self.udp_client.send_setting('max_depth_jump_strict', settings['max_depth_jump_strict'])
             
             # Override Detection settings
             if 'override_min_confidence_tracked' in settings:

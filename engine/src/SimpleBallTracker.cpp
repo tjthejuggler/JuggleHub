@@ -1509,7 +1509,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 
                 // CRITICAL: Check if detection is within max distance from ball's previous position
                 // This prevents trackers from flickering to far away balls
-                if (ball.has_yolo_detection && ball.frames_without_yolo == 0) {
+                // Apply this constraint if the ball had ANY position in the previous frame
+                // (whether from YOLO, Kalman, color tracking, or hand snapping)
+                if (ball.position.z > 0.01f) {  // Ball has a valid previous position
                     float dx = det.world_pos.x - ball.position.x;
                     float dy = det.world_pos.y - ball.position.y;
                     float dz = det.world_pos.z - ball.position.z;
@@ -1519,7 +1521,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         DEBUG_LOG(euclidean_log, {
                             OPEN_DEBUG_LOG(euclidean_log);
                             euclidean_log << "  Det#" << det.index << " REJECTED: Distance " << distance_from_previous
-                                         << "m from previous position exceeds max_tracker_distance_per_frame="
+                                         << "m from previous tracker position exceeds max_tracker_distance_per_frame="
                                          << tracking_settings_.max_tracker_distance_per_frame << "m" << std::endl;
                         });
                         continue;

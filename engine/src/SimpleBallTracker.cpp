@@ -1143,6 +1143,13 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // Track which detections are used
     std::set<int> used_detections;
     
+    // CRITICAL: Reset detection flags at start of frame
+    // This prevents balls from keeping stale "has_yolo_detection" flags
+    for (auto& ball : balls_) {
+        ball.has_yolo_detection = false;
+        ball.frames_without_yolo++;
+    }
+    
     // NEW: Check if ALL enabled profiles are calibrated for euclidean matching
     bool all_calibrated = true;
     for (const auto& profile : color_profiles_) {
@@ -1482,44 +1489,250 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         
         if (profile) {
             
+            // SWIPE-THROUGH DETECTION FOR VISIBLE BALLS:
+            // Check if hand is swiping through ball's trajectory even when ball is still visible
+            // This catches fast catches where YOLO still detects the ball but hand has intercepted it
+            if (ball.has_yolo_detection && ball.frames_without_yolo == 0 && !ball.is_held) {
+                // Check if any hand is swiping through the ball's current trajectory
+                bool swipe_detected = false;
+                int swipe_hand_id = -1;
+                cv::Point3f swipe_hand_pos(0, 0, 0);
+                
+                // Need at least 2 frames of history to detect movement
+                if (ball.color_predictor.getHistorySize() >= 2) {
+                    auto history = ball.color_predictor.getHistory();
+                    cv::Point3f ball_prev_pos = history[history.size() - 2].position;
+                    cv::Point3f ball_curr_pos = ball.position;
+                    
+                    // Calculate ball's movement vector
+                    cv::Point3f ball_movement = ball_curr_pos - ball_prev_pos;
+                    float ball_movement_mag = cv::norm(ball_movement);
+                    
+                    if (ball_movement_mag > 0.01f) {  // Ball is moving
+                        for (const auto& hand : hands) {
+                            if (!hand.is_visible) continue;
+                            
+                            // Vector from previous ball position to current hand position
+                            cv::Point3f prev_to_hand = hand.wrist_pos_3d - ball_prev_pos;
+                            
+                            // Vector from current ball position to current hand position
+                            cv::Point3f curr_to_hand = hand.wrist_pos_3d - ball_curr_pos;
+                            
+                            // Check if hand crossed the ball's trajectory
+                            float dot_prev = ball_movement.dot(prev_to_hand);
+                            float dot_curr = ball_movement.dot(curr_to_hand);
+                            
+                            // If signs are opposite, hand crossed the trajectory
+                            bool crossed_trajectory = (dot_prev * dot_curr) < 0;
+                            
+                            // Distance from hand to trajectory line
+                            cv::Point3f ball_dir = ball_movement / ball_movement_mag;
+                            cv::Point3f to_hand = hand.wrist_pos_3d - ball_prev_pos;
+                            float proj_length = to_hand.dot(ball_dir);
+                            cv::Point3f closest_point = ball_prev_pos + ball_dir * proj_length;
+                            float dist_to_trajectory = cv::norm(hand.wrist_pos_3d - closest_point);
+                            
+                            // Also check current distance to ball
+                            float dist_to_ball = cv::norm(hand.wrist_pos_3d - ball_curr_pos);
+                            
+                            const float SWIPE_TRAJECTORY_THRESHOLD = 0.20f;  // 20cm from trajectory
+                            const float SWIPE_BALL_THRESHOLD = 0.25f;        // 25cm from ball
+                            
+                            // Detect swipe if hand crossed trajectory AND is close to ball
+                            if (crossed_trajectory &&
+                                (dist_to_trajectory < SWIPE_TRAJECTORY_THRESHOLD || dist_to_ball < SWIPE_BALL_THRESHOLD)) {
+                                swipe_detected = true;
+                                swipe_hand_id = hand.id;
+                                swipe_hand_pos = hand.wrist_pos_3d;
+                                
+                                DEBUG_LOG(swipe_visible_log, {
+                                    OPEN_DEBUG_LOG(swipe_visible_log);
+                                    swipe_visible_log << "\n[SWIPE_VISIBLE] Ball " << ball.id
+                                                     << " | Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT") << ")"
+                                                     << " swiped through visible ball"
+                                                     << " | dist_to_trajectory=" << dist_to_trajectory << "m"
+                                                     << " | dist_to_ball=" << dist_to_ball << "m"
+                                                     << " | ball_movement_mag=" << ball_movement_mag << "m" << std::endl;
+                                });
+                                break;  // Use first detected swipe
+                            }
+                        }
+                    }
+                }
+                
+                if (swipe_detected) {
+                    // SWIPE-THROUGH CATCH DETECTED ON VISIBLE BALL
+                    DEBUG_LOG(catch_inference_log, {
+                        OPEN_DEBUG_LOG(catch_inference_log);
+                        catch_inference_log << "\n[CATCH_SWIPE_VISIBLE] Ball " << ball.id
+                                           << " still visible but hand " << swipe_hand_id
+                                           << " (" << (swipe_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                                           << " SWIPED THROUGH - INFERRING CATCH" << std::endl;
+                    });
+                    
+                    // CRITICAL: Mark ball as HELD so it follows the hand
+                    ball.is_held = true;
+                    ball.held_by_hand_id = swipe_hand_id;
+                    ball.previous_held_by_hand_id = swipe_hand_id;
+                    ball.yolo_class_id = 1;  // Mark as held
+                    ball.position = swipe_hand_pos;
+                    ball.pixel_pos = project_3d_to_2d(swipe_hand_pos, intrinsics);
+                    ball.has_yolo_detection = false;  // Override YOLO detection
+                    ball.frames_without_yolo = 1;     // Mark as just lost
+                    
+                    char reason[128];
+                    snprintf(reason, sizeof(reason), "CATCH_SWIPE_VIS@Hand[%c]",
+                             swipe_hand_id == 0 ? 'L' : 'R');
+                    ball.tracking_reason = reason;
+                    
+                    // Update color predictor with hand position
+                    ball.color_predictor.addDetection(ball.position);
+                    
+                    // Continue to next ball - skip normal fallback logic
+                    continue;
+                }
+            }
+            
             // CATCH DETECTION: If ball just vanished from YOLO (frames_without_yolo == 1)
-            // and a hand is nearby, infer that the ball was caught
+            // and a hand is nearby OR a hand swiped through the ball's position, infer catch
             if (ball.frames_without_yolo == 1 && !ball.is_held) {
                 // Check if any hand is near the ball's last known position
                 float min_hand_dist = std::numeric_limits<float>::max();
                 int closest_hand_id = -1;
                 cv::Point3f closest_hand_pos(0, 0, 0);
                 
+                // Also check for "swipe-through" detection
+                bool swipe_detected = false;
+                int swipe_hand_id = -1;
+                cv::Point3f swipe_hand_pos(0, 0, 0);
+                
                 for (const auto& hand : hands) {
                     if (!hand.is_visible) continue;
+                    
+                    // Standard proximity check
                     float dist = cv::norm(ball.position - hand.wrist_pos_3d);
                     if (dist < min_hand_dist) {
                         min_hand_dist = dist;
                         closest_hand_id = hand.id;
                         closest_hand_pos = hand.wrist_pos_3d;
                     }
+                    
+                    // SWIPE-THROUGH DETECTION: Check if hand moved from one side of ball to opposite side
+                    // This catches fast catches where hand swipes through ball's trajectory
+                    // We need at least 2 frames of history to detect movement
+                    if (ball.color_predictor.getHistorySize() >= 2) {
+                        auto history = ball.color_predictor.getHistory();
+                        cv::Point3f ball_prev_pos = history[history.size() - 2].position;
+                        cv::Point3f ball_curr_pos = ball.position;
+                        
+                        // Get hand's previous position from stored hands (if available)
+                        // For now, we'll use a simpler approach: check if hand is now on opposite side
+                        // of ball compared to where ball was moving
+                        
+                        // Calculate ball's movement vector
+                        cv::Point3f ball_movement = ball_curr_pos - ball_prev_pos;
+                        float ball_movement_mag = cv::norm(ball_movement);
+                        
+                        if (ball_movement_mag > 0.01f) {  // Ball was moving
+                            // Vector from previous ball position to current hand position
+                            cv::Point3f prev_to_hand = hand.wrist_pos_3d - ball_prev_pos;
+                            
+                            // Vector from current ball position to current hand position
+                            cv::Point3f curr_to_hand = hand.wrist_pos_3d - ball_curr_pos;
+                            
+                            // Check if hand crossed the ball's trajectory
+                            // This happens when the dot products have opposite signs
+                            // (hand was on one side, now on opposite side)
+                            float dot_prev = ball_movement.dot(prev_to_hand);
+                            float dot_curr = ball_movement.dot(curr_to_hand);
+                            
+                            // If signs are opposite, hand crossed the trajectory
+                            bool crossed_trajectory = (dot_prev * dot_curr) < 0;
+                            
+                            // Also check that hand is reasonably close to the trajectory line
+                            // Distance from point to line: ||(p - a) - ((p - a) · n) * n||
+                            // where n is normalized direction vector
+                            cv::Point3f ball_dir = ball_movement / ball_movement_mag;
+                            cv::Point3f to_hand = hand.wrist_pos_3d - ball_prev_pos;
+                            float proj_length = to_hand.dot(ball_dir);
+                            cv::Point3f closest_point = ball_prev_pos + ball_dir * proj_length;
+                            float dist_to_trajectory = cv::norm(hand.wrist_pos_3d - closest_point);
+                            
+                            const float SWIPE_TRAJECTORY_THRESHOLD = 0.20f;  // 20cm from trajectory line
+                            
+                            if (crossed_trajectory && dist_to_trajectory < SWIPE_TRAJECTORY_THRESHOLD) {
+                                swipe_detected = true;
+                                swipe_hand_id = hand.id;
+                                swipe_hand_pos = hand.wrist_pos_3d;
+                                
+                                DEBUG_LOG(swipe_log, {
+                                    OPEN_DEBUG_LOG(swipe_log);
+                                    swipe_log << "\n[SWIPE_DETECTED] Ball " << ball.id
+                                             << " | Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT") << ")"
+                                             << " crossed trajectory"
+                                             << " | dist_to_trajectory=" << dist_to_trajectory << "m"
+                                             << " | ball_movement_mag=" << ball_movement_mag << "m" << std::endl;
+                                });
+                                break;  // Use first detected swipe
+                            }
+                        }
+                    }
                 }
                 
-                // If a hand is within catch distance when ball vanishes, infer catch
+                // Prioritize swipe detection over proximity
                 const float CATCH_INFERENCE_DISTANCE = 0.25f;  // 25cm - generous for catch detection
-                if (min_hand_dist < CATCH_INFERENCE_DISTANCE) {
+                
+                if (swipe_detected) {
+                    // SWIPE-THROUGH CATCH DETECTED
                     DEBUG_LOG(catch_inference_log, {
                         OPEN_DEBUG_LOG(catch_inference_log);
-                        catch_inference_log << "\n[CATCH_INFERENCE] Ball " << ball.id
+                        catch_inference_log << "\n[CATCH_INFERENCE_SWIPE] Ball " << ball.id
+                                           << " vanished from YOLO with hand " << swipe_hand_id
+                                           << " (" << (swipe_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
+                                           << " SWIPING THROUGH trajectory"
+                                           << " - INFERRING CATCH" << std::endl;
+                    });
+                    
+                    // CRITICAL: Mark ball as HELD so it follows the hand
+                    ball.is_held = true;
+                    ball.held_by_hand_id = swipe_hand_id;
+                    ball.previous_held_by_hand_id = swipe_hand_id;
+                    ball.yolo_class_id = 1;  // Mark as held
+                    ball.position = swipe_hand_pos;
+                    ball.pixel_pos = project_3d_to_2d(swipe_hand_pos, intrinsics);
+                    
+                    char reason[128];
+                    snprintf(reason, sizeof(reason), "CATCH_SWIPE@Hand[%c]",
+                             swipe_hand_id == 0 ? 'L' : 'R');
+                    ball.tracking_reason = reason;
+                    
+                    // Update color predictor with hand position
+                    ball.color_predictor.addDetection(ball.position);
+                    
+                    // Continue to next ball - skip normal fallback logic
+                    continue;
+                }
+                else if (min_hand_dist < CATCH_INFERENCE_DISTANCE) {
+                    // PROXIMITY-BASED CATCH DETECTED
+                    DEBUG_LOG(catch_inference_log, {
+                        OPEN_DEBUG_LOG(catch_inference_log);
+                        catch_inference_log << "\n[CATCH_INFERENCE_PROXIMITY] Ball " << ball.id
                                            << " vanished from YOLO with hand " << closest_hand_id
                                            << " (" << (closest_hand_id == 0 ? "LEFT" : "RIGHT") << ")"
                                            << " at distance " << min_hand_dist << "m"
                                            << " - INFERRING CATCH" << std::endl;
                     });
                     
-                    // Mark ball as held by this hand
+                    // CRITICAL: Mark ball as HELD so it follows the hand
+                    ball.is_held = true;
                     ball.held_by_hand_id = closest_hand_id;
+                    ball.previous_held_by_hand_id = closest_hand_id;
                     ball.yolo_class_id = 1;  // Mark as held
                     ball.position = closest_hand_pos;
                     ball.pixel_pos = project_3d_to_2d(closest_hand_pos, intrinsics);
                     
                     char reason[128];
-                    snprintf(reason, sizeof(reason), "CATCH_INFERRED@Hand[%c] d=%.2fm",
+                    snprintf(reason, sizeof(reason), "CATCH_PROX@Hand[%c] d=%.2fm",
                              closest_hand_id == 0 ? 'L' : 'R', min_hand_dist);
                     ball.tracking_reason = reason;
                     

@@ -584,136 +584,8 @@ if PYQT_AVAILABLE:
             layout.addWidget(info_label, row, 0, 1, 3)
             row += 1
             
-            # YOLO Confidence Weight
-            self.ct_yolo_confidence_weight_slider, self.ct_yolo_confidence_weight_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="YOLO Confidence Weight",
-                tooltip_text="Weight for YOLO detection confidence score.\n"
-                             "Range: 0.0-5.0. Default: 2.0.\n"
-                             "Higher = prefer high-confidence detections.",
-                range_min=0,
-                range_max=50,
-                initial_value=20,
-                update_func=lambda v: self.update_setting('yolo_confidence_weight', v / 10.0),
-                is_float=True
-            )
-            row += 1
-            
-            # YOLO Class Weight
-            self.ct_yolo_class_weight_slider, self.ct_yolo_class_weight_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="YOLO Class Weight",
-                tooltip_text="Weight for YOLO class (ball vs ball_held).\n"
-                             "Range: 0.0-5.0. Default: 3.0.\n"
-                             "Higher = strongly prefer 'ball' over 'ball_held'.",
-                range_min=0,
-                range_max=50,
-                initial_value=30,
-                update_func=lambda v: self.update_setting('yolo_class_weight', v / 10.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Color Match Weight
-            self.ct_color_match_weight_slider, self.ct_color_match_weight_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Color Match Weight",
-                tooltip_text="Weight for color matching score.\n"
-                             "Range: 0.0-5.0. Default: 1.0.\n"
-                             "Higher = require better color match.",
-                range_min=0,
-                range_max=50,
-                initial_value=10,
-                update_func=lambda v: self.update_setting('color_match_weight', v / 10.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Kalman Proximity Weight
-            self.ct_kalman_proximity_weight_slider, self.ct_kalman_proximity_weight_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Kalman Proximity Weight",
-                tooltip_text="Weight for proximity to Kalman prediction.\n"
-                             "Range: 0.0-5.0. Default: 0.0 (disabled).\n"
-                             "Higher = strongly prefer detections near prediction.\n"
-                             "⚠️ Set to 2.0-4.0 to fix the issue shown in your images!",
-                range_min=0,
-                range_max=50,
-                initial_value=0,
-                update_func=lambda v: self.update_setting('kalman_proximity_weight', v / 10.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Separator for override settings
-            layout.addWidget(QLabel("Color Tracker Override Settings:"), row, 0, 1, 3)
-            row += 1
-            
-            # Min YOLO Score Threshold
-            self.ct_min_yolo_score_slider, self.ct_min_yolo_score_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min YOLO Score Threshold",
-                tooltip_text="Minimum total score for using YOLO detection as color tracker.\n"
-                             "Range: 0.0-10.0. Default: 0.0 (always use YOLO if available).\n"
-                             "If score is below this, use Kalman prediction instead.\n"
-                             "Higher = require better YOLO detection to use it.",
-                range_min=0,
-                range_max=100,
-                initial_value=0,
-                update_func=lambda v: self.update_setting('min_yolo_score_threshold', v / 10.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Override Confidence Threshold
-            self.ct_override_confidence_slider, self.ct_override_confidence_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Override Confidence Threshold",
-                tooltip_text="Minimum YOLO confidence to force use even if score is below threshold.\n"
-                             "Range: 0.0-1.0. Default: 0.7.\n"
-                             "Helps 'unstick' Kalman predictions with high-confidence detections.",
-                range_min=0,
-                range_max=100,
-                initial_value=70,
-                update_func=lambda v: self.update_setting('override_confidence_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Override Color Threshold
-            self.ct_override_color_slider, self.ct_override_color_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Override Color Threshold",
-                tooltip_text="Minimum color match score to force use even if score is below threshold.\n"
-                             "Range: 0.0-1.0. Default: 0.8.\n"
-                             "Requires good color match for override.",
-                range_min=0,
-                range_max=100,
-                initial_value=80,
-                update_func=lambda v: self.update_setting('override_color_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Override Require Ball Class Toggle
-            self.ct_override_require_ball_toggle = QPushButton("Override Requires 'Ball' Class")
-            self.ct_override_require_ball_toggle.setCheckable(True)
-            self.ct_override_require_ball_toggle.setChecked(True)
-            self.ct_override_require_ball_toggle.clicked.connect(
-                lambda: self.update_setting('override_require_ball_class', 1 if self.ct_override_require_ball_toggle.isChecked() else 0)
-            )
-            layout.addWidget(self.ct_override_require_ball_toggle, row, 0, 1, 3)
-            row += 1
-            
             # Separator for euclidean matching settings
-            layout.addWidget(QLabel("Euclidean Matching Temporal Consistency:"), row, 0, 1, 3)
+            layout.addWidget(QLabel("Temporal Consistency (prevents ball identity swaps):"), row, 0, 1, 3)
             row += 1
             
             # Temporal Consistency Bonus
@@ -769,20 +641,6 @@ if PYQT_AVAILABLE:
                 update_func=lambda v: self.update_setting('color_sample_radius', v),
                 is_float=False
             )
-            row += 1
-            
-            # Add explanation
-            explanation_label = QLabel(
-                "💡 <b>How it works:</b><br>"
-                "Each YOLO detection gets a score = (class_weight × confidence_weight × confidence) + "
-                "(color_match_weight × color_score) + (kalman_proximity_weight × proximity_score)<br><br>"
-                "The detection with the highest score is assigned to the ball.<br><br>"
-                "<b>To fix your issue:</b> Increase Kalman Proximity Weight to 2.0-4.0 so the tracker "
-                "prefers the detection closer to the prediction circle, even if it has lower confidence."
-            )
-            explanation_label.setStyleSheet("color: #aaaaaa; font-size: 10px; padding: 10px; background-color: #1e1e1e; border-radius: 5px;")
-            explanation_label.setWordWrap(True)
-            layout.addWidget(explanation_label, row, 0, 1, 3)
             row += 1
             
             return section
@@ -1378,18 +1236,6 @@ if PYQT_AVAILABLE:
                 'prediction_history_frames': self._safe_get_slider_value(self.kp_prediction_history_slider, 5) if hasattr(self, 'kp_prediction_history_slider') else 5,
                 'prediction_radius_m': self._safe_get_slider_value(self.kp_prediction_radius_slider, 15) / 100.0 if hasattr(self, 'kp_prediction_radius_slider') else 0.15,
                 
-                # Color Tracker Weights
-                'yolo_confidence_weight': self._safe_get_slider_value(self.ct_yolo_confidence_weight_slider, 20) / 10.0 if hasattr(self, 'ct_yolo_confidence_weight_slider') else 2.0,
-                'yolo_class_weight': self._safe_get_slider_value(self.ct_yolo_class_weight_slider, 30) / 10.0 if hasattr(self, 'ct_yolo_class_weight_slider') else 3.0,
-                'color_match_weight': self._safe_get_slider_value(self.ct_color_match_weight_slider, 10) / 10.0 if hasattr(self, 'ct_color_match_weight_slider') else 1.0,
-                'kalman_proximity_weight': self._safe_get_slider_value(self.ct_kalman_proximity_weight_slider, 0) / 10.0 if hasattr(self, 'ct_kalman_proximity_weight_slider') else 0.0,
-                
-                # Color Tracker Override Settings
-                'min_yolo_score_threshold': self._safe_get_slider_value(self.ct_min_yolo_score_slider, 0) / 10.0 if hasattr(self, 'ct_min_yolo_score_slider') else 0.0,
-                'override_confidence_threshold': self._safe_get_slider_value(self.ct_override_confidence_slider, 70) / 100.0 if hasattr(self, 'ct_override_confidence_slider') else 0.7,
-                'override_color_threshold': self._safe_get_slider_value(self.ct_override_color_slider, 80) / 100.0 if hasattr(self, 'ct_override_color_slider') else 0.8,
-                'override_require_ball_class': self.ct_override_require_ball_toggle.isChecked() if hasattr(self, 'ct_override_require_ball_toggle') else True,
-                
                 # Euclidean Matching Temporal Consistency
                 'temporal_consistency_bonus': self._safe_get_slider_value(self.ct_temporal_consistency_bonus_slider, 25) / 100.0 if hasattr(self, 'ct_temporal_consistency_bonus_slider') else 0.25,
                 'spatial_threshold': self._safe_get_slider_value(self.ct_spatial_threshold_slider, 40) / 100.0 if hasattr(self, 'ct_spatial_threshold_slider') else 0.40,
@@ -1511,32 +1357,6 @@ if PYQT_AVAILABLE:
             if 'collapsed_color_tracker_weights' in settings and hasattr(self, 'color_tracker_weights_section'):
                 if settings['collapsed_color_tracker_weights'] != self.color_tracker_weights_section.is_collapsed:
                     self.color_tracker_weights_section.toggle_collapsed()
-            
-            # Color Tracker Weights settings
-            if 'yolo_confidence_weight' in settings and hasattr(self, 'ct_yolo_confidence_weight_slider'):
-                self.ct_yolo_confidence_weight_slider.setValue(int(settings['yolo_confidence_weight'] * 10))
-            
-            if 'yolo_class_weight' in settings and hasattr(self, 'ct_yolo_class_weight_slider'):
-                self.ct_yolo_class_weight_slider.setValue(int(settings['yolo_class_weight'] * 10))
-            
-            if 'color_match_weight' in settings and hasattr(self, 'ct_color_match_weight_slider'):
-                self.ct_color_match_weight_slider.setValue(int(settings['color_match_weight'] * 10))
-            
-            if 'kalman_proximity_weight' in settings and hasattr(self, 'ct_kalman_proximity_weight_slider'):
-                self.ct_kalman_proximity_weight_slider.setValue(int(settings['kalman_proximity_weight'] * 10))
-            
-            # Color Tracker Override Settings
-            if 'min_yolo_score_threshold' in settings and hasattr(self, 'ct_min_yolo_score_slider'):
-                self.ct_min_yolo_score_slider.setValue(int(settings['min_yolo_score_threshold'] * 10))
-            
-            if 'override_confidence_threshold' in settings and hasattr(self, 'ct_override_confidence_slider'):
-                self.ct_override_confidence_slider.setValue(int(settings['override_confidence_threshold'] * 100))
-            
-            if 'override_color_threshold' in settings and hasattr(self, 'ct_override_color_slider'):
-                self.ct_override_color_slider.setValue(int(settings['override_color_threshold'] * 100))
-            
-            if 'override_require_ball_class' in settings and hasattr(self, 'ct_override_require_ball_toggle'):
-                self.ct_override_require_ball_toggle.setChecked(settings['override_require_ball_class'])
             
             # Euclidean Matching Temporal Consistency settings
             if 'temporal_consistency_bonus' in settings and hasattr(self, 'ct_temporal_consistency_bonus_slider'):
@@ -1674,32 +1494,6 @@ if PYQT_AVAILABLE:
             
             if 'prediction_radius_m' in settings:
                 self.udp_client.send_setting('prediction_radius_m', settings['prediction_radius_m'])
-            
-            # Color Tracker Weights
-            if 'yolo_confidence_weight' in settings:
-                self.udp_client.send_setting('yolo_confidence_weight', settings['yolo_confidence_weight'])
-            
-            if 'yolo_class_weight' in settings:
-                self.udp_client.send_setting('yolo_class_weight', settings['yolo_class_weight'])
-            
-            if 'color_match_weight' in settings:
-                self.udp_client.send_setting('color_match_weight', settings['color_match_weight'])
-            
-            if 'kalman_proximity_weight' in settings:
-                self.udp_client.send_setting('kalman_proximity_weight', settings['kalman_proximity_weight'])
-            
-            # Color Tracker Override Settings
-            if 'min_yolo_score_threshold' in settings:
-                self.udp_client.send_setting('min_yolo_score_threshold', settings['min_yolo_score_threshold'])
-            
-            if 'override_confidence_threshold' in settings:
-                self.udp_client.send_setting('override_confidence_threshold', settings['override_confidence_threshold'])
-            
-            if 'override_color_threshold' in settings:
-                self.udp_client.send_setting('override_color_threshold', settings['override_color_threshold'])
-            
-            if 'override_require_ball_class' in settings:
-                self.udp_client.send_setting('override_require_ball_class', 1 if settings['override_require_ball_class'] else 0)
             
             # Euclidean Matching Temporal Consistency
             if 'temporal_consistency_bonus' in settings:

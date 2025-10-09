@@ -9,6 +9,7 @@
 #include "json.hpp"
 #include "KalmanFilter3D.hpp"
 #include "ColorBasedPredictor.hpp"
+#include "GpuHsvConverter.hpp"
 
 using json = nlohmann::json;
 
@@ -264,6 +265,9 @@ private:
     ov::InferRequest ball_infer_;
     ov::CompiledModel pose_model_;
     ov::InferRequest pose_infer_;
+    
+    // GPU-accelerated HSV converter
+    std::unique_ptr<GpuHsvConverter> gpu_hsv_converter_;
     
     // State
     std::vector<ColorProfile> color_profiles_;

@@ -52,6 +52,7 @@ add_executable(juggle_engine
     src/main.cpp
     src/Engine.cpp
     src/SimpleBallTracker.cpp
+    src/GpuHsvConverter.cpp
     src/KalmanFilter3D.cpp
     src/modules/UdpBallColorModule.cpp
     src/modules/PositionToRgbModule.cpp

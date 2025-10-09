@@ -59,6 +59,10 @@ SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
                                     const std::string& settings_file)
     : settings_file_(settings_file) {
     
+    // Initialize GPU-accelerated HSV converter
+    gpu_hsv_converter_ = std::make_unique<GpuHsvConverter>();
+    std::cout << "[SimpleBallTracker] " << gpu_hsv_converter_->getGpuInfo() << std::endl;
+    
     // Load OpenVINO models
     ball_model_ = core_.compile_model(ball_model_path, device_name);
     ball_infer_ = ball_model_.create_infer_request();
@@ -422,7 +426,7 @@ float SimpleBallTracker::matchColor(const Detection& det, const ColorProfile& pr
         return 0.0f;
     }
     
-    // OPTIMIZATION: Convert only the ROI around detection center to HSV
+    // GPU-ACCELERATED: Convert only the ROI around detection center to HSV using GPU
     // Sample region: 5x5 for calibrated, 15x15 for legacy (radius of 2 vs 7)
     const int max_sample_radius = 7;  // Legacy mode uses larger radius
     int roi_x = std::max(0, static_cast<int>(center.x) - max_sample_radius);
@@ -431,9 +435,7 @@ float SimpleBallTracker::matchColor(const Detection& det, const ColorProfile& pr
     int roi_height = std::min(color_frame.rows - roi_y, max_sample_radius * 2 + 1);
     
     cv::Rect roi(roi_x, roi_y, roi_width, roi_height);
-    cv::Mat color_roi = color_frame(roi);
-    cv::Mat hsv_roi;
-    cv::cvtColor(color_roi, hsv_roi, cv::COLOR_BGR2HSV);
+    cv::Mat hsv_roi = gpu_hsv_converter_->convertRoiToHsv(color_frame, roi);
     
     // NEW: If profile has calibrated avg_hue and avg_saturation, use euclidean distance
     if (profile.avg_hue >= 0.0f && profile.avg_saturation >= 0.0f) {
@@ -525,59 +527,32 @@ cv::Point2f SimpleBallTracker::searchForColorBlob(const cv::Mat& color_frame,
                                                   const ColorProfile& profile,
                                                   const cv::Point2f& search_center,
                                                   int radius) {
-    // OPTIMIZATION: Convert only the ROI around search center to HSV
+    // GPU-ACCELERATED: Perform entire color blob search on GPU
+    // This includes HSV conversion, inRange masking, and contour detection
     int roi_x = std::max(0, static_cast<int>(search_center.x) - radius);
     int roi_y = std::max(0, static_cast<int>(search_center.y) - radius);
     int roi_width = std::min(color_frame.cols - roi_x, radius * 2);
     int roi_height = std::min(color_frame.rows - roi_y, radius * 2);
     
     cv::Rect roi(roi_x, roi_y, roi_width, roi_height);
-    cv::Mat color_roi = color_frame(roi);
-    cv::Mat hsv_roi;
-    cv::cvtColor(color_roi, hsv_roi, cv::COLOR_BGR2HSV);
     
-    // Create mask for color
-    cv::Mat mask1, mask2, mask;
-    cv::inRange(hsv_roi, profile.min_hsv, profile.max_hsv, mask1);
+    // Use GPU-accelerated blob search (HSV conversion + inRange on GPU)
+    cv::Point2f blob_center = gpu_hsv_converter_->findColorBlob(
+        color_frame, roi,
+        profile.min_hsv, profile.max_hsv,
+        profile.min_hsv2, profile.max_hsv2,
+        roi_x, roi_y
+    );
     
-    if (profile.min_hsv2[0] >= 0) {
-        cv::inRange(hsv_roi, profile.min_hsv2, profile.max_hsv2, mask2);
-        cv::bitwise_or(mask1, mask2, mask);
-    } else {
-        mask = mask1;
-    }
-    
-    // Find contours
-    std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-    
-    // Find largest contour (prioritize size over proximity when near hands)
-    double max_area = 0;
-    cv::Point2f best_center(-1, -1);
-    
-    for (const auto& contour : contours) {
-        double area = cv::contourArea(contour);
-        if (area < 50.0) continue;  // Minimum blob size
-        
-        cv::Moments m = cv::moments(contour);
-        if (m.m00 == 0) continue;
-        
-        // Convert center back to original frame coordinates
-        cv::Point2f center(m.m10 / m.m00 + roi_x, m.m01 / m.m00 + roi_y);
-        
-        // Check if within search radius
-        float dist = cv::norm(center - search_center);
-        if (dist > radius) continue;
-        
-        // Prefer larger blobs - this helps when ball is occluded by hand
-        // The largest blob is most likely the actual ball
-        if (area > max_area) {
-            max_area = area;
-            best_center = center;
+    // Check if blob is within search radius
+    if (blob_center.x > 0 && blob_center.y > 0) {
+        float dist = cv::norm(blob_center - search_center);
+        if (dist > radius) {
+            return cv::Point2f(-1, -1);
         }
     }
     
-    return best_center;
+    return blob_center;
 }
 
 float SimpleBallTracker::getDepthAtPoint(const cv::Mat& depth_frame, const cv::Point2f& point) {
@@ -1355,7 +1330,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 if (center.x < 0 || center.x >= color_frame.cols ||
                     center.y < 0 || center.y >= color_frame.rows) continue;
                 
-                // OPTIMIZATION: Convert only small ROI for sampling
+                // GPU-ACCELERATED: Convert only small ROI for sampling using GPU
                 const int sample_radius = tracking_settings_.color_sample_radius;
                 int roi_x = std::max(0, static_cast<int>(center.x) - sample_radius);
                 int roi_y = std::max(0, static_cast<int>(center.y) - sample_radius);
@@ -1363,9 +1338,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 int roi_height = std::min(color_frame.rows - roi_y, sample_radius * 2 + 1);
                 
                 cv::Rect roi(roi_x, roi_y, roi_width, roi_height);
-                cv::Mat color_roi = color_frame(roi);
-                cv::Mat hsv_roi;
-                cv::cvtColor(color_roi, hsv_roi, cv::COLOR_BGR2HSV);
+                cv::Mat hsv_roi = gpu_hsv_converter_->convertRoiToHsv(color_frame, roi);
                 
                 std::vector<float> hue_samples, sat_samples;
                 
@@ -2711,8 +2684,8 @@ bool SimpleBallTracker::calibrateColor(const std::string& color_name,
         return false;
     }
     
-    // OPTIMIZATION: Convert only the ROI around detection center to HSV
-    // (calibrateColor only needs a small 5x5 sample)
+    // GPU-ACCELERATED: Convert small ROI around detection center to HSV using GPU
+    // (calibrateColor needs a 5x5 sample for averaging)
     
     // Calculate center of bounding box
     int center_x = static_cast<int>(clicked_det->box.x + clicked_det->box.width / 2.0f);
@@ -2722,24 +2695,24 @@ bool SimpleBallTracker::calibrateColor(const std::string& color_name,
     const int sample_size = 5;
     const int half_size = sample_size / 2;
     
+    // Create ROI for the 5x5 sample area
+    int roi_x = std::max(0, center_x - half_size);
+    int roi_y = std::max(0, center_y - half_size);
+    int roi_width = std::min(last_color_frame_.cols - roi_x, sample_size);
+    int roi_height = std::min(last_color_frame_.rows - roi_y, sample_size);
+    
+    cv::Rect sample_roi(roi_x, roi_y, roi_width, roi_height);
+    cv::Mat hsv_roi = gpu_hsv_converter_->convertRoiToHsv(last_color_frame_, sample_roi);
+    
     std::vector<float> hue_samples;
     std::vector<float> sat_samples;
     
-    for (int dy = -half_size; dy <= half_size; ++dy) {
-        for (int dx = -half_size; dx <= half_size; ++dx) {
-            int x = center_x + dx;
-            int y = center_y + dy;
-            
-            // Check bounds
-            if (x >= 0 && x < last_color_frame_.cols && y >= 0 && y < last_color_frame_.rows) {
-                // Convert single pixel to HSV on-demand
-                cv::Mat pixel_bgr = last_color_frame_(cv::Rect(x, y, 1, 1));
-                cv::Mat pixel_hsv;
-                cv::cvtColor(pixel_bgr, pixel_hsv, cv::COLOR_BGR2HSV);
-                cv::Vec3b hsv = pixel_hsv.at<cv::Vec3b>(0, 0);
-                hue_samples.push_back(static_cast<float>(hsv[0]));
-                sat_samples.push_back(static_cast<float>(hsv[1]));
-            }
+    // Sample from the converted HSV ROI
+    for (int dy = 0; dy < hsv_roi.rows; ++dy) {
+        for (int dx = 0; dx < hsv_roi.cols; ++dx) {
+            cv::Vec3b hsv = hsv_roi.at<cv::Vec3b>(dy, dx);
+            hue_samples.push_back(static_cast<float>(hsv[0]));
+            sat_samples.push_back(static_cast<float>(hsv[1]));
         }
     }
     

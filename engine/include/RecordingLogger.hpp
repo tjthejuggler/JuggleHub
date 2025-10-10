@@ -250,6 +250,98 @@ public:
         frame_number_++;
     }
     
+    // Log detailed velocity estimation and prediction calculations
+    void logVelocityEstimation(int ball_id, const std::string& ball_color,
+                               const std::vector<TrajectoryPoint>& points,
+                               const cv::Point3f& estimated_velocity,
+                               const cv::Point3f& current_position,
+                               float gravity) {
+        if (!is_active_) return;
+        
+        log_file_ << "  *** VELOCITY ESTIMATION DEBUG (Ball " << ball_id << " - " << ball_color << ") ***\n";
+        log_file_ << "    Number of trajectory points: " << points.size() << "\n";
+        log_file_ << "    Gravity: " << std::fixed << std::setprecision(4) << gravity << " m/s²\n\n";
+        
+        if (points.size() < 2) {
+            log_file_ << "    ERROR: Not enough points for velocity estimation (need at least 2)\n\n";
+            return;
+        }
+        
+        // Show the points being used
+        log_file_ << "    Trajectory points (for velocity calculation):\n";
+        for (size_t i = 0; i < points.size(); ++i) {
+            const auto& p = points[i];
+            log_file_ << "      Point[" << i << "]: pos=("
+                     << std::fixed << std::setprecision(4)
+                     << p.position.x << ", " << p.position.y << ", " << p.position.z << ") m"
+                     << " | timestamp=" << p.timestamp << " µs"
+                     << " | verified=" << (p.verified ? "YES" : "NO") << "\n";
+        }
+        log_file_ << "\n";
+        
+        // Show two-point calculation if only 2 points
+        if (points.size() == 2) {
+            const auto& p1 = points[0];
+            const auto& p2 = points[1];
+            
+            double dt = (p2.timestamp - p1.timestamp) / 1000000.0;
+            cv::Point3f dp = p2.position - p1.position;
+            
+            log_file_ << "    TWO-POINT METHOD:\n";
+            log_file_ << "      p1 = (" << p1.position.x << ", " << p1.position.y << ", " << p1.position.z << ") at t=" << p1.timestamp << " µs\n";
+            log_file_ << "      p2 = (" << p2.position.x << ", " << p2.position.y << ", " << p2.position.z << ") at t=" << p2.timestamp << " µs\n";
+            log_file_ << "      Δt = " << std::setprecision(6) << dt << " seconds\n";
+            log_file_ << "      Δp = (" << std::setprecision(4) << dp.x << ", " << dp.y << ", " << dp.z << ") m\n";
+            log_file_ << "      v = Δp / Δt = (" << (dp.x/dt) << ", " << (dp.y/dt) << ", " << (dp.z/dt) << ") m/s\n\n";
+        } else {
+            log_file_ << "    LEAST-SQUARES METHOD (using last " << std::min(10, (int)points.size()) << " points):\n";
+            log_file_ << "      Setting t=0 at LAST point (current time)\n";
+            log_file_ << "      All previous points have negative time values\n\n";
+        }
+        
+        log_file_ << "    ESTIMATED VELOCITY (at current position):\n";
+        log_file_ << "      v_current = (" << std::fixed << std::setprecision(4)
+                 << estimated_velocity.x << ", "
+                 << estimated_velocity.y << ", "
+                 << estimated_velocity.z << ") m/s\n";
+        
+        float speed = std::sqrt(estimated_velocity.x * estimated_velocity.x +
+                               estimated_velocity.y * estimated_velocity.y +
+                               estimated_velocity.z * estimated_velocity.z);
+        log_file_ << "      Speed magnitude: " << std::setprecision(4) << speed << " m/s\n";
+        log_file_ << "      Horizontal speed: " << std::sqrt(estimated_velocity.x * estimated_velocity.x +
+                                                             estimated_velocity.y * estimated_velocity.y) << " m/s\n";
+        log_file_ << "      Vertical speed: " << estimated_velocity.z << " m/s "
+                 << (estimated_velocity.z > 0 ? "(upward)" : "(downward)") << "\n\n";
+        
+        log_file_ << "    CURRENT POSITION (prediction starting point):\n";
+        log_file_ << "      p_current = (" << std::fixed << std::setprecision(4)
+                 << current_position.x << ", "
+                 << current_position.y << ", "
+                 << current_position.z << ") m\n\n";
+        
+        // Show prediction equation
+        log_file_ << "    PREDICTION EQUATION:\n";
+        log_file_ << "      For time t seconds into the future:\n";
+        log_file_ << "      x(t) = " << current_position.x << " + " << estimated_velocity.x << " * t\n";
+        log_file_ << "      y(t) = " << current_position.y << " + " << estimated_velocity.y << " * t\n";
+        log_file_ << "      z(t) = " << current_position.z << " + " << estimated_velocity.z << " * t - 0.5 * " << gravity << " * t²\n\n";
+        
+        // Show first few predicted points
+        log_file_ << "    SAMPLE PREDICTIONS (first 5 time steps at 0.033s intervals):\n";
+        for (int i = 0; i < 5; ++i) {
+            float t = i * 0.033f;
+            float x = current_position.x + estimated_velocity.x * t;
+            float y = current_position.y + estimated_velocity.y * t;
+            float z = current_position.z + estimated_velocity.z * t - 0.5f * gravity * t * t;
+            
+            log_file_ << "      t=" << std::fixed << std::setprecision(3) << t << "s: ("
+                     << std::setprecision(4) << x << ", " << y << ", " << z << ") m\n";
+        }
+        log_file_ << "\n";
+        log_file_.flush();
+    }
+    
     // Close the log file and write events summary at the top
     void close() {
         if (is_active_ && log_file_.is_open()) {

@@ -86,6 +86,14 @@ struct TrajectoryPredictionParams {
 
 class GpuTrajectoryPredictor {
 public:
+    // Result struct for general parabolic fit
+    struct ParabolicFitResult {
+        cv::Point3f position;      // Position at t=0 (p₀)
+        cv::Point3f velocity;      // Velocity at t=0 (v₀)
+        cv::Point3f acceleration;  // Constant acceleration (a)
+        bool success = false;
+    };
+    
     GpuTrajectoryPredictor();
     ~GpuTrajectoryPredictor() = default;
     
@@ -105,6 +113,7 @@ public:
     std::vector<cv::Point3f> predictTrajectory(
         const cv::Point3f& initial_pos,
         const cv::Point3f& initial_vel,
+        const cv::Point3f& acceleration,
         const TrajectoryPredictionParams& params = TrajectoryPredictionParams()
     );
     
@@ -124,21 +133,80 @@ public:
     );
     
     /**
-     * Estimate initial velocity from verified trajectory points
-     * 
-     * Uses least-squares fitting to estimate v0 from observed points.
+     * Estimate initial conditions (position and velocity) from verified trajectory points
+     *
+     * Uses least-squares fitting to estimate p0 and v0 at t=0 of the fit window.
      * Fits parabolic trajectory to minimize error.
-     * 
+     *
      * Algorithm:
      * 1. Extract time and position data from verified points
-     * 2. Fit linear model for x(t) and y(t)
-     * 3. Fit quadratic model for z(t) with gravity
-     * 4. Extract velocity components from fitted parameters
-     * 
+     * 2. Fit linear model for x(t) and y(t): x = p0x + v0x*t
+     * 3. Fit quadratic model for z(t): z = p0z + v0z*t - 0.5*g*t²
+     * 4. Extract position (intercepts) and velocity (slopes) at t=0
+     *
      * @param points Verified trajectory points (minimum 3 required)
      * @param gravity Gravitational acceleration (m/s²)
-     * @return Estimated initial velocity vector
+     * @return Pair of (initial_position, initial_velocity) at t=0 of fit window
      */
+    using TrajectoryInitialConditions = std::pair<cv::Point3f, cv::Point3f>;
+    
+    TrajectoryInitialConditions estimateInitialConditions(
+        const std::vector<TrajectoryPoint>& points,
+        float gravity = 9.81f
+    );
+    
+    /**
+     * Estimate the ball's CURRENT velocity from recent trajectory points
+     *
+     * This calculates the velocity at the time of the LAST verified point,
+     * which is the correct velocity to use for predicting future trajectory.
+     *
+     * Algorithm:
+     * - For 2 points: Simple two-point method (v = Δp / Δt)
+     * - For 3+ points: Least-squares fitting with better noise resistance
+     *
+     * Key difference from estimateInitialVelocity:
+     * - This estimates velocity AT THE CURRENT POSITION (last point)
+     * - estimateInitialVelocity estimates velocity at t=0 of fit window
+     *
+     * @param points Recent trajectory points (minimum 2 required)
+     * @param gravity Gravitational acceleration (m/s²)
+     * @return Current velocity vector at the last verified point
+     */
+    cv::Point3f estimateCurrentVelocity(
+        const std::vector<TrajectoryPoint>& points,
+        float gravity = 9.81f
+    );
+    
+    /**
+     * Estimate current state (position, velocity, acceleration) using general parabolic fit
+     *
+     * This is the NEW method that fits general parabolas to all three axes independently,
+     * without assuming any prior knowledge about gravity or physics constraints.
+     *
+     * Algorithm:
+     * - Fits p(t) = c₂t² + c₁t + c₀ independently for X, Y, Z axes
+     * - Extracts: position = c₀, velocity = c₁, acceleration = 2*c₂
+     * - Uses last 10 points for better noise resistance
+     * - Sets t=0 at the LAST point (current time)
+     *
+     * @param points Recent trajectory points (minimum 3 required)
+     * @return ParabolicFitResult with position, velocity, and acceleration
+     */
+    ParabolicFitResult estimateCurrentStateCpu(
+        const std::vector<TrajectoryPoint>& points
+    );
+    
+    /**
+     * DEPRECATED: Use estimateCurrentVelocity instead
+     *
+     * This method estimates velocity at t=0 of the fit window,
+     * which is NOT the current velocity. This causes prediction errors
+     * when predicting from the current ball position.
+     *
+     * Kept for backward compatibility only.
+     */
+    [[deprecated("Use estimateCurrentVelocity instead - this estimates velocity at wrong time")]]
     cv::Point3f estimateInitialVelocity(
         const std::vector<TrajectoryPoint>& points,
         float gravity = 9.81f
@@ -235,12 +303,23 @@ private:
     std::vector<cv::Point3f> predictTrajectoryCpu(
         const cv::Point3f& initial_pos,
         const cv::Point3f& initial_vel,
+        const cv::Point3f& acceleration,
         const TrajectoryPredictionParams& params
     );
     
     std::pair<int, float> findClosestPointCpu(
         const std::vector<cv::Point3f>& trajectory,
         const cv::Point3f& position
+    );
+    
+    TrajectoryInitialConditions estimateInitialConditionsCpu(
+        const std::vector<TrajectoryPoint>& points,
+        float gravity
+    );
+    
+    cv::Point3f estimateCurrentVelocityCpu(
+        const std::vector<TrajectoryPoint>& points,
+        float gravity
     );
     
     cv::Point3f estimateInitialVelocityCpu(

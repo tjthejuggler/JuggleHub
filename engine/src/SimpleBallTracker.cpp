@@ -1981,7 +1981,7 @@ void SimpleBallTracker::initiateCatch(
 // ============================================================================
 
 cv::Point3f SimpleBallTracker::predictWithTwoPoints(SimpleBall& ball) {
-    // Use last two verified points for linear extrapolation
+    // Use last two verified points for prediction
     if (ball.trajectory.points.size() < 2) {
         // Not enough points - return last known position
         if (!ball.trajectory.points.empty()) {
@@ -1990,26 +1990,20 @@ cv::Point3f SimpleBallTracker::predictWithTwoPoints(SimpleBall& ball) {
         return ball.position;
     }
     
-    const TrajectoryPoint& p1 = ball.trajectory.points[ball.trajectory.points.size() - 2];
-    const TrajectoryPoint& p2 = ball.trajectory.points[ball.trajectory.points.size() - 1];
-    
-    // Calculate time difference
-    float dt = (p2.timestamp - p1.timestamp) / 1000000.0f;  // Convert µs to s
-    
-    if (dt < 0.001f) {  // Avoid division by very small numbers
-        return p2.position;
-    }
-    
-    // Estimate velocity from these two points
-    cv::Point3f velocity = (p2.position - p1.position) / dt;
+    // Use general parabolic fit even for 2 points
+    // This gives us position, velocity, and acceleration
+    GpuTrajectoryPredictor::ParabolicFitResult state =
+        gpu_trajectory_predictor_->estimateCurrentStateCpu(ball.trajectory.points);
     
     // Update stored velocity
-    ball.trajectory.initial_velocity = velocity;
+    ball.trajectory.initial_velocity = state.velocity;
     
-    // Predict next position (one frame ahead)
+    // Predict next position (one frame ahead) using full parabolic motion
     float predict_dt = tracking_settings_.traj_time_step;
-    cv::Point3f predicted = p2.position + velocity * predict_dt;
-    predicted.z -= 0.5f * tracking_settings_.traj_gravity * predict_dt * predict_dt;
+    cv::Point3f predicted;
+    predicted.x = state.position.x + state.velocity.x * predict_dt + 0.5f * state.acceleration.x * predict_dt * predict_dt;
+    predicted.y = state.position.y + state.velocity.y * predict_dt + 0.5f * state.acceleration.y * predict_dt * predict_dt;
+    predicted.z = state.position.z + state.velocity.z * predict_dt + 0.5f * state.acceleration.z * predict_dt * predict_dt;
     
     return predicted;
 }
@@ -2026,28 +2020,108 @@ std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ba
         return std::vector<cv::Point3f>();
     }
     
-    // Re-estimate initial velocity from all verified points using GPU
-    cv::Point3f refined_velocity = gpu_trajectory_predictor_->estimateInitialVelocity(
-        ball.trajectory.points,
-        tracking_settings_.traj_gravity
-    );
+    // NEW: Use general parabolic fit to estimate position, velocity, AND acceleration
+    // This replaces the old physics-constrained approach
+    GpuTrajectoryPredictor::ParabolicFitResult state =
+        gpu_trajectory_predictor_->estimateCurrentStateCpu(ball.trajectory.points);
     
-    // Update trajectory parameters
-    ball.trajectory.initial_velocity = refined_velocity;
+    // Update trajectory parameters with current state
+    ball.trajectory.initial_velocity = state.velocity;
+    cv::Point3f current_position = state.position;
+    cv::Point3f current_acceleration = state.acceleration;
     
-    // CRITICAL FIX: Use the LAST verified point as the starting position for prediction
-    // not the initial_position from throw (which may be outdated)
-    cv::Point3f current_position = ball.trajectory.points.back().position;
+    // LOG DETAILED STATE ESTIMATION to trajectory_debug.log
+    {
+        static std::ofstream debug_log("trajectory_debug.log", std::ios::app);
+        if (debug_log.is_open()) {
+            debug_log << "\n========================================\n";
+            debug_log << "STATE ESTIMATION DEBUG - Ball " << ball.id << " (" << ball.color_name << ")\n";
+            debug_log << "Frame: " << frame_counter_ << "\n";
+            debug_log << "========================================\n";
+            debug_log << "Number of trajectory points: " << ball.trajectory.points.size() << "\n\n";
+            
+            // Show all trajectory points with timestamps
+            debug_log << "Trajectory points (for parabolic fit):\n";
+            for (size_t i = 0; i < ball.trajectory.points.size(); ++i) {
+                const auto& p = ball.trajectory.points[i];
+                debug_log << "  Point[" << i << "]: pos=("
+                         << std::fixed << std::setprecision(4)
+                         << p.position.x << ", " << p.position.y << ", " << p.position.z << ") m"
+                         << " | timestamp=" << p.timestamp << " µs"
+                         << " | verified=" << (p.verified ? "YES" : "NO") << "\n";
+            }
+            debug_log << "\n";
+            
+            // Show time differences between consecutive points
+            debug_log << "Time differences between consecutive points:\n";
+            for (size_t i = 1; i < ball.trajectory.points.size(); ++i) {
+                int64_t dt_us = static_cast<int64_t>(ball.trajectory.points[i].timestamp) -
+                               static_cast<int64_t>(ball.trajectory.points[i-1].timestamp);
+                double dt_s = dt_us / 1000000.0;
+                debug_log << "  Δt[" << (i-1) << "->" << i << "] = " << std::setprecision(6)
+                         << dt_s << " s (" << dt_us << " µs)\n";
+            }
+            debug_log << "\n";
+            
+            // Show calculation method
+            debug_log << "GENERAL PARABOLIC FIT METHOD:\n";
+            debug_log << "  Fitting p(t) = c₂t² + c₁t + c₀ independently for X, Y, Z axes\n";
+            debug_log << "  Using last " << std::min(10, (int)ball.trajectory.points.size()) << " points\n";
+            debug_log << "  Setting t=0 at LAST point (current time)\n";
+            debug_log << "  All previous points have negative time values\n\n";
+            
+            // Show estimated state
+            debug_log << "ESTIMATED STATE (at current position):\n";
+            debug_log << "  Position: (" << std::fixed << std::setprecision(4)
+                     << state.position.x << ", " << state.position.y << ", " << state.position.z << ") m\n";
+            debug_log << "  Velocity: (" << std::fixed << std::setprecision(4)
+                     << state.velocity.x << ", " << state.velocity.y << ", " << state.velocity.z << ") m/s\n";
+            debug_log << "  Acceleration: (" << std::fixed << std::setprecision(4)
+                     << state.acceleration.x << ", " << state.acceleration.y << ", " << state.acceleration.z << ") m/s²\n\n";
+            
+            float speed = std::sqrt(state.velocity.x * state.velocity.x +
+                                   state.velocity.y * state.velocity.y +
+                                   state.velocity.z * state.velocity.z);
+            debug_log << "  Speed magnitude: " << std::setprecision(4) << speed << " m/s\n";
+            debug_log << "  Horizontal speed: " << std::sqrt(state.velocity.x * state.velocity.x +
+                                                             state.velocity.y * state.velocity.y) << " m/s\n";
+            debug_log << "  Vertical speed: " << state.velocity.z << " m/s "
+                     << (state.velocity.z > 0 ? "(upward)" : "(downward)") << "\n\n";
+            
+            // Show prediction equation with actual acceleration
+            debug_log << "PREDICTION EQUATION:\n";
+            debug_log << "  For time t seconds into the future:\n";
+            debug_log << "  x(t) = " << state.position.x << " + " << state.velocity.x << " * t + 0.5 * " << state.acceleration.x << " * t²\n";
+            debug_log << "  y(t) = " << state.position.y << " + " << state.velocity.y << " * t + 0.5 * " << state.acceleration.y << " * t²\n";
+            debug_log << "  z(t) = " << state.position.z << " + " << state.velocity.z << " * t + 0.5 * " << state.acceleration.z << " * t²\n\n";
+            
+            // Show first few predicted points
+            debug_log << "SAMPLE PREDICTIONS (first 5 time steps at " << tracking_settings_.traj_time_step << "s intervals):\n";
+            for (int i = 0; i < 5; ++i) {
+                float t = i * tracking_settings_.traj_time_step;
+                float x = state.position.x + state.velocity.x * t + 0.5f * state.acceleration.x * t * t;
+                float y = state.position.y + state.velocity.y * t + 0.5f * state.acceleration.y * t * t;
+                float z = state.position.z + state.velocity.z * t + 0.5f * state.acceleration.z * t * t;
+                
+                debug_log << "  t=" << std::fixed << std::setprecision(3) << t << "s: ("
+                         << std::setprecision(4) << x << ", " << y << ", " << z << ") m\n";
+            }
+            debug_log << "\n";
+            debug_log.flush();
+        }
+    }
     
-    // Predict full trajectory path from current position
+    // Predict full trajectory path from current state
+    // Now using position, velocity, AND acceleration from parabolic fit!
     TrajectoryPredictionParams params;
     params.time_step = tracking_settings_.traj_time_step;
     params.max_time = tracking_settings_.traj_max_time;
     params.gravity = tracking_settings_.traj_gravity;
     
     std::vector<cv::Point3f> predicted_path = gpu_trajectory_predictor_->predictTrajectory(
-        current_position,  // Start from current position, not initial throw position
-        refined_velocity,
+        state.position,      // Current position from fit
+        state.velocity,      // Current velocity from fit
+        state.acceleration,  // Current acceleration from fit (not just gravity!)
         params
     );
     

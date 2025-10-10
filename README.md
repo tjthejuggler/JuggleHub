@@ -2,7 +2,18 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-10 02:28 CEST
+**Last Updated:** 2025-10-10 16:16 CEST
+
+**Recent Changes (2025-10-10):**
+- **🎯 TRAJECTORY PREDICTION FIX - PROPER PARABOLIC ARCS**
+  - **Issue Fixed**: Trajectory prediction was producing linear extrapolations instead of parabolic arcs
+  - **Root Cause**: System estimated velocity at throw time but predicted from current position, causing temporal inconsistency
+  - **Solution**: New `estimateCurrentVelocity()` method calculates velocity at current ball position
+  - **Physics Model**: Now properly uses p(t) = p₀ + v₀t + ½at² where all components reference the same time
+  - **Two Methods**: Simple two-point method (2 points) and least-squares method (3+ points) for noise resistance
+  - **Result**: Smooth parabolic arcs that naturally continue from current trajectory
+  - **Files Modified**: [`engine/include/GpuTrajectoryPredictor.hpp`](engine/include/GpuTrajectoryPredictor.hpp), [`engine/src/GpuTrajectoryPredictor.cpp`](engine/src/GpuTrajectoryPredictor.cpp), [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp)
+  - **Documentation**: See [`TRAJECTORY_PREDICTION_REDESIGN.md`](TRAJECTORY_PREDICTION_REDESIGN.md), [`TRAJECTORY_PREDICTION_DIAGRAM.md`](TRAJECTORY_PREDICTION_DIAGRAM.md), and [`TRAJECTORY_PREDICTION_IMPLEMENTATION.md`](TRAJECTORY_PREDICTION_IMPLEMENTATION.md)
 
 **Recent Changes (2025-10-10):**
 - **🚀 GPU TRAJECTORY PREDICTOR - PHASE 1 COMPLETE**

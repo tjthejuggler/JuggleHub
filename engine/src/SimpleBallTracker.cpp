@@ -1143,7 +1143,76 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                           << " - already positioned by override" << std::endl;
                 debug_log.close();
             });
-            continue;
+            
+            // CRITICAL FIX: When ball is overridden, we must still update its state
+            // based on the YOLO detection that triggered the override
+            // This prevents the wrist fallback from overriding the override!
+            
+            // Update state based on YOLO class_id
+            if (ball.yolo_class_id == 1) {  // ball_held
+                ball.state = HELD;
+                ball.is_held = true;
+                // Keep held_by_hand_id as is (may have been set by proximity)
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  Override: Ball set to HELD (YOLO class=ball_held)" << std::endl;
+                    debug_log.close();
+                });
+            } else if (ball.yolo_class_id == 0) {  // ball (in-flight)
+                // CRITICAL: If ball was HELD and YOLO now says in-flight, this is a THROW
+                bool was_held = (ball.state == HELD);
+                
+                ball.state = IN_FLIGHT;
+                ball.is_held = false;
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  Override: Ball set to IN_FLIGHT (YOLO class=ball)" << std::endl;
+                    debug_log << "  Was previously HELD: " << (was_held ? "YES" : "NO") << std::endl;
+                    debug_log << "  Ball position: (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
+                    debug_log.close();
+                });
+                
+                // If transitioning from HELD to IN_FLIGHT, initialize trajectory
+                if (was_held) {
+                    // Clear any old trajectory data
+                    ball.trajectory.points.clear();
+                    ball.trajectory.verified_point_count = 0;
+                    ball.trajectory.trajectory_confidence = 0.0f;
+                    ball.trajectory.prediction_valid = false;
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  Cleared trajectory (transition from HELD to IN_FLIGHT)" << std::endl;
+                        debug_log.close();
+                    });
+                }
+                
+                // Add trajectory point for overridden in-flight balls
+                if (ball.position.z > 0) {
+                    uint64_t current_timestamp = getCurrentTimestamp();
+                    addVerifiedPoint(ball, ball.position, current_timestamp);
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  Added trajectory point for overridden ball: #"
+                                  << ball.trajectory.verified_point_count << std::endl;
+                        debug_log.close();
+                    });
+                }
+                
+                // CRITICAL: NO catch detection for overridden balls
+                // The override has positioned the ball based on YOLO - trust it
+                // Catch detection will happen in normal tracking on subsequent frames
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  Skipping catch detection for overridden ball (trust YOLO classification)" << std::endl;
+                    debug_log.close();
+                });
+            }
+            
+            continue;  // Skip normal update logic
         }
         
         if (ball.state == HELD) {

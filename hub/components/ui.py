@@ -1245,13 +1245,6 @@ if PYQT_AVAILABLE:
                 for det in frame_data.unmatched_detections:
                     painter.drawRect(int(det.x), int(det.y), int(det.width), int(det.height))
 
-            # --- Draw ByteTrack Boxes (Step 12) ---
-            if self.show_tracked_boxes_toggle.isChecked():
-                painter.setPen(QPen(QColor(0, 255, 0, 200), 3))  # Thick green
-                for obj in frame_data.balls:
-                    if obj.status == juggler_pb2.Ball.TRACKED:
-                        bbox = obj.bounding_box_2d
-                        painter.drawRect(int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height))
 
             # --- Draw Hand Tracking (Step 7) ---
             if self.show_hand_tracking_toggle.isChecked():
@@ -1333,7 +1326,7 @@ if PYQT_AVAILABLE:
                         region = ball.color_search_region
                         painter.drawRect(int(region.x), int(region.y), int(region.width), int(region.height))
             
-            # --- Draw Color Trackers (Step 11 - NEW SIMPLIFIED SYSTEM) ---
+            # --- Draw Color Trackers (Step 11 - Colored circles with labels) ---
             if self.show_color_tracker_toggle.isChecked():
                 # Get color map from profile manager
                 color_name_map = self.color_profile_manager.get_color_map()
@@ -1428,6 +1421,46 @@ if PYQT_AVAILABLE:
                         else:
                             painter.setPen(QPen(QColor(255, 255, 255)))
                         painter.drawText(label_offset_x, wrist_label_y, f"[{wrist_label}]")
+            
+            # --- Draw Final Trackers (Step 12 - White circle border with colored letter, matches recording) ---
+            if self.show_tracked_boxes_toggle.isChecked():
+                # Get color map from profile manager
+                color_name_map = self.color_profile_manager.get_color_map()
+                
+                for color_ball in frame_data.color_tracked_balls:
+                    # CRITICAL: Don't check is_active - Final Tracker should ALWAYS be visible
+                    # This is the persistent tracker that exists even when YOLO doesn't detect the ball
+                    
+                    # Get color for this ball
+                    color = color_name_map.get(color_ball.color_name.lower(), QColor(255, 255, 255))
+                    
+                    # Use pixel_pos which snaps to wrist when held (same as trajectory system)
+                    center_x = int(color_ball.pixel_pos.x)
+                    center_y = int(color_ball.pixel_pos.y)
+                    
+                    # Draw the color letter (first letter of color name)
+                    label = color_ball.color_name[0].upper() if color_ball.color_name else "?"
+                    
+                    # Draw white circle BORDER only (no fill) - so you can see the ball behind it
+                    label_radius = 15
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                    painter.setPen(QPen(QColor(255, 255, 255), 2))
+                    painter.drawEllipse(center_x - label_radius, center_y - label_radius, label_radius * 2, label_radius * 2)
+                    
+                    # If held, draw dashed circle to indicate held state
+                    if color_ball.associated_wrist_id >= 0:
+                        pen = QPen(color, 2)
+                        pen.setStyle(Qt.PenStyle.DashLine)
+                        painter.setPen(pen)
+                        painter.drawEllipse(center_x - label_radius - 3, center_y - label_radius - 3,
+                                          (label_radius + 3) * 2, (label_radius + 3) * 2)
+                    
+                    # Draw the color letter with black outline for visibility
+                    painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+                    painter.setPen(QPen(QColor(0, 0, 0), 4))
+                    painter.drawText(center_x - 8, center_y + 8, label)
+                    painter.setPen(QPen(color, 2))
+                    painter.drawText(center_x - 8, center_y + 8, label)
 
             # --- Draw Tracker Tails ---
             if self.show_tails_toggle.isChecked():

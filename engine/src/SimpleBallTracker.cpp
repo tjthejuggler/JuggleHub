@@ -1633,6 +1633,7 @@ void SimpleBallTracker::updateInFlightBall(
     // Step 1: Determine prediction strategy based on point count
     int point_count = ball.trajectory.verified_point_count;
     cv::Point3f predicted_next;
+    bool use_prediction = false;
     
     if (point_count == 0) {
         // Should not happen - throw should add first point
@@ -1640,18 +1641,20 @@ void SimpleBallTracker::updateInFlightBall(
         return;
     }
     else if (point_count == 1) {
-        // Use last held position + first flight position for velocity estimation
-        predicted_next = predictWithOnePoint(ball);
+        // CRITICAL: With only 1 point, we can't predict - just search near last position
+        predicted_next = ball.trajectory.points[0].position;
+        use_prediction = false;
         
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);
-            debug_log << "  Using ONE POINT prediction" << std::endl;
+            debug_log << "  Only 1 point - no prediction yet, searching near last position" << std::endl;
             debug_log.close();
         });
     }
     else if (point_count == 2) {
         // Use two points for linear prediction
         predicted_next = predictWithTwoPoints(ball);
+        use_prediction = true;
         
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);
@@ -1665,8 +1668,10 @@ void SimpleBallTracker::updateInFlightBall(
         
         if (!predicted_path.empty()) {
             predicted_next = predicted_path[0];  // Next frame prediction
+            use_prediction = true;
         } else {
             predicted_next = ball.position;  // Fallback to current position
+            use_prediction = false;
         }
         
         DEBUG_LOG(debug_log, {
@@ -1676,10 +1681,11 @@ void SimpleBallTracker::updateInFlightBall(
         });
     }
     
-    // Step 2: Search for detection along prediction line
+    // Step 2: Search for detection along prediction line (or near last position if no prediction)
+    float search_radius = use_prediction ? ball.trajectory.search_radius_m : 0.30f;  // Wider search if no prediction
     const Detection* detection = searchAlongPredictionLine(
         predicted_next,
-        ball.trajectory.search_radius_m,
+        search_radius,
         detections,
         color_frame,
         ball.color_name
@@ -1812,13 +1818,21 @@ void SimpleBallTracker::updateInFlightBall(
         });
     }
     
-    // Step 5: Check for catch
+    // Step 5: Check for catch - ball must be close to hand AND moving towards it or slowing down
     for (const auto& hand : hands_) {
         if (!hand.is_visible) continue;
         
         float dist_to_hand = cv::norm(ball.position - hand.wrist_pos_3d);
         
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  Checking catch for hand " << hand.id << ": dist=" << dist_to_hand
+                      << "m, threshold=" << tracking_settings_.catch_distance_threshold << "m" << std::endl;
+            debug_log.close();
+        });
+        
         if (dist_to_hand < tracking_settings_.catch_distance_threshold) {
+            // CRITICAL FIX: Catch detected - transition to HELD state
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
                 debug_log << "  CATCH DETECTED: dist=" << dist_to_hand
@@ -1843,7 +1857,7 @@ void SimpleBallTracker::initiateThrow(
     const SimpleHand* hand,
     std::vector<BallEvent>& events) {
     
-    // 1. Store last held position for velocity estimation
+    // 1. Store last held position (for reference, but not used for velocity)
     if (hand != nullptr) {
         ball.last_held_position = hand->wrist_pos_3d;
     } else {
@@ -1863,7 +1877,7 @@ void SimpleBallTracker::initiateThrow(
     
     // 4. Initialize trajectory parameters
     ball.trajectory.throw_timestamp = getCurrentTimestamp();
-    ball.trajectory.initial_position = ball.last_held_position;
+    ball.trajectory.initial_position = first_detection.world_pos;  // Use first detection as initial position
     ball.trajectory.gravity = tracking_settings_.traj_gravity;
     ball.trajectory.search_radius_m = tracking_settings_.traj_search_radius;
     
@@ -1876,9 +1890,8 @@ void SimpleBallTracker::initiateThrow(
     ball.trajectory.points.push_back(first_point);
     ball.trajectory.verified_point_count = 1;
     
-    // 6. Estimate initial velocity from last held position to first detection
-    float dt = tracking_settings_.traj_velocity_estimation_time;
-    ball.trajectory.initial_velocity = (first_detection.world_pos - ball.last_held_position) / dt;
+    // 6. Initial velocity will be estimated once we have 2+ points
+    ball.trajectory.initial_velocity = cv::Point3f(0, 0, 0);
     
     // 7. Generate THROW event
     events.push_back({
@@ -1895,9 +1908,7 @@ void SimpleBallTracker::initiateThrow(
         OPEN_DEBUG_LOG(debug_log);
         debug_log << "[THROW] Ball " << ball.id << " (" << ball.color_name
                   << ") thrown from hand " << ball.held_by_hand_id
-                  << ", initial_velocity=(" << ball.trajectory.initial_velocity.x
-                  << "," << ball.trajectory.initial_velocity.y
-                  << "," << ball.trajectory.initial_velocity.z << ")" << std::endl;
+                  << " - waiting for 2nd point to estimate velocity" << std::endl;
         debug_log.close();
     });
 }
@@ -1950,35 +1961,14 @@ void SimpleBallTracker::initiateCatch(
 // TRAJECTORY PREDICTION HELPER METHODS
 // ============================================================================
 
-cv::Point3f SimpleBallTracker::predictWithOnePoint(SimpleBall& ball) {
-    // Use last held position and first flight position to estimate velocity
-    if (ball.trajectory.points.empty()) {
-        return ball.position;
-    }
-    
-    const TrajectoryPoint& first_point = ball.trajectory.points[0];
-    cv::Point3f last_held_pos = ball.last_held_position;
-    
-    // Estimate time between held and first detection
-    float dt = tracking_settings_.traj_velocity_estimation_time;
-    
-    // Estimate velocity: v = (p1 - p0) / dt
-    cv::Point3f estimated_velocity = (first_point.position - last_held_pos) / dt;
-    
-    // Store for future use
-    ball.trajectory.initial_velocity = estimated_velocity;
-    
-    // Predict next position using simple ballistic motion
-    cv::Point3f predicted = first_point.position + estimated_velocity * tracking_settings_.traj_time_step;
-    predicted.z -= 0.5f * tracking_settings_.traj_gravity * tracking_settings_.traj_time_step * tracking_settings_.traj_time_step;
-    
-    return predicted;
-}
-
 cv::Point3f SimpleBallTracker::predictWithTwoPoints(SimpleBall& ball) {
     // Use last two verified points for linear extrapolation
     if (ball.trajectory.points.size() < 2) {
-        return predictWithOnePoint(ball);
+        // Not enough points - return last known position
+        if (!ball.trajectory.points.empty()) {
+            return ball.trajectory.points.back().position;
+        }
+        return ball.position;
     }
     
     const TrajectoryPoint& p1 = ball.trajectory.points[ball.trajectory.points.size() - 2];
@@ -2021,14 +2011,18 @@ std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ba
     // Update trajectory parameters
     ball.trajectory.initial_velocity = refined_velocity;
     
-    // Predict full trajectory path
+    // CRITICAL FIX: Use the LAST verified point as the starting position for prediction
+    // not the initial_position from throw (which may be outdated)
+    cv::Point3f current_position = ball.trajectory.points.back().position;
+    
+    // Predict full trajectory path from current position
     TrajectoryPredictionParams params;
     params.time_step = tracking_settings_.traj_time_step;
     params.max_time = tracking_settings_.traj_max_time;
     params.gravity = tracking_settings_.traj_gravity;
     
     std::vector<cv::Point3f> predicted_path = gpu_trajectory_predictor_->predictTrajectory(
-        ball.trajectory.initial_position,
+        current_position,  // Start from current position, not initial throw position
         refined_velocity,
         params
     );
@@ -2101,50 +2095,36 @@ void SimpleBallTracker::drawTrajectory(
 ) const {
     if (ball.state != IN_FLIGHT || !viz_settings_.show_trajectory) return;
     
-    // 1. Draw predicted path
-    if (viz_settings_.show_predicted_path && !ball.trajectory.predicted_path.empty()) {
-        std::vector<cv::Point2f> path_2d;
-        for (const auto& point_3d : ball.trajectory.predicted_path) {
-            cv::Point2f point_2d = project_3d_to_2d(point_3d, intrinsics);
-            
-            // Check if on-screen
-            if (point_2d.x >= 0 && point_2d.x < frame.cols &&
-                point_2d.y >= 0 && point_2d.y < frame.rows) {
-                path_2d.push_back(point_2d);
+    // Get ball's color from color profile for both verified and predicted points
+    cv::Scalar ball_color = viz_settings_.verified_point_color;  // Default green
+    cv::Scalar darker_ball_color = cv::Scalar(50, 50, 50);  // Default dark gray
+    
+    // Try to get the actual ball color
+    for (const auto& profile : color_profiles_) {
+        if (profile.name == ball.color_name) {
+            // Convert HSV to BGR for visualization
+            // Use the average hue and saturation from the profile
+            if (profile.avg_hue >= 0) {
+                cv::Mat hsv_color(1, 1, CV_8UC3, cv::Scalar(profile.avg_hue, profile.avg_saturation, 255));
+                cv::Mat bgr_color;
+                cv::cvtColor(hsv_color, bgr_color, cv::COLOR_HSV2BGR);
+                ball_color = cv::Scalar(bgr_color.at<cv::Vec3b>(0, 0)[0],
+                                       bgr_color.at<cv::Vec3b>(0, 0)[1],
+                                       bgr_color.at<cv::Vec3b>(0, 0)[2]);
+                
+                // Create darker version (40% brightness) for predicted points
+                darker_ball_color = cv::Scalar(
+                    ball_color[0] * 0.4,
+                    ball_color[1] * 0.4,
+                    ball_color[2] * 0.4
+                );
             }
-        }
-        
-        // Draw as polyline
-        if (path_2d.size() > 1) {
-            std::vector<std::vector<cv::Point2f>> paths = {path_2d};
-            cv::polylines(frame, paths, false, 
-                         viz_settings_.trajectory_color, 
-                         viz_settings_.trajectory_thickness);
+            break;
         }
     }
     
-    // 2. Draw verified points with ball's color
+    // 1. Draw verified points with ball's full color
     if (viz_settings_.show_verified_points) {
-        // Get ball's color from color profile
-        cv::Scalar ball_color = viz_settings_.verified_point_color;  // Default green
-        
-        // Try to get the actual ball color
-        for (const auto& profile : color_profiles_) {
-            if (profile.name == ball.color_name) {
-                // Convert HSV to BGR for visualization
-                // Use the average hue and saturation from the profile
-                if (profile.avg_hue >= 0) {
-                    cv::Mat hsv_color(1, 1, CV_8UC3, cv::Scalar(profile.avg_hue, profile.avg_saturation, 255));
-                    cv::Mat bgr_color;
-                    cv::cvtColor(hsv_color, bgr_color, cv::COLOR_HSV2BGR);
-                    ball_color = cv::Scalar(bgr_color.at<cv::Vec3b>(0, 0)[0],
-                                           bgr_color.at<cv::Vec3b>(0, 0)[1],
-                                           bgr_color.at<cv::Vec3b>(0, 0)[2]);
-                }
-                break;
-            }
-        }
-        
         for (const auto& traj_point : ball.trajectory.points) {
             if (!traj_point.verified) continue;
             
@@ -2153,7 +2133,7 @@ void SimpleBallTracker::drawTrajectory(
             // Check if on-screen
             if (point_2d.x >= 0 && point_2d.x < frame.cols &&
                 point_2d.y >= 0 && point_2d.y < frame.rows) {
-                // Draw circle with ball's color
+                // Draw circle with ball's full color
                 cv::circle(frame, point_2d, viz_settings_.point_radius, ball_color, -1);
                 // Add white border for visibility
                 cv::circle(frame, point_2d, viz_settings_.point_radius, cv::Scalar(255, 255, 255), 1);
@@ -2161,10 +2141,27 @@ void SimpleBallTracker::drawTrajectory(
         }
     }
     
+    // 2. Draw predicted future points as darker shaded dots (one per frame)
+    if (viz_settings_.show_predicted_path && !ball.trajectory.predicted_path.empty()) {
+        // Draw each predicted point as a darker dot
+        for (const auto& point_3d : ball.trajectory.predicted_path) {
+            cv::Point2f point_2d = project_3d_to_2d(point_3d, intrinsics);
+            
+            // Check if on-screen
+            if (point_2d.x >= 0 && point_2d.x < frame.cols &&
+                point_2d.y >= 0 && point_2d.y < frame.rows) {
+                // Draw circle with darker ball color
+                cv::circle(frame, point_2d, viz_settings_.point_radius - 1, darker_ball_color, -1);
+                // Add subtle border for visibility
+                cv::circle(frame, point_2d, viz_settings_.point_radius - 1, cv::Scalar(100, 100, 100), 1);
+            }
+        }
+    }
+    
     // 3. Draw current search radius
     if (viz_settings_.show_search_radius && ball.pixel_pos.x >= 0) {
         // Approximate pixel radius from meters
-        float radius_pixels = ball.trajectory.search_radius_m * 
+        float radius_pixels = ball.trajectory.search_radius_m *
                              intrinsics.fx / ball.position.z;
         
         cv::circle(frame, ball.pixel_pos, static_cast<int>(radius_pixels),
@@ -2173,12 +2170,12 @@ void SimpleBallTracker::drawTrajectory(
     
     // 4. Draw confidence indicator
     if (viz_settings_.show_confidence && ball.pixel_pos.x >= 0) {
-        std::string conf_text = cv::format("Conf: %.2f", 
+        std::string conf_text = cv::format("Conf: %.2f",
                                            ball.trajectory.trajectory_confidence);
         cv::Point text_pos(ball.pixel_pos.x + 10, ball.pixel_pos.y - 10);
         
         cv::putText(frame, conf_text, text_pos,
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5, 
+                    cv::FONT_HERSHEY_SIMPLEX, 0.5,
                     viz_settings_.trajectory_color, 1);
     }
 }

@@ -323,7 +323,6 @@ private:
     void addVerifiedPoint(SimpleBall& ball, const cv::Point3f& position, uint64_t timestamp);
     
     // Trajectory prediction helper methods
-    cv::Point3f predictWithOnePoint(SimpleBall& ball);
     cv::Point3f predictWithTwoPoints(SimpleBall& ball);
     std::vector<cv::Point3f> predictFullTrajectory(SimpleBall& ball);
     const Detection* searchAlongPredictionLine(const cv::Point3f& predicted_pos,

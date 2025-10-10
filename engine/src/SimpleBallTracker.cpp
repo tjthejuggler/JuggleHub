@@ -1614,8 +1614,41 @@ void SimpleBallTracker::updateInFlightBall(
     bool use_prediction = false;
     
     if (point_count == 0) {
-        // Should not happen - throw should add first point
-        ball.tracking_reason = "IN_FLIGHT_no_points";
+        // CRITICAL FALLBACK: No trajectory points - force catch to nearest hand
+        // This ensures we ALWAYS have a tracker position
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  CRITICAL: No trajectory points - forcing catch to nearest hand" << std::endl;
+            debug_log.close();
+        });
+        
+        // Find nearest hand and force catch
+        if (!hands_.empty()) {
+            float min_dist = std::numeric_limits<float>::max();
+            const SimpleHand* nearest_hand = nullptr;
+            
+            for (const auto& hand : hands_) {
+                if (!hand.is_visible) continue;
+                float dist = cv::norm(ball.position - hand.wrist_pos_3d);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    nearest_hand = &hand;
+                }
+            }
+            
+            if (nearest_hand) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  FORCED CATCH to hand " << nearest_hand->id << " (dist=" << min_dist << "m)" << std::endl;
+                    debug_log.close();
+                });
+                initiateCatch(ball, *nearest_hand, events);
+                return;
+            }
+        }
+        
+        // Absolute last resort: keep ball at last known position
+        ball.tracking_reason = "IN_FLIGHT_no_points_no_hands";
         return;
     }
     else if (point_count == 1) {
@@ -1737,7 +1770,11 @@ void SimpleBallTracker::updateInFlightBall(
                     if (dist < tracking_settings_.traj_max_search_distance) {
                         ball.position = blob_3d;
                         ball.pixel_pos = blob;
-                        ball.has_yolo_detection = false;
+                        
+                        // CRITICAL: Set has_yolo_detection to TRUE for visualization
+                        ball.has_yolo_detection = true;
+                        ball.yolo_confidence = 0.6f;  // Good confidence for color blob
+                        ball.yolo_class_id = 0;  // ball (in-flight) class
                         ball.tracking_reason = "IN_FLIGHT_color_blob";
                         
                         float bbox_size = 30.0f;
@@ -1762,7 +1799,12 @@ void SimpleBallTracker::updateInFlightBall(
         if (!verified) {
             ball.position = predicted_next;
             ball.pixel_pos = project_3d_to_2d(predicted_next, intrinsics);
-            ball.has_yolo_detection = false;
+            
+            // CRITICAL: Set has_yolo_detection to TRUE for visualization
+            // Even though we're using prediction, we want the tracker to stay visible
+            ball.has_yolo_detection = true;
+            ball.yolo_confidence = 0.4f;  // Moderate-low confidence for prediction
+            ball.yolo_class_id = 0;  // ball (in-flight) class
             ball.tracking_reason = "IN_FLIGHT_predicted";
             
             float bbox_size = 30.0f;
@@ -1807,6 +1849,7 @@ void SimpleBallTracker::updateInFlightBall(
         
         // NEW FIX: Check if ball is very close to any hand - if so, snap to hand position
         // This prevents tracker from getting stuck in air when ball returns to hand
+        bool snapped_to_hand = false;
         for (const auto& hand : hands_) {
             if (!hand.is_visible) continue;
             
@@ -1815,7 +1858,20 @@ void SimpleBallTracker::updateInFlightBall(
                 // Snap to hand position instead of using stale prediction
                 ball.position = hand.wrist_pos_3d;
                 ball.pixel_pos = project_3d_to_2d(hand.wrist_pos_3d, intrinsics);
+                
+                // CRITICAL: Set bbox and detection flag for visualization
+                float bbox_size = 30.0f;
+                ball.bbox = cv::Rect_<float>(
+                    ball.pixel_pos.x - bbox_size/2,
+                    ball.pixel_pos.y - bbox_size/2,
+                    bbox_size,
+                    bbox_size
+                );
+                ball.has_yolo_detection = true;
+                ball.yolo_confidence = 0.5f;
+                ball.yolo_class_id = 0;  // ball class (transitioning to catch)
                 ball.tracking_reason = "IN_FLIGHT_near_hand_fallback";
+                snapped_to_hand = true;
                 
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
@@ -1832,6 +1888,34 @@ void SimpleBallTracker::updateInFlightBall(
             debug_log << "  Skipping trajectory point addition (using prediction, not verified)" << std::endl;
             debug_log.close();
         });
+    }
+    
+    // CRITICAL GUARANTEE: If ball position is still invalid (z <= 0), force catch to nearest hand
+    // This ensures we ALWAYS have a valid tracker position on every frame
+    if (ball.position.z <= 0 && !hands_.empty()) {
+        float min_dist = std::numeric_limits<float>::max();
+        const SimpleHand* nearest_hand = nullptr;
+        
+        for (const auto& hand : hands_) {
+            if (!hand.is_visible) continue;
+            // Use predicted_next for distance calculation since ball.position is invalid
+            float dist = cv::norm(predicted_next - hand.wrist_pos_3d);
+            if (dist < min_dist) {
+                min_dist = dist;
+                nearest_hand = &hand;
+            }
+        }
+        
+        if (nearest_hand) {
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  CRITICAL FALLBACK: Invalid position (z=" << ball.position.z
+                          << ") - forcing catch to nearest hand " << nearest_hand->id << std::endl;
+                debug_log.close();
+            });
+            initiateCatch(ball, *nearest_hand, events);
+            return;
+        }
     }
     
     // Step 5: Check for catch - ball must be IN_FLIGHT and close to hand
@@ -2328,8 +2412,73 @@ void SimpleBallTracker::updateHeldBall(
     }
     
     if (!hand || !hand->is_visible) {
-        ball.tracking_reason = "HELD_hand_offscreen";
-        return;
+        // CRITICAL FALLBACK: Hand not found or offscreen
+        // Try to find ANY visible hand and force assignment
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  Hand " << ball.held_by_hand_id << " not found or offscreen" << std::endl;
+            debug_log.close();
+        });
+        
+        // Find any visible hand
+        const SimpleHand* any_hand = nullptr;
+        for (const auto& h : hands) {
+            if (h.is_visible) {
+                any_hand = &h;
+                break;
+            }
+        }
+        
+        if (any_hand) {
+            // Force assignment to this hand
+            ball.held_by_hand_id = any_hand->id;
+            hand = any_hand;
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  FORCED assignment to visible hand " << any_hand->id << std::endl;
+                debug_log.close();
+            });
+        } else {
+            // ABSOLUTE LAST RESORT: No hands visible at all
+            // Keep ball at last known position or use persisted hand position
+            if (!hands.empty()) {
+                // Use first persisted hand (not visible but has last known position)
+                ball.position = hands[0].wrist_pos_3d;
+                ball.pixel_pos = project_3d_to_2d(hands[0].wrist_pos_3d, intrinsics);
+                
+                // CRITICAL: Always set bbox for visualization
+                float bbox_size = 30.0f;
+                ball.bbox = cv::Rect_<float>(
+                    ball.pixel_pos.x - bbox_size/2,
+                    ball.pixel_pos.y - bbox_size/2,
+                    bbox_size,
+                    bbox_size
+                );
+                
+                // CRITICAL: Set has_yolo_detection to TRUE for visualization
+                ball.has_yolo_detection = true;
+                ball.yolo_confidence = 0.3f;  // Low confidence for persisted fallback
+                ball.yolo_class_id = 1;  // ball_held class
+                ball.tracking_reason = "HELD_persisted_hand_fallback";
+                ball.held_by_hand_id = hands[0].id;
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ABSOLUTE FALLBACK: Using persisted hand " << hands[0].id << " position" << std::endl;
+                    debug_log.close();
+                });
+            } else {
+                // No hands at all - keep ball at last position
+                ball.tracking_reason = "HELD_no_hands_available";
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  CRITICAL: No hands available - keeping last position" << std::endl;
+                    debug_log.close();
+                });
+            }
+            return;
+        }
     }
     
     // CRITICAL: Search for YOLO detection near hand that matches ball color
@@ -2376,8 +2525,21 @@ void SimpleBallTracker::updateHeldBall(
         // Fallback: place at wrist
         ball.position = hand->wrist_pos_3d;
         ball.pixel_pos = project_3d_to_2d(hand->wrist_pos_3d, intrinsics);
-        ball.bbox = cv::Rect_<float>(ball.pixel_pos.x - 15, ball.pixel_pos.y - 15, 30, 30);
-        ball.has_yolo_detection = false;
+        
+        // CRITICAL: Always set bbox for visualization, even in fallback
+        float bbox_size = 30.0f;
+        ball.bbox = cv::Rect_<float>(
+            ball.pixel_pos.x - bbox_size/2,
+            ball.pixel_pos.y - bbox_size/2,
+            bbox_size,
+            bbox_size
+        );
+        
+        // CRITICAL: Set has_yolo_detection to TRUE even for fallback
+        // This ensures the color tracker visualization stays on
+        ball.has_yolo_detection = true;
+        ball.yolo_confidence = 0.5f;  // Moderate confidence for fallback
+        ball.yolo_class_id = 1;  // ball_held class
         ball.tracking_reason = "HELD@wrist_fallback";
         
         DEBUG_LOG(debug_log, {

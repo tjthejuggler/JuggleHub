@@ -57,13 +57,14 @@ struct BallTrajectory {
     std::vector<cv::Point3f> predicted_path;  // Full predicted trajectory
     uint64_t prediction_timestamp;            // When prediction was computed
     bool prediction_valid;                    // True if prediction is up-to-date
+    std::string prediction_failure_reason;    // Why prediction failed (for debugging)
     
-    BallTrajectory() 
+    BallTrajectory()
         : initial_velocity(0, 0, 0), initial_position(0, 0, 0),
           gravity(9.81f), throw_timestamp(0),
           verified_point_count(0), trajectory_confidence(0.0f),
           search_radius_m(0.30f), prediction_timestamp(0),
-          prediction_valid(false) {}
+          prediction_valid(false), prediction_failure_reason("") {}
 };
 
 struct TrajectoryPredictionParams {

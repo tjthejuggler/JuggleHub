@@ -1517,6 +1517,15 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                      ball.position.x, ball.position.y, ball.position.z);
             info_lines.push_back(pos_info);
             info_colors.push_back(cv::Scalar(180, 180, 180));
+            
+            // Add prediction status for HELD balls
+            if (ball.is_held) {
+                char pred_status[256];
+                snprintf(pred_status, sizeof(pred_status),
+                         "  Predicted Points: NONE (ball is HELD, no trajectory)");
+                info_lines.push_back(pred_status);
+                info_colors.push_back(cv::Scalar(100, 100, 100)); // Gray
+            }
         }
     }
     
@@ -1560,6 +1569,45 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                     cv::circle(temp_result, point_2d, 5, ball_color, -1);
                     // Add white border for visibility
                     cv::circle(temp_result, point_2d, 5, cv::Scalar(255, 255, 255), 1);
+                }
+            }
+            
+            // Draw predicted future points as darker shaded dots (one per frame)
+            // NEW: Show predicted trajectory points in recording visualization
+            // Only show predictions when we have more than 3 verified points in history
+            if (ball.trajectory.verified_point_count > 3 &&
+                !ball.trajectory.predicted_path.empty() &&
+                ball.trajectory.prediction_valid) {
+                // Create darker version (40% brightness) of ball color for predicted points
+                cv::Scalar darker_ball_color(
+                    ball_color[0] * 0.4,
+                    ball_color[1] * 0.4,
+                    ball_color[2] * 0.4
+                );
+                
+                // Draw each predicted point as a darker dot
+                for (const auto& point_3d : ball.trajectory.predicted_path) {
+                    // Validate depth before projection
+                    if (point_3d.z <= 0) continue;
+                    
+                    // Project 3D point to 2D
+                    float x_2d = (point_3d.x * camera_intrinsics_.fx) / point_3d.z + camera_intrinsics_.ppx;
+                    float y_2d = (point_3d.y * camera_intrinsics_.fy) / point_3d.z + camera_intrinsics_.ppy;
+                    
+                    // Validate that coordinates are finite and within reasonable bounds
+                    if (!std::isfinite(x_2d) || !std::isfinite(y_2d)) continue;
+                    if (x_2d < -10000 || x_2d > 10000 || y_2d < -10000 || y_2d > 10000) continue;
+                    
+                    cv::Point2f point_2d(x_2d, y_2d);
+                    
+                    // Check if on-screen
+                    if (point_2d.x >= 0 && point_2d.x < temp_result.cols &&
+                        point_2d.y >= 0 && point_2d.y < temp_result.rows) {
+                        // Draw circle with darker ball color (smaller than verified points)
+                        cv::circle(temp_result, point_2d, 4, darker_ball_color, -1);
+                        // Add subtle border for visibility
+                        cv::circle(temp_result, point_2d, 4, cv::Scalar(100, 100, 100), 1);
+                    }
                 }
             }
             
@@ -1637,6 +1685,40 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                     info_lines.push_back(point_line);
                     info_colors.push_back(cv::Scalar(180, 180, 180));
                     point_index++;
+                }
+                
+                // ALWAYS add prediction status information
+                char pred_status[512];
+                int pred_count = ball.trajectory.predicted_path.size();
+                
+                if (ball.trajectory.verified_point_count <= 3) {
+                    // Not enough points for prediction
+                    snprintf(pred_status, sizeof(pred_status),
+                             "  Predicted Points: NONE (need >3 verified points, have %d)",
+                             ball.trajectory.verified_point_count);
+                    info_lines.push_back(pred_status);
+                    info_colors.push_back(cv::Scalar(100, 100, 100)); // Gray
+                } else if (!ball.trajectory.prediction_valid) {
+                    // Prediction is invalid - show detailed reason
+                    snprintf(pred_status, sizeof(pred_status),
+                             "  Predicted Points: NONE (prediction_valid=false, path_size=%d) | %s",
+                             pred_count,
+                             ball.trajectory.prediction_failure_reason.c_str());
+                    info_lines.push_back(pred_status);
+                    info_colors.push_back(cv::Scalar(0, 0, 255)); // Red - this is the problem!
+                } else if (ball.trajectory.predicted_path.empty()) {
+                    // Prediction path is empty
+                    snprintf(pred_status, sizeof(pred_status),
+                             "  Predicted Points: NONE (predicted_path is empty)");
+                    info_lines.push_back(pred_status);
+                    info_colors.push_back(cv::Scalar(0, 0, 255)); // Red
+                } else {
+                    // We have predictions!
+                    snprintf(pred_status, sizeof(pred_status),
+                             "  Predicted Points: %d (shown as darker dots)",
+                             pred_count);
+                    info_lines.push_back(pred_status);
+                    info_colors.push_back(cv::Scalar(0, 255, 0)); // Green - success!
                 }
             }
         }

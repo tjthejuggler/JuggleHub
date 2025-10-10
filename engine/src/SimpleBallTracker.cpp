@@ -1181,6 +1181,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     ball.trajectory.verified_point_count = 0;
                     ball.trajectory.trajectory_confidence = 0.0f;
                     ball.trajectory.prediction_valid = false;
+                    ball.trajectory.prediction_failure_reason = "TRAJECTORY_CLEARED: transition from HELD to IN_FLIGHT";
                     
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
@@ -1194,10 +1195,21 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     uint64_t current_timestamp = getCurrentTimestamp();
                     addVerifiedPoint(ball, ball.position, current_timestamp);
                     
+                    // CRITICAL: Recalculate prediction immediately after adding point
+                    // This ensures prediction is valid for rendering in recordings
+                    // Need >= 3 points (not > 3) to start prediction
+                    if (ball.trajectory.verified_point_count >= tracking_settings_.traj_min_points_for_prediction) {
+                        predictFullTrajectory(ball);
+                    }
+                    
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
                         debug_log << "  Added trajectory point for overridden ball: #"
                                   << ball.trajectory.verified_point_count << std::endl;
+                        if (ball.trajectory.verified_point_count >= tracking_settings_.traj_min_points_for_prediction) {
+                            debug_log << "  Prediction recalculated: valid=" << ball.trajectory.prediction_valid
+                                      << ", path_size=" << ball.trajectory.predicted_path.size() << std::endl;
+                        }
                         debug_log.close();
                     });
                 }
@@ -1805,15 +1817,20 @@ void SimpleBallTracker::updateInFlightBall(
     if (ball.position.z > 0) {
         addVerifiedPoint(ball, ball.position, current_timestamp);
         
-        // Update prediction for next frame if we have enough points
-        if (point_count >= 2) {
-            // Invalidate cached prediction so it gets recomputed
-            ball.trajectory.prediction_valid = false;
+        // CRITICAL: Recalculate prediction immediately after adding point
+        // This ensures prediction is valid for rendering in recordings
+        // Need >= 3 points (not > 3) to start prediction
+        if (ball.trajectory.verified_point_count >= tracking_settings_.traj_min_points_for_prediction) {
+            predictFullTrajectory(ball);
         }
         
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);
             debug_log << "  Added verified point #" << ball.trajectory.verified_point_count << std::endl;
+            if (ball.trajectory.verified_point_count >= tracking_settings_.traj_min_points_for_prediction) {
+                debug_log << "  Prediction recalculated: valid=" << ball.trajectory.prediction_valid
+                          << ", path_size=" << ball.trajectory.predicted_path.size() << std::endl;
+            }
             debug_log.close();
         });
     }
@@ -1870,6 +1887,7 @@ void SimpleBallTracker::initiateThrow(
     ball.trajectory.verified_point_count = 0;
     ball.trajectory.trajectory_confidence = 0.0f;
     ball.trajectory.prediction_valid = false;
+    ball.trajectory.prediction_failure_reason = "TRAJECTORY_CLEARED: initiateThrow() - starting new trajectory";
     
     // 3. Transition to IN_FLIGHT state
     ball.state = IN_FLIGHT;
@@ -1924,6 +1942,7 @@ void SimpleBallTracker::initiateCatch(
     ball.trajectory.verified_point_count = 0;
     ball.trajectory.trajectory_confidence = 0.0f;
     ball.trajectory.prediction_valid = false;
+    ball.trajectory.prediction_failure_reason = "TRAJECTORY_CLEARED: initiateCatch() - ball caught";
     
     // 2. Reset physics parameters
     ball.trajectory.initial_velocity = cv::Point3f(0, 0, 0);
@@ -1997,8 +2016,13 @@ cv::Point3f SimpleBallTracker::predictWithTwoPoints(SimpleBall& ball) {
 
 std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ball) {
     // Use GPU-accelerated trajectory predictor for full physics
+    // Requirement: need at least traj_min_points_for_prediction points (default 3)
     if (ball.trajectory.points.size() < static_cast<size_t>(tracking_settings_.traj_min_points_for_prediction)) {
         // Not enough points yet, return empty
+        ball.trajectory.prediction_valid = false;
+        ball.trajectory.prediction_failure_reason = "INSUFFICIENT_POINTS: have " +
+            std::to_string(ball.trajectory.points.size()) + " points, need >=" +
+            std::to_string(tracking_settings_.traj_min_points_for_prediction);
         return std::vector<cv::Point3f>();
     }
     
@@ -2030,7 +2054,14 @@ std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ba
     // Cache prediction
     ball.trajectory.predicted_path = predicted_path;
     ball.trajectory.prediction_timestamp = getCurrentTimestamp();
-    ball.trajectory.prediction_valid = true;
+    
+    if (predicted_path.empty()) {
+        ball.trajectory.prediction_valid = false;
+        ball.trajectory.prediction_failure_reason = "GPU_PREDICTOR_RETURNED_EMPTY";
+    } else {
+        ball.trajectory.prediction_valid = true;
+        ball.trajectory.prediction_failure_reason = "";
+    }
     
     return predicted_path;
 }

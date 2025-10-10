@@ -452,6 +452,22 @@ if PYQT_AVAILABLE:
             self.show_unmatched_detections_toggle.setToolTip("Show unmatched detections (yellow boxes)")
             toggles_row5.addWidget(self.show_unmatched_detections_toggle)
             
+            self.show_trajectory_toggle = QPushButton("Show Trajectory")
+            self.show_trajectory_toggle.setCheckable(True)
+            self.show_trajectory_toggle.setChecked(False)
+            self.show_trajectory_toggle.clicked.connect(self.toggle_overlays)
+            self.show_trajectory_toggle.setMaximumWidth(150)
+            self.show_trajectory_toggle.setToolTip("Show predicted ball trajectory paths (cyan lines)")
+            toggles_row5.addWidget(self.show_trajectory_toggle)
+            
+            self.show_trajectory_points_toggle = QPushButton("Show Trajectory Points")
+            self.show_trajectory_points_toggle.setCheckable(True)
+            self.show_trajectory_points_toggle.setChecked(False)
+            self.show_trajectory_points_toggle.clicked.connect(self.toggle_overlays)
+            self.show_trajectory_points_toggle.setMaximumWidth(180)
+            self.show_trajectory_points_toggle.setToolTip("Show verified tracking points as colored circles")
+            toggles_row5.addWidget(self.show_trajectory_points_toggle)
+            
             self.show_tails_toggle = QPushButton("Show Tails")
             self.show_tails_toggle.setCheckable(True)
             self.show_tails_toggle.setChecked(False)
@@ -1322,11 +1338,38 @@ if PYQT_AVAILABLE:
                 # Get color map from profile manager
                 color_name_map = self.color_profile_manager.get_color_map()
                 
+                # Get camera intrinsics for 3D-to-2D projection
+                fx = frame_data.intrinsics.fx if frame_data.HasField('intrinsics') else 385.0
+                fy = frame_data.intrinsics.fy if frame_data.HasField('intrinsics') else 385.0
+                ppx = frame_data.intrinsics.ppx if frame_data.HasField('intrinsics') else 320.0
+                ppy = frame_data.intrinsics.ppy if frame_data.HasField('intrinsics') else 240.0
+                
                 for color_ball in frame_data.color_tracked_balls:
                     if not color_ball.is_active:
                         continue
                     
+                    # CRITICAL: Show tracker at ACTUAL color location
+                    # - If held: show at wrist position (where the ball actually is)
+                    # - If in flight: show at ball position (YOLO detection or trajectory prediction)
                     center_x, center_y = int(color_ball.pixel_pos.x), int(color_ball.pixel_pos.y)
+                    
+                    if color_ball.associated_wrist_id >= 0:
+                        # Ball is held - show tracker at wrist position
+                        found_hand = False
+                        for hand in frame_data.hands:
+                            if hand.id == color_ball.associated_wrist_id and hand.is_visible:
+                                # Project wrist 3D position to 2D
+                                if hand.wrist_pos_3d.z > 0:
+                                    center_x = int((hand.wrist_pos_3d.x * fx) / hand.wrist_pos_3d.z + ppx)
+                                    center_y = int((hand.wrist_pos_3d.y * fy) / hand.wrist_pos_3d.z + ppy)
+                                    found_hand = True
+                                    break
+                        
+                        # Fallback to ball pixel position if hand not found
+                        if not found_hand:
+                            center_x = int(color_ball.pixel_pos.x)
+                            center_y = int(color_ball.pixel_pos.y)
+                    
                     # Use the actual color name from the tracker, fallback to white if unknown
                     color = color_name_map.get(color_ball.color_name.lower(), QColor(255, 255, 255))
                     radius = 12
@@ -1404,6 +1447,101 @@ if PYQT_AVAILABLE:
                                     painter.setPen(pen)
                                     painter.drawLine(int(p1[0]), int(p1[1]), int(p2[0]), int(p2[1]))
 
+            # --- Draw Trajectory Visualization ---
+            # Get camera intrinsics once for both trajectory and points
+            fx = frame_data.intrinsics.fx if frame_data.HasField('intrinsics') else 385.0
+            fy = frame_data.intrinsics.fy if frame_data.HasField('intrinsics') else 385.0
+            ppx = frame_data.intrinsics.ppx if frame_data.HasField('intrinsics') else 320.0
+            ppy = frame_data.intrinsics.ppy if frame_data.HasField('intrinsics') else 240.0
+            
+            # Helper function to get ball color from color name
+            def get_ball_color_from_name(color_name):
+                color_map = {
+                    'yellow': QColor(255, 255, 0),
+                    'green': QColor(0, 255, 0),
+                    'red': QColor(255, 0, 0),
+                    'blue': QColor(0, 0, 255),
+                    'orange': QColor(255, 165, 0),
+                    'pink': QColor(255, 192, 203),
+                    'purple': QColor(128, 0, 128),
+                    'white': QColor(255, 255, 255),
+                }
+                return color_map.get(color_name.lower(), QColor(0, 255, 0))
+            
+            # Draw trajectory points (colored circles)
+            if self.show_trajectory_points_toggle.isChecked():
+                for ball_state in frame_data.ball_states:
+                    # Only draw trajectory for in-flight balls
+                    if ball_state.state != juggler_pb2.BallState.IN_FLIGHT:
+                        continue
+                    
+                    # Skip if no trajectory points
+                    if len(ball_state.trajectory_points) == 0:
+                        continue
+                    
+                    # Get the ball's color for visualization
+                    color_ball = next((cb for cb in frame_data.color_tracked_balls if cb.logical_id == ball_state.logical_id), None)
+                    if not color_ball:
+                        continue
+                    
+                    # Get ball color from the ball's color name
+                    ball_color = get_ball_color_from_name(color_ball.color_name)
+                    
+                    # Draw all verified trajectory points as colored circles
+                    for traj_point in ball_state.trajectory_points:
+                        if traj_point.position.z <= 0:
+                            continue
+                        
+                        # Project 3D point to 2D
+                        point_x = int((traj_point.position.x * fx) / traj_point.position.z + ppx)
+                        point_y = int((traj_point.position.y * fy) / traj_point.position.z + ppy)
+                        
+                        # Check if on-screen
+                        if point_x >= 0 and point_x < pixmap.width() and point_y >= 0 and point_y < pixmap.height():
+                            # Draw circle with ball's color
+                            painter.setBrush(QBrush(ball_color))
+                            painter.setPen(QPen(QColor(255, 255, 255), 1))  # White border
+                            painter.drawEllipse(point_x - 5, point_y - 5, 10, 10)
+            
+            # Draw trajectory path (connecting lines)
+            if self.show_trajectory_toggle.isChecked():
+                for ball_state in frame_data.ball_states:
+                    # Only draw trajectory for in-flight balls
+                    if ball_state.state != juggler_pb2.BallState.IN_FLIGHT:
+                        continue
+                    
+                    # Skip if not enough points
+                    if len(ball_state.trajectory_points) < 2:
+                        continue
+                    
+                    # Get the ball's color for visualization
+                    color_ball = next((cb for cb in frame_data.color_tracked_balls if cb.logical_id == ball_state.logical_id), None)
+                    if not color_ball:
+                        continue
+                    
+                    # Get ball color from the ball's color name
+                    ball_color = get_ball_color_from_name(color_ball.color_name)
+                    
+                    # Draw a line connecting the points
+                    from PyQt6.QtGui import QPainterPath
+                    path = QPainterPath()
+                    first_point = True
+                    for traj_point in ball_state.trajectory_points:
+                        if traj_point.position.z <= 0:
+                            continue
+                        point_x = int((traj_point.position.x * fx) / traj_point.position.z + ppx)
+                        point_y = int((traj_point.position.y * fy) / traj_point.position.z + ppy)
+                        if point_x >= 0 and point_x < pixmap.width() and point_y >= 0 and point_y < pixmap.height():
+                            if first_point:
+                                path.moveTo(point_x, point_y)
+                                first_point = False
+                            else:
+                                path.lineTo(point_x, point_y)
+                    
+                    # Draw the connecting line
+                    painter.setPen(QPen(ball_color, 2, Qt.PenStyle.DashLine))
+                    painter.drawPath(path)
+            
             # --- Draw Pose Skeleton (Step 10) ---
             if self.show_skeleton_toggle.isChecked():
                 # Get frame dimensions for bounds checking
@@ -1528,6 +1666,7 @@ if PYQT_AVAILABLE:
             viz_states.show_tracked_boxes = self.show_tracked_boxes_toggle.isChecked()
             viz_states.show_unmatched_detections = self.show_unmatched_detections_toggle.isChecked()
             viz_states.show_tails = self.show_tails_toggle.isChecked()
+            viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
             
             command = juggler_pb2.CommandRequest(
                 type=juggler_pb2.CommandRequest.CommandType.RECORD_START,
@@ -1570,6 +1709,7 @@ if PYQT_AVAILABLE:
                 viz_states.show_tracked_boxes = self.show_tracked_boxes_toggle.isChecked()
                 viz_states.show_unmatched_detections = self.show_unmatched_detections_toggle.isChecked()
                 viz_states.show_tails = self.show_tails_toggle.isChecked()
+                viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
                 command.visualization_states.CopyFrom(viz_states)
             
             try:

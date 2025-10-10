@@ -7,9 +7,8 @@
 #include <memory>
 #include <set>
 #include "json.hpp"
-#include "KalmanFilter3D.hpp"
-#include "ColorBasedPredictor.hpp"
 #include "GpuHsvConverter.hpp"
+#include "GpuTrajectoryPredictor.hpp"
 
 using json = nlohmann::json;
 
@@ -46,6 +45,12 @@ struct ColorProfile {
           min_hsv(min), max_hsv(max), min_hsv2(min2), max_hsv2(max2) {}
 };
 
+// Ball state enum for simplified state machine
+enum BallState {
+    HELD,       // Ball is in hand, tracker at wrist
+    IN_FLIGHT   // Ball is airborne, tracker on trajectory
+};
+
 // Detection from YOLO
 struct Detection {
     cv::Rect_<float> box;
@@ -53,6 +58,22 @@ struct Detection {
     float confidence;
     int class_id;
     int index;  // Index in detection array
+    
+    // Override evaluation (calculated per-ball during tracking)
+    struct OverrideEval {
+        std::string ball_color;
+        float color_score;
+        bool meets_confidence_threshold;
+        bool meets_color_threshold;
+        bool meets_class_requirement;
+        bool would_override;
+        std::string reason;
+        
+        OverrideEval() : color_score(0.0f), meets_confidence_threshold(false),
+                        meets_color_threshold(false), meets_class_requirement(false),
+                        would_override(false) {}
+    };
+    std::vector<OverrideEval> override_evals;  // One per ball color
 };
 
 // Simple hand state
@@ -72,19 +93,17 @@ struct SimpleBall {
     cv::Point2f pixel_pos;           // Current 2D position
     cv::Rect_<float> bbox;           // Bounding box
     
-    // State
-    bool is_held;                    // In hand or in flight
-    bool previous_is_held;           // Previous frame state
+    // State (NEW: simplified state machine)
+    BallState state;                 // HELD or IN_FLIGHT
+    bool is_held;                    // In hand or in flight (kept for compatibility)
     int held_by_hand_id;             // -1 if not held, 0=left, 1=right
     int previous_held_by_hand_id;    // Previous frame's hand ID (for detecting hand switches)
-    int state_change_counter;        // For debouncing state changes
-    float distance_to_nearest_wrist; // Distance to nearest wrist in meters
+    
+    // Trajectory (NEW: replaces Kalman and ColorBasedPredictor in Phase 3)
+    BallTrajectory trajectory;       // Only valid when IN_FLIGHT
     
     // Tracking
     bool has_yolo_detection;         // True if YOLO sees it this frame
-    int frames_without_yolo;         // Counter for fallback logic
-    KalmanFilter3D kalman;           // Only used when YOLO fails (legacy)
-    ColorBasedPredictor color_predictor;  // NEW: Color-based prediction for visualization
     
     // Confidence scores (for UI display and override detection)
     float yolo_confidence;           // YOLO detection confidence (0.0-1.0)
@@ -96,11 +115,9 @@ struct SimpleBall {
     // Debug info for visualization
     std::string tracking_reason;     // Why this position was chosen (for debugging)
     
-    SimpleBall() : id(-1), is_held(false), previous_is_held(false),
+    SimpleBall() : id(-1), state(HELD), is_held(false),
                    held_by_hand_id(-1), previous_held_by_hand_id(-1),
-                   state_change_counter(0),
-                   distance_to_nearest_wrist(-1.0f),
-                   has_yolo_detection(false), frames_without_yolo(0),
+                   has_yolo_detection(false),
                    yolo_confidence(0.0f), color_match_score(0.0f),
                    yolo_class_id(0),
                    matched_detection_confidence(0.0f),
@@ -117,87 +134,91 @@ struct BallEvent {
     uint64_t timestamp;
 };
 
-// Tracking settings for state detection
+// Tracking settings for trajectory-based tracking
 struct TrackingSettings {
-    // Weights for held/in-air detection (when YOLO detects the ball)
-    float ml_ball_weight = 0.3f;           // Weight for ML "ball" (in-air) classification
-    float ml_ball_held_weight = 0.3f;      // Weight for ML "ball_held" classification
-    float wrist_proximity_weight = 0.4f;   // Weight for wrist proximity detection (INCREASED - proximity is more reliable)
+    // State transition thresholds
+    float throw_distance_threshold = 0.20f;   // Min distance to detect throw (m)
+    float catch_distance_threshold = 0.30f;   // Max distance to detect catch (m) - increased to match typical juggling catches
+    int min_frames_for_transition = 2;        // Debouncing for state changes
     
-    // Distance thresholds
-    float wrist_proximity_threshold = 0.15f;      // 15cm - distance to consider detected ball as held
-    float undetected_near_hand_threshold = 0.20f; // 20cm - distance to consider undetected ball as held (occluded)
+    // Trajectory parameters
+    float gravity = 9.81f;                    // Gravitational acceleration (m/s²)
+    float trajectory_time_step = 0.033f;      // Time between predicted points (s)
+    float max_trajectory_time = 3.0f;         // Maximum trajectory duration (s)
     
-    // State change parameters
-    int min_frames_for_state_change = 2;   // Frames needed to confirm state change (REDUCED from 3 to 2)
-    float min_throw_distance = 0.20f;      // Minimum distance (m) ball must move from wrist to count as throw (default: 0.20m = 20cm)
+    // Search parameters
+    float initial_search_radius = 0.30f;      // Wide search initially (m)
+    float min_search_radius = 0.10f;          // Tight search when confident (m)
+    float min_color_match_score = 0.50f;      // Color verification threshold
     
-    // Color-based prediction settings
-    int prediction_history_frames = 5;     // Number of frames to use for prediction
-    float prediction_radius_m = 0.15f;     // Radius of prediction circle in meters (15cm)
+    // Confidence parameters
+    int points_for_full_confidence = 5;       // Points needed for 100% confidence
     
-    // Color tracker matching weights (for choosing which YOLO detection to assign to each ball)
-    float yolo_confidence_weight = 2.0f;   // Weight for YOLO detection confidence
-    float yolo_class_weight = 3.0f;        // Weight for YOLO class (ball vs ball_held)
-    float color_match_weight = 1.0f;       // Weight for color matching score
-    float kalman_proximity_weight = 0.0f;  // Weight for proximity to Kalman prediction (0=disabled)
-    int color_sample_radius = 1;           // Radius for color sampling from detection center (1=3x3, 2=5x5, etc.)
-    
-    // Minimum score threshold for using YOLO detection as color tracker
-    // If best YOLO detection score is below this, use Kalman prediction instead
-    float min_yolo_score_threshold = 0.0f;  // 0.0 = always use YOLO if available (default behavior)
-    
-    // Color tracker override settings - force use of YOLO even if score is below threshold
-    // when these conditions are met (helps unstick Kalman prediction)
-    float override_confidence_threshold = 0.7f;  // Minimum YOLO confidence for override
-    float override_color_threshold = 0.8f;       // Minimum color match score for override
-    bool override_require_ball_class = true;     // Only override if ML class is 'ball' (not 'ball_held')
-    
-    // Maximum distance a ball tracker can move between frames (prevents flickering to far away balls)
-    float max_tracker_distance_per_frame = 0.50f;  // 50cm - maximum distance ball can move in one frame
-    
-    // Euclidean color matching temporal consistency settings
-    float temporal_consistency_bonus = 0.25f;  // Bonus to reduce distance for detections near previous position (prevents identity swaps)
-    float spatial_threshold = 0.40f;  // Maximum distance (m) to apply temporal consistency bonus
-    
-    // Kalman prediction bonus - STRONGEST signal for tracker placement
-    float kalman_prediction_bonus = 0.50f;  // Huge bonus for detections near Kalman prediction (default: 0.50)
-    float kalman_prediction_threshold = 0.30f;  // Maximum distance (m) from Kalman prediction to apply bonus (default: 0.30m)
-    
-    // Override detection thresholds - force tracker placement when conditions are met
-    // These settings ensure trackers never disappear when high-confidence detections exist
-    
-    // When tracker EXISTS (ball currently being tracked):
-    float override_min_confidence_tracked = 0.50f;     // Minimum YOLO confidence to force tracker placement (default: 0.50)
-    float override_min_color_score_tracked = 0.60f;    // Minimum color match score to force tracker placement (default: 0.60)
-    
-    // When tracker MISSING (no tracker for this color currently):
-    float override_min_confidence_missing = 0.70f;     // Minimum YOLO confidence to create tracker (default: 0.70)
-    float override_min_color_score_missing = 0.80f;    // Minimum color match score to create tracker (default: 0.80)
-    
-    // Held ball color blob detection settings
-    // These control how the system searches for color blobs when a ball is marked as held
-    int held_color_search_radius = 120;                // Search radius in pixels around hand when ball is held (default: 120px)
-    float held_color_min_score = 0.30f;                // Minimum color match score to accept color blob when held (default: 0.30)
-    float held_color_max_distance = 0.25f;             // Maximum distance (m) from hand to accept color blob when held (default: 0.25m)
-    
-    // Kalman glob detection settings
-    // These control color blob search near Kalman prediction when YOLO detection is missing
-    bool kalman_glob_detection_enabled = true;         // Enable color blob search at Kalman prediction (default: true)
-    int kalman_glob_search_radius = 100;               // Search radius in pixels around Kalman prediction (default: 100px)
-    float kalman_glob_min_color_score = 0.50f;         // Minimum color match score to accept color blob at Kalman prediction (default: 0.50)
-    float kalman_glob_max_depth_diff = 0.30f;          // Maximum depth difference (m) from Kalman prediction to accept blob (default: 0.30m)
-    
-    // Euclidean matching quality thresholds (prevents identity swaps)
-    float max_euclidean_distance = 0.15f;              // Maximum color distance to accept match (default: 0.15) - rejects terrible color matches
-    float min_euclidean_color_score = 0.30f;           // Minimum color similarity required (default: 0.30) - ensures decent color match
-    
-    // Kalman validation thresholds (prevents corruption)
-    float max_kalman_prediction_jump = 0.50f;          // Maximum jump from last known position (default: 0.50m) - resets corrupted Kalman
-    float max_depth_jump_strict = 0.20f;               // Stricter depth jump threshold (default: 0.20m, was 0.30m) - prevents depth sensor errors
+    // LEGACY SETTINGS (kept for backward compatibility during transition)
+    // These will be removed in Phase 3
+    float ml_ball_weight = 0.3f;
+    float ml_ball_held_weight = 0.3f;
+    float wrist_proximity_weight = 0.4f;
+    float wrist_proximity_threshold = 0.15f;
+    float undetected_near_hand_threshold = 0.20f;
+    int min_frames_for_state_change = 2;
+    float min_throw_distance = 0.20f;
+    int prediction_history_frames = 5;
+    float prediction_radius_m = 0.15f;
+    float yolo_confidence_weight = 2.0f;
+    float yolo_class_weight = 3.0f;
+    float color_match_weight = 1.0f;
+    float kalman_proximity_weight = 0.0f;
+    int color_sample_radius = 1;
+    float min_yolo_score_threshold = 0.0f;
+    float override_confidence_threshold = 0.7f;
+    float override_color_threshold = 0.8f;
+    bool override_require_ball_class = true;
+    float max_tracker_distance_per_frame = 0.50f;
+    float temporal_consistency_bonus = 0.25f;
+    float spatial_threshold = 0.40f;
+    float kalman_prediction_bonus = 0.50f;
+    float kalman_prediction_threshold = 0.30f;
+    float override_min_confidence_tracked = 0.50f;
+    float override_min_color_score_tracked = 0.60f;
+    float override_min_confidence_missing = 0.70f;
+    float override_min_color_score_missing = 0.80f;
+    int held_color_search_radius = 120;
+    float held_color_min_score = 0.30f;
+    float held_color_max_distance = 0.25f;
+    bool kalman_glob_detection_enabled = true;
+    int kalman_glob_search_radius = 100;
+    float kalman_glob_min_color_score = 0.50f;
+    float kalman_glob_max_depth_diff = 0.30f;
+    float max_euclidean_distance = 0.15f;
+    float min_euclidean_color_score = 0.30f;
+    float max_kalman_prediction_jump = 0.50f;
+    float max_depth_jump_strict = 0.20f;
     
     TrackingSettings() = default;
 };
+// Trajectory visualization settings
+struct TrajectoryVisualizationSettings {
+    bool show_trajectory = true;           // Toggle trajectory display
+    bool show_verified_points = true;      // Show confirmed points
+    bool show_predicted_path = true;       // Show full predicted path
+    bool show_search_radius = true;        // Show current search area
+    bool show_confidence = true;           // Show confidence indicator
+    
+    // Colors (BGR format for OpenCV)
+    cv::Scalar trajectory_color = cv::Scalar(255, 255, 0);      // Cyan
+    cv::Scalar verified_point_color = cv::Scalar(0, 255, 0);    // Green
+    cv::Scalar predicted_point_color = cv::Scalar(0, 255, 255); // Yellow
+    cv::Scalar search_radius_color = cv::Scalar(255, 0, 255);   // Magenta
+    
+    // Sizes
+    int trajectory_thickness = 2;
+    int point_radius = 5;
+    float trajectory_point_spacing = 0.05f;  // 5cm between drawn points
+    
+    TrajectoryVisualizationSettings() = default;
+};
+
 
 class SimpleBallTracker {
 public:
@@ -232,6 +253,19 @@ public:
     const std::vector<Detection>& getLastRawDetections() const { return last_raw_detections_; }
     
     // Tracking settings
+    
+    // Trajectory visualization settings
+    const TrajectoryVisualizationSettings& getVizSettings() const { return viz_settings_; }
+    void setVizSettings(const TrajectoryVisualizationSettings& settings) { viz_settings_ = settings; }
+    
+    /**
+     * Draw trajectory visualization on frame
+     * 
+     * @param frame Frame to draw on (modified in-place)
+     * @param ball Ball to visualize
+     * @param intrinsics Camera intrinsics for 3D-to-2D projection
+     */
+    void drawTrajectory(cv::Mat& frame, const SimpleBall& ball, const CameraIntrinsics& intrinsics) const;
     const TrackingSettings& getTrackingSettings() const { return tracking_settings_; }
     void setTrackingSettings(const TrackingSettings& settings) { tracking_settings_ = settings; }
     
@@ -251,10 +285,26 @@ private:
     // Color matching (OPTIMIZED: now takes color_frame and converts only ROIs to HSV)
     float matchColor(const Detection& det, const ColorProfile& profile, const cv::Mat& color_frame);
     
+    // Override evaluation - calculates override criteria for all detections
+    void evaluateOverrideCriteria(std::vector<Detection>& detections, const cv::Mat& color_frame);
+    
     // State detection
     bool isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands);
     std::vector<BallEvent> detectStatesAndEvents(std::vector<SimpleBall>& balls,
                                                  const std::vector<SimpleHand>& hands);
+    
+    // NEW: Trajectory-based tracking methods
+    void updateHeldBall(SimpleBall& ball, const std::vector<SimpleHand>& hands,
+                       const std::vector<Detection>& yolo_detections,
+                       const cv::Mat& color_frame, const cv::Mat& depth_frame,
+                       const CameraIntrinsics& intrinsics, std::vector<BallEvent>& events);
+    void updateInFlightBall(SimpleBall& ball, const std::vector<Detection>& yolo_detections,
+                           const cv::Mat& color_frame, const cv::Mat& depth_frame,
+                           const CameraIntrinsics& intrinsics, std::vector<BallEvent>& events);
+    void initiateThrow(SimpleBall& ball, const Detection& first_detection,
+                      const SimpleHand* hand, std::vector<BallEvent>& events);
+    void initiateCatch(SimpleBall& ball, const SimpleHand& hand, std::vector<BallEvent>& events);
+    void addVerifiedPoint(SimpleBall& ball, const cv::Point3f& position, uint64_t timestamp);
     
     // Fallback tracking (OPTIMIZED: now takes color_frame and converts only ROI to HSV)
     cv::Point2f searchForColorBlob(const cv::Mat& color_frame,
@@ -272,11 +322,13 @@ private:
     ov::Core core_;
     ov::CompiledModel ball_model_;
     ov::InferRequest ball_infer_;
+    TrajectoryVisualizationSettings viz_settings_;  // Trajectory visualization configuration
     ov::CompiledModel pose_model_;
     ov::InferRequest pose_infer_;
     
-    // GPU-accelerated HSV converter
+    // GPU-accelerated components
     std::unique_ptr<GpuHsvConverter> gpu_hsv_converter_;
+    std::unique_ptr<GpuTrajectoryPredictor> gpu_trajectory_predictor_;
     
     // State
     std::vector<ColorProfile> color_profiles_;

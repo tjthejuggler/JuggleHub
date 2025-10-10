@@ -235,23 +235,24 @@ void Engine::run() {
  
         }
 
-        // Populate color-based predictions for visualization
-        // NEW: Uses color detection history instead of Kalman filter
+        // Populate trajectory-based predictions for visualization
+        // NEW: Uses trajectory physics instead of Kalman filter
         if (use_dnn_tracker_ && simple_tracker_) {
             for (const auto& ball : tracked_balls) {
-                // Only create prediction if we have enough color detection history
-                if (!ball.color_predictor.hasEnoughData()) {
-                    continue;  // Skip balls without sufficient history
+                // Only create prediction if we have enough trajectory data
+                if (ball.trajectory.verified_point_count < 3) {
+                    continue;  // Skip balls without sufficient trajectory
                 }
                 
                 auto* kalman_pred = frame_data.add_kalman_predictions();
                 kalman_pred->set_logical_id(ball.id);
                 
-                // Get predicted position from color-based predictor
-                // This uses recent color detections and applies gravity for in-air balls
-                // Use 1/60s as default prediction time (assumes 60 FPS)
-                float prediction_dt = 1.0f / 60.0f;
-                cv::Point3f pred_pos_3d = ball.color_predictor.getPredictedPosition(prediction_dt, !ball.is_held);
+                // Get predicted position from trajectory
+                // Use first point in predicted path (next frame)
+                cv::Point3f pred_pos_3d(0, 0, 0);
+                if (!ball.trajectory.predicted_path.empty() && ball.trajectory.prediction_valid) {
+                    pred_pos_3d = ball.trajectory.predicted_path[0];
+                }
                 
                 // Skip if prediction failed (returns 0,0,0)
                 if (pred_pos_3d.z <= 0) {
@@ -293,9 +294,8 @@ void Engine::run() {
             bbox->set_y(ball.bbox.y);
             bbox->set_width(ball.bbox.width);
             bbox->set_height(ball.bbox.height);
+ball_pb->set_class_name(ball.is_held ? "ball_held" : "ball");
 
-            ball_pb->set_class_name(ball.is_held ? "ball_held" : "ball");
-            ball_pb->set_distance_to_nearest_wrist(ball.distance_to_nearest_wrist);
             
             cv::Point2f projected_pos = SimpleBallTracker::project_3d_to_2d(ball.position, camera_intrinsics_);
             auto* proj_pos_2d = ball_pb->mutable_projected_pos_2d();
@@ -315,7 +315,7 @@ void Engine::run() {
             world_pos->set_z(ball.position.z);
             color_ball->set_is_active(ball.has_yolo_detection);
             color_ball->set_associated_wrist_id(ball.held_by_hand_id);
-            color_ball->set_frames_since_seen(ball.frames_without_yolo);
+            color_ball->set_frames_since_seen(0);  // No longer tracking frames without YOLO
             
             // Add ball state
             auto* ball_state = frame_data.add_ball_states();
@@ -327,8 +327,23 @@ void Engine::run() {
             } else {
                 ball_state->set_state(juggler::v1::BallState::IN_FLIGHT);
                 ball_state->set_associated_hand_id(-1);
+                
+                // Add trajectory points for in-flight balls
+                ball_state->set_verified_point_count(ball.trajectory.verified_point_count);
+                for (const auto& traj_point : ball.trajectory.points) {
+                    if (traj_point.verified) {
+                        auto* point_pb = ball_state->add_trajectory_points();
+                        auto* pos = point_pb->mutable_position();
+                        pos->set_x(traj_point.position.x);
+                        pos->set_y(traj_point.position.y);
+                        pos->set_z(traj_point.position.z);
+                        point_pb->set_timestamp_us(traj_point.timestamp);
+                        point_pb->set_verified(traj_point.verified);
+                        point_pb->set_confidence(traj_point.confidence);
+                    }
+                }
             }
-            ball_state->set_frames_in_state(ball.state_change_counter);
+            ball_state->set_frames_in_state(0);  // State change counter removed
         }
         
         // Populate throw/catch events in protobuf
@@ -609,7 +624,7 @@ void Engine::saveRecording() {
             // Log frame data to recording.log
             if (recording_logger_.isActive()) {
                 // Log events first
-                recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls);
+                recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls, rec_frame.tracked_hands_simple);
                 // Then log frame data
                 recording_logger_.logFrame(rec_frame.tracked_balls,
                                           rec_frame.tracked_hands_simple,
@@ -637,7 +652,8 @@ void Engine::saveRecording() {
                                  visualization_states_.show_color_tracker() ||
                                  visualization_states_.show_tracked_boxes() ||
                                  visualization_states_.show_unmatched_detections() ||
-                                 visualization_states_.show_tails();
+                                 visualization_states_.show_tails() ||
+                                 visualization_states_.show_trajectory();
 
         if (has_visualizations) {
             fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
@@ -715,7 +731,7 @@ void Engine::stopContinuousRecording() {
             // Log frame data to recording.log
             if (recording_logger_.isActive()) {
                 // Log events first
-                recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls);
+                recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls, rec_frame.tracked_hands_simple);
                 // Then log frame data
                 recording_logger_.logFrame(rec_frame.tracked_balls,
                                           rec_frame.tracked_hands_simple,
@@ -743,7 +759,8 @@ void Engine::stopContinuousRecording() {
                                  visualization_states_.show_color_tracker() ||
                                  visualization_states_.show_tracked_boxes() ||
                                  visualization_states_.show_unmatched_detections() ||
-                                 visualization_states_.show_tails();
+                                 visualization_states_.show_tails() ||
+                                 visualization_states_.show_trajectory();
 
         if (has_visualizations) {
             fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
@@ -931,19 +948,44 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         std::string hand_side = event.hand_id == 0 ? "LEFT" : "RIGHT";
         std::string event_type = event.type == BallEvent::THROW ? "THROW" : "CATCH";
         
-        // Find the ball to get its color name
+        // Find the ball to get its color name and calculate distance
         std::string ball_color = "UNKNOWN";
+        float distance = 0.0f;
+        float threshold = 0.0f;
+        
         for (const auto& ball : rec_frame.tracked_balls) {
             if (ball.id == event.ball_id) {
                 ball_color = ball.color_name;
+                
+                // Calculate distance between ball and hand
+                for (const auto& hand : rec_frame.tracked_hands_simple) {
+                    if (hand.id == event.hand_id) {
+                        float dx = ball.position.x - hand.wrist_pos_3d.x;
+                        float dy = ball.position.y - hand.wrist_pos_3d.y;
+                        float dz = ball.position.z - hand.wrist_pos_3d.z;
+                        distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+                        break;
+                    }
+                }
                 break;
             }
         }
         
-        std::string event_text = event_type + " " + hand_side + " (" + ball_color + ")";
+        // Set threshold based on event type (matching SimpleBallTracker thresholds)
+        if (event.type == BallEvent::CATCH) {
+            threshold = 0.15f;  // catch_distance_threshold
+        } else {  // THROW
+            threshold = 0.20f;  // throw_distance_threshold
+        }
+        
+        // Create event text with distance information
+        char event_text[256];
+        snprintf(event_text, sizeof(event_text), "%s %s (%s) | %.3fm < %.3fm",
+                 event_type.c_str(), hand_side.c_str(), ball_color.c_str(),
+                 distance, threshold);
         
         // Add to the beginning of info lines
-        info_lines.insert(info_lines.begin(), event_text);
+        info_lines.insert(info_lines.begin(), std::string(event_text));
         
         // Color: Green for catch, Orange for throw
         cv::Scalar event_color = event.type == BallEvent::CATCH ?
@@ -1048,6 +1090,19 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             info_lines.push_back(info_text);
             info_colors.push_back(cv::Scalar(200, 200, 255)); // Light red for raw
             
+            // Add override evaluation for each ball color
+            for (const auto& eval : det.override_evals) {
+                char override_text[512];
+                snprintf(override_text, sizeof(override_text), "  [%s] %s",
+                         eval.ball_color.c_str(), eval.reason.c_str());
+                info_lines.push_back(override_text);
+                // Color: green if would override, red if not
+                cv::Scalar override_color = eval.would_override ?
+                                           cv::Scalar(0, 255, 0) :    // Green for override
+                                           cv::Scalar(0, 0, 255);     // Red for no override
+                info_colors.push_back(override_color);
+            }
+            
             det_num++;
         }
     }
@@ -1144,6 +1199,19 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             info_lines.push_back(info_text);
             info_colors.push_back(cv::Scalar(255, 255, 255)); // White for filtered
             
+            // Add override evaluation for each ball color
+            for (const auto& eval : det.override_evals) {
+                char override_text[512];
+                snprintf(override_text, sizeof(override_text), "  [%s] %s",
+                         eval.ball_color.c_str(), eval.reason.c_str());
+                info_lines.push_back(override_text);
+                // Color: green if would override, red if not
+                cv::Scalar override_color = eval.would_override ?
+                                           cv::Scalar(0, 255, 0) :    // Green for override
+                                           cv::Scalar(0, 0, 255);     // Red for no override
+                info_colors.push_back(override_color);
+            }
+            
             det_num++;
         }
     }
@@ -1207,11 +1275,36 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         }
         
         for (const auto& ball : rec_frame.tracked_balls) {
-            // Draw tracker visualization only if ball has YOLO detection
-            if (ball.has_yolo_detection) {
+            // CRITICAL: Show tracker at ACTUAL color location
+            // - If held: show at wrist position (where the ball actually is)
+            // - If in flight: show at ball position (YOLO detection or trajectory prediction)
+            int center_x, center_y;
             
-            int center_x = static_cast<int>(ball.pixel_pos.x);
-            int center_y = static_cast<int>(ball.pixel_pos.y);
+            if (ball.is_held && ball.held_by_hand_id >= 0) {
+                // Ball is held - show tracker at wrist position
+                bool found_hand = false;
+                for (const auto& hand : rec_frame.tracked_hands_simple) {
+                    if (hand.id == ball.held_by_hand_id && hand.is_visible) {
+                        // Project wrist 3D position to 2D
+                        if (hand.wrist_pos_3d.z > 0) {
+                            center_x = static_cast<int>((hand.wrist_pos_3d.x * camera_intrinsics_.fx) / hand.wrist_pos_3d.z + camera_intrinsics_.ppx);
+                            center_y = static_cast<int>((hand.wrist_pos_3d.y * camera_intrinsics_.fy) / hand.wrist_pos_3d.z + camera_intrinsics_.ppy);
+                            found_hand = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Fallback to ball pixel position if hand not found
+                if (!found_hand) {
+                    center_x = static_cast<int>(ball.pixel_pos.x);
+                    center_y = static_cast<int>(ball.pixel_pos.y);
+                }
+            } else {
+                // Ball is in flight - show at ball position (YOLO or trajectory)
+                center_x = static_cast<int>(ball.pixel_pos.x);
+                center_y = static_cast<int>(ball.pixel_pos.y);
+            }
             
             // Get color for this ball
             cv::Scalar color = cv::Scalar(255, 255, 255);  // Default white
@@ -1238,59 +1331,118 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                        cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 4, cv::LINE_AA);
             cv::putText(temp_result, label, cv::Point(center_x - 8, center_y + 8),
                        cv::FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv::LINE_AA);
-            }
             
             // Get color for this ball (for info panel)
             cv::Scalar ball_color = cv::Scalar(255, 255, 255);  // Default white
-            auto it = color_map.find(ball.color_name);
-            if (it != color_map.end()) {
-                ball_color = it->second;
+            auto color_it = color_map.find(ball.color_name);
+            if (color_it != color_map.end()) {
+                ball_color = color_it->second;
             }
             
-            // Add color tracker info to panel (always, even if no tracker placed)
+            // ALWAYS add color tracker info to panel
             char info_text[512];
-            if (ball.has_yolo_detection) {
-                std::string state = ball.is_held ? "HELD" : "FLIGHT";
-                std::string hand_info = "";
-                if (ball.is_held && ball.held_by_hand_id >= 0) {
-                    hand_info = " [" + std::string(ball.held_by_hand_id == 0 ? "L" : "R") + "]";
+            std::string state = ball.is_held ? "HELD" : "FLIGHT";
+            std::string hand_info = "";
+            if (ball.is_held && ball.held_by_hand_id >= 0) {
+                hand_info = " [" + std::string(ball.held_by_hand_id == 0 ? "L" : "R") + "]";
+            }
+            
+            snprintf(info_text, sizeof(info_text), "%s: %s%s z=%.2fm | %s",
+                     ball.color_name.c_str(), state.c_str(), hand_info.c_str(),
+                     ball.position.z, ball.tracking_reason.c_str());
+            info_lines.push_back(info_text);
+            info_colors.push_back(ball_color);
+            
+            // Add detailed ball position info
+            char pos_info[256];
+            snprintf(pos_info, sizeof(pos_info), "  Ball pos: (%.2f, %.2f, %.2f)",
+                     ball.position.x, ball.position.y, ball.position.z);
+            info_lines.push_back(pos_info);
+            info_colors.push_back(cv::Scalar(180, 180, 180));
+        }
+    }
+    
+    // Draw trajectory visualization for in-flight balls
+    // Shows verified tracking points as colored circles
+    if (viz.show_trajectory() && simple_tracker_) {
+        for (const auto& ball : rec_frame.tracked_balls) {
+            // Only draw trajectory for in-flight balls
+            if (ball.state != IN_FLIGHT) continue;
+            
+            // Skip if no trajectory points
+            if (ball.trajectory.points.empty()) continue;
+            
+            // Get ball color (convert HSV to BGR)
+            cv::Scalar ball_color(0, 255, 0);  // Default green
+            for (const auto& profile : simple_tracker_->getColorProfiles()) {
+                if (profile.name == ball.color_name && profile.avg_hue >= 0) {
+                    cv::Mat hsv_color(1, 1, CV_8UC3, cv::Scalar(profile.avg_hue, profile.avg_saturation, 255));
+                    cv::Mat bgr_color;
+                    cv::cvtColor(hsv_color, bgr_color, cv::COLOR_HSV2BGR);
+                    ball_color = cv::Scalar(bgr_color.at<cv::Vec3b>(0, 0)[0],
+                                           bgr_color.at<cv::Vec3b>(0, 0)[1],
+                                           bgr_color.at<cv::Vec3b>(0, 0)[2]);
+                    break;
+                }
+            }
+            
+            // Draw all verified trajectory points as colored circles
+            for (const auto& traj_point : ball.trajectory.points) {
+                if (!traj_point.verified) continue;
+                
+                // Project 3D point to 2D
+                float x_2d = (traj_point.position.x * camera_intrinsics_.fx) / traj_point.position.z + camera_intrinsics_.ppx;
+                float y_2d = (traj_point.position.y * camera_intrinsics_.fy) / traj_point.position.z + camera_intrinsics_.ppy;
+                cv::Point2f point_2d(x_2d, y_2d);
+                
+                // Check if on-screen
+                if (point_2d.x >= 0 && point_2d.x < temp_result.cols &&
+                    point_2d.y >= 0 && point_2d.y < temp_result.rows) {
+                    // Draw circle with ball's color
+                    cv::circle(temp_result, point_2d, 5, ball_color, -1);
+                    // Add white border for visibility
+                    cv::circle(temp_result, point_2d, 5, cv::Scalar(255, 255, 255), 1);
+                }
+            }
+            
+            // Optionally draw connecting line
+            if (ball.trajectory.points.size() > 1) {
+                std::vector<cv::Point2f> path_2d;
+                for (const auto& traj_point : ball.trajectory.points) {
+                    if (!traj_point.verified) continue;
+                    
+                    float x_2d = (traj_point.position.x * camera_intrinsics_.fx) / traj_point.position.z + camera_intrinsics_.ppx;
+                    float y_2d = (traj_point.position.y * camera_intrinsics_.fy) / traj_point.position.z + camera_intrinsics_.ppy;
+                    cv::Point2f point_2d(x_2d, y_2d);
+                    
+                    if (point_2d.x >= 0 && point_2d.x < temp_result.cols &&
+                        point_2d.y >= 0 && point_2d.y < temp_result.rows) {
+                        path_2d.push_back(point_2d);
+                    }
                 }
                 
-                snprintf(info_text, sizeof(info_text), "%s: %s%s z=%.2fm | %s",
-                         ball.color_name.c_str(), state.c_str(), hand_info.c_str(),
-                         ball.position.z, ball.tracking_reason.c_str());
-                info_lines.push_back(info_text);
-                info_colors.push_back(ball_color);
-                
-                // Add detailed ball position info
-                char pos_info[256];
-                snprintf(pos_info, sizeof(pos_info), "  Ball pos: (%.2f, %.2f, %.2f)",
-                         ball.position.x, ball.position.y, ball.position.z);
-                info_lines.push_back(pos_info);
-                info_colors.push_back(cv::Scalar(180, 180, 180));
-            } else {
-                // No tracker placed - show why
-                snprintf(info_text, sizeof(info_text), "%s: NO TRACKER | %s",
-                         ball.color_name.c_str(), ball.tracking_reason.c_str());
-                info_lines.push_back(info_text);
-                info_colors.push_back(ball_color);
+                // Draw polyline connecting the points
+                if (path_2d.size() > 1) {
+                    cv::polylines(temp_result, path_2d, false, ball_color, 2, cv::LINE_AA);
+                }
             }
         }
     }
     
-    // Draw color-based prediction circles
-    // NEW: Shows predicted search region based on color detection history
+    // Draw trajectory-based prediction circles
+    // NEW: Shows predicted search region based on trajectory physics
     if (viz.show_kalman_predictions()) {
         for (const auto& ball : rec_frame.tracked_balls) {
-            // Only draw if we have enough history
-            if (!ball.color_predictor.hasEnoughData()) {
+            // Only draw if we have enough trajectory data
+            if (ball.trajectory.verified_point_count < 3) {
                 continue;
             }
             
-            // Get predicted position from color-based predictor
-            // Use 1/60s as default prediction time (assumes 60 FPS)
-            float prediction_dt = 1.0f / 60.0f;
-            cv::Point3f pred_pos_3d = ball.color_predictor.getPredictedPosition(prediction_dt, !ball.is_held);
+            // Get predicted position from trajectory
+            cv::Point3f pred_pos_3d(0, 0, 0);
+            if (!ball.trajectory.predicted_path.empty() && ball.trajectory.prediction_valid) {
+                pred_pos_3d = ball.trajectory.predicted_path[0];
+            }
             
             // Skip if prediction failed
             if (pred_pos_3d.z <= 0) {
@@ -1301,8 +1453,8 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             int pred_x = static_cast<int>((pred_pos_3d.x * camera_intrinsics_.fx) / pred_pos_3d.z + camera_intrinsics_.ppx);
             int pred_y = static_cast<int>((pred_pos_3d.y * camera_intrinsics_.fy) / pred_pos_3d.z + camera_intrinsics_.ppy);
             
-            // Get prediction radius from settings (in meters)
-            float uncertainty_meters = ball.color_predictor.getPredictionRadius();
+            // Get prediction radius from trajectory (in meters)
+            float uncertainty_meters = ball.trajectory.search_radius_m;
             
             // Project uncertainty to pixel space
             float uncertainty_pixels = (uncertainty_meters * camera_intrinsics_.fx) / pred_pos_3d.z;
@@ -1336,15 +1488,16 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             
             // Add detailed prediction info to info panel
             char pred_info[512];
-            snprintf(pred_info, sizeof(pred_info), "  Pred: pos=(%.2f,%.2f,%.2f) hist=%zu grav=%s",
+            snprintf(pred_info, sizeof(pred_info), "  Pred: pos=(%.2f,%.2f,%.2f) points=%d conf=%.2f grav=%s",
                      pred_pos_3d.x, pred_pos_3d.y, pred_pos_3d.z,
-                     ball.color_predictor.getHistorySize(),
+                     ball.trajectory.verified_point_count,
+                     ball.trajectory.trajectory_confidence,
                      ball.is_held ? "OFF" : "ON");
             info_lines.push_back(pred_info);
             info_colors.push_back(circle_color);
             
-            // Add velocity info from color predictor
-            cv::Point3f velocity = ball.color_predictor.getVelocity();
+            // Add velocity info from trajectory
+            cv::Point3f velocity = ball.trajectory.initial_velocity;
             char vel_info[256];
             snprintf(vel_info, sizeof(vel_info), "  Velocity: (%.2f, %.2f, %.2f) m/s",
                      velocity.x, velocity.y, velocity.z);
@@ -1371,25 +1524,18 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             info_lines.push_back(state_info);
             info_colors.push_back(cv::Scalar(200, 200, 100));
             
-            // Show wrist distance
-            char wrist_info[256];
-            snprintf(wrist_info, sizeof(wrist_info), "  dist_to_wrist=%.3fm frames_no_yolo=%d",
-                     ball.distance_to_nearest_wrist, ball.frames_without_yolo);
-            info_lines.push_back(wrist_info);
-            info_colors.push_back(cv::Scalar(200, 200, 100));
-            
-            // Show the actual history positions for debugging
-            const auto& history = ball.color_predictor.getHistory();
-            if (!history.empty()) {
+            // Show trajectory points for debugging
+            const auto& traj_points = ball.trajectory.points;
+            if (!traj_points.empty()) {
                 char hist_info[512];
-                if (history.size() >= 2) {
-                    const auto& last = history.back().position;
-                    const auto& prev = history[history.size()-2].position;
-                    snprintf(hist_info, sizeof(hist_info), "  History: last=(%.2f,%.2f,%.2f) prev=(%.2f,%.2f,%.2f)",
+                if (traj_points.size() >= 2) {
+                    const auto& last = traj_points.back().position;
+                    const auto& prev = traj_points[traj_points.size()-2].position;
+                    snprintf(hist_info, sizeof(hist_info), "  Trajectory: last=(%.2f,%.2f,%.2f) prev=(%.2f,%.2f,%.2f)",
                              last.x, last.y, last.z, prev.x, prev.y, prev.z);
                 } else {
-                    const auto& last = history.back().position;
-                    snprintf(hist_info, sizeof(hist_info), "  History: last=(%.2f,%.2f,%.2f) only",
+                    const auto& last = traj_points.back().position;
+                    snprintf(hist_info, sizeof(hist_info), "  Trajectory: last=(%.2f,%.2f,%.2f) only",
                              last.x, last.y, last.z);
                 }
                 info_lines.push_back(hist_info);

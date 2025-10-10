@@ -168,6 +168,14 @@ message NewTracker {
   int32 detection_index = 4;        // Which detection initialized this tracker
 }
 
+// Trajectory point for ball flight path
+message TrajectoryPoint {
+  Vector3 position = 1;             // 3D position of the point
+  uint64 timestamp_us = 2;          // Timestamp in microseconds
+  bool verified = 3;                // Whether this point was verified by detection
+  float confidence = 4;             // Confidence of this point
+}
+
 // STEP 8: Throw/Catch State - Current state of each ball
 message BallState {
   int32 logical_id = 1;             // Ball ID
@@ -180,6 +188,8 @@ message BallState {
   int32 associated_hand_id = 3;     // Hand ID if held/transitioning (-1 if in flight)
   float confidence = 4;             // State confidence score
   int32 frames_in_state = 5;        // How many frames in current state
+  repeated TrajectoryPoint trajectory_points = 6;  // Verified trajectory points (only for IN_FLIGHT)
+  int32 verified_point_count = 7;   // Number of verified points in trajectory
 }
 
 // STEP 9: Legacy Occlusion - Occlusion states
@@ -304,6 +314,7 @@ message VisualizationStates {
   bool show_tracked_boxes = 12;
   bool show_unmatched_detections = 13;
   bool show_tails = 14;
+  bool show_trajectory = 15;  // Show trajectory path for in-flight balls
 }
 
 message ColorCommand {

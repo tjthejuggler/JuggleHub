@@ -29,6 +29,8 @@ public:
         std::string ball_color;
         int hand_id;
         std::string hand_side;  // "LEFT" or "RIGHT"
+        float distance;  // Distance between ball and hand when event occurred
+        float threshold;  // Threshold that was compared against
     };
     
     // Start a new recording log session
@@ -65,7 +67,8 @@ public:
     
     // Log throw/catch events for this frame
     void logEvents(const std::vector<BallEvent>& events,
-                   const std::vector<SimpleBall>& balls) {
+                   const std::vector<SimpleBall>& balls,
+                   const std::vector<SimpleHand>& hands) {
         if (!is_active_) return;
         
         for (const auto& event : events) {
@@ -76,13 +79,35 @@ public:
             record.hand_id = event.hand_id;
             record.hand_side = (event.hand_id == 0) ? "LEFT" : "RIGHT";
             
-            // Find ball color
+            // Find ball color and calculate distance
             record.ball_color = "unknown";
+            record.distance = 0.0f;
+            record.threshold = 0.0f;
+            
             for (const auto& ball : balls) {
                 if (ball.id == event.ball_id) {
                     record.ball_color = ball.color_name;
+                    
+                    // Calculate distance between ball and hand
+                    for (const auto& hand : hands) {
+                        if (hand.id == event.hand_id) {
+                            float dx = ball.position.x - hand.wrist_pos_3d.x;
+                            float dy = ball.position.y - hand.wrist_pos_3d.y;
+                            float dz = ball.position.z - hand.wrist_pos_3d.z;
+                            record.distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+                            break;
+                        }
+                    }
                     break;
                 }
+            }
+            
+            // Set threshold based on event type
+            // These values should match the thresholds in SimpleBallTracker
+            if (event.type == BallEvent::CATCH) {
+                record.threshold = 0.15f;  // catch_distance_threshold
+            } else {  // THROW
+                record.threshold = 0.20f;  // throw_distance_threshold
             }
             
             event_records_.push_back(record);
@@ -134,98 +159,88 @@ public:
                      << ball.bbox.x << ", " << ball.bbox.y << ", "
                      << ball.bbox.width << ", " << ball.bbox.height << "]\n";
             log_file_ << "    State: " << (ball.is_held ? "HELD" : "IN_FLIGHT") << "\n";
-            log_file_ << "    Held by hand: " << (ball.held_by_hand_id >= 0 ? 
+            log_file_ << "    Held by hand: " << (ball.held_by_hand_id >= 0 ?
                      std::to_string(ball.held_by_hand_id) : "NONE") << "\n";
-            log_file_ << "    Distance to nearest wrist: " << std::setprecision(4)
-                     << ball.distance_to_nearest_wrist << " m\n";
             log_file_ << "    Has YOLO detection: " << (ball.has_yolo_detection ? "YES" : "NO") << "\n";
-            log_file_ << "    Frames without YOLO: " << ball.frames_without_yolo << "\n";
             log_file_ << "    YOLO confidence: " << std::setprecision(3) << ball.yolo_confidence << "\n";
             log_file_ << "    YOLO class: " << (ball.yolo_class_id == 0 ? "ball" : "ball_held") << "\n";
             log_file_ << "    Color match score: " << std::setprecision(3) << ball.color_match_score << "\n";
             log_file_ << "    Tracking reason: " << ball.tracking_reason << "\n\n";
             
-            // Color-based predictor history (THE KEY INFORMATION YOU REQUESTED)
-            log_file_ << "  COLOR PREDICTOR HISTORY:\n";
-            const auto& history = ball.color_predictor.getHistory();
-            log_file_ << "    History size: " << history.size() << " frames\n";
-            log_file_ << "    Has enough data for prediction: " 
-                     << (ball.color_predictor.hasEnoughData() ? "YES" : "NO") << "\n";
+            // Trajectory-based tracking info
+            log_file_ << "  TRAJECTORY TRACKING:\n";
+            const auto& trajectory = ball.trajectory;
+            log_file_ << "    Verified points: " << trajectory.verified_point_count << "\n";
+            log_file_ << "    Trajectory confidence: " << std::setprecision(3)
+                     << trajectory.trajectory_confidence << "\n";
+            log_file_ << "    Search radius: " << std::setprecision(4)
+                     << trajectory.search_radius_m << " m\n";
+            log_file_ << "    Has enough data for prediction: "
+                     << (trajectory.verified_point_count >= 3 ? "YES" : "NO") << "\n";
             
-            if (!history.empty()) {
-                log_file_ << "    History entries (oldest to newest):\n";
-                for (size_t i = 0; i < history.size(); ++i) {
-                    const auto& entry = history[i];
-                    auto time_since_epoch = entry.timestamp.time_since_epoch();
-                    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
-                    
+            if (!trajectory.points.empty()) {
+                log_file_ << "    Trajectory points (oldest to newest):\n";
+                for (size_t i = 0; i < trajectory.points.size(); ++i) {
+                    const auto& point = trajectory.points[i];
                     log_file_ << "      [" << i << "] Position: ("
                              << std::fixed << std::setprecision(4)
-                             << entry.position.x << ", "
-                             << entry.position.y << ", "
-                             << entry.position.z << ") m, Timestamp: " << ms << " ms\n";
+                             << point.position.x << ", "
+                             << point.position.y << ", "
+                             << point.position.z << ") m, Verified: "
+                             << (point.verified ? "YES" : "NO") << ", Confidence: "
+                             << std::setprecision(3) << point.confidence << "\n";
                 }
                 
-                // Calculate and log velocity from history
-                if (history.size() >= 2) {
-                    cv::Point3f velocity = ball.color_predictor.getVelocity();
-                    log_file_ << "    Calculated velocity: ("
+                // Log velocity from trajectory
+                if (trajectory.verified_point_count >= 2) {
+                    cv::Point3f velocity = trajectory.initial_velocity;
+                    log_file_ << "    Initial velocity: ("
                              << std::fixed << std::setprecision(4)
                              << velocity.x << ", "
                              << velocity.y << ", "
                              << velocity.z << ") m/s\n";
                     
-                    float speed = std::sqrt(velocity.x * velocity.x + 
-                                          velocity.y * velocity.y + 
+                    float speed = std::sqrt(velocity.x * velocity.x +
+                                          velocity.y * velocity.y +
                                           velocity.z * velocity.z);
                     log_file_ << "    Speed magnitude: " << std::setprecision(4) << speed << " m/s\n";
                 }
             } else {
-                log_file_ << "    (No history available)\n";
+                log_file_ << "    (No trajectory points available)\n";
             }
             log_file_ << "\n";
             
             // Prediction details
-            if (ball.color_predictor.hasEnoughData()) {
+            if (trajectory.verified_point_count >= 3 && !trajectory.predicted_path.empty()) {
                 log_file_ << "  PREDICTION DETAILS:\n";
-                float prediction_dt = 1.0f / 60.0f;  // Assume 60 FPS
-                cv::Point3f pred_pos = ball.color_predictor.getPredictedPosition(
-                    prediction_dt, !ball.is_held);
+                log_file_ << "    Predicted path points: " << trajectory.predicted_path.size() << "\n";
+                log_file_ << "    Gravity: " << std::setprecision(4) << trajectory.gravity << " m/s²\n";
+                log_file_ << "    Prediction valid: " << (trajectory.prediction_valid ? "YES" : "NO") << "\n";
                 
-                log_file_ << "    Prediction time delta: " << std::setprecision(6) 
-                         << prediction_dt << " s\n";
-                log_file_ << "    Gravity applied: " << (ball.is_held ? "NO" : "YES") << "\n";
-                log_file_ << "    Predicted position: ("
-                         << std::fixed << std::setprecision(4)
-                         << pred_pos.x << ", "
-                         << pred_pos.y << ", "
-                         << pred_pos.z << ") m\n";
-                log_file_ << "    Prediction radius: " << std::setprecision(4)
-                         << ball.color_predictor.getPredictionRadius() << " m\n";
-                
-                // Calculate prediction error if we have current position
-                if (ball.has_yolo_detection && pred_pos.z > 0) {
-                    float dx = ball.position.x - pred_pos.x;
-                    float dy = ball.position.y - pred_pos.y;
-                    float dz = ball.position.z - pred_pos.z;
-                    float error = std::sqrt(dx*dx + dy*dy + dz*dz);
+                // Show first predicted position
+                if (!trajectory.predicted_path.empty()) {
+                    const auto& pred_pos = trajectory.predicted_path[0];
+                    log_file_ << "    Next predicted position: ("
+                             << std::fixed << std::setprecision(4)
+                             << pred_pos.x << ", "
+                             << pred_pos.y << ", "
+                             << pred_pos.z << ") m\n";
+                    log_file_ << "    Search radius: " << std::setprecision(4)
+                             << trajectory.search_radius_m << " m\n";
                     
-                    log_file_ << "    Prediction error: " << std::setprecision(4) << error << " m\n";
-                    log_file_ << "    Error components: dx=" << dx << ", dy=" << dy << ", dz=" << dz << " m\n";
+                    // Calculate prediction error if we have current position
+                    if (ball.has_yolo_detection && pred_pos.z > 0) {
+                        float dx = ball.position.x - pred_pos.x;
+                        float dy = ball.position.y - pred_pos.y;
+                        float dz = ball.position.z - pred_pos.z;
+                        float error = std::sqrt(dx*dx + dy*dy + dz*dz);
+                        
+                        log_file_ << "    Prediction error: " << std::setprecision(4) << error << " m\n";
+                        log_file_ << "    Error components: dx=" << dx << ", dy=" << dy << ", dz=" << dz << " m\n";
+                    }
                 }
             } else {
-                log_file_ << "  PREDICTION: Not enough history data\n";
-            }
-            log_file_ << "\n";
-            
-            // Legacy Kalman filter info (if used)
-            log_file_ << "  LEGACY KALMAN FILTER:\n";
-            log_file_ << "    (Note: Kalman filter is only used as fallback when YOLO fails)\n";
-            log_file_ << "    Frames without YOLO: " << ball.frames_without_yolo << "\n";
-            if (ball.frames_without_yolo > 0) {
-                log_file_ << "    Kalman fallback is ACTIVE\n";
-            } else {
-                log_file_ << "    Kalman fallback is INACTIVE (using YOLO)\n";
+                log_file_ << "  PREDICTION: Not enough trajectory data (need 3+ verified points)\n";
             }
             log_file_ << "\n";
         }
@@ -295,14 +310,16 @@ private:
             events_summary << "Total events: " << event_records_.size() << "\n\n";
             
             if (!event_records_.empty()) {
-                events_summary << "Frame | Event Type | Ball (Color) | Hand\n";
-                events_summary << "------|------------|--------------|------\n";
+                events_summary << "Frame | Event Type | Ball (Color) | Hand | Distance < Threshold\n";
+                events_summary << "------|------------|--------------|------|---------------------\n";
                 
                 for (const auto& record : event_records_) {
                     events_summary << std::setw(5) << record.frame_number << " | "
                                   << std::setw(10) << std::left << record.event_type << " | "
                                   << "Ball " << record.ball_id << " (" << std::setw(6) << record.ball_color << ") | "
-                                  << record.hand_side << "\n";
+                                  << std::setw(4) << record.hand_side << " | "
+                                  << std::fixed << std::setprecision(3) << record.distance << "m < "
+                                  << std::setprecision(3) << record.threshold << "m\n";
                 }
             } else {
                 events_summary << "No throw/catch events recorded.\n";

@@ -314,13 +314,31 @@ struct NewTrackerDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 NewTrackerDefaultTypeInternal _NewTracker_default_instance_;
+PROTOBUF_CONSTEXPR TrajectoryPoint::TrajectoryPoint(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.position_)*/nullptr
+  , /*decltype(_impl_.timestamp_us_)*/uint64_t{0u}
+  , /*decltype(_impl_.verified_)*/false
+  , /*decltype(_impl_.confidence_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct TrajectoryPointDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR TrajectoryPointDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~TrajectoryPointDefaultTypeInternal() {}
+  union {
+    TrajectoryPoint _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 TrajectoryPointDefaultTypeInternal _TrajectoryPoint_default_instance_;
 PROTOBUF_CONSTEXPR BallState::BallState(
     ::_pbi::ConstantInitialized): _impl_{
-    /*decltype(_impl_.logical_id_)*/0
+    /*decltype(_impl_.trajectory_points_)*/{}
+  , /*decltype(_impl_.logical_id_)*/0
   , /*decltype(_impl_.state_)*/0
   , /*decltype(_impl_.associated_hand_id_)*/0
   , /*decltype(_impl_.confidence_)*/0
   , /*decltype(_impl_.frames_in_state_)*/0
+  , /*decltype(_impl_.verified_point_count_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct BallStateDefaultTypeInternal {
   PROTOBUF_CONSTEXPR BallStateDefaultTypeInternal()
@@ -460,6 +478,7 @@ PROTOBUF_CONSTEXPR VisualizationStates::VisualizationStates(
   , /*decltype(_impl_.show_tracked_boxes_)*/false
   , /*decltype(_impl_.show_unmatched_detections_)*/false
   , /*decltype(_impl_.show_tails_)*/false
+  , /*decltype(_impl_.show_trajectory_)*/false
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct VisualizationStatesDefaultTypeInternal {
   PROTOBUF_CONSTEXPR VisualizationStatesDefaultTypeInternal()
@@ -501,7 +520,7 @@ struct CommandResponseDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 CommandResponseDefaultTypeInternal _CommandResponse_default_instance_;
 }  // namespace v1
 }  // namespace juggler
-static ::_pb::Metadata file_level_metadata_juggler_2eproto[26];
+static ::_pb::Metadata file_level_metadata_juggler_2eproto[27];
 static const ::_pb::EnumDescriptor* file_level_enum_descriptors_juggler_2eproto[4];
 static constexpr ::_pb::ServiceDescriptor const** file_level_service_descriptors_juggler_2eproto = nullptr;
 
@@ -697,6 +716,16 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::NewTracker, _impl_.initial_pos_2d_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::NewTracker, _impl_.detection_index_),
   ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrajectoryPoint, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrajectoryPoint, _impl_.position_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrajectoryPoint, _impl_.timestamp_us_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrajectoryPoint, _impl_.verified_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::TrajectoryPoint, _impl_.confidence_),
+  ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _internal_metadata_),
   ~0u,  // no _extensions_
   ~0u,  // no _oneof_case_
@@ -707,6 +736,8 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.associated_hand_id_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.confidence_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.frames_in_state_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.trajectory_points_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::BallState, _impl_.verified_point_count_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::OcclusionState, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -815,6 +846,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_tracked_boxes_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_unmatched_detections_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_tails_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_trajectory_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorCommand, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -851,15 +883,16 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 160, -1, -1, sizeof(::juggler::v1::FilteredDetection)},
   { 169, -1, -1, sizeof(::juggler::v1::TrackerAssociation)},
   { 180, -1, -1, sizeof(::juggler::v1::NewTracker)},
-  { 190, -1, -1, sizeof(::juggler::v1::BallState)},
-  { 201, -1, -1, sizeof(::juggler::v1::OcclusionState)},
-  { 211, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
-  { 224, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 253, 261, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 263, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 289, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
-  { 309, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 317, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 190, -1, -1, sizeof(::juggler::v1::TrajectoryPoint)},
+  { 200, -1, -1, sizeof(::juggler::v1::BallState)},
+  { 213, -1, -1, sizeof(::juggler::v1::OcclusionState)},
+  { 223, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
+  { 236, -1, -1, sizeof(::juggler::v1::FrameData)},
+  { 265, 273, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 275, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 301, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
+  { 322, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 330, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -880,6 +913,7 @@ static const ::_pb::Message* const file_default_instances[] = {
   &::juggler::v1::_FilteredDetection_default_instance_._instance,
   &::juggler::v1::_TrackerAssociation_default_instance_._instance,
   &::juggler::v1::_NewTracker_default_instance_._instance,
+  &::juggler::v1::_TrajectoryPoint_default_instance_._instance,
   &::juggler::v1::_BallState_default_instance_._instance,
   &::juggler::v1::_OcclusionState_default_instance_._instance,
   &::juggler::v1::_ColorSearchRegion_default_instance_._instance,
@@ -958,92 +992,98 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "\nlogical_id\030\001 \001(\005\022(\n\013initial_pos\030\002 \001(\0132\023"
   ".juggler.v1.Vector3\022+\n\016initial_pos_2d\030\003 "
   "\001(\0132\023.juggler.v1.Vector2\022\027\n\017detection_in"
-  "dex\030\004 \001(\005\"\311\001\n\tBallState\022\022\n\nlogical_id\030\001 "
-  "\001(\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1.BallStat"
-  "e.State\022\032\n\022associated_hand_id\030\003 \001(\005\022\022\n\nc"
-  "onfidence\030\004 \001(\002\022\027\n\017frames_in_state\030\005 \001(\005"
-  "\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRANSITIONIN"
-  "G\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022\022\n\nlogic"
-  "al_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010\022\031\n\021occl"
-  "uding_hand_id\030\003 \001(\005\022\030\n\020distance_to_hand\030"
-  "\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nlogical_i"
-  "d\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rsearch_ce"
-  "nter\030\003 \001(\0132\023.juggler.v1.Vector2\022\025\n\rsearc"
-  "h_radius\030\004 \001(\002\022(\n\013blob_center\030\005 \001(\0132\023.ju"
-  "ggler.v1.Vector2\022\021\n\tblob_area\030\006 \001(\002\022\r\n\005f"
-  "ound\030\007 \001(\010\"\327\007\n\tFrameData\022\024\n\014timestamp_us"
-  "\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler.v1.Ball\022"
-  "\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand\022%\n\010imu_"
-  "data\030\004 \003(\0132\023.juggler.v1.IMUData\0220\n\nintri"
-  "nsics\030\005 \001(\0132\034.juggler.v1.CameraIntrinsic"
-  "s\022(\n\006status\030\006 \001(\0132\030.juggler.v1.SystemSta"
-  "tus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014frame_height"
-  "\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016raw_dete"
-  "ctions\030\n \003(\0132\031.juggler.v1.BoundingBox2D\022"
-  "7\n\024unmatched_detections\030\020 \003(\0132\031.juggler."
-  "v1.BoundingBox2D\022\027\n\017color_image_b64\030\013 \001("
-  "\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir_project"
-  "or_active\030\r \001(\010\0229\n\023color_tracked_balls\030\016"
-  " \003(\0132\034.juggler.v1.ColorTrackedBall\0227\n\022th"
-  "row_catch_events\030\017 \003(\0132\033.juggler.v1.Thro"
-  "wCatchEvent\0228\n\022kalman_predictions\030\021 \003(\0132"
-  "\034.juggler.v1.KalmanPrediction\022:\n\023filtere"
-  "d_detections\030\022 \003(\0132\035.juggler.v1.Filtered"
-  "Detection\022<\n\024tracker_associations\030\023 \003(\0132"
-  "\036.juggler.v1.TrackerAssociation\022,\n\014new_t"
-  "rackers\030\024 \003(\0132\026.juggler.v1.NewTracker\022*\n"
-  "\013ball_states\030\025 \003(\0132\025.juggler.v1.BallStat"
-  "e\0224\n\020occlusion_states\030\026 \003(\0132\032.juggler.v1"
-  ".OcclusionState\022;\n\024color_search_regions\030"
-  "\027 \003(\0132\035.juggler.v1.ColorSearchRegion\"\335\010\n"
-  "\016CommandRequest\0224\n\004type\030\001 \001(\0162&.juggler."
-  "v1.CommandRequest.CommandType\022\023\n\013module_"
-  "name\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/\n\rcolo"
-  "r_command\030\004 \001(\0132\030.juggler.v1.ColorComman"
-  "d\022\?\n\013module_args\030\005 \003(\0132*.juggler.v1.Comm"
-  "andRequest.ModuleArgsEntry\022\034\n\024camera_set"
-  "tings_file\030\006 \001(\t\022\024\n\014camera_width\030\007 \001(\r\022\025"
-  "\n\rcamera_height\030\010 \001(\r\022\022\n\ncamera_fps\030\t \001("
-  "\r\022\037\n\027logical_id_to_calibrate\030\n \001(\005\0222\n\025ca"
-  "libration_pixel_pos\030\013 \001(\0132\023.juggler.v1.V"
-  "ector2\022\036\n\026record_with_yolo_boxes\030\014 \001(\010\022#"
-  "\n\033record_with_bytetrack_boxes\030\r \001(\010\022\032\n\022p"
-  "ose_model_enabled\030\016 \001(\010\022=\n\024visualization"
-  "_states\030\023 \001(\0132\037.juggler.v1.Visualization"
-  "States\022\022\n\ncolor_name\030\017 \001(\t\022\017\n\007click_x\030\020 "
-  "\001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014feature_name\030\022 \001"
-  "(\t\022\032\n\022video_feed_enabled\030\024 \001(\010\0321\n\017Module"
-  "ArgsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028"
-  "\001\"\210\003\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_M"
-  "ODULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR"
-  "_COMMAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECO"
-  "RD_START\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022"
-  "\032\n\026RECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_W"
-  "ITH_CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020"
-  "\n\014CAMERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032"
-  "\n\026SET_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_"
-  "COLOR\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_F"
-  "EATURE\020\017\022\032\n\026SET_VIDEO_FEED_ENABLED\020\020\"\232\003\n"
-  "\023VisualizationStates\022\037\n\027show_kalman_pred"
-  "ictions\030\001 \001(\010\022\033\n\023show_raw_detections\030\002 \001"
-  "(\010\022 \n\030show_filtered_detections\030\003 \001(\010\022\031\n\021"
-  "show_associations\030\004 \001(\010\022\031\n\021show_new_trac"
-  "kers\030\005 \001(\010\022\032\n\022show_hand_tracking\030\006 \001(\010\022\030"
-  "\n\020show_ball_states\030\007 \001(\010\022\026\n\016show_occlusi"
-  "on\030\010 \001(\010\022\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021show_"
-  "color_search\030\n \001(\010\022\032\n\022show_color_tracker"
-  "\030\013 \001(\010\022\032\n\022show_tracked_boxes\030\014 \001(\010\022!\n\031sh"
-  "ow_unmatched_detections\030\r \001(\010\022\022\n\nshow_ta"
-  "ils\030\016 \001(\010\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001"
-  "(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017"
-  "CommandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007mess"
-  "age\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
+  "dex\030\004 \001(\005\"t\n\017TrajectoryPoint\022%\n\010position"
+  "\030\001 \001(\0132\023.juggler.v1.Vector3\022\024\n\014timestamp"
+  "_us\030\002 \001(\004\022\020\n\010verified\030\003 \001(\010\022\022\n\nconfidenc"
+  "e\030\004 \001(\002\"\237\002\n\tBallState\022\022\n\nlogical_id\030\001 \001("
+  "\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1.BallState."
+  "State\022\032\n\022associated_hand_id\030\003 \001(\005\022\022\n\ncon"
+  "fidence\030\004 \001(\002\022\027\n\017frames_in_state\030\005 \001(\005\0226"
+  "\n\021trajectory_points\030\006 \003(\0132\033.juggler.v1.T"
+  "rajectoryPoint\022\034\n\024verified_point_count\030\007"
+  " \001(\005\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRANSITI"
+  "ONING\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022\022\n\nl"
+  "ogical_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010\022\031\n\021"
+  "occluding_hand_id\030\003 \001(\005\022\030\n\020distance_to_h"
+  "and\030\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nlogic"
+  "al_id\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rsearc"
+  "h_center\030\003 \001(\0132\023.juggler.v1.Vector2\022\025\n\rs"
+  "earch_radius\030\004 \001(\002\022(\n\013blob_center\030\005 \001(\0132"
+  "\023.juggler.v1.Vector2\022\021\n\tblob_area\030\006 \001(\002\022"
+  "\r\n\005found\030\007 \001(\010\"\327\007\n\tFrameData\022\024\n\014timestam"
+  "p_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler.v1.B"
+  "all\022\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand\022%\n\010"
+  "imu_data\030\004 \003(\0132\023.juggler.v1.IMUData\0220\n\ni"
+  "ntrinsics\030\005 \001(\0132\034.juggler.v1.CameraIntri"
+  "nsics\022(\n\006status\030\006 \001(\0132\030.juggler.v1.Syste"
+  "mStatus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014frame_he"
+  "ight\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016raw_"
+  "detections\030\n \003(\0132\031.juggler.v1.BoundingBo"
+  "x2D\0227\n\024unmatched_detections\030\020 \003(\0132\031.jugg"
+  "ler.v1.BoundingBox2D\022\027\n\017color_image_b64\030"
+  "\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir_pro"
+  "jector_active\030\r \001(\010\0229\n\023color_tracked_bal"
+  "ls\030\016 \003(\0132\034.juggler.v1.ColorTrackedBall\0227"
+  "\n\022throw_catch_events\030\017 \003(\0132\033.juggler.v1."
+  "ThrowCatchEvent\0228\n\022kalman_predictions\030\021 "
+  "\003(\0132\034.juggler.v1.KalmanPrediction\022:\n\023fil"
+  "tered_detections\030\022 \003(\0132\035.juggler.v1.Filt"
+  "eredDetection\022<\n\024tracker_associations\030\023 "
+  "\003(\0132\036.juggler.v1.TrackerAssociation\022,\n\014n"
+  "ew_trackers\030\024 \003(\0132\026.juggler.v1.NewTracke"
+  "r\022*\n\013ball_states\030\025 \003(\0132\025.juggler.v1.Ball"
+  "State\0224\n\020occlusion_states\030\026 \003(\0132\032.juggle"
+  "r.v1.OcclusionState\022;\n\024color_search_regi"
+  "ons\030\027 \003(\0132\035.juggler.v1.ColorSearchRegion"
+  "\"\335\010\n\016CommandRequest\0224\n\004type\030\001 \001(\0162&.jugg"
+  "ler.v1.CommandRequest.CommandType\022\023\n\013mod"
+  "ule_name\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004\022/\n\r"
+  "color_command\030\004 \001(\0132\030.juggler.v1.ColorCo"
+  "mmand\022\?\n\013module_args\030\005 \003(\0132*.juggler.v1."
+  "CommandRequest.ModuleArgsEntry\022\034\n\024camera"
+  "_settings_file\030\006 \001(\t\022\024\n\014camera_width\030\007 \001"
+  "(\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n\ncamera_fps\030"
+  "\t \001(\r\022\037\n\027logical_id_to_calibrate\030\n \001(\005\0222"
+  "\n\025calibration_pixel_pos\030\013 \001(\0132\023.juggler."
+  "v1.Vector2\022\036\n\026record_with_yolo_boxes\030\014 \001"
+  "(\010\022#\n\033record_with_bytetrack_boxes\030\r \001(\010\022"
+  "\032\n\022pose_model_enabled\030\016 \001(\010\022=\n\024visualiza"
+  "tion_states\030\023 \001(\0132\037.juggler.v1.Visualiza"
+  "tionStates\022\022\n\ncolor_name\030\017 \001(\t\022\017\n\007click_"
+  "x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014feature_name"
+  "\030\022 \001(\t\022\032\n\022video_feed_enabled\030\024 \001(\010\0321\n\017Mo"
+  "duleArgsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001("
+  "\t:\0028\001\"\210\003\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LO"
+  "AD_MODULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_C"
+  "OLOR_COMMAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014"
+  "RECORD_START\020\005\022\033\n\027RECORD_CONTINUOUS_STAR"
+  "T\020\006\022\032\n\026RECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTA"
+  "RT_WITH_CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP"
+  "\020\t\022\020\n\014CAMERA_START\020\n\022\024\n\020CALIBRATE_OBJECT"
+  "\020\013\022\032\n\026SET_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBR"
+  "ATE_COLOR\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISAB"
+  "LE_FEATURE\020\017\022\032\n\026SET_VIDEO_FEED_ENABLED\020\020"
+  "\"\263\003\n\023VisualizationStates\022\037\n\027show_kalman_"
+  "predictions\030\001 \001(\010\022\033\n\023show_raw_detections"
+  "\030\002 \001(\010\022 \n\030show_filtered_detections\030\003 \001(\010"
+  "\022\031\n\021show_associations\030\004 \001(\010\022\031\n\021show_new_"
+  "trackers\030\005 \001(\010\022\032\n\022show_hand_tracking\030\006 \001"
+  "(\010\022\030\n\020show_ball_states\030\007 \001(\010\022\026\n\016show_occ"
+  "lusion\030\010 \001(\010\022\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021s"
+  "how_color_search\030\n \001(\010\022\032\n\022show_color_tra"
+  "cker\030\013 \001(\010\022\032\n\022show_tracked_boxes\030\014 \001(\010\022!"
+  "\n\031show_unmatched_detections\030\r \001(\010\022\022\n\nsho"
+  "w_tails\030\016 \001(\010\022\027\n\017show_trajectory\030\017 \001(\010\"A"
+  "\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color"
+  "\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017CommandResp"
+  "onse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024"
+  "\n\014timestamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 5839, descriptor_table_protodef_juggler_2eproto,
+    false, false, 6068, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
-    &descriptor_table_juggler_2eproto_once, nullptr, 0, 26,
+    &descriptor_table_juggler_2eproto_once, nullptr, 0, 27,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
     file_level_metadata_juggler_2eproto, file_level_enum_descriptors_juggler_2eproto,
     file_level_service_descriptors_juggler_2eproto,
@@ -7025,6 +7065,294 @@ void NewTracker::InternalSwap(NewTracker* other) {
 
 // ===================================================================
 
+class TrajectoryPoint::_Internal {
+ public:
+  static const ::juggler::v1::Vector3& position(const TrajectoryPoint* msg);
+};
+
+const ::juggler::v1::Vector3&
+TrajectoryPoint::_Internal::position(const TrajectoryPoint* msg) {
+  return *msg->_impl_.position_;
+}
+TrajectoryPoint::TrajectoryPoint(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:juggler.v1.TrajectoryPoint)
+}
+TrajectoryPoint::TrajectoryPoint(const TrajectoryPoint& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  TrajectoryPoint* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.position_){nullptr}
+    , decltype(_impl_.timestamp_us_){}
+    , decltype(_impl_.verified_){}
+    , decltype(_impl_.confidence_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  if (from._internal_has_position()) {
+    _this->_impl_.position_ = new ::juggler::v1::Vector3(*from._impl_.position_);
+  }
+  ::memcpy(&_impl_.timestamp_us_, &from._impl_.timestamp_us_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.confidence_) -
+    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.confidence_));
+  // @@protoc_insertion_point(copy_constructor:juggler.v1.TrajectoryPoint)
+}
+
+inline void TrajectoryPoint::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.position_){nullptr}
+    , decltype(_impl_.timestamp_us_){uint64_t{0u}}
+    , decltype(_impl_.verified_){false}
+    , decltype(_impl_.confidence_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+TrajectoryPoint::~TrajectoryPoint() {
+  // @@protoc_insertion_point(destructor:juggler.v1.TrajectoryPoint)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void TrajectoryPoint::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  if (this != internal_default_instance()) delete _impl_.position_;
+}
+
+void TrajectoryPoint::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void TrajectoryPoint::Clear() {
+// @@protoc_insertion_point(message_clear_start:juggler.v1.TrajectoryPoint)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  if (GetArenaForAllocation() == nullptr && _impl_.position_ != nullptr) {
+    delete _impl_.position_;
+  }
+  _impl_.position_ = nullptr;
+  ::memset(&_impl_.timestamp_us_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.confidence_) -
+      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.confidence_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* TrajectoryPoint::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // .juggler.v1.Vector3 position = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+          ptr = ctx->ParseMessage(_internal_mutable_position(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint64 timestamp_us = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          _impl_.timestamp_us_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool verified = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.verified_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float confidence = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 37)) {
+          _impl_.confidence_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* TrajectoryPoint::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:juggler.v1.TrajectoryPoint)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // .juggler.v1.Vector3 position = 1;
+  if (this->_internal_has_position()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(1, _Internal::position(this),
+        _Internal::position(this).GetCachedSize(), target, stream);
+  }
+
+  // uint64 timestamp_us = 2;
+  if (this->_internal_timestamp_us() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteUInt64ToArray(2, this->_internal_timestamp_us(), target);
+  }
+
+  // bool verified = 3;
+  if (this->_internal_verified() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(3, this->_internal_verified(), target);
+  }
+
+  // float confidence = 4;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = this->_internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(4, this->_internal_confidence(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:juggler.v1.TrajectoryPoint)
+  return target;
+}
+
+size_t TrajectoryPoint::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:juggler.v1.TrajectoryPoint)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // .juggler.v1.Vector3 position = 1;
+  if (this->_internal_has_position()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.position_);
+  }
+
+  // uint64 timestamp_us = 2;
+  if (this->_internal_timestamp_us() != 0) {
+    total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(this->_internal_timestamp_us());
+  }
+
+  // bool verified = 3;
+  if (this->_internal_verified() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // float confidence = 4;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = this->_internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    total_size += 1 + 4;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData TrajectoryPoint::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    TrajectoryPoint::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*TrajectoryPoint::GetClassData() const { return &_class_data_; }
+
+
+void TrajectoryPoint::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<TrajectoryPoint*>(&to_msg);
+  auto& from = static_cast<const TrajectoryPoint&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:juggler.v1.TrajectoryPoint)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_has_position()) {
+    _this->_internal_mutable_position()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_position());
+  }
+  if (from._internal_timestamp_us() != 0) {
+    _this->_internal_set_timestamp_us(from._internal_timestamp_us());
+  }
+  if (from._internal_verified() != 0) {
+    _this->_internal_set_verified(from._internal_verified());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_confidence = from._internal_confidence();
+  uint32_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    _this->_internal_set_confidence(from._internal_confidence());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void TrajectoryPoint::CopyFrom(const TrajectoryPoint& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:juggler.v1.TrajectoryPoint)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool TrajectoryPoint::IsInitialized() const {
+  return true;
+}
+
+void TrajectoryPoint::InternalSwap(TrajectoryPoint* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(TrajectoryPoint, _impl_.confidence_)
+      + sizeof(TrajectoryPoint::_impl_.confidence_)
+      - PROTOBUF_FIELD_OFFSET(TrajectoryPoint, _impl_.position_)>(
+          reinterpret_cast<char*>(&_impl_.position_),
+          reinterpret_cast<char*>(&other->_impl_.position_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata TrajectoryPoint::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
+      file_level_metadata_juggler_2eproto[17]);
+}
+
+// ===================================================================
+
 class BallState::_Internal {
  public:
 };
@@ -7039,17 +7367,19 @@ BallState::BallState(const BallState& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   BallState* const _this = this; (void)_this;
   new (&_impl_) Impl_{
-      decltype(_impl_.logical_id_){}
+      decltype(_impl_.trajectory_points_){from._impl_.trajectory_points_}
+    , decltype(_impl_.logical_id_){}
     , decltype(_impl_.state_){}
     , decltype(_impl_.associated_hand_id_){}
     , decltype(_impl_.confidence_){}
     , decltype(_impl_.frames_in_state_){}
+    , decltype(_impl_.verified_point_count_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   ::memcpy(&_impl_.logical_id_, &from._impl_.logical_id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.frames_in_state_) -
-    reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.frames_in_state_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.verified_point_count_) -
+    reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.verified_point_count_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.BallState)
 }
 
@@ -7058,11 +7388,13 @@ inline void BallState::SharedCtor(
   (void)arena;
   (void)is_message_owned;
   new (&_impl_) Impl_{
-      decltype(_impl_.logical_id_){0}
+      decltype(_impl_.trajectory_points_){arena}
+    , decltype(_impl_.logical_id_){0}
     , decltype(_impl_.state_){0}
     , decltype(_impl_.associated_hand_id_){0}
     , decltype(_impl_.confidence_){0}
     , decltype(_impl_.frames_in_state_){0}
+    , decltype(_impl_.verified_point_count_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
 }
@@ -7078,6 +7410,7 @@ BallState::~BallState() {
 
 inline void BallState::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.trajectory_points_.~RepeatedPtrField();
 }
 
 void BallState::SetCachedSize(int size) const {
@@ -7090,9 +7423,10 @@ void BallState::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  _impl_.trajectory_points_.Clear();
   ::memset(&_impl_.logical_id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.frames_in_state_) -
-      reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.frames_in_state_));
+      reinterpret_cast<char*>(&_impl_.verified_point_count_) -
+      reinterpret_cast<char*>(&_impl_.logical_id_)) + sizeof(_impl_.verified_point_count_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -7139,6 +7473,27 @@ const char* BallState::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx
       case 5:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
           _impl_.frames_in_state_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.TrajectoryPoint trajectory_points = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 50)) {
+          ptr -= 1;
+          do {
+            ptr += 1;
+            ptr = ctx->ParseMessage(_internal_add_trajectory_points(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<50>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 verified_point_count = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 56)) {
+          _impl_.verified_point_count_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -7207,6 +7562,20 @@ uint8_t* BallState::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteInt32ToArray(5, this->_internal_frames_in_state(), target);
   }
 
+  // repeated .juggler.v1.TrajectoryPoint trajectory_points = 6;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_trajectory_points_size()); i < n; i++) {
+    const auto& repfield = this->_internal_trajectory_points(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(6, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
+  // int32 verified_point_count = 7;
+  if (this->_internal_verified_point_count() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(7, this->_internal_verified_point_count(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -7222,6 +7591,13 @@ size_t BallState::ByteSizeLong() const {
   uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
+
+  // repeated .juggler.v1.TrajectoryPoint trajectory_points = 6;
+  total_size += 1UL * this->_internal_trajectory_points_size();
+  for (const auto& msg : this->_impl_.trajectory_points_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
 
   // int32 logical_id = 1;
   if (this->_internal_logical_id() != 0) {
@@ -7253,6 +7629,11 @@ size_t BallState::ByteSizeLong() const {
     total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_frames_in_state());
   }
 
+  // int32 verified_point_count = 7;
+  if (this->_internal_verified_point_count() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_verified_point_count());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -7271,6 +7652,7 @@ void BallState::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROT
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
+  _this->_impl_.trajectory_points_.MergeFrom(from._impl_.trajectory_points_);
   if (from._internal_logical_id() != 0) {
     _this->_internal_set_logical_id(from._internal_logical_id());
   }
@@ -7290,6 +7672,9 @@ void BallState::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROT
   if (from._internal_frames_in_state() != 0) {
     _this->_internal_set_frames_in_state(from._internal_frames_in_state());
   }
+  if (from._internal_verified_point_count() != 0) {
+    _this->_internal_set_verified_point_count(from._internal_verified_point_count());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -7307,9 +7692,10 @@ bool BallState::IsInitialized() const {
 void BallState::InternalSwap(BallState* other) {
   using std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  _impl_.trajectory_points_.InternalSwap(&other->_impl_.trajectory_points_);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(BallState, _impl_.frames_in_state_)
-      + sizeof(BallState::_impl_.frames_in_state_)
+      PROTOBUF_FIELD_OFFSET(BallState, _impl_.verified_point_count_)
+      + sizeof(BallState::_impl_.verified_point_count_)
       - PROTOBUF_FIELD_OFFSET(BallState, _impl_.logical_id_)>(
           reinterpret_cast<char*>(&_impl_.logical_id_),
           reinterpret_cast<char*>(&other->_impl_.logical_id_));
@@ -7318,7 +7704,7 @@ void BallState::InternalSwap(BallState* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata BallState::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[17]);
+      file_level_metadata_juggler_2eproto[18]);
 }
 
 // ===================================================================
@@ -7589,7 +7975,7 @@ void OcclusionState::InternalSwap(OcclusionState* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata OcclusionState::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[18]);
+      file_level_metadata_juggler_2eproto[19]);
 }
 
 // ===================================================================
@@ -8006,7 +8392,7 @@ void ColorSearchRegion::InternalSwap(ColorSearchRegion* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata ColorSearchRegion::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[19]);
+      file_level_metadata_juggler_2eproto[20]);
 }
 
 // ===================================================================
@@ -8939,7 +9325,7 @@ void FrameData::InternalSwap(FrameData* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata FrameData::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[20]);
+      file_level_metadata_juggler_2eproto[21]);
 }
 
 // ===================================================================
@@ -8953,7 +9339,7 @@ void CommandRequest_ModuleArgsEntry_DoNotUse::MergeFrom(const CommandRequest_Mod
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandRequest_ModuleArgsEntry_DoNotUse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[21]);
+      file_level_metadata_juggler_2eproto[22]);
 }
 
 // ===================================================================
@@ -9804,7 +10190,7 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandRequest::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[22]);
+      file_level_metadata_juggler_2eproto[23]);
 }
 
 // ===================================================================
@@ -9837,12 +10223,13 @@ VisualizationStates::VisualizationStates(const VisualizationStates& from)
     , decltype(_impl_.show_tracked_boxes_){}
     , decltype(_impl_.show_unmatched_detections_){}
     , decltype(_impl_.show_tails_){}
+    , decltype(_impl_.show_trajectory_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   ::memcpy(&_impl_.show_kalman_predictions_, &from._impl_.show_kalman_predictions_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.show_tails_) -
-    reinterpret_cast<char*>(&_impl_.show_kalman_predictions_)) + sizeof(_impl_.show_tails_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.show_trajectory_) -
+    reinterpret_cast<char*>(&_impl_.show_kalman_predictions_)) + sizeof(_impl_.show_trajectory_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.VisualizationStates)
 }
 
@@ -9865,6 +10252,7 @@ inline void VisualizationStates::SharedCtor(
     , decltype(_impl_.show_tracked_boxes_){false}
     , decltype(_impl_.show_unmatched_detections_){false}
     , decltype(_impl_.show_tails_){false}
+    , decltype(_impl_.show_trajectory_){false}
     , /*decltype(_impl_._cached_size_)*/{}
   };
 }
@@ -9893,8 +10281,8 @@ void VisualizationStates::Clear() {
   (void) cached_has_bits;
 
   ::memset(&_impl_.show_kalman_predictions_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.show_tails_) -
-      reinterpret_cast<char*>(&_impl_.show_kalman_predictions_)) + sizeof(_impl_.show_tails_));
+      reinterpret_cast<char*>(&_impl_.show_trajectory_) -
+      reinterpret_cast<char*>(&_impl_.show_kalman_predictions_)) + sizeof(_impl_.show_trajectory_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -10016,6 +10404,14 @@ const char* VisualizationStates::_InternalParse(const char* ptr, ::_pbi::ParseCo
         } else
           goto handle_unusual;
         continue;
+      // bool show_trajectory = 15;
+      case 15:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 120)) {
+          _impl_.show_trajectory_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
       default:
         goto handle_unusual;
     }  // switch
@@ -10129,6 +10525,12 @@ uint8_t* VisualizationStates::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(14, this->_internal_show_tails(), target);
   }
 
+  // bool show_trajectory = 15;
+  if (this->_internal_show_trajectory() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(15, this->_internal_show_trajectory(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -10215,6 +10617,11 @@ size_t VisualizationStates::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // bool show_trajectory = 15;
+  if (this->_internal_show_trajectory() != 0) {
+    total_size += 1 + 1;
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -10275,6 +10682,9 @@ void VisualizationStates::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, co
   if (from._internal_show_tails() != 0) {
     _this->_internal_set_show_tails(from._internal_show_tails());
   }
+  if (from._internal_show_trajectory() != 0) {
+    _this->_internal_set_show_trajectory(from._internal_show_trajectory());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -10293,8 +10703,8 @@ void VisualizationStates::InternalSwap(VisualizationStates* other) {
   using std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_tails_)
-      + sizeof(VisualizationStates::_impl_.show_tails_)
+      PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_trajectory_)
+      + sizeof(VisualizationStates::_impl_.show_trajectory_)
       - PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_kalman_predictions_)>(
           reinterpret_cast<char*>(&_impl_.show_kalman_predictions_),
           reinterpret_cast<char*>(&other->_impl_.show_kalman_predictions_));
@@ -10303,7 +10713,7 @@ void VisualizationStates::InternalSwap(VisualizationStates* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata VisualizationStates::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[23]);
+      file_level_metadata_juggler_2eproto[24]);
 }
 
 // ===================================================================
@@ -10548,7 +10958,7 @@ void ColorCommand::InternalSwap(ColorCommand* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata ColorCommand::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[24]);
+      file_level_metadata_juggler_2eproto[25]);
 }
 
 // ===================================================================
@@ -10811,7 +11221,7 @@ void CommandResponse::InternalSwap(CommandResponse* other) {
 ::PROTOBUF_NAMESPACE_ID::Metadata CommandResponse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_juggler_2eproto_getter, &descriptor_table_juggler_2eproto_once,
-      file_level_metadata_juggler_2eproto[25]);
+      file_level_metadata_juggler_2eproto[26]);
 }
 
 // @@protoc_insertion_point(namespace_scope)
@@ -10885,6 +11295,10 @@ Arena::CreateMaybeMessage< ::juggler::v1::TrackerAssociation >(Arena* arena) {
 template<> PROTOBUF_NOINLINE ::juggler::v1::NewTracker*
 Arena::CreateMaybeMessage< ::juggler::v1::NewTracker >(Arena* arena) {
   return Arena::CreateMessageInternal< ::juggler::v1::NewTracker >(arena);
+}
+template<> PROTOBUF_NOINLINE ::juggler::v1::TrajectoryPoint*
+Arena::CreateMaybeMessage< ::juggler::v1::TrajectoryPoint >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::juggler::v1::TrajectoryPoint >(arena);
 }
 template<> PROTOBUF_NOINLINE ::juggler::v1::BallState*
 Arena::CreateMaybeMessage< ::juggler::v1::BallState >(Arena* arena) {

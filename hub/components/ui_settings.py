@@ -450,12 +450,51 @@ if PYQT_AVAILABLE:
             )
             row += 1
 
-            # Min Throw Distance
+            # Throw Distance Threshold (for trajectory-based tracking)
+            self.tc_throw_distance_threshold_slider, self.tc_throw_distance_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Throw Distance Threshold (cm)",
+                tooltip_text="Distance ball must be from hand to detect a throw (trajectory-based).\n"
+                             "Range: 5-50 cm. Default: 20 cm.\n"
+                             "When ball moves this far from hand, it's considered thrown.\n"
+                             "Lower = more sensitive (detects throws earlier)\n"
+                             "Higher = less sensitive (requires ball to be farther)\n"
+                             "⚠️ This is the threshold you see in debug logs!",
+                range_min=5,
+                range_max=50,
+                initial_value=20,
+                update_func=lambda v: self.update_setting('throw_distance_threshold', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Catch Distance Threshold (for trajectory-based tracking)
+            self.tc_catch_distance_threshold_slider, self.tc_catch_distance_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Catch Distance Threshold (cm)",
+                tooltip_text="Maximum distance from hand to detect a catch (trajectory-based).\n"
+                             "Range: 10-50 cm. Default: 30 cm.\n"
+                             "When ball gets within this distance of hand, it's considered caught.\n"
+                             "Lower = stricter (must be very close to hand)\n"
+                             "Higher = more lenient (catches from farther away)\n"
+                             "⚠️ Increase if catches are being missed!",
+                range_min=10,
+                range_max=50,
+                initial_value=30,
+                update_func=lambda v: self.update_setting('catch_distance_threshold', v / 100.0),
+                is_float=False
+            )
+            row += 1
+
+            # Min Throw Distance (LEGACY - kept for backward compatibility)
             self.tc_min_throw_distance_slider, self.tc_min_throw_distance_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Min Throw Distance (cm)",
-                tooltip_text="Minimum distance ball must move from wrist to count as a throw/catch.\n"
+                label_text="Min Throw Distance (cm) [LEGACY]",
+                tooltip_text="LEGACY SETTING - Use 'Throw Distance Threshold' above instead.\n"
+                             "Minimum distance ball must move from wrist to count as a throw/catch.\n"
                              "Range: 5-50 cm. Default: 20 cm.\n"
                              "Prevents false throw/catch events when ball is just being held.\n"
                              "Lower = more sensitive (may trigger false events)\n"
@@ -1791,6 +1830,8 @@ if PYQT_AVAILABLE:
                 'wrist_proximity_threshold': self.tc_wrist_proximity_slider.value() / 100.0,  # cm to m
                 'undetected_near_hand_threshold': self.tc_undetected_near_hand_slider.value() / 100.0,  # cm to m
                 'min_frames_for_state_change': self.tc_min_frames_slider.value(),
+                'throw_distance_threshold': self.tc_throw_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_throw_distance_threshold_slider') else 0.20,  # cm to m
+                'catch_distance_threshold': self.tc_catch_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_catch_distance_threshold_slider') else 0.30,  # cm to m
                 'min_throw_distance': self.tc_min_throw_distance_slider.value() / 100.0 if hasattr(self, 'tc_min_throw_distance_slider') else 0.20,  # cm to m
                 'max_tracker_distance_per_frame': self.tc_max_tracker_distance_slider.value() / 100.0,  # cm to m
                 'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked(),
@@ -1934,6 +1975,12 @@ if PYQT_AVAILABLE:
             if 'min_frames_for_state_change' in settings:
                 self.tc_min_frames_slider.setValue(settings['min_frames_for_state_change'])
 
+            if 'throw_distance_threshold' in settings and hasattr(self, 'tc_throw_distance_threshold_slider'):
+                self.tc_throw_distance_threshold_slider.setValue(int(settings['throw_distance_threshold'] * 100))  # m to cm
+            
+            if 'catch_distance_threshold' in settings and hasattr(self, 'tc_catch_distance_threshold_slider'):
+                self.tc_catch_distance_threshold_slider.setValue(int(settings['catch_distance_threshold'] * 100))  # m to cm
+            
             if 'min_throw_distance' in settings and hasattr(self, 'tc_min_throw_distance_slider'):
                 self.tc_min_throw_distance_slider.setValue(int(settings['min_throw_distance'] * 100))  # m to cm
 
@@ -2204,6 +2251,12 @@ if PYQT_AVAILABLE:
             if 'min_frames_for_state_change' in settings:
                 self.udp_client.send_setting('min_frames_for_state_change', settings['min_frames_for_state_change'])
 
+            if 'throw_distance_threshold' in settings:
+                self.udp_client.send_setting('throw_distance_threshold', settings['throw_distance_threshold'])
+            
+            if 'catch_distance_threshold' in settings:
+                self.udp_client.send_setting('catch_distance_threshold', settings['catch_distance_threshold'])
+            
             if 'min_throw_distance' in settings:
                 self.udp_client.send_setting('min_throw_distance', settings['min_throw_distance'])
 

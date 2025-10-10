@@ -1807,14 +1807,15 @@ void SimpleBallTracker::updateInFlightBall(
             
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
-                debug_log << "  Using predicted position" << std::endl;
+                debug_log << "  Using predicted position (no detection found)" << std::endl;
                 debug_log.close();
             });
         }
     }
     
-    // Step 4: Add verified point to trajectory
-    if (ball.position.z > 0) {
+    // Step 4: Add verified point to trajectory ONLY if we have a real detection
+    // When using predicted position, DON'T add it as a verified point
+    if (verified && ball.position.z > 0) {
         addVerifiedPoint(ball, ball.position, current_timestamp);
         
         // CRITICAL: Recalculate prediction immediately after adding point
@@ -1833,33 +1834,52 @@ void SimpleBallTracker::updateInFlightBall(
             }
             debug_log.close();
         });
-    }
-    
-    // Step 5: Check for catch - ball must be close to hand AND moving towards it or slowing down
-    for (const auto& hand : hands_) {
-        if (!hand.is_visible) continue;
-        
-        float dist_to_hand = cv::norm(ball.position - hand.wrist_pos_3d);
-        
+    } else if (!verified && ball.position.z > 0) {
+        // CRITICAL: When we don't have a detection, we're using predicted position
+        // Don't add this as a verified point, but DO update the ball position for rendering
+        // The trajectory prediction will continue from the last verified point
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);
-            debug_log << "  Checking catch for hand " << hand.id << ": dist=" << dist_to_hand
-                      << "m, threshold=" << tracking_settings_.catch_distance_threshold << "m" << std::endl;
+            debug_log << "  Skipping trajectory point addition (using prediction, not verified)" << std::endl;
             debug_log.close();
         });
-        
-        if (dist_to_hand < tracking_settings_.catch_distance_threshold) {
-            // CRITICAL FIX: Catch detected - transition to HELD state
+    }
+    
+    // Step 5: Check for catch - ball must be IN_FLIGHT and close to hand
+    // CRITICAL: Only balls that are IN_FLIGHT can be caught!
+    if (ball.state == IN_FLIGHT) {
+        for (const auto& hand : hands_) {
+            if (!hand.is_visible) continue;
+            
+            float dist_to_hand = cv::norm(ball.position - hand.wrist_pos_3d);
+            
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
-                debug_log << "  CATCH DETECTED: dist=" << dist_to_hand
+                debug_log << "  Checking catch for hand " << hand.id << ": dist=" << dist_to_hand
                           << "m, threshold=" << tracking_settings_.catch_distance_threshold << "m" << std::endl;
                 debug_log.close();
             });
             
-            initiateCatch(ball, hand, events);
-            return;
+            if (dist_to_hand < tracking_settings_.catch_distance_threshold) {
+                // CRITICAL FIX: Catch detected - transition to HELD state
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  CATCH DETECTED: dist=" << dist_to_hand
+                              << "m, threshold=" << tracking_settings_.catch_distance_threshold << "m" << std::endl;
+                    debug_log.close();
+                });
+                
+                initiateCatch(ball, hand, events);
+                return;
+            }
         }
+    } else {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  Skipping catch detection - ball is not IN_FLIGHT (state="
+                      << (ball.state == HELD ? "HELD" : "UNKNOWN") << ")" << std::endl;
+            debug_log.close();
+        });
     }
 }
 
@@ -2326,19 +2346,40 @@ void SimpleBallTracker::updateHeldBall(
         }
     }
     
-    // Auto-assign to first visible hand if unassigned
-    if (!hand && !hands.empty()) {
+    // CRITICAL FIX: Only auto-assign if ball has NEVER been assigned to a hand
+    // Once assigned, preserve the hand ID to prevent incorrect switches
+    // This prevents the tracker from jumping between hands when YOLO detection is lost
+    if (ball.held_by_hand_id == -1 && !hands.empty()) {
+        // Ball has never been assigned - find closest hand
+        float min_dist = std::numeric_limits<float>::max();
+        int closest_hand_id = -1;
+        
         for (const auto& h : hands) {
             if (h.is_visible) {
-                ball.held_by_hand_id = h.id;
-                hand = &h;
-                DEBUG_LOG(debug_log, {
-                    OPEN_DEBUG_LOG(debug_log);
-                    debug_log << "  Auto-assigned to first visible hand: " << h.id << std::endl;
-                    debug_log.close();
-                });
-                break;
+                float dist = cv::norm(ball.position - h.wrist_pos_3d);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    closest_hand_id = h.id;
+                }
             }
+        }
+        
+        if (closest_hand_id >= 0) {
+            ball.held_by_hand_id = closest_hand_id;
+            // Find the hand pointer
+            for (const auto& h : hands) {
+                if (h.id == closest_hand_id) {
+                    hand = &h;
+                    break;
+                }
+            }
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  Initial assignment to closest hand: " << closest_hand_id
+                          << " (dist=" << min_dist << "m)" << std::endl;
+                debug_log.close();
+            });
         }
     }
     

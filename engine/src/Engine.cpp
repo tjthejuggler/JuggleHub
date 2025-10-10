@@ -1129,18 +1129,31 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             }
         }
         
-        // Set threshold based on event type (matching SimpleBallTracker thresholds)
-        if (event.type == BallEvent::CATCH) {
-            threshold = 0.15f;  // catch_distance_threshold
-        } else {  // THROW
-            threshold = 0.20f;  // throw_distance_threshold
+        // Get actual threshold values from SimpleBallTracker settings
+        if (simple_tracker_) {
+            const auto& settings = simple_tracker_->getTrackingSettings();
+            if (event.type == BallEvent::CATCH) {
+                threshold = settings.catch_distance_threshold;
+            } else {  // THROW
+                threshold = settings.throw_distance_threshold;
+            }
+        } else {
+            // Fallback to default values if tracker not available
+            if (event.type == BallEvent::CATCH) {
+                threshold = 0.15f;  // default catch_distance_threshold
+            } else {  // THROW
+                threshold = 0.20f;  // default throw_distance_threshold
+            }
         }
         
         // Create event text with distance information
+        // THROW events trigger when distance > threshold
+        // CATCH events trigger when distance < threshold
         char event_text[256];
-        snprintf(event_text, sizeof(event_text), "%s %s (%s) | %.3fm < %.3fm",
+        const char* comparison = (event.type == BallEvent::THROW) ? ">" : "<";
+        snprintf(event_text, sizeof(event_text), "%s %s (%s) | %.3fm %s %.3fm",
                  event_type.c_str(), hand_side.c_str(), ball_color.c_str(),
-                 distance, threshold);
+                 distance, comparison, threshold);
         
         // Add to the beginning of info lines
         info_lines.insert(info_lines.begin(), std::string(event_text));

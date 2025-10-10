@@ -15,7 +15,8 @@ bool g_enable_debug_log = false;
 std::ofstream g_engine_debug_log;
 
 void writeDebugLog(const std::string& message) {
-    if (g_engine_debug_log.is_open()) {
+    // Only write if debug logging is enabled AND file is open
+    if (g_enable_debug_log && g_engine_debug_log.is_open()) {
         auto now = std::chrono::system_clock::now();
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
         auto timer = std::chrono::system_clock::to_time_t(now);
@@ -52,15 +53,6 @@ int main(int argc, char* argv[]) {
     signal(SIGFPE, signalHandler);   // Floating point exception
     signal(SIGILL, signalHandler);   // Illegal instruction
     
-    // Open engine_debug.log at startup (separate from GPU_debug.log which was removed)
-    g_engine_debug_log.open("engine_debug.log", std::ios::out | std::ios::trunc);
-    if (!g_engine_debug_log.is_open()) {
-        std::cerr << "Failed to open engine_debug.log" << std::endl;
-        return EXIT_FAILURE;
-    }
-    
-    writeDebugLog("=== ENGINE STARTUP ===");
-    writeDebugLog("Parsing command line arguments...");
     Engine::OutputFormat format = Engine::OutputFormat::DEFAULT;
     bool use_dnn_tracker = false;
     bool verbose = false;
@@ -94,45 +86,62 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    writeDebugLog("Command line arguments parsed successfully");
-    writeDebugLog("Device: " + device_name);
-    writeDebugLog("Model: " + model_name);
-    writeDebugLog("Pose Model: " + pose_model_name);
-    writeDebugLog("Camera Settings: " + (camera_settings_path.empty() ? "none" : camera_settings_path));
-    writeDebugLog("Use DNN Tracker: " + std::string(use_dnn_tracker ? "true" : "false"));
-    writeDebugLog("Verbose: " + std::string(verbose ? "true" : "false"));
-
-    // Create debug log file at startup only if debug logging is enabled
+    // Only open debug log file if debug logging is enabled
     if (g_enable_debug_log) {
-        std::ofstream debug_log("engine_debug.log", std::ios::out | std::ios::trunc);
-        debug_log << "=== ENGINE STARTED ===" << std::endl;
-        debug_log << "Build: 3D MATCHING - 2025-10-03" << std::endl;
-        debug_log << "╔════════════════════════════════════════╗" << std::endl;
-        debug_log << "║  ENGINE WITH 3D MATCHING - BUILD 2025 ║" << std::endl;
-        debug_log << "║  If you see this, new code is loaded  ║" << std::endl;
-        debug_log << "╚════════════════════════════════════════╝" << std::endl;
-        debug_log.close();
+        g_engine_debug_log.open("engine_debug.log", std::ios::out | std::ios::trunc);
+        if (!g_engine_debug_log.is_open()) {
+            std::cerr << "Failed to open engine_debug.log" << std::endl;
+            return EXIT_FAILURE;
+        }
+        
+        writeDebugLog("=== ENGINE STARTUP ===");
+        writeDebugLog("Parsing command line arguments...");
+        writeDebugLog("Command line arguments parsed successfully");
+        writeDebugLog("Device: " + device_name);
+        writeDebugLog("Model: " + model_name);
+        writeDebugLog("Pose Model: " + pose_model_name);
+        writeDebugLog("Camera Settings: " + (camera_settings_path.empty() ? "none" : camera_settings_path));
+        writeDebugLog("Use DNN Tracker: " + std::string(use_dnn_tracker ? "true" : "false"));
+        writeDebugLog("Verbose: " + std::string(verbose ? "true" : "false"));
+        
+        writeDebugLog("=== ENGINE STARTED ===");
+        writeDebugLog("Build: 3D MATCHING - 2025-10-03");
+        writeDebugLog("╔════════════════════════════════════════╗");
+        writeDebugLog("║  ENGINE WITH 3D MATCHING - BUILD 2025 ║");
+        writeDebugLog("║  If you see this, new code is loaded  ║");
+        writeDebugLog("╚════════════════════════════════════════╝");
     }
 
     try {
-        writeDebugLog("Creating Engine instance...");
+        if (g_enable_debug_log) {
+            writeDebugLog("Creating Engine instance...");
+        }
         Engine engine(camera_settings_path, device_name, model_name, pose_model_name, format, use_dnn_tracker, verbose);
-        writeDebugLog("Engine instance created successfully");
-        
-        writeDebugLog("Starting engine.run()...");
+        if (g_enable_debug_log) {
+            writeDebugLog("Engine instance created successfully");
+            writeDebugLog("Starting engine.run()...");
+        }
         engine.run();
-        writeDebugLog("engine.run() completed normally");
+        if (g_enable_debug_log) {
+            writeDebugLog("engine.run() completed normally");
+        }
     } catch (const std::exception& e) {
-        writeDebugLog("EXCEPTION CAUGHT: " + std::string(e.what()));
-        g_engine_debug_log.close();
+        if (g_enable_debug_log) {
+            writeDebugLog("EXCEPTION CAUGHT: " + std::string(e.what()));
+            g_engine_debug_log.close();
+        }
         return EXIT_FAILURE;
     } catch (...) {
-        writeDebugLog("UNKNOWN EXCEPTION CAUGHT");
-        g_engine_debug_log.close();
+        if (g_enable_debug_log) {
+            writeDebugLog("UNKNOWN EXCEPTION CAUGHT");
+            g_engine_debug_log.close();
+        }
         return EXIT_FAILURE;
     }
     
-    writeDebugLog("=== ENGINE SHUTDOWN ===");
-    g_engine_debug_log.close();
+    if (g_enable_debug_log) {
+        writeDebugLog("=== ENGINE SHUTDOWN ===");
+        g_engine_debug_log.close();
+    }
     return EXIT_SUCCESS;
 }

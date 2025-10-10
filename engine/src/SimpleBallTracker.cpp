@@ -1109,87 +1109,49 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     debug_log.close();
                 });
             } else if (ball.yolo_class_id == 0) {  // ball (in-flight)
-                // CRITICAL: If ball was HELD and YOLO now says in-flight, verify it's actually moving away
+                // CRITICAL FIX: When override positions the ball, TRUST the override position
+                // The override system has already verified the ball is at the color tracker location
+                // Don't second-guess based on proximity to hand - that causes the tracker to snap back
                 bool was_held = (ball.state == HELD);
                 
-                // CRITICAL FIX: Only transition to IN_FLIGHT if ball has moved away from the hand
-                // This prevents spurious state changes when YOLO briefly misclassifies a held ball
-                bool actually_thrown = false;
-                if (was_held && ball.held_by_hand_id >= 0) {
-                    // Check if ball has moved away from the hand that was holding it
-                    for (const auto& hand : hands_) {
-                        if (hand.id == ball.held_by_hand_id && hand.is_visible) {
-                            float dist_from_hand = cv::norm(ball.position - hand.wrist_pos_3d);
-                            // Use throw_distance_threshold to determine if ball has actually left the hand
-                            if (dist_from_hand > tracking_settings_.throw_distance_threshold) {
-                                actually_thrown = true;
-                            }
-                            
-                            DEBUG_LOG(debug_log, {
-                                OPEN_DEBUG_LOG(debug_log);
-                                debug_log << "  Override: Ball distance from holding hand " << hand.id
-                                          << ": " << dist_from_hand << "m (threshold: "
-                                          << tracking_settings_.throw_distance_threshold << "m)" << std::endl;
-                                debug_log << "  Actually thrown: " << (actually_thrown ? "YES" : "NO") << std::endl;
-                                debug_log.close();
-                            });
+                // ALWAYS transition to IN_FLIGHT when override says so
+                // The override has positioned the ball correctly, so trust it
+                ball.state = IN_FLIGHT;
+                ball.is_held = false;
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  Override: Ball set to IN_FLIGHT (YOLO class=ball, trusting override position)" << std::endl;
+                    debug_log << "  Was previously HELD: " << (was_held ? "YES" : "NO") << std::endl;
+                    debug_log << "  Ball position: (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
+                    debug_log.close();
+                });
+                
+                // If transitioning from HELD to IN_FLIGHT, generate throw event
+                if (was_held) {
+                    // Find the hand that was holding the ball
+                    const SimpleHand* throwing_hand = nullptr;
+                    for (const auto& h : hands_) {
+                        if (h.id == ball.held_by_hand_id) {
+                            throwing_hand = &h;
                             break;
                         }
                     }
-                } else {
-                    // Ball wasn't held or hand ID unknown - trust YOLO classification
-                    actually_thrown = true;
-                }
-                
-                // Only transition to IN_FLIGHT if ball has actually moved away from hand
-                if (actually_thrown) {
-                    ball.state = IN_FLIGHT;
-                    ball.is_held = false;
+                    
+                    // Create a Detection struct from the override detection for initiateThrow
+                    Detection throw_detection;
+                    throw_detection.world_pos = ball.position;
+                    throw_detection.box = ball.bbox;
+                    throw_detection.confidence = ball.yolo_confidence;
+                    throw_detection.class_id = ball.yolo_class_id;
+                    
+                    // Generate throw event using initiateThrow
+                    initiateThrow(ball, throw_detection, throwing_hand, events);
                     
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  Override: Ball set to IN_FLIGHT (YOLO class=ball, verified thrown)" << std::endl;
-                        debug_log << "  Was previously HELD: " << (was_held ? "YES" : "NO") << std::endl;
-                        debug_log << "  Ball position: (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
-                        debug_log.close();
-                    });
-                    
-                    // If transitioning from HELD to IN_FLIGHT, generate throw event
-                    if (was_held) {
-                        // Find the hand that was holding the ball
-                        const SimpleHand* throwing_hand = nullptr;
-                        for (const auto& h : hands_) {
-                            if (h.id == ball.held_by_hand_id) {
-                                throwing_hand = &h;
-                                break;
-                            }
-                        }
-                        
-                        // Create a Detection struct from the override detection for initiateThrow
-                        Detection throw_detection;
-                        throw_detection.world_pos = ball.position;
-                        throw_detection.box = ball.bbox;
-                        throw_detection.confidence = ball.yolo_confidence;
-                        throw_detection.class_id = ball.yolo_class_id;
-                        
-                        // Generate throw event using initiateThrow
-                        initiateThrow(ball, throw_detection, throwing_hand, events);
-                        
-                        DEBUG_LOG(debug_log, {
-                            OPEN_DEBUG_LOG(debug_log);
-                            debug_log << "  THROW EVENT GENERATED via override logic (HELD→IN_FLIGHT transition)" << std::endl;
-                            debug_log << "  Hand ID: " << ball.held_by_hand_id << std::endl;
-                            debug_log.close();
-                        });
-                    }
-                } else {
-                    // Ball is still near the hand - keep it as HELD despite YOLO saying in-flight
-                    ball.state = HELD;
-                    ball.is_held = true;
-                    
-                    DEBUG_LOG(debug_log, {
-                        OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  Override: Ball kept as HELD (YOLO says in-flight but ball still near hand)" << std::endl;
+                        debug_log << "  THROW EVENT GENERATED via override logic (HELD→IN_FLIGHT transition)" << std::endl;
+                        debug_log << "  Hand ID: " << ball.held_by_hand_id << std::endl;
                         debug_log.close();
                     });
                 }

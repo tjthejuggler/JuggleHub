@@ -113,12 +113,6 @@ if PYQT_AVAILABLE:
             self.throw_catch_section = self.create_throw_catch_section()
             container_layout.addWidget(self.throw_catch_section)
             
-            self.kalman_prediction_section = self.create_kalman_prediction_section()
-            container_layout.addWidget(self.kalman_prediction_section)
-            
-            self.kalman_glob_detection_section = self.create_kalman_glob_detection_section()
-            container_layout.addWidget(self.kalman_glob_detection_section)
-            
             self.color_tracker_weights_section = self.create_color_tracker_weights_section()
             container_layout.addWidget(self.color_tracker_weights_section)
             
@@ -634,142 +628,6 @@ if PYQT_AVAILABLE:
             
             return section
         
-        def create_kalman_prediction_section(self):
-            """Create the Kalman Prediction Settings section"""
-            section = CollapsibleGroupBox("🎯 Kalman Prediction", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Info label
-            info_label = QLabel("ℹ️ Configure prediction circle based on color detection history")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
-            
-            # Prediction history frames
-            self.kp_prediction_history_slider, self.kp_prediction_history_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="History Frames",
-                tooltip_text="Number of recent color detections to use for prediction.\n"
-                             "Range: 2-10 frames. Default: 5.\n"
-                             "Higher = smoother but slower to adapt.",
-                range_min=2,
-                range_max=10,
-                initial_value=5,
-                update_func=lambda v: self.update_setting('prediction_history_frames', v),
-                is_float=False
-            )
-            row += 1
-            
-            # Prediction radius
-            self.kp_prediction_radius_slider, self.kp_prediction_radius_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Circle Radius (cm)",
-                tooltip_text="Radius of prediction circle showing search region.\n"
-                             "Range: 5-100cm. Default: 15cm.\n"
-                             "Larger = wider search area.",
-                range_min=5,
-                range_max=100,
-                initial_value=15,
-                update_func=lambda v: self.update_setting('prediction_radius_m', v / 100.0),  # Convert cm to m
-                is_float=False
-            )
-            row += 1
-            
-            return section
-        
-        def create_kalman_glob_detection_section(self):
-            """Create the Kalman Glob Detection Settings section"""
-            section = CollapsibleGroupBox("🔍 Kalman Glob Detection", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Info label
-            info_label = QLabel("ℹ️ Search for color blobs near Kalman prediction when YOLO detection is missing")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
-            
-            # Enable/disable toggle
-            self.kgd_enabled_toggle = QPushButton("Enable Kalman Glob Detection")
-            self.kgd_enabled_toggle.setCheckable(True)
-            self.kgd_enabled_toggle.setChecked(True)
-            self.kgd_enabled_toggle.clicked.connect(lambda: self.update_setting('kalman_glob_detection_enabled', 1 if self.kgd_enabled_toggle.isChecked() else 0))
-            layout.addWidget(self.kgd_enabled_toggle, row, 0, 1, 3)
-            row += 1
-            
-            # Search radius
-            self.kgd_search_radius_slider, self.kgd_search_radius_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Search Radius (pixels)",
-                tooltip_text="Radius in pixels to search for color blob around Kalman prediction.\n"
-                             "Range: 40-200 pixels. Default: 100 pixels.\n"
-                             "Larger values search wider area but may find wrong objects.\n"
-                             "Smaller values are more precise but may miss the ball.",
-                range_min=40,
-                range_max=200,
-                initial_value=100,
-                update_func=lambda v: self.update_setting('kalman_glob_search_radius', v),
-                is_float=False
-            )
-            row += 1
-            
-            # Minimum color score
-            self.kgd_min_color_score_slider, self.kgd_min_color_score_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Color Match Score",
-                tooltip_text="Minimum color match score to accept a color blob at Kalman prediction.\n"
-                             "Range: 0.00-1.00. Default: 0.50.\n"
-                             "Higher values = stricter color matching (fewer false positives).\n"
-                             "Lower values = more lenient (may track wrong objects).\n"
-                             "⚠️ Increase to 0.60-0.70 if tracker jumps to wrong objects!",
-                range_min=0,
-                range_max=100,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('kalman_glob_min_color_score', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Maximum depth difference
-            self.kgd_max_depth_diff_slider, self.kgd_max_depth_diff_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Max Depth Difference (cm)",
-                tooltip_text="Maximum depth difference from Kalman prediction to accept a color blob.\n"
-                             "Range: 10-100cm. Default: 30cm.\n"
-                             "Prevents tracking objects at wrong depth.\n"
-                             "Lower values = stricter depth requirement.\n"
-                             "⚠️ Reduce to 20cm if tracker jumps to background/foreground objects!",
-                range_min=10,
-                range_max=100,
-                initial_value=30,
-                update_func=lambda v: self.update_setting('kalman_glob_max_depth_diff', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Info about how it works
-            how_it_works_label = QLabel("💡 How it works: When YOLO doesn't detect a ball, the system uses Kalman "
-                                        "prediction to estimate where the ball should be. It then searches for a color "
-                                        "blob near that prediction. These settings ensure it only accepts blobs that "
-                                        "match the ball's color AND are at the correct depth, preventing false matches.")
-            how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
-            how_it_works_label.setWordWrap(True)
-            layout.addWidget(how_it_works_label, row, 0, 1, 3)
-            
-            return section
-            
         def create_color_tracker_weights_section(self):
             """Create the Color Tracker Weights section"""
             section = CollapsibleGroupBox("🎯 Color Tracker Weights", collapsed=False)
@@ -883,25 +741,6 @@ if PYQT_AVAILABLE:
                 initial_value=30,
                 update_func=lambda v: self.update_setting('min_euclidean_color_score', v / 100.0),
                 is_float=True
-            )
-            row += 1
-            
-            # Max Kalman Prediction Jump
-            self.ct_max_kalman_prediction_jump_slider, self.ct_max_kalman_prediction_jump_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Max Kalman Prediction Jump (cm)",
-                tooltip_text="Maximum distance Kalman prediction can jump from last known position.\n"
-                             "Range: 0-100cm. Default: 50cm.\n"
-                             "Resets Kalman filter if prediction jumps too far.\n"
-                             "Prevents corrupted Kalman from causing wild predictions.\n"
-                             "Set to 0 to disable this check.\n"
-                             "⚠️ Set to 50cm to prevent Kalman corruption from causing identity swaps!",
-                range_min=0,
-                range_max=100,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('max_kalman_prediction_jump', v / 100.0),
-                is_float=False
             )
             row += 1
             
@@ -1844,16 +1683,11 @@ if PYQT_AVAILABLE:
                 'collapsed_yolo': self.yolo_section.is_collapsed,
                 'collapsed_pose': self.pose_section.is_collapsed,
                 'collapsed_throw_catch': self.throw_catch_section.is_collapsed,
-                'collapsed_kalman_prediction': self.kalman_prediction_section.is_collapsed if hasattr(self, 'kalman_prediction_section') and self.kalman_prediction_section else False,
                 'collapsed_color_tracker_weights': self.color_tracker_weights_section.is_collapsed if hasattr(self, 'color_tracker_weights_section') and self.color_tracker_weights_section else False,
                 'collapsed_adaptive_color': self.adaptive_color_section.is_collapsed if hasattr(self, 'adaptive_color_section') else False,
                 'collapsed_override_detection': self.override_detection_section.is_collapsed if hasattr(self, 'override_detection_section') else False,
                 'collapsed_held_color_blob': self.held_color_blob_section.is_collapsed if hasattr(self, 'held_color_blob_section') else False,
                 'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False,
-                
-                # Kalman Prediction settings
-                'prediction_history_frames': self._safe_get_slider_value(self.kp_prediction_history_slider, 5) if hasattr(self, 'kp_prediction_history_slider') else 5,
-                'prediction_radius_m': self._safe_get_slider_value(self.kp_prediction_radius_slider, 15) / 100.0 if hasattr(self, 'kp_prediction_radius_slider') else 0.15,
                 
                 # Euclidean Matching Temporal Consistency
                 'temporal_consistency_bonus': self._safe_get_slider_value(self.ct_temporal_consistency_bonus_slider, 25) / 100.0 if hasattr(self, 'ct_temporal_consistency_bonus_slider') else 0.25,
@@ -1865,7 +1699,6 @@ if PYQT_AVAILABLE:
                 # Identity Swap Prevention settings
                 'max_euclidean_distance': self._safe_get_slider_value(self.ct_max_euclidean_distance_slider, 15) / 100.0 if hasattr(self, 'ct_max_euclidean_distance_slider') else 0.15,
                 'min_euclidean_color_score': self._safe_get_slider_value(self.ct_min_euclidean_color_score_slider, 30) / 100.0 if hasattr(self, 'ct_min_euclidean_color_score_slider') else 0.30,
-                'max_kalman_prediction_jump': self._safe_get_slider_value(self.ct_max_kalman_prediction_jump_slider, 50) / 100.0 if hasattr(self, 'ct_max_kalman_prediction_jump_slider') else 0.50,
                 'max_depth_jump_strict': self._safe_get_slider_value(self.ct_max_depth_jump_strict_slider, 20) / 100.0 if hasattr(self, 'ct_max_depth_jump_strict_slider') else 0.20,
                 
                 # Override Detection settings (NEW: class-specific thresholds)
@@ -1879,12 +1712,6 @@ if PYQT_AVAILABLE:
                 'override_min_color_score_tracked': self._safe_get_slider_value(self.od_min_color_score_tracked_slider, 60) / 100.0 if hasattr(self, 'od_min_color_score_tracked_slider') else 0.60,
                 'override_min_confidence_missing': self._safe_get_slider_value(self.od_min_confidence_missing_slider, 70) / 100.0 if hasattr(self, 'od_min_confidence_missing_slider') else 0.70,
                 'override_min_color_score_missing': self._safe_get_slider_value(self.od_min_color_score_missing_slider, 80) / 100.0 if hasattr(self, 'od_min_color_score_missing_slider') else 0.80,
-                
-                # Kalman Glob Detection settings
-                'kalman_glob_detection_enabled': self.kgd_enabled_toggle.isChecked() if hasattr(self, 'kgd_enabled_toggle') else True,
-                'kalman_glob_search_radius': self._safe_get_slider_value(self.kgd_search_radius_slider, 100) if hasattr(self, 'kgd_search_radius_slider') else 100,
-                'kalman_glob_min_color_score': self._safe_get_slider_value(self.kgd_min_color_score_slider, 50) / 100.0 if hasattr(self, 'kgd_min_color_score_slider') else 0.50,
-                'kalman_glob_max_depth_diff': self._safe_get_slider_value(self.kgd_max_depth_diff_slider, 30) / 100.0 if hasattr(self, 'kgd_max_depth_diff_slider') else 0.30,
                 
                 # Held Color Blob Detection settings
                 'held_color_search_radius': self._safe_get_slider_value(self.hcb_search_radius_slider, 120) if hasattr(self, 'hcb_search_radius_slider') else 120,
@@ -2016,21 +1843,6 @@ if PYQT_AVAILABLE:
                 if settings['collapsed_throw_catch'] != self.throw_catch_section.is_collapsed:
                     self.throw_catch_section.toggle_collapsed()
             
-            if 'collapsed_kalman_prediction' in settings and hasattr(self, 'kalman_prediction_section'):
-                if settings['collapsed_kalman_prediction'] != self.kalman_prediction_section.is_collapsed:
-                    self.kalman_prediction_section.toggle_collapsed()
-            
-            if 'collapsed_kalman_glob_detection' in settings and hasattr(self, 'kalman_glob_detection_section'):
-                if settings['collapsed_kalman_glob_detection'] != self.kalman_glob_detection_section.is_collapsed:
-                    self.kalman_glob_detection_section.toggle_collapsed()
-            
-            # Kalman Prediction settings
-            if 'prediction_history_frames' in settings and hasattr(self, 'kp_prediction_history_slider'):
-                self.kp_prediction_history_slider.setValue(settings['prediction_history_frames'])
-            
-            if 'prediction_radius_m' in settings and hasattr(self, 'kp_prediction_radius_slider'):
-                self.kp_prediction_radius_slider.setValue(int(settings['prediction_radius_m'] * 100))  # m to cm
-            
             if 'collapsed_color_tracker_weights' in settings and hasattr(self, 'color_tracker_weights_section'):
                 if settings['collapsed_color_tracker_weights'] != self.color_tracker_weights_section.is_collapsed:
                     self.color_tracker_weights_section.toggle_collapsed()
@@ -2052,9 +1864,6 @@ if PYQT_AVAILABLE:
             
             if 'min_euclidean_color_score' in settings and hasattr(self, 'ct_min_euclidean_color_score_slider'):
                 self.ct_min_euclidean_color_score_slider.setValue(int(settings['min_euclidean_color_score'] * 100))
-            
-            if 'max_kalman_prediction_jump' in settings and hasattr(self, 'ct_max_kalman_prediction_jump_slider'):
-                self.ct_max_kalman_prediction_jump_slider.setValue(int(settings['max_kalman_prediction_jump'] * 100))
             
             if 'max_depth_jump_strict' in settings and hasattr(self, 'ct_max_depth_jump_strict_slider'):
                 self.ct_max_depth_jump_strict_slider.setValue(int(settings['max_depth_jump_strict'] * 100))
@@ -2084,19 +1893,6 @@ if PYQT_AVAILABLE:
             
             if 'override_min_color_score_missing' in settings and hasattr(self, 'od_min_color_score_missing_slider'):
                 self.od_min_color_score_missing_slider.setValue(int(settings['override_min_color_score_missing'] * 100))
-            
-            # Kalman Glob Detection settings
-            if 'kalman_glob_detection_enabled' in settings and hasattr(self, 'kgd_enabled_toggle'):
-                self.kgd_enabled_toggle.setChecked(settings['kalman_glob_detection_enabled'])
-            
-            if 'kalman_glob_search_radius' in settings and hasattr(self, 'kgd_search_radius_slider'):
-                self.kgd_search_radius_slider.setValue(settings['kalman_glob_search_radius'])
-            
-            if 'kalman_glob_min_color_score' in settings and hasattr(self, 'kgd_min_color_score_slider'):
-                self.kgd_min_color_score_slider.setValue(int(settings['kalman_glob_min_color_score'] * 100))
-            
-            if 'kalman_glob_max_depth_diff' in settings and hasattr(self, 'kgd_max_depth_diff_slider'):
-                self.kgd_max_depth_diff_slider.setValue(int(settings['kalman_glob_max_depth_diff'] * 100))  # m to cm
             
             # Held Color Blob Detection settings
             if 'held_color_search_radius' in settings and hasattr(self, 'hcb_search_radius_slider'):
@@ -2275,13 +2071,6 @@ if PYQT_AVAILABLE:
             if 'tc_name_on_throw' in settings:
                 self.udp_client.send_setting('tc_name_on_throw', 1 if settings['tc_name_on_throw'] else 0)
             
-            # Kalman Prediction settings
-            if 'prediction_history_frames' in settings:
-                self.udp_client.send_setting('prediction_history_frames', settings['prediction_history_frames'])
-            
-            if 'prediction_radius_m' in settings:
-                self.udp_client.send_setting('prediction_radius_m', settings['prediction_radius_m'])
-            
             # Euclidean Matching Temporal Consistency
             if 'temporal_consistency_bonus' in settings:
                 self.udp_client.send_setting('temporal_consistency_bonus', settings['temporal_consistency_bonus'])
@@ -2299,9 +2088,6 @@ if PYQT_AVAILABLE:
             
             if 'min_euclidean_color_score' in settings:
                 self.udp_client.send_setting('min_euclidean_color_score', settings['min_euclidean_color_score'])
-            
-            if 'max_kalman_prediction_jump' in settings:
-                self.udp_client.send_setting('max_kalman_prediction_jump', settings['max_kalman_prediction_jump'])
             
             if 'max_depth_jump_strict' in settings:
                 self.udp_client.send_setting('max_depth_jump_strict', settings['max_depth_jump_strict'])
@@ -2331,19 +2117,6 @@ if PYQT_AVAILABLE:
             
             if 'override_min_color_score_missing' in settings:
                 self.udp_client.send_setting('override_min_color_score_missing', settings['override_min_color_score_missing'])
-            
-            # Kalman Glob Detection settings
-            if 'kalman_glob_detection_enabled' in settings:
-                self.udp_client.send_setting('kalman_glob_detection_enabled', 1 if settings['kalman_glob_detection_enabled'] else 0)
-            
-            if 'kalman_glob_search_radius' in settings:
-                self.udp_client.send_setting('kalman_glob_search_radius', settings['kalman_glob_search_radius'])
-            
-            if 'kalman_glob_min_color_score' in settings:
-                self.udp_client.send_setting('kalman_glob_min_color_score', settings['kalman_glob_min_color_score'])
-            
-            if 'kalman_glob_max_depth_diff' in settings:
-                self.udp_client.send_setting('kalman_glob_max_depth_diff', settings['kalman_glob_max_depth_diff'])
             
             # Held Color Blob Detection settings
             if 'held_color_search_radius' in settings:

@@ -282,47 +282,8 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.min_throw_distance = std::stof(value);
             return true;
         }
-        else if (key == "prediction_history_frames") {
-            tracking_settings_.prediction_history_frames = std::stoi(value);
-            
-            return true;
-        }
-        else if (key == "prediction_radius_m") {
-            tracking_settings_.prediction_radius_m = std::stof(value);
-            
-            return true;
-        }
-        // Color tracker matching weights
-        else if (key == "yolo_confidence_weight") {
-            tracking_settings_.yolo_confidence_weight = std::stof(value);
-            return true;
-        }
-        else if (key == "yolo_class_weight") {
-            tracking_settings_.yolo_class_weight = std::stof(value);
-            return true;
-        }
-        else if (key == "color_match_weight") {
-            tracking_settings_.color_match_weight = std::stof(value);
-            return true;
-        }
-        else if (key == "kalman_proximity_weight") {
-            tracking_settings_.kalman_proximity_weight = std::stof(value);
-            return true;
-        }
         else if (key == "color_sample_radius") {
             tracking_settings_.color_sample_radius = std::stoi(value);
-            return true;
-        }
-        else if (key == "min_yolo_score_threshold") {
-            tracking_settings_.min_yolo_score_threshold = std::stof(value);
-            return true;
-        }
-        else if (key == "override_confidence_threshold") {
-            tracking_settings_.override_confidence_threshold = std::stof(value);
-            return true;
-        }
-        else if (key == "override_color_threshold") {
-            tracking_settings_.override_color_threshold = std::stof(value);
             return true;
         }
         // NEW: Separate override thresholds for ball and ball_held
@@ -358,15 +319,7 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.spatial_threshold = std::stof(value);
             return true;
         }
-        else if (key == "kalman_prediction_bonus") {
-            tracking_settings_.kalman_prediction_bonus = std::stof(value);
-            return true;
-        }
-        else if (key == "kalman_prediction_threshold") {
-            tracking_settings_.kalman_prediction_threshold = std::stof(value);
-            return true;
-        }
-        // Override detection thresholds
+        // Override detection thresholds (DEPRECATED - kept for backward compatibility)
         else if (key == "override_min_confidence_tracked") {
             tracking_settings_.override_min_confidence_tracked = std::stof(value);
             return true;
@@ -420,10 +373,6 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         }
         else if (key == "min_euclidean_color_score") {
             tracking_settings_.min_euclidean_color_score = std::stof(value);
-            return true;
-        }
-        else if (key == "max_kalman_prediction_jump") {
-            tracking_settings_.max_kalman_prediction_jump = std::stof(value);
             return true;
         }
         else if (key == "max_depth_jump_strict") {

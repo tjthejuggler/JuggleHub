@@ -208,7 +208,6 @@ struct TrackingSettings {
     float kalman_glob_max_depth_diff = 0.30f;
     float max_euclidean_distance = 0.15f;
     float min_euclidean_color_score = 0.30f;
-    float max_kalman_prediction_jump = 0.50f;
     float max_depth_jump_strict = 0.20f;
     
     TrackingSettings() = default;

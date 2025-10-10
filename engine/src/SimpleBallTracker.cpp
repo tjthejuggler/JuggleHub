@@ -2423,14 +2423,13 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         state(4) = 0.0f;  // vy = 0
                         state(5) = 0.0f;  // vz = 0
                         
-                        // CRITICAL: Update color predictor for PERMANENCE
-                        // Even though snapping creates teleportation, we need to maintain
-                        // tracker visibility and prevent stale history
-                        ball.color_predictor.addDetection(ball.position);
+                        // CRITICAL FIX: DO NOT add snap positions to color predictor
+                        // Snapping creates teleportation, not real motion - adding it corrupts velocity
+                        // The color predictor should only track real ball motion, not artificial snaps
                         
                         DEBUG_LOG(fallback_log, {
                             OPEN_DEBUG_LOG(fallback_log);
-                            fallback_log << "  -> Snapped to wrist (last resort) - velocity reset to zero" << std::endl;
+                            fallback_log << "  -> Snapped to wrist (last resort) - velocity reset, NOT added to color predictor" << std::endl;
                         });
                         continue;
                     }
@@ -2841,42 +2840,15 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                 state(4) = 0.0f;  // vy = 0
                                 state(5) = 0.0f;  // vz = 0
                                 
-                               // CRITICAL: Validate position before adding to color predictor
-                               // Snapping creates teleportation - only add if jump is reasonable
-                               bool should_add_to_predictor = true;
-                               if (ball.color_predictor.getHistorySize() > 0) {
-                                   auto history = ball.color_predictor.getHistory();
-                                   cv::Point3f last_pos = history.back().position;
-                                   float distance = cv::norm(ball.position - last_pos);
-                                   const float MAX_POSITION_JUMP = 0.15f;  // 15cm max for held balls
-                                   
-                                   if (distance > MAX_POSITION_JUMP) {
-                                       should_add_to_predictor = false;
-                                       // Reset color predictor to prevent velocity corruption
-                                       ball.color_predictor = ColorBasedPredictor();
-                                       ColorBasedPredictor::PredictionSettings pred_settings;
-                                       pred_settings.history_frames = tracking_settings_.prediction_history_frames;
-                                       pred_settings.prediction_radius_m = tracking_settings_.prediction_radius_m;
-                                       ball.color_predictor.setSettings(pred_settings);
-                                       
-                                       DEBUG_LOG(snap_reset_log, {
-                                           OPEN_DEBUG_LOG(snap_reset_log);
-                                           snap_reset_log << "\n[SNAP_RESET] Ball " << ball.id
-                                                         << " | Position jump " << distance << "m from snap"
-                                                         << " | Color predictor RESET to prevent corruption" << std::endl;
-                                       });
-                                   }
-                               }
-                               
-                               if (should_add_to_predictor) {
-                                   ball.color_predictor.addDetection(ball.position);
-                               }
+                                // CRITICAL FIX: DO NOT add snap positions to color predictor
+                                // Snapping creates teleportation, not real motion - adding it corrupts velocity
+                                // The color predictor should only track real ball motion, not artificial snaps
                                 
                                 DEBUG_LOG(held_snap_log, {
                                     OPEN_DEBUG_LOG(held_snap_log);
                                     held_snap_log << "\n[HELD_SNAP] Ball " << ball.id << " snapped to wrist of hand " << hand.id
                                                  << " at (" << ball.position.x << ", " << ball.position.y << ", "
-                                                 << ball.position.z << ") - velocity reset, color predictor updated, bbox set" << std::endl;
+                                                 << ball.position.z << ") - velocity reset, NOT added to color predictor" << std::endl;
                                 });
                             }
                         } else {
@@ -2901,23 +2873,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                             ball.pixel_pos = hand_2d;
                             ball.tracking_reason = "Held_NoProfile@Wrist";
                             
-                            // Validate before adding to color predictor
-                            bool should_add = true;
-                            if (ball.color_predictor.getHistorySize() > 0) {
-                                auto history = ball.color_predictor.getHistory();
-                                float distance = cv::norm(ball.position - history.back().position);
-                                if (distance > 0.15f) {
-                                    should_add = false;
-                                    ball.color_predictor = ColorBasedPredictor();
-                                    ColorBasedPredictor::PredictionSettings pred_settings;
-                                    pred_settings.history_frames = tracking_settings_.prediction_history_frames;
-                                    pred_settings.prediction_radius_m = tracking_settings_.prediction_radius_m;
-                                    ball.color_predictor.setSettings(pred_settings);
-                                }
-                            }
-                            if (should_add) {
-                                ball.color_predictor.addDetection(ball.position);
-                            }
+                            // CRITICAL FIX: DO NOT add snap positions to color predictor
+                            // Snapping creates teleportation, not real motion - adding it corrupts velocity
+                            // The color predictor should only track real ball motion, not artificial snaps
                         } else {
                             // Keep last position when hand goes off-screen
                             ball.tracking_reason = "Held_NoProfile_OFFSCREEN";

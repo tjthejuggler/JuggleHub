@@ -1154,18 +1154,31 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         debug_log.close();
                     });
                     
-                    // If transitioning from HELD to IN_FLIGHT, initialize trajectory
+                    // If transitioning from HELD to IN_FLIGHT, generate throw event
                     if (was_held) {
-                        // Clear any old trajectory data
-                        ball.trajectory.points.clear();
-                        ball.trajectory.verified_point_count = 0;
-                        ball.trajectory.trajectory_confidence = 0.0f;
-                        ball.trajectory.prediction_valid = false;
-                        ball.trajectory.prediction_failure_reason = "TRAJECTORY_CLEARED: transition from HELD to IN_FLIGHT";
+                        // Find the hand that was holding the ball
+                        const SimpleHand* throwing_hand = nullptr;
+                        for (const auto& h : hands_) {
+                            if (h.id == ball.held_by_hand_id) {
+                                throwing_hand = &h;
+                                break;
+                            }
+                        }
+                        
+                        // Create a Detection struct from the override detection for initiateThrow
+                        Detection throw_detection;
+                        throw_detection.world_pos = ball.position;
+                        throw_detection.box = ball.bbox;
+                        throw_detection.confidence = ball.yolo_confidence;
+                        throw_detection.class_id = ball.yolo_class_id;
+                        
+                        // Generate throw event using initiateThrow
+                        initiateThrow(ball, throw_detection, throwing_hand, events);
                         
                         DEBUG_LOG(debug_log, {
                             OPEN_DEBUG_LOG(debug_log);
-                            debug_log << "  Cleared trajectory (transition from HELD to IN_FLIGHT)" << std::endl;
+                            debug_log << "  THROW EVENT GENERATED via override logic (HELD→IN_FLIGHT transition)" << std::endl;
+                            debug_log << "  Hand ID: " << ball.held_by_hand_id << std::endl;
                             debug_log.close();
                         });
                     }
@@ -1829,6 +1842,29 @@ void SimpleBallTracker::updateInFlightBall(
         // CRITICAL: When we don't have a detection, we're using predicted position
         // Don't add this as a verified point, but DO update the ball position for rendering
         // The trajectory prediction will continue from the last verified point
+        
+        // NEW FIX: Check if ball is very close to any hand - if so, snap to hand position
+        // This prevents tracker from getting stuck in air when ball returns to hand
+        for (const auto& hand : hands_) {
+            if (!hand.is_visible) continue;
+            
+            float dist = cv::norm(predicted_next - hand.wrist_pos_3d);
+            if (dist < 0.15f) {  // Very close to hand (15cm)
+                // Snap to hand position instead of using stale prediction
+                ball.position = hand.wrist_pos_3d;
+                ball.pixel_pos = project_3d_to_2d(hand.wrist_pos_3d, intrinsics);
+                ball.tracking_reason = "IN_FLIGHT_near_hand_fallback";
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  NEAR-HAND FALLBACK: Ball within 0.15m of hand " << hand.id
+                              << " (dist=" << dist << "m) - snapping to hand position" << std::endl;
+                    debug_log.close();
+                });
+                break;
+            }
+        }
+        
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);
             debug_log << "  Skipping trajectory point addition (using prediction, not verified)" << std::endl;
@@ -1852,17 +1888,38 @@ void SimpleBallTracker::updateInFlightBall(
             });
             
             if (dist_to_hand < tracking_settings_.catch_distance_threshold) {
-                // CRITICAL FIX: Prevent catching a ball that was just held by the same hand
+                // CRITICAL FIX: Check if ball has moved away from hand before allowing catch
                 // This prevents spurious catch events when a ball briefly transitions to IN_FLIGHT
                 // due to tracking issues (e.g., YOLO override) but never actually left the hand
                 if (ball.held_by_hand_id == hand.id) {
+                    // Calculate max distance ball has been from this hand during flight
+                    float max_distance = 0.0f;
+                    for (const auto& point : ball.trajectory.points) {
+                        float dist = cv::norm(point.position - hand.wrist_pos_3d);
+                        max_distance = std::max(max_distance, dist);
+                    }
+                    
+                    // Only prevent catch if ball never moved away significantly
+                    // Use 2x throw_distance_threshold to ensure ball actually traveled
+                    if (max_distance < tracking_settings_.throw_distance_threshold * 2.0f) {
+                        // Ball never really left hand, prevent spurious catch
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  CATCH PREVENTED: Ball never moved away from hand " << hand.id
+                                      << " (max_dist=" << max_distance << "m, threshold="
+                                      << (tracking_settings_.throw_distance_threshold * 2.0f) << "m)" << std::endl;
+                            debug_log.close();
+                        });
+                        continue;  // Skip this hand, check other hands
+                    }
+                    
+                    // Ball traveled away and came back - allow catch
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  CATCH PREVENTED: Ball was already held by hand " << hand.id
-                                  << " - cannot catch a ball you're already holding!" << std::endl;
+                        debug_log << "  CATCH ALLOWED: Ball traveled away from hand " << hand.id
+                                  << " (max_dist=" << max_distance << "m) and returned" << std::endl;
                         debug_log.close();
                     });
-                    continue;  // Skip this hand, check other hands
                 }
                 
                 // CRITICAL FIX: Catch detected - transition to HELD state

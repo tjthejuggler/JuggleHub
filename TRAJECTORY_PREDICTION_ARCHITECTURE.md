@@ -109,48 +109,6 @@ This produces a proper parabolic arc that continues the current trajectory.
 3. **`engine/src/SimpleBallTracker.cpp`**
    - Updated `predictFullTrajectory()` to use new method
    - Updated `predictWithTwoPoints()` for consistency
-   - Added debug logging to `trajectory_debug.log`
-
-### Debug Logging
-
-The system now logs detailed prediction information to `trajectory_debug.log`:
-
-```
-=== TRAJECTORY PREDICTION DEBUG ===
-Timestamp: [microseconds]
-Number of trajectory points: N
-
-Trajectory Points:
-  [0] (x, y, z) at t=T₀
-  [1] (x, y, z) at t=T₁
-  ...
-
-Velocity Estimation Method: [two-point | least-squares]
-
-Calculated Velocity:
-  vx = X m/s
-  vy = Y m/s
-  vz = Z m/s
-
-Current Position: (x, y, z)
-
-Prediction Equation:
-  x(t) = x₀ + vx*t
-  y(t) = y₀ + vy*t
-  z(t) = z₀ + vz*t - 4.905*t²
-
-Sample Predictions:
-  t=0.00s: (x, y, z)
-  t=0.10s: (x, y, z)
-  t=0.20s: (x, y, z)
-  ...
-```
-
-This allows verification that:
-- Correct trajectory points are being used
-- Velocity calculation is accurate
-- Prediction equations are properly formed
-- Predicted points form a parabolic arc
 
 ## Advantages of New System
 
@@ -166,8 +124,7 @@ This allows verification that:
 To verify the system is working correctly:
 
 1. Run the juggling engine with ball tracking
-2. Check `trajectory_debug.log` for prediction details
-3. Verify that:
+2. Verify that:
    - Velocity values are reasonable (typically 1-5 m/s for juggling)
    - Predicted points form a smooth parabolic arc
    - The arc continues the current trajectory direction

@@ -11,27 +11,26 @@
 // Global flag to control debug logging
 bool g_enable_debug_log = false;
 
-// Global debug log file
-std::ofstream g_gpu_debug_log;
+// Global debug log file for engine_debug.log (not GPU_debug.log)
+std::ofstream g_engine_debug_log;
 
 void writeDebugLog(const std::string& message) {
-    if (g_gpu_debug_log.is_open()) {
+    if (g_engine_debug_log.is_open()) {
         auto now = std::chrono::system_clock::now();
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
         auto timer = std::chrono::system_clock::to_time_t(now);
         std::tm bt = *std::localtime(&timer);
         
-        g_gpu_debug_log << std::put_time(&bt, "%H:%M:%S") << "."
+        g_engine_debug_log << std::put_time(&bt, "%H:%M:%S") << "."
                         << std::setfill('0') << std::setw(3) << ms.count()
                         << " | " << message << std::endl;
-        g_gpu_debug_log.flush();
+        g_engine_debug_log.flush();
     }
 }
 
 void signalHandler(int sig) {
     writeDebugLog("=== SIGNAL CAUGHT: " + std::to_string(sig) + " ===");
     
-    // Get stack trace
     void* array[20];
     size_t size = backtrace(array, 20);
     
@@ -42,7 +41,7 @@ void signalHandler(int sig) {
     }
     free(strings);
     
-    g_gpu_debug_log.close();
+    g_engine_debug_log.close();
     exit(1);
 }
 
@@ -53,10 +52,10 @@ int main(int argc, char* argv[]) {
     signal(SIGFPE, signalHandler);   // Floating point exception
     signal(SIGILL, signalHandler);   // Illegal instruction
     
-    // Clear and open GPU_debug.log at startup
-    g_gpu_debug_log.open("GPU_debug.log", std::ios::out | std::ios::trunc);
-    if (!g_gpu_debug_log.is_open()) {
-        std::cerr << "Failed to open GPU_debug.log" << std::endl;
+    // Open engine_debug.log at startup (separate from GPU_debug.log which was removed)
+    g_engine_debug_log.open("engine_debug.log", std::ios::out | std::ios::trunc);
+    if (!g_engine_debug_log.is_open()) {
+        std::cerr << "Failed to open engine_debug.log" << std::endl;
         return EXIT_FAILURE;
     }
     
@@ -125,15 +124,15 @@ int main(int argc, char* argv[]) {
         writeDebugLog("engine.run() completed normally");
     } catch (const std::exception& e) {
         writeDebugLog("EXCEPTION CAUGHT: " + std::string(e.what()));
-        g_gpu_debug_log.close();
+        g_engine_debug_log.close();
         return EXIT_FAILURE;
     } catch (...) {
         writeDebugLog("UNKNOWN EXCEPTION CAUGHT");
-        g_gpu_debug_log.close();
+        g_engine_debug_log.close();
         return EXIT_FAILURE;
     }
     
     writeDebugLog("=== ENGINE SHUTDOWN ===");
-    g_gpu_debug_log.close();
+    g_engine_debug_log.close();
     return EXIT_SUCCESS;
 }

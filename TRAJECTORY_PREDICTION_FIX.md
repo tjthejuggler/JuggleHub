@@ -47,46 +47,6 @@ Implemented a complete redesign using a **unified general parabolic fit** for al
 ### 3. `engine/src/SimpleBallTracker.cpp`
 - **Updated `predictFullTrajectory()`**: Now uses `estimateCurrentStateCpu()` instead of `estimateCurrentVelocity()`
 - **Updated `predictWithTwoPoints()`**: Also uses the new general parabolic fit
-- **Enhanced logging**: Added extensive debug logging to `trajectory_debug.log` showing:
-  - All trajectory points with timestamps
-  - Time differences between consecutive points
-  - Fitted position, velocity, and acceleration
-  - Sample predictions with the new equation
-
-## Debug Logging
-
-The new implementation logs detailed information to `trajectory_debug.log`:
-
-```
-========================================
-STATE ESTIMATION DEBUG - Ball 0 (yellow)
-Frame: 763
-========================================
-Number of trajectory points: 10
-
-Trajectory points (for parabolic fit):
-  Point[0]: pos=(-0.1259, 0.1996, 1.7090) m | timestamp=1760112019141310 µs | verified=YES
-  ...
-
-Time differences between consecutive points:
-  Δt[0->1] = 0.028669 s (28669 µs)
-  ...
-
-GENERAL PARABOLIC FIT METHOD:
-  Fitting p(t) = c₂t² + c₁t + c₀ independently for X, Y, Z axes
-  Using last 10 points
-  Setting t=0 at LAST point (current time)
-
-ESTIMATED STATE (at current position):
-  Position: (0.1078, -0.2864, 1.7300) m
-  Velocity: (0.5234, 1.2456, 2.3456) m/s  [EXAMPLE - should now be non-zero!]
-  Acceleration: (-0.0123, 0.0456, -9.7234) m/s²
-
-PREDICTION EQUATION:
-  x(t) = 0.1078 + 0.5234 * t + 0.5 * -0.0123 * t²
-  y(t) = -0.2864 + 1.2456 * t + 0.5 * 0.0456 * t²
-  z(t) = 1.7300 + 2.3456 * t + 0.5 * -9.7234 * t²
-```
 
 ## Testing
 
@@ -99,7 +59,6 @@ To verify the fix:
 
 2. **Run the system** and observe:
    - Dark yellow prediction circles should now follow a proper parabolic arc
-   - Check `trajectory_debug.log` for non-zero velocity values
    - Verify that predictions match the actual ball trajectory
 
 3. **Expected behavior**:

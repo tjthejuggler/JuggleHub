@@ -1,8 +1,5 @@
 #include "GpuHsvConverter.hpp"
 #include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <ctime>
 
 GpuHsvConverter::GpuHsvConverter() : gpu_enabled_(false) {
     // Check if OpenCL is available
@@ -39,7 +36,6 @@ cv::Mat GpuHsvConverter::convertRoiToHsv(const cv::Mat& bgr_frame, const cv::Rec
     if (!gpu_enabled_) {
         // Fallback to CPU conversion
         debug_counters_.hsv_roi_cpu_fallback++;
-        // logDebugStats();  // Commented out to investigate crash
         
         cv::Mat bgr_roi = bgr_frame(roi);
         cv::Mat hsv_roi;
@@ -64,7 +60,6 @@ cv::Mat GpuHsvConverter::convertRoiToHsv(const cv::Mat& bgr_frame, const cv::Rec
         gpu_hsv_roi.copyTo(hsv_roi);
         
         debug_counters_.hsv_roi_gpu_success++;
-        // logDebugStats();  // Commented out to investigate crash
         
         return hsv_roi;
         
@@ -73,7 +68,6 @@ cv::Mat GpuHsvConverter::convertRoiToHsv(const cv::Mat& bgr_frame, const cv::Rec
         std::cerr << "[GpuHsvConverter] Falling back to CPU" << std::endl;
         
         debug_counters_.hsv_roi_cpu_fallback++;
-        // logDebugStats();  // Commented out to investigate crash
         
         // Fallback to CPU
         cv::Mat bgr_roi = bgr_frame(roi);
@@ -89,7 +83,6 @@ cv::Mat GpuHsvConverter::convertToHsv(const cv::Mat& bgr_frame) {
     if (!gpu_enabled_) {
         // Fallback to CPU conversion
         debug_counters_.hsv_full_cpu_fallback++;
-        // logDebugStats();  // Commented out to investigate crash
         
         cv::Mat hsv_frame;
         cv::cvtColor(bgr_frame, hsv_frame, cv::COLOR_BGR2HSV);
@@ -110,7 +103,6 @@ cv::Mat GpuHsvConverter::convertToHsv(const cv::Mat& bgr_frame) {
         gpu_hsv.copyTo(hsv_frame);
         
         debug_counters_.hsv_full_gpu_success++;
-        // logDebugStats();  // Commented out to investigate crash
         
         return hsv_frame;
         
@@ -119,7 +111,6 @@ cv::Mat GpuHsvConverter::convertToHsv(const cv::Mat& bgr_frame) {
         std::cerr << "[GpuHsvConverter] Falling back to CPU" << std::endl;
         
         debug_counters_.hsv_full_cpu_fallback++;
-        // logDebugStats();  // Commented out to investigate crash
         
         // Fallback to CPU
         cv::Mat hsv_frame;
@@ -141,7 +132,6 @@ cv::Point2f GpuHsvConverter::findColorBlob(const cv::Mat& bgr_frame,
     if (!gpu_enabled_) {
         // Fallback to CPU implementation
         debug_counters_.blob_search_cpu_fallback++;
-        // logDebugStats();  // Commented out to investigate crash
         cv::Mat bgr_roi = bgr_frame(roi);
         cv::Mat hsv_roi;
         cv::cvtColor(bgr_roi, hsv_roi, cv::COLOR_BGR2HSV);
@@ -233,7 +223,6 @@ cv::Point2f GpuHsvConverter::findColorBlob(const cv::Mat& bgr_frame,
         }
         
         debug_counters_.blob_search_gpu_success++;
-        // logDebugStats();  // Commented out to investigate crash
         
         return best_center;
         
@@ -242,7 +231,6 @@ cv::Point2f GpuHsvConverter::findColorBlob(const cv::Mat& bgr_frame,
         std::cerr << "[GpuHsvConverter] Falling back to CPU" << std::endl;
         
         debug_counters_.blob_search_cpu_fallback++;
-        // logDebugStats();  // Commented out to investigate crash
         
         // Fallback to CPU
         cv::Mat bgr_roi = bgr_frame(roi);
@@ -282,89 +270,6 @@ cv::Point2f GpuHsvConverter::findColorBlob(const cv::Mat& bgr_frame,
         
         return best_center;
     }
-}
-
-void GpuHsvConverter::logDebugStats() {
-    // Log every 300 operations (roughly every 10 seconds at 30 FPS)
-    uint64_t total_ops = debug_counters_.hsv_roi_gpu_success +
-                         debug_counters_.hsv_roi_cpu_fallback +
-                         debug_counters_.hsv_full_gpu_success +
-                         debug_counters_.hsv_full_cpu_fallback +
-                         debug_counters_.blob_search_gpu_success +
-                         debug_counters_.blob_search_cpu_fallback;
-    
-    if (total_ops - debug_counters_.last_log_frame < 300) {
-        return;
-    }
-    
-    debug_counters_.last_log_frame = total_ops;
-    
-    // Get current timestamp
-    auto now = std::time(nullptr);
-    auto tm = *std::localtime(&now);
-    
-    // Open log file in append mode
-    std::ofstream log_file("GPU_debug.log", std::ios::app);
-    if (!log_file.is_open()) {
-        return;
-    }
-    
-    // Calculate percentages
-    uint64_t total_hsv_roi = debug_counters_.hsv_roi_gpu_success + debug_counters_.hsv_roi_cpu_fallback;
-    uint64_t total_hsv_full = debug_counters_.hsv_full_gpu_success + debug_counters_.hsv_full_cpu_fallback;
-    uint64_t total_blob = debug_counters_.blob_search_gpu_success + debug_counters_.blob_search_cpu_fallback;
-    
-    float hsv_roi_gpu_pct = total_hsv_roi > 0 ?
-        (100.0f * debug_counters_.hsv_roi_gpu_success / total_hsv_roi) : 0.0f;
-    float hsv_full_gpu_pct = total_hsv_full > 0 ?
-        (100.0f * debug_counters_.hsv_full_gpu_success / total_hsv_full) : 0.0f;
-    float blob_gpu_pct = total_blob > 0 ?
-        (100.0f * debug_counters_.blob_search_gpu_success / total_blob) : 0.0f;
-    
-    // Write log entry
-    log_file << "\n========================================\n";
-    log_file << std::put_time(&tm, "[%Y-%m-%d %H:%M:%S]") << " GPU Usage Statistics\n";
-    log_file << "========================================\n";
-    log_file << "GPU Enabled: " << (gpu_enabled_ ? "YES" : "NO") << "\n\n";
-    
-    log_file << "HSV ROI Conversion:\n";
-    log_file << "  GPU Success:    " << std::setw(8) << debug_counters_.hsv_roi_gpu_success
-             << " (" << std::fixed << std::setprecision(1) << hsv_roi_gpu_pct << "%)\n";
-    log_file << "  CPU Fallback:   " << std::setw(8) << debug_counters_.hsv_roi_cpu_fallback
-             << " (" << std::fixed << std::setprecision(1) << (100.0f - hsv_roi_gpu_pct) << "%)\n";
-    log_file << "  Total:          " << std::setw(8) << total_hsv_roi << "\n\n";
-    
-    log_file << "HSV Full Frame Conversion:\n";
-    log_file << "  GPU Success:    " << std::setw(8) << debug_counters_.hsv_full_gpu_success
-             << " (" << std::fixed << std::setprecision(1) << hsv_full_gpu_pct << "%)\n";
-    log_file << "  CPU Fallback:   " << std::setw(8) << debug_counters_.hsv_full_cpu_fallback
-             << " (" << std::fixed << std::setprecision(1) << (100.0f - hsv_full_gpu_pct) << "%)\n";
-    log_file << "  Total:          " << std::setw(8) << total_hsv_full << "\n\n";
-    
-    log_file << "Color Blob Search:\n";
-    log_file << "  GPU Success:    " << std::setw(8) << debug_counters_.blob_search_gpu_success
-             << " (" << std::fixed << std::setprecision(1) << blob_gpu_pct << "%)\n";
-    log_file << "  CPU Fallback:   " << std::setw(8) << debug_counters_.blob_search_cpu_fallback
-             << " (" << std::fixed << std::setprecision(1) << (100.0f - blob_gpu_pct) << "%)\n";
-    log_file << "  Total:          " << std::setw(8) << total_blob << "\n\n";
-    
-    uint64_t total_gpu = debug_counters_.hsv_roi_gpu_success +
-                         debug_counters_.hsv_full_gpu_success +
-                         debug_counters_.blob_search_gpu_success;
-    uint64_t total_cpu = debug_counters_.hsv_roi_cpu_fallback +
-                         debug_counters_.hsv_full_cpu_fallback +
-                         debug_counters_.blob_search_cpu_fallback;
-    float overall_gpu_pct = total_ops > 0 ? (100.0f * total_gpu / total_ops) : 0.0f;
-    
-    log_file << "Overall Summary:\n";
-    log_file << "  Total GPU Ops:  " << std::setw(8) << total_gpu
-             << " (" << std::fixed << std::setprecision(1) << overall_gpu_pct << "%)\n";
-    log_file << "  Total CPU Ops:  " << std::setw(8) << total_cpu
-             << " (" << std::fixed << std::setprecision(1) << (100.0f - overall_gpu_pct) << "%)\n";
-    log_file << "  Grand Total:    " << std::setw(8) << total_ops << "\n";
-    log_file << "========================================\n";
-    
-    log_file.close();
 }
 
 std::string GpuHsvConverter::getGpuInfo() const {

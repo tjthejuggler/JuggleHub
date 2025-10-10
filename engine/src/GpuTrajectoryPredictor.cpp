@@ -1,8 +1,6 @@
 #include "GpuTrajectoryPredictor.hpp"
 #include <chrono>
 #include <iostream>
-#include <fstream>
-#include <iomanip>
 #include <cmath>
 #include <algorithm>
 
@@ -522,17 +520,7 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
 ) {
     int n = points.size();
     
-    // Open debug log file for detailed velocity calculation logging
-    std::ofstream debug_log("trajectory_debug.log", std::ios::app);
-    
-    debug_log << "\n=== VELOCITY CALCULATION DEBUG ===" << std::endl;
-    debug_log << "Number of trajectory points: " << n << std::endl;
-    std::cerr << "\n=== VELOCITY CALCULATION DEBUG ===" << std::endl;
-    std::cerr << "Number of trajectory points: " << n << std::endl;
-    
     if (n < 2) {
-        debug_log << "ERROR: Not enough points (need at least 2)" << std::endl;
-        std::cerr << "ERROR: Not enough points (need at least 2)" << std::endl;
         return cv::Point3f(0, 0, 0);
     }
     
@@ -540,9 +528,6 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
     ParabolicFitResult fit = estimateCurrentStateCpu(points);
 
     if (fit.success) {
-        // Log the full result for debugging
-        std::cerr << "Parabolic fit success: p0=" << fit.position
-                  << ", v0=" << fit.velocity << ", a=" << fit.acceleration << std::endl;
         return fit.velocity;
     }
     
@@ -551,23 +536,12 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
         const TrajectoryPoint& p1 = points[0];
         const TrajectoryPoint& p2 = points[1];
         
-        debug_log << "\nUsing TWO-POINT method:" << std::endl;
-        debug_log << "Point 1: pos=(" << p1.position.x << ", " << p1.position.y << ", " << p1.position.z
-                  << ") timestamp=" << p1.timestamp << " us" << std::endl;
-        debug_log << "Point 2: pos=(" << p2.position.x << ", " << p2.position.y << ", " << p2.position.z
-                  << ") timestamp=" << p2.timestamp << " us" << std::endl;
-        std::cerr << "\nUsing TWO-POINT method:" << std::endl;
-        
         // CRITICAL: Use signed integers to avoid overflow
         int64_t ts1 = static_cast<int64_t>(p1.timestamp);
         int64_t ts2 = static_cast<int64_t>(p2.timestamp);
         double dt = (ts2 - ts1) / 1000000.0;  // µs to seconds
-        debug_log << "Time difference: " << dt << " seconds" << std::endl;
-        std::cerr << "Time difference: " << dt << " seconds" << std::endl;
         
         if (dt < 0.001) {
-            debug_log << "ERROR: Time difference too small (< 0.001s)" << std::endl;
-            std::cerr << "ERROR: Time difference too small (< 0.001s)" << std::endl;
             return cv::Point3f(0, 0, 0);
         }
         
@@ -577,22 +551,11 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
         velocity.y = (p2.position.y - p1.position.y) / dt;
         velocity.z = (p2.position.z - p1.position.z) / dt;
         
-        debug_log << "Position difference: ("
-                  << (p2.position.x - p1.position.x) << ", "
-                  << (p2.position.y - p1.position.y) << ", "
-                  << (p2.position.z - p1.position.z) << ")" << std::endl;
-        debug_log << "Calculated velocity: (" << velocity.x << ", " << velocity.y << ", " << velocity.z << ") m/s" << std::endl;
-        debug_log << "Speed magnitude: " << std::sqrt(velocity.x*velocity.x + velocity.y*velocity.y + velocity.z*velocity.z) << " m/s" << std::endl;
-        std::cerr << "Calculated velocity: (" << velocity.x << ", " << velocity.y << ", " << velocity.z << ") m/s" << std::endl;
-        
         return velocity;
     }
     
     // For 3+ points: Use least-squares fitting for better noise resistance
     // Key difference: Set t=0 at the LAST point (current time), not first point
-    
-    debug_log << "\nUsing LEAST-SQUARES method:" << std::endl;
-    std::cerr << "\nUsing LEAST-SQUARES method:" << std::endl;
     
     const int MAX_FIT_POINTS = 10;
     int start_idx = std::max(0, n - MAX_FIT_POINTS);
@@ -603,19 +566,10 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
     // CRITICAL: Use the timestamp of the LAST point as t=0 (current time)
     // MUST use signed integers to handle negative time differences!
     int64_t t_current = static_cast<int64_t>(points[n - 1].timestamp);
-    debug_log << "Current time (t=0): " << t_current << " us" << std::endl;
-    debug_log << "Using points from index " << start_idx << " to " << (n-1) << std::endl;
-    std::cerr << "Current time (t=0): " << t_current << " us" << std::endl;
     
     for (int i = start_idx; i < n; i++) {
-        debug_log << "Point[" << i << "]: pos=(" << points[i].position.x << ", " << points[i].position.y
-                  << ", " << points[i].position.z << ") timestamp=" << points[i].timestamp
-                  << " us, verified=" << (points[i].verified ? "true" : "false") << std::endl;
-        
         // Only use verified points for fitting
         if (!points[i].verified) {
-            debug_log << "  -> SKIPPED (not verified)" << std::endl;
-            std::cerr << "  -> Point[" << i << "] SKIPPED (not verified)" << std::endl;
             continue;
         }
         
@@ -623,7 +577,6 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
         // CRITICAL: Cast to signed int64_t before subtraction to avoid overflow!
         int64_t timestamp_i = static_cast<int64_t>(points[i].timestamp);
         double t = (timestamp_i - t_current) / 1000000.0;  // Convert to seconds
-        debug_log << "  -> t=" << std::fixed << std::setprecision(6) << t << " s (relative to current)" << std::endl;
         
         times.push_back(t);
         x_vals.push_back(points[i].position.x);
@@ -631,31 +584,17 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
         z_vals.push_back(points[i].position.z);
     }
     
-    debug_log << "Number of verified points for fitting: " << times.size() << std::endl;
-    std::cerr << "Number of verified points for fitting: " << times.size() << std::endl;
-    
     if (times.size() < 2) {
-        debug_log << "Not enough verified points, falling back to two-point method" << std::endl;
-        std::cerr << "Not enough verified points, falling back to two-point method" << std::endl;
-        
         // Fall back to two-point method with last 2 points
         const TrajectoryPoint& p1 = points[n - 2];
         const TrajectoryPoint& p2 = points[n - 1];
-        
-        debug_log << "Point 1: pos=(" << p1.position.x << ", " << p1.position.y << ", " << p1.position.z
-                  << ") timestamp=" << p1.timestamp << " us" << std::endl;
-        debug_log << "Point 2: pos=(" << p2.position.x << ", " << p2.position.y << ", " << p2.position.z
-                  << ") timestamp=" << p2.timestamp << " us" << std::endl;
         
         // CRITICAL: Use signed integers to avoid overflow
         int64_t ts1 = static_cast<int64_t>(p1.timestamp);
         int64_t ts2 = static_cast<int64_t>(p2.timestamp);
         double dt = (ts2 - ts1) / 1000000.0;
-        debug_log << "Time difference: " << dt << " seconds" << std::endl;
         
         if (dt < 0.001) {
-            debug_log << "ERROR: Time difference too small" << std::endl;
-            std::cerr << "ERROR: Time difference too small" << std::endl;
             return cv::Point3f(0, 0, 0);
         }
         
@@ -664,8 +603,6 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
         velocity.y = (p2.position.y - p1.position.y) / dt;
         velocity.z = (p2.position.z - p1.position.z) / dt;
         
-        debug_log << "Calculated velocity: (" << velocity.x << ", " << velocity.y << ", " << velocity.z << ") m/s" << std::endl;
-        std::cerr << "Calculated velocity: (" << velocity.x << ", " << velocity.y << ", " << velocity.z << ") m/s" << std::endl;
         return velocity;
     }
     
@@ -680,55 +617,25 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
     x_mean /= times.size();
     y_mean /= times.size();
     
-    debug_log << "\nLeast-squares calculation:" << std::endl;
-    debug_log << "t_mean = " << std::fixed << std::setprecision(6) << t_mean << " seconds" << std::endl;
-    debug_log << "x_mean = " << x_mean << " m" << std::endl;
-    debug_log << "y_mean = " << y_mean << " m" << std::endl;
-    std::cerr << "\nLeast-squares: t_mean = " << t_mean << " s" << std::endl;
-    
     double sum_t_dev_sq = 0.0;
     double sum_tx_dev = 0.0, sum_ty_dev = 0.0;
     
-    debug_log << "\nCalculating deviations from mean:" << std::endl;
     for (size_t i = 0; i < times.size(); i++) {
         double t_dev = times[i] - t_mean;
-        double x_dev = x_vals[i] - x_mean;
-        double y_dev = y_vals[i] - y_mean;
-        
-        debug_log << "  Point[" << i << "]: t_dev=" << std::setprecision(6) << t_dev
-                  << ", x_dev=" << x_dev << ", y_dev=" << y_dev << std::endl;
         
         sum_t_dev_sq += t_dev * t_dev;
-        sum_tx_dev += t_dev * x_dev;
-        sum_ty_dev += t_dev * y_dev;
+        sum_tx_dev += t_dev * (x_vals[i] - x_mean);
+        sum_ty_dev += t_dev * (y_vals[i] - y_mean);
     }
-    
-    debug_log << "\nSums:" << std::endl;
-    debug_log << "sum_t_dev_sq = " << std::scientific << sum_t_dev_sq << std::endl;
-    debug_log << "sum_tx_dev = " << sum_tx_dev << std::endl;
-    debug_log << "sum_ty_dev = " << sum_ty_dev << std::endl;
-    std::cerr << "sum_t_dev_sq = " << sum_t_dev_sq << std::endl;
     
     // CRITICAL FIX: Check if variance is essentially zero (all points at same time)
     // Use a very small threshold since we're working with small time differences
     // When t=0 at last point, times range from ~-0.3s to 0s, giving variance ~0.01
     if (sum_t_dev_sq < 1e-20) {
-        debug_log << "ERROR: sum_t_dev_sq too small (< 1e-20), all points at same time!" << std::endl;
-        debug_log << "This should never happen with real trajectory data." << std::endl;
-        std::cerr << "ERROR: sum_t_dev_sq too small (< 1e-20), all points at same time!" << std::endl;
         return cv::Point3f(0, 0, 0);
     }
     
-    debug_log << "sum_t_dev_sq is valid, proceeding with velocity calculation..." << std::endl;
-    std::cerr << "sum_t_dev_sq is valid, proceeding..." << std::endl;
-    
     // Velocity is the slope of the linear fit: v = sum(t_dev * pos_dev) / sum(t_dev^2)
-    debug_log << "\nCalculating X and Y velocities:" << std::endl;
-    debug_log << "  v_x = sum_tx_dev / sum_t_dev_sq = " << sum_tx_dev << " / " << sum_t_dev_sq
-              << " = " << (sum_tx_dev / sum_t_dev_sq) << " m/s" << std::endl;
-    debug_log << "  v_y = sum_ty_dev / sum_t_dev_sq = " << sum_ty_dev << " / " << sum_t_dev_sq
-              << " = " << (sum_ty_dev / sum_t_dev_sq) << " m/s" << std::endl;
-    
     float v0x = static_cast<float>(sum_tx_dev / sum_t_dev_sq);
     float v0y = static_cast<float>(sum_ty_dev / sum_t_dev_sq);
     
@@ -739,13 +646,9 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
     // Rearranging: z(t) + (g/2)*t^2 = b*t + c
     // Let z_adjusted = z + (g/2)*t^2, then fit: z_adjusted = b*t + c
     
-    debug_log << "\nFitting Z velocity with physics constraint (a = -g/2):" << std::endl;
-    std::cerr << "\nFitting Z with physics constraint..." << std::endl;
-    
     double sum_t = 0.0, sum_t2 = 0.0;
     double sum_z_adj = 0.0, sum_tz_adj = 0.0;
     
-    debug_log << "Adjusting Z values by adding (g/2)*t^2:" << std::endl;
     for (size_t i = 0; i < times.size(); i++) {
         double t = times[i];
         double t2 = t * t;
@@ -754,9 +657,6 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
         // Adjust z by adding back the gravity term: z_adj = z + (g/2)*t^2
         double z_adjusted = z + 0.5 * gravity * t2;
         
-        debug_log << "  Point[" << i << "]: t=" << std::setprecision(6) << t
-                  << ", z=" << z << ", z_adj=" << z_adjusted << std::endl;
-        
         sum_t += t;
         sum_t2 += t2;
         sum_z_adj += z_adjusted;
@@ -764,13 +664,6 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
     }
     
     double n_pts = static_cast<double>(times.size());
-    
-    debug_log << "\nSums for linear fit of z_adjusted:" << std::endl;
-    debug_log << "  sum_t = " << sum_t << std::endl;
-    debug_log << "  sum_t2 = " << sum_t2 << std::endl;
-    debug_log << "  sum_z_adj = " << sum_z_adj << std::endl;
-    debug_log << "  sum_tz_adj = " << sum_tz_adj << std::endl;
-    debug_log << "  n_pts = " << n_pts << std::endl;
     
     // Build the normal equations for linear fit: z_adj = b*t + c
     // Matrix form: [sum_t2, sum_t  ] [b] = [sum_tz_adj]
@@ -781,16 +674,9 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
         
     cv::Mat B = (cv::Mat_<double>(2, 1) << sum_tz_adj, sum_z_adj);
     
-    debug_log << "\nSolving for [b, c] with physics constraint:" << std::endl;
-    debug_log << "Matrix A:" << std::endl << A << std::endl;
-    debug_log << "Vector B:" << std::endl << B << std::endl;
-    std::cerr << "Solving with physics constraint..." << std::endl;
-    
     cv::Mat coeffs;
     // Solve the system for [b, c]
     if (!cv::solve(A, B, coeffs, cv::DECOMP_LU)) {
-        debug_log << "WARNING: Matrix is singular, falling back to simple linear Z fit" << std::endl;
-        std::cerr << "WARNING: Matrix is singular" << std::endl;
         // Fallback to linear fit if matrix is singular
         double z_mean = 0.0;
         for (double z : z_vals) z_mean += z;
@@ -804,33 +690,11 @@ cv::Point3f GpuTrajectoryPredictor::estimateCurrentVelocityCpu(
         return cv::Point3f(v0x, v0y, v0z);
     }
     
-    debug_log << "Solution found!" << std::endl;
-    debug_log << "Coefficients:" << std::endl << coeffs << std::endl;
-    std::cerr << "Solution found!" << std::endl;
-    
     // Extract velocity and position
     // z(t) = (-g/2)*t^2 + b*t + c
     // At t=0: v_z = b (the derivative at t=0)
     double b_coeff = coeffs.at<double>(0);  // velocity at t=0
-    double c_coeff = coeffs.at<double>(1);  // position at t=0
-    double a_coeff = -0.5 * gravity;         // constrained by physics
-    
-    debug_log << "\nPhysics-constrained parabola coefficients:" << std::endl;
-    debug_log << "  a (constrained) = " << a_coeff << " = -g/2" << std::endl;
-    debug_log << "  b (fitted velocity at t=0) = " << b_coeff << std::endl;
-    debug_log << "  c (fitted position at t=0) = " << c_coeff << std::endl;
-    
     float v0z = static_cast<float>(b_coeff);
-    
-    debug_log << "\n=== FINAL VELOCITY RESULTS ===" << std::endl;
-    debug_log << "X velocity: " << std::setprecision(4) << v0x << " m/s" << std::endl;
-    debug_log << "Y velocity: " << v0y << " m/s" << std::endl;
-    debug_log << "Z velocity: " << v0z << " m/s" << std::endl;
-    debug_log << "Speed magnitude: " << std::sqrt(v0x*v0x + v0y*v0y + v0z*v0z) << " m/s" << std::endl;
-    debug_log << "Horizontal speed: " << std::sqrt(v0x*v0x + v0y*v0y) << " m/s" << std::endl;
-    debug_log << "=================================\n" << std::endl;
-    
-    std::cerr << "=== FINAL: v=(" << v0x << ", " << v0y << ", " << v0z << ") m/s ===" << std::endl;
     
     return cv::Point3f(v0x, v0y, v0z);
 }

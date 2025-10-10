@@ -325,6 +325,23 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.override_color_threshold = std::stof(value);
             return true;
         }
+        // NEW: Separate override thresholds for ball and ball_held
+        else if (key == "override_ball_confidence_threshold") {
+            tracking_settings_.override_ball_confidence_threshold = std::stof(value);
+            return true;
+        }
+        else if (key == "override_ball_color_threshold") {
+            tracking_settings_.override_ball_color_threshold = std::stof(value);
+            return true;
+        }
+        else if (key == "override_ball_held_confidence_threshold") {
+            tracking_settings_.override_ball_held_confidence_threshold = std::stof(value);
+            return true;
+        }
+        else if (key == "override_ball_held_color_threshold") {
+            tracking_settings_.override_ball_held_color_threshold = std::stof(value);
+            return true;
+        }
         else if (key == "override_require_ball_class") {
             tracking_settings_.override_require_ball_class = (value == "true" || value == "1");
             return true;
@@ -441,6 +458,39 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         }
         else if (key == "throw_distance_threshold") {
             tracking_settings_.throw_distance_threshold = std::stof(value);
+            return true;
+        }
+        // Trajectory physics settings
+        else if (key == "traj_gravity") {
+            tracking_settings_.traj_gravity = std::stof(value);
+            return true;
+        }
+        else if (key == "traj_time_step") {
+            tracking_settings_.traj_time_step = std::stof(value);
+            return true;
+        }
+        else if (key == "traj_max_time") {
+            tracking_settings_.traj_max_time = std::stof(value);
+            return true;
+        }
+        else if (key == "traj_search_radius") {
+            tracking_settings_.traj_search_radius = std::stof(value);
+            return true;
+        }
+        else if (key == "traj_min_points_for_prediction") {
+            tracking_settings_.traj_min_points_for_prediction = std::stoi(value);
+            return true;
+        }
+        else if (key == "traj_color_match_threshold") {
+            tracking_settings_.traj_color_match_threshold = std::stof(value);
+            return true;
+        }
+        else if (key == "traj_velocity_estimation_time") {
+            tracking_settings_.traj_velocity_estimation_time = std::stof(value);
+            return true;
+        }
+        else if (key == "traj_max_search_distance") {
+            tracking_settings_.traj_max_search_distance = std::stof(value);
             return true;
         }
     } catch (const std::exception& e) {
@@ -572,10 +622,19 @@ void SimpleBallTracker::evaluateOverrideCriteria(std::vector<Detection>& detecti
             // Calculate color score
             eval.color_score = matchColor(det, profile, color_frame);
             
-            // Check override criteria using the NEW settings (override_min_*_missing)
-            // These are the settings that the UI actually sends
-            eval.meets_confidence_threshold = (det.confidence >= tracking_settings_.override_min_confidence_missing);
-            eval.meets_color_threshold = (eval.color_score >= tracking_settings_.override_min_color_score_missing);
+            // NEW: Use class-specific thresholds based on detection class_id
+            // class_id=0 is 'ball', class_id=1 is 'ball_held'
+            float confidence_threshold = (det.class_id == 0) ?
+                tracking_settings_.override_ball_confidence_threshold :
+                tracking_settings_.override_ball_held_confidence_threshold;
+            
+            float color_threshold = (det.class_id == 0) ?
+                tracking_settings_.override_ball_color_threshold :
+                tracking_settings_.override_ball_held_color_threshold;
+            
+            // Check override criteria using class-specific thresholds
+            eval.meets_confidence_threshold = (det.confidence >= confidence_threshold);
+            eval.meets_color_threshold = (eval.color_score >= color_threshold);
             eval.meets_class_requirement = !tracking_settings_.override_require_ball_class || (det.class_id == 0);
             
             // Determine if this would override
@@ -583,28 +642,30 @@ void SimpleBallTracker::evaluateOverrideCriteria(std::vector<Detection>& detecti
                                  eval.meets_color_threshold &&
                                  eval.meets_class_requirement;
             
-            // Build reason string
+            // Build reason string with class-specific thresholds
+            std::string class_name = (det.class_id == 0) ? "ball" : "ball_held";
+            
             if (eval.would_override) {
                 eval.reason = "OVERRIDE: conf=" + std::to_string(det.confidence) +
-                             " >= " + std::to_string(tracking_settings_.override_min_confidence_missing) +
+                             " >= " + std::to_string(confidence_threshold) +
                              ", color=" + std::to_string(eval.color_score) +
-                             " >= " + std::to_string(tracking_settings_.override_min_color_score_missing);
+                             " >= " + std::to_string(color_threshold) +
+                             ", class=" + class_name;
                 if (tracking_settings_.override_require_ball_class) {
-                    eval.reason += ", class=ball";
+                    eval.reason += " (requires ball)";
                 }
             } else {
                 eval.reason = "NO_OVERRIDE:";
                 if (!eval.meets_confidence_threshold) {
                     eval.reason += " conf=" + std::to_string(det.confidence) +
-                                  " < " + std::to_string(tracking_settings_.override_min_confidence_missing);
+                                  " < " + std::to_string(confidence_threshold);
                 }
                 if (!eval.meets_color_threshold) {
                     eval.reason += " color=" + std::to_string(eval.color_score) +
-                                  " < " + std::to_string(tracking_settings_.override_min_color_score_missing);
+                                  " < " + std::to_string(color_threshold);
                 }
                 if (!eval.meets_class_requirement) {
-                    eval.reason += " class=" + std::string(det.class_id == 0 ? "ball" : "ball_held") +
-                                  " (requires ball)";
+                    eval.reason += " class=" + class_name + " (requires ball)";
                 }
             }
             
@@ -1493,243 +1554,212 @@ void SimpleBallTracker::updateInFlightBall(
     const CameraIntrinsics& intrinsics,
     std::vector<BallEvent>& events) {
     
-    // 1. Update trajectory prediction
-    // Generate initial prediction even with 1-2 points for visualization
-    if (ball.trajectory.verified_point_count >= 3) {
-        // Refine trajectory with least-squares fitting when we have enough points
-        ball.trajectory = gpu_trajectory_predictor_->refineTrajectory(ball.trajectory);
-    } else if (ball.trajectory.verified_point_count >= 1) {
-        // Generate simple trajectory prediction for visualization
-        // Use a default initial velocity estimate based on typical juggling throws
-        TrajectoryPredictionParams params;
-        params.gravity = ball.trajectory.gravity;
-        params.time_step = tracking_settings_.trajectory_time_step;
-        params.max_time = tracking_settings_.max_trajectory_time;
-        
-        // Estimate velocity from recent points if we have 2 points
-        cv::Point3f estimated_velocity(0, 0, 2.0f);  // Default upward velocity
-        if (ball.trajectory.points.size() >= 2) {
-            const auto& p1 = ball.trajectory.points[ball.trajectory.points.size() - 2];
-            const auto& p2 = ball.trajectory.points[ball.trajectory.points.size() - 1];
-            float dt = (p2.timestamp - p1.timestamp) / 1000000.0f;  // Convert to seconds
-            if (dt > 0.001f) {  // Avoid division by very small numbers
-                estimated_velocity.x = (p2.position.x - p1.position.x) / dt;
-                estimated_velocity.y = (p2.position.y - p1.position.y) / dt;
-                estimated_velocity.z = (p2.position.z - p1.position.z) / dt;
-            }
-        }
-        
-        // Generate predicted path
-        ball.trajectory.initial_velocity = estimated_velocity;
-        ball.trajectory.predicted_path = gpu_trajectory_predictor_->predictTrajectory(
-            ball.trajectory.initial_position,
-            estimated_velocity,
-            params
-        );
-        ball.trajectory.prediction_valid = true;
-    }
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\n[updateInFlightBall] Ball " << ball.id << " (" << ball.color_name << ")" << std::endl;
+        debug_log << "  verified_point_count: " << ball.trajectory.verified_point_count << std::endl;
+        debug_log.close();
+    });
     
-    // 2. Get current predicted position from trajectory
-    uint64_t current_time = getCurrentTimestamp();
-    float time_since_throw = (current_time - ball.trajectory.throw_timestamp) / 1000000.0f;
+    // Step 1: Determine prediction strategy based on point count
+    int point_count = ball.trajectory.verified_point_count;
+    cv::Point3f predicted_next;
     
-    cv::Point3f predicted_pos = ball.trajectory.initial_position;
-    
-    // Interpolate position from trajectory
-    int point_index = static_cast<int>(time_since_throw / tracking_settings_.trajectory_time_step);
-    if (point_index >= 0 && point_index < static_cast<int>(ball.trajectory.predicted_path.size())) {
-        predicted_pos = ball.trajectory.predicted_path[point_index];
-    } else if (!ball.trajectory.predicted_path.empty()) {
-        // Use last predicted point if we're beyond the trajectory
-        predicted_pos = ball.trajectory.predicted_path.back();
-    }
-    
-    // 3. Search for verification along trajectory
-    bool verified = false;
-    
-    // Find the color profile for this ball
-    const ColorProfile* profile = nullptr;
-    for (const auto& p : color_profiles_) {
-        if (p.name == ball.color_name) {
-            profile = &p;
-            break;
-        }
-    }
-    
-    if (!profile) {
-        ball.tracking_reason = "IN_FLIGHT_no_color_profile";
-        ball.position = predicted_pos;
-        ball.pixel_pos = project_3d_to_2d(predicted_pos, intrinsics);
+    if (point_count == 0) {
+        // Should not happen - throw should add first point
+        ball.tracking_reason = "IN_FLIGHT_no_points";
         return;
     }
-    
-    // 3a. Try YOLO detection near trajectory
-    for (const auto& det : detections) {
-        auto [closest_idx, distance] = gpu_trajectory_predictor_->findClosestPoint(
-            ball.trajectory.predicted_path, det.world_pos
-        );
-        
-        if (distance < ball.trajectory.search_radius_m) {
-            float color_score = matchColor(det, *profile, color_frame);
-            
-            if (color_score > tracking_settings_.min_color_match_score) {
-                // VERIFIED - update ball position
-                ball.position = det.world_pos;
-                ball.pixel_pos = project_3d_to_2d(det.world_pos, intrinsics);
-                ball.bbox = det.box;
-                ball.has_yolo_detection = true;
-                ball.yolo_confidence = det.confidence;
-                ball.yolo_class_id = det.class_id;
-                ball.color_match_score = color_score;
-                ball.tracking_reason = "IN_FLIGHT_yolo_verified";
-                verified = true;
-                break;
-            }
-        }
-    }
-    
-    // 3b. Fallback: Color blob search along trajectory
-    if (!verified) {
-        cv::Point2f predicted_2d = project_3d_to_2d(predicted_pos, intrinsics);
-        
-        // Calculate search radius in pixels based on depth
-        int search_radius_px = static_cast<int>(
-            ball.trajectory.search_radius_m * intrinsics.fx / std::max(0.1f, predicted_pos.z)
-        );
-        search_radius_px = std::min(search_radius_px, 200); // Cap at 200 pixels
-        
-        cv::Point2f blob = searchForColorBlob(color_frame, *profile, predicted_2d, search_radius_px);
-        
-        if (blob.x > 0 && blob.y > 0) {
-            float depth = getDepthAtPoint(depth_frame, blob);
-            
-            if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
-                cv::Point3f blob_3d = deprojectToWorld(blob, depth, intrinsics);
-                
-                // Verify blob is on trajectory
-                auto [closest_idx, distance] = gpu_trajectory_predictor_->findClosestPoint(
-                    ball.trajectory.predicted_path, blob_3d
-                );
-                
-                if (distance < ball.trajectory.search_radius_m) {
-                    ball.position = blob_3d;
-                    ball.pixel_pos = blob;
-                    ball.has_yolo_detection = false;
-                    ball.tracking_reason = "IN_FLIGHT_color_blob_verified";
-                    
-                    // Estimate bbox from blob
-                    float bbox_size = 30.0f; // Default size in pixels
-                    ball.bbox = cv::Rect_<float>(
-                        blob.x - bbox_size/2, blob.y - bbox_size/2,
-                        bbox_size, bbox_size
-                    );
-                    
-                    verified = true;
-                }
-            }
-        }
-    }
-    
-    // 3c. No verification - check if ball should snap to wrist
-    if (!verified) {
-        // Check if ball is close enough to any hand to be considered held
-        bool snapped_to_wrist = false;
-        const SimpleHand* closest_hand = nullptr;
-        float min_dist = std::numeric_limits<float>::max();
-        
-        for (const auto& hand : hands_) {
-            if (!hand.is_visible) continue;
-            
-            float dist_to_hand = cv::norm(predicted_pos - hand.wrist_pos_3d);
-            
-            if (dist_to_hand < min_dist) {
-                min_dist = dist_to_hand;
-                closest_hand = &hand;
-            }
-        }
-        
-        // If ball is within wrist proximity threshold, snap to wrist and trigger catch
-        if (closest_hand && min_dist < tracking_settings_.wrist_proximity_threshold) {
-            ball.position = closest_hand->wrist_pos_3d;
-            ball.pixel_pos = project_3d_to_2d(closest_hand->wrist_pos_3d, intrinsics);
-            ball.has_yolo_detection = false;
-            ball.tracking_reason = "IN_FLIGHT_snapped_to_wrist";
-            
-            // Estimate bbox from wrist position
-            float bbox_size = 30.0f;
-            ball.bbox = cv::Rect_<float>(
-                ball.pixel_pos.x - bbox_size/2, ball.pixel_pos.y - bbox_size/2,
-                bbox_size, bbox_size
-            );
-            
-            snapped_to_wrist = true;
-            
-            DEBUG_LOG(debug_log, {
-                OPEN_DEBUG_LOG(debug_log);
-                debug_log << "  Ball snapped to wrist (dist=" << min_dist
-                          << "m, threshold=" << tracking_settings_.wrist_proximity_threshold
-                          << "m) - triggering CATCH" << std::endl;
-                debug_log.close();
-            });
-            
-            // Trigger catch transition
-            initiateCatch(ball, *closest_hand, events);
-            return;
-        } else {
-            // Use predicted position
-            ball.position = predicted_pos;
-            ball.pixel_pos = project_3d_to_2d(predicted_pos, intrinsics);
-            ball.has_yolo_detection = false;
-            ball.tracking_reason = "IN_FLIGHT_predicted";
-            
-            // Estimate bbox from predicted position
-            float bbox_size = 30.0f;
-            ball.bbox = cv::Rect_<float>(
-                ball.pixel_pos.x - bbox_size/2, ball.pixel_pos.y - bbox_size/2,
-                bbox_size, bbox_size
-            );
-        }
-    }
-    
-    // 4. Check for CATCH: ball reaches hand (for verified positions)
-    if (verified) {
-        for (const auto& hand : hands_) {
-            if (!hand.is_visible) continue;
-            
-            float dist_to_hand = cv::norm(ball.position - hand.wrist_pos_3d);
-            
-            if (dist_to_hand < tracking_settings_.catch_distance_threshold) {
-                // CATCH DETECTED - initiate catch transition
-                DEBUG_LOG(debug_log, {
-                    OPEN_DEBUG_LOG(debug_log);
-                    debug_log << "  CATCH DETECTED: ball " << dist_to_hand
-                              << "m from hand " << hand.id << " (threshold: "
-                              << tracking_settings_.catch_distance_threshold << "m)" << std::endl;
-                    debug_log.close();
-                });
-                initiateCatch(ball, hand, events);
-                return;
-            }
-        }
-    }
-    
-    // 5. CRITICAL: Add verified point for EVERY frame where we have a valid position
-    // This ensures the trajectory list grows continuously during flight
-    if (ball.position.z > 0) {
-        TrajectoryPoint point;
-        point.position = ball.position;
-        point.timestamp = current_time;
-        point.verified = true;
-        point.confidence = 1.0f;
-        ball.trajectory.points.push_back(point);
-        ball.trajectory.verified_point_count++;
+    else if (point_count == 1) {
+        // Use last held position + first flight position for velocity estimation
+        predicted_next = predictWithOnePoint(ball);
         
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);
-            debug_log << "  Added verified point #" << ball.trajectory.verified_point_count
-                      << " at (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
+            debug_log << "  Using ONE POINT prediction" << std::endl;
             debug_log.close();
         });
+    }
+    else if (point_count == 2) {
+        // Use two points for linear prediction
+        predicted_next = predictWithTwoPoints(ball);
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  Using TWO POINT prediction" << std::endl;
+            debug_log.close();
+        });
+    }
+    else {  // point_count >= 3
+        // Use full physics-based trajectory
+        std::vector<cv::Point3f> predicted_path = predictFullTrajectory(ball);
+        
+        if (!predicted_path.empty()) {
+            predicted_next = predicted_path[0];  // Next frame prediction
+        } else {
+            predicted_next = ball.position;  // Fallback to current position
+        }
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  Using FULL PHYSICS prediction (" << predicted_path.size() << " points)" << std::endl;
+            debug_log.close();
+        });
+    }
+    
+    // Step 2: Search for detection along prediction line
+    const Detection* detection = searchAlongPredictionLine(
+        predicted_next,
+        ball.trajectory.search_radius_m,
+        detections,
+        color_frame,
+        ball.color_name
+    );
+    
+    // Step 3: Handle detection result
+    bool verified = false;
+    uint64_t current_timestamp = getCurrentTimestamp();
+    
+    if (detection) {
+        // YOLO detection found and verified
+        ball.position = detection->world_pos;
+        ball.pixel_pos = cv::Point2f(detection->box.x + detection->box.width / 2.0f,
+                                     detection->box.y + detection->box.height / 2.0f);
+        ball.bbox = detection->box;
+        ball.has_yolo_detection = true;
+        ball.yolo_confidence = detection->confidence;
+        ball.yolo_class_id = detection->class_id;
+        
+        // Get color profile for color score
+        const ColorProfile* profile = nullptr;
+        for (const auto& p : color_profiles_) {
+            if (p.name == ball.color_name && p.enabled) {
+                profile = &p;
+                break;
+            }
+        }
+        if (profile) {
+            ball.color_match_score = matchColor(*detection, *profile, color_frame);
+        }
+        
+        ball.tracking_reason = "IN_FLIGHT_yolo_verified";
+        verified = true;
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  YOLO detection verified!" << std::endl;
+            debug_log.close();
+        });
+    }
+    else {
+        // No YOLO detection - use color blob fallback
+        cv::Point2f predicted_2d = project_3d_to_2d(predicted_next, intrinsics);
+        
+        // Find color profile
+        const ColorProfile* profile = nullptr;
+        for (const auto& p : color_profiles_) {
+            if (p.name == ball.color_name && p.enabled) {
+                profile = &p;
+                break;
+            }
+        }
+        
+        if (profile) {
+            // Calculate search radius in pixels
+            int search_radius_px = static_cast<int>(
+                ball.trajectory.search_radius_m * intrinsics.fx / std::max(0.1f, predicted_next.z)
+            );
+            search_radius_px = std::min(search_radius_px, 200);
+            
+            cv::Point2f blob = searchForColorBlob(color_frame, *profile, predicted_2d, search_radius_px);
+            
+            if (blob.x > 0 && blob.y > 0) {
+                float depth = getDepthAtPoint(depth_frame, blob);
+                
+                if (depth > MIN_DEPTH && depth < MAX_DEPTH) {
+                    cv::Point3f blob_3d = deprojectToWorld(blob, depth, intrinsics);
+                    
+                    // Verify blob is within search distance
+                    float dist = cv::norm(blob_3d - predicted_next);
+                    if (dist < tracking_settings_.traj_max_search_distance) {
+                        ball.position = blob_3d;
+                        ball.pixel_pos = blob;
+                        ball.has_yolo_detection = false;
+                        ball.tracking_reason = "IN_FLIGHT_color_blob";
+                        
+                        float bbox_size = 30.0f;
+                        ball.bbox = cv::Rect_<float>(
+                            blob.x - bbox_size/2, blob.y - bbox_size/2,
+                            bbox_size, bbox_size
+                        );
+                        
+                        verified = true;
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  Color blob found!" << std::endl;
+                            debug_log.close();
+                        });
+                    }
+                }
+            }
+        }
+        
+        // If still not verified, use predicted position
+        if (!verified) {
+            ball.position = predicted_next;
+            ball.pixel_pos = project_3d_to_2d(predicted_next, intrinsics);
+            ball.has_yolo_detection = false;
+            ball.tracking_reason = "IN_FLIGHT_predicted";
+            
+            float bbox_size = 30.0f;
+            ball.bbox = cv::Rect_<float>(
+                ball.pixel_pos.x - bbox_size/2, ball.pixel_pos.y - bbox_size/2,
+                bbox_size, bbox_size
+            );
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  Using predicted position" << std::endl;
+                debug_log.close();
+            });
+        }
+    }
+    
+    // Step 4: Add verified point to trajectory
+    if (ball.position.z > 0) {
+        addVerifiedPoint(ball, ball.position, current_timestamp);
+        
+        // Update prediction for next frame if we have enough points
+        if (point_count >= 2) {
+            // Invalidate cached prediction so it gets recomputed
+            ball.trajectory.prediction_valid = false;
+        }
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  Added verified point #" << ball.trajectory.verified_point_count << std::endl;
+            debug_log.close();
+        });
+    }
+    
+    // Step 5: Check for catch
+    for (const auto& hand : hands_) {
+        if (!hand.is_visible) continue;
+        
+        float dist_to_hand = cv::norm(ball.position - hand.wrist_pos_3d);
+        
+        if (dist_to_hand < tracking_settings_.catch_distance_threshold) {
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  CATCH DETECTED: dist=" << dist_to_hand
+                          << "m, threshold=" << tracking_settings_.catch_distance_threshold << "m" << std::endl;
+                debug_log.close();
+            });
+            
+            initiateCatch(ball, hand, events);
+            return;
+        }
     }
 }
 
@@ -1744,26 +1774,44 @@ void SimpleBallTracker::initiateThrow(
     const SimpleHand* hand,
     std::vector<BallEvent>& events) {
     
-    // Transition to IN_FLIGHT state
-    ball.state = IN_FLIGHT;
+    // 1. Store last held position for velocity estimation
+    if (hand != nullptr) {
+        ball.last_held_position = hand->wrist_pos_3d;
+    } else {
+        ball.last_held_position = ball.position;
+    }
     
-    // Initialize trajectory
-    ball.trajectory.throw_timestamp = getCurrentTimestamp();
-    ball.trajectory.initial_position = first_detection.world_pos;
-    ball.trajectory.verified_point_count = 1;
+    // 2. Clear trajectory list completely
+    ball.trajectory.points.clear();
+    ball.trajectory.predicted_path.clear();
+    ball.trajectory.verified_point_count = 0;
     ball.trajectory.trajectory_confidence = 0.0f;
-    ball.trajectory.search_radius_m = tracking_settings_.initial_search_radius;
+    ball.trajectory.prediction_valid = false;
     
-    // Add first verified point
+    // 3. Transition to IN_FLIGHT state
+    ball.state = IN_FLIGHT;
+    ball.is_held = false;
+    
+    // 4. Initialize trajectory parameters
+    ball.trajectory.throw_timestamp = getCurrentTimestamp();
+    ball.trajectory.initial_position = ball.last_held_position;
+    ball.trajectory.gravity = tracking_settings_.traj_gravity;
+    ball.trajectory.search_radius_m = tracking_settings_.traj_search_radius;
+    
+    // 5. Add first flight position as verified point
     TrajectoryPoint first_point;
     first_point.position = first_detection.world_pos;
     first_point.timestamp = ball.trajectory.throw_timestamp;
     first_point.verified = true;
     first_point.confidence = 1.0f;
-    ball.trajectory.points.clear();
     ball.trajectory.points.push_back(first_point);
+    ball.trajectory.verified_point_count = 1;
     
-    // Generate THROW event
+    // 6. Estimate initial velocity from last held position to first detection
+    float dt = tracking_settings_.traj_velocity_estimation_time;
+    ball.trajectory.initial_velocity = (first_detection.world_pos - ball.last_held_position) / dt;
+    
+    // 7. Generate THROW event
     events.push_back({
         BallEvent::THROW,
         ball.id,
@@ -1771,13 +1819,16 @@ void SimpleBallTracker::initiateThrow(
         ball.trajectory.throw_timestamp
     });
     
-    std::cout << "[THROW] Ball " << ball.id << " (" << ball.color_name 
+    std::cout << "[THROW] Ball " << ball.id << " (" << ball.color_name
               << ") thrown from hand " << ball.held_by_hand_id << std::endl;
     
     DEBUG_LOG(debug_log, {
         OPEN_DEBUG_LOG(debug_log);
-        debug_log << "[THROW] Ball " << ball.id << " (" << ball.color_name 
-                  << ") thrown from hand " << ball.held_by_hand_id << std::endl;
+        debug_log << "[THROW] Ball " << ball.id << " (" << ball.color_name
+                  << ") thrown from hand " << ball.held_by_hand_id
+                  << ", initial_velocity=(" << ball.trajectory.initial_velocity.x
+                  << "," << ball.trajectory.initial_velocity.y
+                  << "," << ball.trajectory.initial_velocity.z << ")" << std::endl;
         debug_log.close();
     });
 }
@@ -1787,17 +1838,26 @@ void SimpleBallTracker::initiateCatch(
     const SimpleHand& hand,
     std::vector<BallEvent>& events) {
     
-    // Transition to HELD state
-    ball.state = HELD;
-    ball.held_by_hand_id = hand.id;
-    
-    // Clear trajectory
+    // 1. Clear entire trajectory list
     ball.trajectory.points.clear();
     ball.trajectory.predicted_path.clear();
     ball.trajectory.verified_point_count = 0;
     ball.trajectory.trajectory_confidence = 0.0f;
+    ball.trajectory.prediction_valid = false;
     
-    // Generate CATCH event
+    // 2. Reset physics parameters
+    ball.trajectory.initial_velocity = cv::Point3f(0, 0, 0);
+    ball.trajectory.initial_position = cv::Point3f(0, 0, 0);
+    
+    // 3. Transition to HELD state
+    ball.state = HELD;
+    ball.is_held = true;
+    ball.held_by_hand_id = hand.id;
+    
+    // 4. Update position to wrist
+    ball.position = hand.wrist_pos_3d;
+    
+    // 5. Generate CATCH event
     uint64_t timestamp = getCurrentTimestamp();
     events.push_back({
         BallEvent::CATCH,
@@ -1806,15 +1866,159 @@ void SimpleBallTracker::initiateCatch(
         timestamp
     });
     
-    std::cout << "[CATCH] Ball " << ball.id << " (" << ball.color_name 
+    std::cout << "[CATCH] Ball " << ball.id << " (" << ball.color_name
               << ") caught by hand " << hand.id << std::endl;
     
     DEBUG_LOG(debug_log, {
         OPEN_DEBUG_LOG(debug_log);
-        debug_log << "[CATCH] Ball " << ball.id << " (" << ball.color_name 
+        debug_log << "[CATCH] Ball " << ball.id << " (" << ball.color_name
                   << ") caught by hand " << hand.id << std::endl;
         debug_log.close();
     });
+}
+
+// ============================================================================
+// TRAJECTORY PREDICTION HELPER METHODS
+// ============================================================================
+
+cv::Point3f SimpleBallTracker::predictWithOnePoint(SimpleBall& ball) {
+    // Use last held position and first flight position to estimate velocity
+    if (ball.trajectory.points.empty()) {
+        return ball.position;
+    }
+    
+    const TrajectoryPoint& first_point = ball.trajectory.points[0];
+    cv::Point3f last_held_pos = ball.last_held_position;
+    
+    // Estimate time between held and first detection
+    float dt = tracking_settings_.traj_velocity_estimation_time;
+    
+    // Estimate velocity: v = (p1 - p0) / dt
+    cv::Point3f estimated_velocity = (first_point.position - last_held_pos) / dt;
+    
+    // Store for future use
+    ball.trajectory.initial_velocity = estimated_velocity;
+    
+    // Predict next position using simple ballistic motion
+    cv::Point3f predicted = first_point.position + estimated_velocity * tracking_settings_.traj_time_step;
+    predicted.z -= 0.5f * tracking_settings_.traj_gravity * tracking_settings_.traj_time_step * tracking_settings_.traj_time_step;
+    
+    return predicted;
+}
+
+cv::Point3f SimpleBallTracker::predictWithTwoPoints(SimpleBall& ball) {
+    // Use last two verified points for linear extrapolation
+    if (ball.trajectory.points.size() < 2) {
+        return predictWithOnePoint(ball);
+    }
+    
+    const TrajectoryPoint& p1 = ball.trajectory.points[ball.trajectory.points.size() - 2];
+    const TrajectoryPoint& p2 = ball.trajectory.points[ball.trajectory.points.size() - 1];
+    
+    // Calculate time difference
+    float dt = (p2.timestamp - p1.timestamp) / 1000000.0f;  // Convert µs to s
+    
+    if (dt < 0.001f) {  // Avoid division by very small numbers
+        return p2.position;
+    }
+    
+    // Estimate velocity from these two points
+    cv::Point3f velocity = (p2.position - p1.position) / dt;
+    
+    // Update stored velocity
+    ball.trajectory.initial_velocity = velocity;
+    
+    // Predict next position (one frame ahead)
+    float predict_dt = tracking_settings_.traj_time_step;
+    cv::Point3f predicted = p2.position + velocity * predict_dt;
+    predicted.z -= 0.5f * tracking_settings_.traj_gravity * predict_dt * predict_dt;
+    
+    return predicted;
+}
+
+std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ball) {
+    // Use GPU-accelerated trajectory predictor for full physics
+    if (ball.trajectory.points.size() < static_cast<size_t>(tracking_settings_.traj_min_points_for_prediction)) {
+        // Not enough points yet, return empty
+        return std::vector<cv::Point3f>();
+    }
+    
+    // Re-estimate initial velocity from all verified points using GPU
+    cv::Point3f refined_velocity = gpu_trajectory_predictor_->estimateInitialVelocity(
+        ball.trajectory.points,
+        tracking_settings_.traj_gravity
+    );
+    
+    // Update trajectory parameters
+    ball.trajectory.initial_velocity = refined_velocity;
+    
+    // Predict full trajectory path
+    TrajectoryPredictionParams params;
+    params.time_step = tracking_settings_.traj_time_step;
+    params.max_time = tracking_settings_.traj_max_time;
+    params.gravity = tracking_settings_.traj_gravity;
+    
+    std::vector<cv::Point3f> predicted_path = gpu_trajectory_predictor_->predictTrajectory(
+        ball.trajectory.initial_position,
+        refined_velocity,
+        params
+    );
+    
+    // Cache prediction
+    ball.trajectory.predicted_path = predicted_path;
+    ball.trajectory.prediction_timestamp = getCurrentTimestamp();
+    ball.trajectory.prediction_valid = true;
+    
+    return predicted_path;
+}
+
+const Detection* SimpleBallTracker::searchAlongPredictionLine(
+    const cv::Point3f& predicted_pos,
+    float search_radius,
+    const std::vector<Detection>& yolo_detections,
+    const cv::Mat& color_frame,
+    const std::string& ball_color) {
+    
+    // Find the color profile for this ball
+    const ColorProfile* profile = nullptr;
+    for (const auto& p : color_profiles_) {
+        if (p.name == ball_color && p.enabled) {
+            profile = &p;
+            break;
+        }
+    }
+    
+    if (!profile) {
+        return nullptr;
+    }
+    
+    const Detection* best_detection = nullptr;
+    float best_distance = search_radius;
+    float best_combined_score = 0.0f;
+    
+    // Search through all YOLO detections
+    for (const auto& det : yolo_detections) {
+        // Calculate 3D distance to predicted position
+        float distance = cv::norm(det.world_pos - predicted_pos);
+        
+        if (distance < search_radius) {
+            // Within search radius - check color match
+            float color_score = matchColor(det, *profile, color_frame);
+            
+            if (color_score >= tracking_settings_.traj_color_match_threshold) {
+                // Prefer closer detections with better color match
+                float combined_score = color_score - (distance / search_radius) * 0.3f;
+                
+                if (combined_score > best_combined_score) {
+                    best_detection = &det;
+                    best_distance = distance;
+                    best_combined_score = combined_score;
+                }
+            }
+        }
+    }
+    
+    return best_detection;
 }
 
 // ============================================================================

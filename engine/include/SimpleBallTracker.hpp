@@ -101,6 +101,7 @@ struct SimpleBall {
     
     // Trajectory (NEW: replaces Kalman and ColorBasedPredictor in Phase 3)
     BallTrajectory trajectory;       // Only valid when IN_FLIGHT
+    cv::Point3f last_held_position;  // Position when last held (for velocity estimation)
     
     // Tracking
     bool has_yolo_detection;         // True if YOLO sees it this frame
@@ -142,16 +143,24 @@ struct TrackingSettings {
     int min_frames_for_transition = 2;        // Debouncing for state changes
     
     // Trajectory parameters
+    float traj_gravity = 9.81f;                        // Gravitational acceleration (m/s²)
+    float traj_time_step = 0.033f;                     // Time between predicted points (s)
+    float traj_max_time = 3.0f;                        // Maximum trajectory duration (s)
+    
+    // Search parameters
+    float traj_search_radius = 0.15f;                  // Search radius along trajectory (m)
+    float traj_min_points_for_prediction = 3;          // Points needed before using full physics
+    float traj_color_match_threshold = 0.50f;          // Color match threshold for verification
+    float traj_velocity_estimation_time = 0.1f;        // Time window for velocity estimation (s)
+    float traj_max_search_distance = 0.50f;            // Maximum search distance from prediction (m)
+    
+    // Legacy trajectory parameters (kept for backward compatibility)
     float gravity = 9.81f;                    // Gravitational acceleration (m/s²)
     float trajectory_time_step = 0.033f;      // Time between predicted points (s)
     float max_trajectory_time = 3.0f;         // Maximum trajectory duration (s)
-    
-    // Search parameters
     float initial_search_radius = 0.30f;      // Wide search initially (m)
     float min_search_radius = 0.10f;          // Tight search when confident (m)
     float min_color_match_score = 0.50f;      // Color verification threshold
-    
-    // Confidence parameters
     int points_for_full_confidence = 5;       // Points needed for 100% confidence
     
     // LEGACY SETTINGS (kept for backward compatibility during transition)
@@ -171,8 +180,15 @@ struct TrackingSettings {
     float kalman_proximity_weight = 0.0f;
     int color_sample_radius = 1;
     float min_yolo_score_threshold = 0.0f;
-    float override_confidence_threshold = 0.7f;
-    float override_color_threshold = 0.8f;
+    float override_confidence_threshold = 0.7f;  // DEPRECATED: kept for backward compatibility
+    float override_color_threshold = 0.8f;       // DEPRECATED: kept for backward compatibility
+    
+    // NEW: Separate override thresholds for ball (class_id=0) and ball_held (class_id=1)
+    float override_ball_confidence_threshold = 0.7f;      // Override confidence threshold for 'ball' detections
+    float override_ball_color_threshold = 0.8f;           // Override color threshold for 'ball' detections
+    float override_ball_held_confidence_threshold = 0.7f; // Override confidence threshold for 'ball_held' detections
+    float override_ball_held_color_threshold = 0.8f;      // Override color threshold for 'ball_held' detections
+    
     bool override_require_ball_class = true;
     float max_tracker_distance_per_frame = 0.50f;
     float temporal_consistency_bonus = 0.25f;
@@ -305,6 +321,16 @@ private:
                       const SimpleHand* hand, std::vector<BallEvent>& events);
     void initiateCatch(SimpleBall& ball, const SimpleHand& hand, std::vector<BallEvent>& events);
     void addVerifiedPoint(SimpleBall& ball, const cv::Point3f& position, uint64_t timestamp);
+    
+    // Trajectory prediction helper methods
+    cv::Point3f predictWithOnePoint(SimpleBall& ball);
+    cv::Point3f predictWithTwoPoints(SimpleBall& ball);
+    std::vector<cv::Point3f> predictFullTrajectory(SimpleBall& ball);
+    const Detection* searchAlongPredictionLine(const cv::Point3f& predicted_pos,
+                                               float search_radius,
+                                               const std::vector<Detection>& yolo_detections,
+                                               const cv::Mat& color_frame,
+                                               const std::string& ball_color);
     
     // Fallback tracking (OPTIMIZED: now takes color_frame and converts only ROI to HSV)
     cv::Point2f searchForColorBlob(const cv::Mat& color_frame,

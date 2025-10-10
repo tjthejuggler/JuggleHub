@@ -128,6 +128,9 @@ if PYQT_AVAILABLE:
             self.held_color_blob_section = self.create_held_color_blob_section()
             container_layout.addWidget(self.held_color_blob_section)
             
+            self.trajectory_section = self.create_trajectory_section()
+            container_layout.addWidget(self.trajectory_section)
+            
             self.ball_profiles_section = self.create_ball_profiles_section()
             container_layout.addWidget(self.ball_profiles_section)
             
@@ -894,92 +897,96 @@ if PYQT_AVAILABLE:
             
             # Info label
             info_label = QLabel("ℹ️ Force tracker placement when high-confidence detections exist\n"
-                               "Prevents trackers from disappearing when balls are clearly visible")
+                               "Separate thresholds for 'ball' (in-air) and 'ball_held' detections")
             info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
             info_label.setWordWrap(True)
             layout.addWidget(info_label, row, 0, 1, 3)
             row += 1
             
-            # Separator for tracked ball settings
-            layout.addWidget(QLabel("When Ball IS Being Tracked:"), row, 0, 1, 3)
+            # Separator for 'ball' (in-air) class
+            separator_label = QLabel("'Ball' (In-Air) Override Thresholds:")
+            separator_label.setStyleSheet("font-weight: bold; color: #4CAF50;")
+            layout.addWidget(separator_label, row, 0, 1, 3)
             row += 1
             
-            # Override min confidence (tracked)
-            self.od_min_confidence_tracked_slider, self.od_min_confidence_tracked_label = self._create_slider_widget(
+            # Ball confidence threshold
+            self.od_ball_confidence_slider, self.od_ball_confidence_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Min YOLO Confidence",
-                tooltip_text="Minimum YOLO confidence to force tracker placement when ball is already tracked.\n"
-                             "Range: 0.00-1.00. Default: 0.50.\n"
-                             "Lower values = more aggressive tracker placement.\n"
-                             "Use this to prevent trackers from disappearing during brief occlusions.",
-                range_min=0,
-                range_max=100,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('override_min_confidence_tracked', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Override min color score (tracked)
-            self.od_min_color_score_tracked_slider, self.od_min_color_score_tracked_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Color Match Score",
-                tooltip_text="Minimum color match score to force tracker placement when ball is already tracked.\n"
-                             "Range: 0.00-1.00. Default: 0.60.\n"
-                             "Lower values = more lenient color matching.\n"
-                             "Combine with YOLO confidence for robust detection.",
-                range_min=0,
-                range_max=100,
-                initial_value=60,
-                update_func=lambda v: self.update_setting('override_min_color_score_tracked', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Separator for missing ball settings
-            layout.addWidget(QLabel("When Ball is NOT Being Tracked:"), row, 0, 1, 3)
-            row += 1
-            
-            # Override min confidence (missing)
-            self.od_min_confidence_missing_slider, self.od_min_confidence_missing_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min YOLO Confidence",
-                tooltip_text="Minimum YOLO confidence to create new tracker when ball is not currently tracked.\n"
+                label_text="'Ball' Min Confidence",
+                tooltip_text="Minimum YOLO confidence for 'ball' (in-air) detections to override tracker.\n"
                              "Range: 0.00-1.00. Default: 0.70.\n"
-                             "Higher threshold prevents false positives when creating new trackers.\n"
-                             "Lower this if trackers are not appearing when they should.",
+                             "Lower values = more aggressive override for in-air balls.\n"
+                             "Use lower threshold if in-air balls are not being tracked reliably.",
                 range_min=0,
                 range_max=100,
                 initial_value=70,
-                update_func=lambda v: self.update_setting('override_min_confidence_missing', v / 100.0),
+                update_func=lambda v: self.update_setting('override_ball_confidence_threshold', v / 100.0),
                 is_float=True
             )
             row += 1
             
-            # Override min color score (missing)
-            self.od_min_color_score_missing_slider, self.od_min_color_score_missing_label = self._create_slider_widget(
+            # Ball color threshold
+            self.od_ball_color_slider, self.od_ball_color_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Min Color Match Score",
-                tooltip_text="Minimum color match score to create new tracker when ball is not currently tracked.\n"
+                label_text="'Ball' Min Color Score",
+                tooltip_text="Minimum color match score for 'ball' (in-air) detections to override tracker.\n"
                              "Range: 0.00-1.00. Default: 0.80.\n"
-                             "Higher threshold ensures only well-matched colors create trackers.\n"
-                             "Lower this if correct-color balls are not being tracked.",
+                             "Lower values = more lenient color matching for in-air balls.\n"
+                             "Combine with confidence for robust in-air detection.",
                 range_min=0,
                 range_max=100,
                 initial_value=80,
-                update_func=lambda v: self.update_setting('override_min_color_score_missing', v / 100.0),
+                update_func=lambda v: self.update_setting('override_ball_color_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Separator for 'ball_held' class
+            separator_label2 = QLabel("'Ball Held' Override Thresholds:")
+            separator_label2.setStyleSheet("font-weight: bold; color: #FF9800;")
+            layout.addWidget(separator_label2, row, 0, 1, 3)
+            row += 1
+            
+            # Ball_held confidence threshold
+            self.od_ball_held_confidence_slider, self.od_ball_held_confidence_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="'Ball Held' Min Confidence",
+                tooltip_text="Minimum YOLO confidence for 'ball_held' detections to override tracker.\n"
+                             "Range: 0.00-1.00. Default: 0.70.\n"
+                             "Higher values = stricter override for held balls (reduces false positives).\n"
+                             "Use higher threshold to avoid tracking hands/clothing as held balls.",
+                range_min=0,
+                range_max=100,
+                initial_value=70,
+                update_func=lambda v: self.update_setting('override_ball_held_confidence_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Ball_held color threshold
+            self.od_ball_held_color_slider, self.od_ball_held_color_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="'Ball Held' Min Color Score",
+                tooltip_text="Minimum color match score for 'ball_held' detections to override tracker.\n"
+                             "Range: 0.00-1.00. Default: 0.80.\n"
+                             "Higher values = stricter color matching for held balls.\n"
+                             "Prevents tracking wrong objects when ball is in hand.",
+                range_min=0,
+                range_max=100,
+                initial_value=80,
+                update_func=lambda v: self.update_setting('override_ball_held_color_threshold', v / 100.0),
                 is_float=True
             )
             row += 1
             
             # Info about how it works
-            how_it_works_label = QLabel("💡 How it works: After normal euclidean matching, the system checks for any "
-                                        "high-confidence detections that match a ball's color. If found, it forces "
-                                        "the tracker to that position, preventing disappearance.")
+            how_it_works_label = QLabel("💡 How it works: The system uses class-specific thresholds to override trackers. "
+                                        "'Ball' (in-air) and 'Ball Held' detections can have different confidence and color "
+                                        "requirements, allowing you to tune each independently for optimal tracking.")
             how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
             how_it_works_label.setWordWrap(True)
             layout.addWidget(how_it_works_label, row, 0, 1, 3)
@@ -1064,6 +1071,151 @@ if PYQT_AVAILABLE:
             how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
             how_it_works_label.setWordWrap(True)
             layout.addWidget(how_it_works_label, row, 0, 1, 3)
+            
+            return section
+        
+        def create_trajectory_section(self):
+            """Create the Trajectory Settings section"""
+            section = CollapsibleGroupBox("🎯 Trajectory Settings", collapsed=False)
+            layout = QGridLayout()
+            section.get_content_layout().addLayout(layout)
+            
+            row = 0
+            
+            # Info label
+            info_label = QLabel("ℹ️ Configure trajectory prediction physics and search parameters")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label, row, 0, 1, 3)
+            row += 1
+            
+            # Gravity
+            self.traj_gravity_slider, self.traj_gravity_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Gravity (m/s²)",
+                tooltip_text="Gravitational acceleration for trajectory prediction.\n"
+                             "Range: 5.0-15.0 m/s². Default: 9.81 m/s².\n"
+                             "Earth gravity is 9.81 m/s². Adjust if needed for calibration.",
+                range_min=50,
+                range_max=150,
+                initial_value=98,
+                update_func=lambda v: self.update_setting('traj_gravity', v / 10.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Time Step
+            self.traj_time_step_slider, self.traj_time_step_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Time Step (ms)",
+                tooltip_text="Time between trajectory prediction points.\n"
+                             "Range: 0.01-0.10 s. Default: 0.033 s (30 FPS).\n"
+                             "Smaller = more points, smoother curve, slower computation.",
+                range_min=10,
+                range_max=100,
+                initial_value=33,
+                update_func=lambda v: self.update_setting('traj_time_step', v / 1000.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Max Duration
+            self.traj_max_time_slider, self.traj_max_time_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Max Duration (s)",
+                tooltip_text="Maximum trajectory prediction duration.\n"
+                             "Range: 1.0-5.0 s. Default: 3.0 s.\n"
+                             "Longer = more predicted points, but may be less accurate.",
+                range_min=10,
+                range_max=50,
+                initial_value=30,
+                update_func=lambda v: self.update_setting('traj_max_time', v / 10.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Search Radius
+            self.traj_search_radius_slider, self.traj_search_radius_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Search Radius (cm)",
+                tooltip_text="Search radius along trajectory for ball detection.\n"
+                             "Range: 0.05-0.50 m. Default: 0.15 m (15 cm).\n"
+                             "Larger = more forgiving but may match wrong objects.",
+                range_min=5,
+                range_max=50,
+                initial_value=15,
+                update_func=lambda v: self.update_setting('traj_search_radius', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Min Points for Prediction
+            self.traj_min_points_for_prediction_slider, self.traj_min_points_for_prediction_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Points for Prediction",
+                tooltip_text="Minimum trajectory points before full physics prediction.\n"
+                             "Range: 2-5 points. Default: 3.\n"
+                             "2 points = linear, 3+ = parabolic arc with gravity.",
+                range_min=2,
+                range_max=5,
+                initial_value=3,
+                update_func=lambda v: self.update_setting('traj_min_points_for_prediction', v),
+                is_float=False
+            )
+            row += 1
+            
+            # Color Match Threshold
+            self.traj_color_match_threshold_slider, self.traj_color_match_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Color Match Threshold",
+                tooltip_text="Minimum color match score for trajectory verification.\n"
+                             "Range: 0.0-1.0. Default: 0.50 (50%).\n"
+                             "Higher = stricter color matching, fewer false positives.",
+                range_min=0,
+                range_max=100,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('traj_color_match_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Velocity Estimation Time
+            self.traj_velocity_estimation_time_slider, self.traj_velocity_estimation_time_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Velocity Estimation Time (ms)",
+                tooltip_text="Time window for initial velocity estimation.\n"
+                             "Range: 0.05-0.30 s. Default: 0.10 s.\n"
+                             "Shorter = more responsive, Longer = more stable.",
+                range_min=5,
+                range_max=30,
+                initial_value=10,
+                update_func=lambda v: self.update_setting('traj_velocity_estimation_time', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Max Search Distance
+            self.traj_max_search_distance_slider, self.traj_max_search_distance_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Max Search Distance (cm)",
+                tooltip_text="Maximum distance to search along trajectory.\n"
+                             "Range: 0.20-1.00 m. Default: 0.50 m (50 cm).\n"
+                             "Limits how far ahead we look for the ball.",
+                range_min=20,
+                range_max=100,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('traj_max_search_distance', v / 100.0),
+                is_float=False
+            )
+            row += 1
             
             return section
 
@@ -1675,7 +1827,13 @@ if PYQT_AVAILABLE:
                 'max_kalman_prediction_jump': self._safe_get_slider_value(self.ct_max_kalman_prediction_jump_slider, 50) / 100.0 if hasattr(self, 'ct_max_kalman_prediction_jump_slider') else 0.50,
                 'max_depth_jump_strict': self._safe_get_slider_value(self.ct_max_depth_jump_strict_slider, 20) / 100.0 if hasattr(self, 'ct_max_depth_jump_strict_slider') else 0.20,
                 
-                # Override Detection settings
+                # Override Detection settings (NEW: class-specific thresholds)
+                'override_ball_confidence_threshold': self._safe_get_slider_value(self.od_ball_confidence_slider, 70) / 100.0 if hasattr(self, 'od_ball_confidence_slider') else 0.70,
+                'override_ball_color_threshold': self._safe_get_slider_value(self.od_ball_color_slider, 80) / 100.0 if hasattr(self, 'od_ball_color_slider') else 0.80,
+                'override_ball_held_confidence_threshold': self._safe_get_slider_value(self.od_ball_held_confidence_slider, 70) / 100.0 if hasattr(self, 'od_ball_held_confidence_slider') else 0.70,
+                'override_ball_held_color_threshold': self._safe_get_slider_value(self.od_ball_held_color_slider, 80) / 100.0 if hasattr(self, 'od_ball_held_color_slider') else 0.80,
+                
+                # DEPRECATED: Keep old settings for backward compatibility
                 'override_min_confidence_tracked': self._safe_get_slider_value(self.od_min_confidence_tracked_slider, 50) / 100.0 if hasattr(self, 'od_min_confidence_tracked_slider') else 0.50,
                 'override_min_color_score_tracked': self._safe_get_slider_value(self.od_min_color_score_tracked_slider, 60) / 100.0 if hasattr(self, 'od_min_color_score_tracked_slider') else 0.60,
                 'override_min_confidence_missing': self._safe_get_slider_value(self.od_min_confidence_missing_slider, 70) / 100.0 if hasattr(self, 'od_min_confidence_missing_slider') else 0.70,
@@ -1691,6 +1849,16 @@ if PYQT_AVAILABLE:
                 'held_color_search_radius': self._safe_get_slider_value(self.hcb_search_radius_slider, 120) if hasattr(self, 'hcb_search_radius_slider') else 120,
                 'held_color_min_score': self._safe_get_slider_value(self.hcb_min_color_score_slider, 30) / 100.0 if hasattr(self, 'hcb_min_color_score_slider') else 0.30,
                 'held_color_max_distance': self._safe_get_slider_value(self.hcb_max_distance_slider, 25) / 100.0 if hasattr(self, 'hcb_max_distance_slider') else 0.25,
+                
+                # Trajectory Settings
+                'traj_gravity': self._safe_get_slider_value(self.traj_gravity_slider, 98) / 10.0 if hasattr(self, 'traj_gravity_slider') else 9.81,
+                'traj_time_step': self._safe_get_slider_value(self.traj_time_step_slider, 33) / 1000.0 if hasattr(self, 'traj_time_step_slider') else 0.033,
+                'traj_max_time': self._safe_get_slider_value(self.traj_max_time_slider, 30) / 10.0 if hasattr(self, 'traj_max_time_slider') else 3.0,
+                'traj_search_radius': self._safe_get_slider_value(self.traj_search_radius_slider, 15) / 100.0 if hasattr(self, 'traj_search_radius_slider') else 0.15,
+                'traj_min_points_for_prediction': self._safe_get_slider_value(self.traj_min_points_for_prediction_slider, 3) if hasattr(self, 'traj_min_points_for_prediction_slider') else 3,
+                'traj_color_match_threshold': self._safe_get_slider_value(self.traj_color_match_threshold_slider, 50) / 100.0 if hasattr(self, 'traj_color_match_threshold_slider') else 0.50,
+                'traj_velocity_estimation_time': self._safe_get_slider_value(self.traj_velocity_estimation_time_slider, 10) / 100.0 if hasattr(self, 'traj_velocity_estimation_time_slider') else 0.10,
+                'traj_max_search_distance': self._safe_get_slider_value(self.traj_max_search_distance_slider, 50) / 100.0 if hasattr(self, 'traj_max_search_distance_slider') else 0.50,
             }
             
             # Add ball profile settings
@@ -1844,7 +2012,20 @@ if PYQT_AVAILABLE:
             if 'max_depth_jump_strict' in settings and hasattr(self, 'ct_max_depth_jump_strict_slider'):
                 self.ct_max_depth_jump_strict_slider.setValue(int(settings['max_depth_jump_strict'] * 100))
             
-            # Override Detection settings
+            # Override Detection settings (NEW: class-specific thresholds)
+            if 'override_ball_confidence_threshold' in settings and hasattr(self, 'od_ball_confidence_slider'):
+                self.od_ball_confidence_slider.setValue(int(settings['override_ball_confidence_threshold'] * 100))
+            
+            if 'override_ball_color_threshold' in settings and hasattr(self, 'od_ball_color_slider'):
+                self.od_ball_color_slider.setValue(int(settings['override_ball_color_threshold'] * 100))
+            
+            if 'override_ball_held_confidence_threshold' in settings and hasattr(self, 'od_ball_held_confidence_slider'):
+                self.od_ball_held_confidence_slider.setValue(int(settings['override_ball_held_confidence_threshold'] * 100))
+            
+            if 'override_ball_held_color_threshold' in settings and hasattr(self, 'od_ball_held_color_slider'):
+                self.od_ball_held_color_slider.setValue(int(settings['override_ball_held_color_threshold'] * 100))
+            
+            # DEPRECATED: Keep old settings for backward compatibility
             if 'override_min_confidence_tracked' in settings and hasattr(self, 'od_min_confidence_tracked_slider'):
                 self.od_min_confidence_tracked_slider.setValue(int(settings['override_min_confidence_tracked'] * 100))
             
@@ -1879,6 +2060,31 @@ if PYQT_AVAILABLE:
             
             if 'held_color_max_distance' in settings and hasattr(self, 'hcb_max_distance_slider'):
                 self.hcb_max_distance_slider.setValue(int(settings['held_color_max_distance'] * 100))  # m to cm
+            
+            # Trajectory Settings
+            if 'traj_gravity' in settings and hasattr(self, 'traj_gravity_slider'):
+                self.traj_gravity_slider.setValue(int(settings['traj_gravity'] * 10))  # to 10ths
+            
+            if 'traj_time_step' in settings and hasattr(self, 'traj_time_step_slider'):
+                self.traj_time_step_slider.setValue(int(settings['traj_time_step'] * 1000))  # s to ms
+            
+            if 'traj_max_time' in settings and hasattr(self, 'traj_max_time_slider'):
+                self.traj_max_time_slider.setValue(int(settings['traj_max_time'] * 10))  # to 10ths
+            
+            if 'traj_search_radius' in settings and hasattr(self, 'traj_search_radius_slider'):
+                self.traj_search_radius_slider.setValue(int(settings['traj_search_radius'] * 100))  # m to cm
+            
+            if 'traj_min_points_for_prediction' in settings and hasattr(self, 'traj_min_points_for_prediction_slider'):
+                self.traj_min_points_for_prediction_slider.setValue(settings['traj_min_points_for_prediction'])
+            
+            if 'traj_color_match_threshold' in settings and hasattr(self, 'traj_color_match_threshold_slider'):
+                self.traj_color_match_threshold_slider.setValue(int(settings['traj_color_match_threshold'] * 100))
+            
+            if 'traj_velocity_estimation_time' in settings and hasattr(self, 'traj_velocity_estimation_time_slider'):
+                self.traj_velocity_estimation_time_slider.setValue(int(settings['traj_velocity_estimation_time'] * 100))  # s to cs
+            
+            if 'traj_max_search_distance' in settings and hasattr(self, 'traj_max_search_distance_slider'):
+                self.traj_max_search_distance_slider.setValue(int(settings['traj_max_search_distance'] * 100))  # m to cm
             
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:
@@ -2047,7 +2253,20 @@ if PYQT_AVAILABLE:
             if 'max_depth_jump_strict' in settings:
                 self.udp_client.send_setting('max_depth_jump_strict', settings['max_depth_jump_strict'])
             
-            # Override Detection settings
+            # Override Detection settings (NEW: class-specific thresholds)
+            if 'override_ball_confidence_threshold' in settings:
+                self.udp_client.send_setting('override_ball_confidence_threshold', settings['override_ball_confidence_threshold'])
+            
+            if 'override_ball_color_threshold' in settings:
+                self.udp_client.send_setting('override_ball_color_threshold', settings['override_ball_color_threshold'])
+            
+            if 'override_ball_held_confidence_threshold' in settings:
+                self.udp_client.send_setting('override_ball_held_confidence_threshold', settings['override_ball_held_confidence_threshold'])
+            
+            if 'override_ball_held_color_threshold' in settings:
+                self.udp_client.send_setting('override_ball_held_color_threshold', settings['override_ball_held_color_threshold'])
+            
+            # DEPRECATED: Keep old settings for backward compatibility
             if 'override_min_confidence_tracked' in settings:
                 self.udp_client.send_setting('override_min_confidence_tracked', settings['override_min_confidence_tracked'])
             
@@ -2082,6 +2301,31 @@ if PYQT_AVAILABLE:
             
             if 'held_color_max_distance' in settings:
                 self.udp_client.send_setting('held_color_max_distance', settings['held_color_max_distance'])
+            
+            # Trajectory Settings
+            if 'traj_gravity' in settings:
+                self.udp_client.send_setting('traj_gravity', settings['traj_gravity'])
+            
+            if 'traj_time_step' in settings:
+                self.udp_client.send_setting('traj_time_step', settings['traj_time_step'])
+            
+            if 'traj_max_time' in settings:
+                self.udp_client.send_setting('traj_max_time', settings['traj_max_time'])
+            
+            if 'traj_search_radius' in settings:
+                self.udp_client.send_setting('traj_search_radius', settings['traj_search_radius'])
+            
+            if 'traj_min_points_for_prediction' in settings:
+                self.udp_client.send_setting('traj_min_points_for_prediction', settings['traj_min_points_for_prediction'])
+            
+            if 'traj_color_match_threshold' in settings:
+                self.udp_client.send_setting('traj_color_match_threshold', settings['traj_color_match_threshold'])
+            
+            if 'traj_velocity_estimation_time' in settings:
+                self.udp_client.send_setting('traj_velocity_estimation_time', settings['traj_velocity_estimation_time'])
+            
+            if 'traj_max_search_distance' in settings:
+                self.udp_client.send_setting('traj_max_search_distance', settings['traj_max_search_distance'])
             
             # Ball tracking enabled states
             if 'ball_tracking_enabled' in settings:

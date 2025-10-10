@@ -16,6 +16,9 @@
 
 namespace fs = std::filesystem;
 
+// External debug log function from main.cpp
+extern void writeDebugLog(const std::string& message);
+
 Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, const std::string& model_name, const std::string& pose_model_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
     : camera_settings_path_(camera_settings_path),
       running_(false),
@@ -37,22 +40,34 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       record_with_yolo_boxes_(false),
       record_with_bytetrack_boxes_(false),
       video_feed_enabled_(true) {  // Start with video feed enabled by default
+   writeDebugLog("Engine constructor: Initializing...");
+   
    // Bind ZMQ sockets
+   writeDebugLog("Engine constructor: Binding ZMQ sockets...");
    zmq_publisher_.bind("tcp://127.0.0.1:5555");
-    zmq_commander_.bind("tcp://127.0.0.1:5565");
+   zmq_commander_.bind("tcp://127.0.0.1:5565");
+   writeDebugLog("Engine constructor: ZMQ sockets bound successfully");
 
     // Initialize SimpleBallTracker with model paths
     try {
+        writeDebugLog("Engine constructor: Initializing SimpleBallTracker...");
         const std::string ball_model_path = "engine/models/" + model_name + ".xml";
         const std::string pose_model_path = "engine/models/" + pose_model_name + ".xml";
+        writeDebugLog("Engine constructor: Ball model path: " + ball_model_path);
+        writeDebugLog("Engine constructor: Pose model path: " + pose_model_path);
+        
         simple_tracker_ = std::make_shared<SimpleBallTracker>(
             ball_model_path, pose_model_path, device_name, "hub/ball_settings.json");
+        writeDebugLog("Engine constructor: SimpleBallTracker initialized successfully");
     } catch (const std::exception& e) {
+        writeDebugLog("Engine constructor: EXCEPTION in SimpleBallTracker init: " + std::string(e.what()));
         return;
     }
 
     // Setup the default color module
+    writeDebugLog("Engine constructor: Setting up color module...");
     color_module_->setup();
+    writeDebugLog("Engine constructor: Initialization complete");
 }
 
 Engine::~Engine() {
@@ -60,41 +75,78 @@ Engine::~Engine() {
 }
 
 void Engine::run() {
+    writeDebugLog("Engine::run() - Starting...");
     running_ = true;
+    
     // Start command processing thread
+    writeDebugLog("Engine::run() - Starting command processing thread...");
     std::thread command_thread(&Engine::processCommands, this);
+    writeDebugLog("Engine::run() - Command thread started");
     
     // Initialize and start the camera with default settings.
+    writeDebugLog("Engine::run() - Initializing camera...");
     initializeCamera();
+    writeDebugLog("Engine::run() - Camera initialized");
+    
+    writeDebugLog("Engine::run() - Starting camera...");
     startCamera();
+    writeDebugLog("Engine::run() - Camera started");
 
     // Initialize settings module with SimpleBallTracker
+    writeDebugLog("Engine::run() - Initializing settings module...");
     settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_);
     settings_module_->setup();
+    writeDebugLog("Engine::run() - Settings module initialized");
 
+    writeDebugLog("Engine::run() - Entering main loop...");
+    int loop_iteration = 0;
     while (running_) {
+        loop_iteration++;
+        if (loop_iteration % 30 == 0) {  // Log every 30 frames to avoid spam
+            writeDebugLog("Engine::run() - Main loop iteration: " + std::to_string(loop_iteration));
+        }
+        
         // Skip frame processing if camera is stopped
         if (!camera_running_) {
+            if (loop_iteration % 30 == 0) {
+                writeDebugLog("Engine::run() - Camera not running, sleeping...");
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
 
         rs2::frameset frames;
         try {
+            if (loop_iteration % 30 == 0) {
+                writeDebugLog("Engine::run() - Waiting for frames...");
+            }
             frames = pipe_.wait_for_frames(1000); // 1 second timeout
+            if (loop_iteration % 30 == 0) {
+                writeDebugLog("Engine::run() - Frames received");
+            }
         } catch (const rs2::error& e) {
+            writeDebugLog("Engine::run() - RealSense error: " + std::string(e.what()));
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
 
+        if (loop_iteration % 30 == 0) {
+            writeDebugLog("Engine::run() - Aligning frames...");
+        }
         auto aligned_frames = align_to_color_.process(frames);
         auto color_frame = aligned_frames.get_color_frame();
         auto depth_frame = aligned_frames.get_depth_frame();
 
         if (!color_frame || !depth_frame) {
+            if (loop_iteration % 30 == 0) {
+                writeDebugLog("Engine::run() - Missing color or depth frame, skipping...");
+            }
             continue;
         }
 
+        if (loop_iteration % 30 == 0) {
+            writeDebugLog("Engine::run() - Creating cv::Mat from frames...");
+        }
         cv::Mat color_image(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
         cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
         last_depth_frame_ = depth_image.clone();
@@ -376,12 +428,18 @@ ball_pb->set_class_name(ball.is_held ? "ball_held" : "ball");
             
         }
 
+        if (loop_iteration % 30 == 0) {
+            writeDebugLog("Engine::run() - Updating active module...");
+        }
         if (active_module_) {
             active_module_->update(frame_data, [this](const juggler::v1::CommandRequest& command) {
                 sendCommand(command);
             });
         }
 
+        if (loop_iteration % 30 == 0) {
+            writeDebugLog("Engine::run() - Serializing and publishing frame data...");
+        }
         // Publish FrameData
         std::string serialized_data;
         frame_data.SerializeToString(&serialized_data);
@@ -389,9 +447,15 @@ ball_pb->set_class_name(ball.is_held ? "ball_held" : "ball");
         zmq::message_t message(serialized_data.size());
         memcpy(message.data(), serialized_data.c_str(), serialized_data.size());
         zmq_publisher_.send(message, zmq::send_flags::dontwait);
+        
+        if (loop_iteration % 30 == 0) {
+            writeDebugLog("Engine::run() - Frame published successfully");
+        }
     }
 
+    writeDebugLog("Engine::run() - Exited main loop, joining command thread...");
     command_thread.join();
+    writeDebugLog("Engine::run() - Command thread joined, exiting run()");
 }
 
 void Engine::stop() {
@@ -445,13 +509,22 @@ void Engine::processCommands() {
                     }
                     break;
                 case juggler::v1::CommandRequest::RECORD_START:
+                    writeDebugLog("processCommands() - RECORD_START command received");
                     record_with_yolo_boxes_ = command.record_with_yolo_boxes();
                     record_with_bytetrack_boxes_ = command.record_with_bytetrack_boxes();
                     if (command.has_visualization_states()) {
                         visualization_states_ = command.visualization_states();
+                        writeDebugLog("processCommands() - Visualization states set");
                     }
-                    saveRecording();
-                    response.set_message("Recording saved");
+                    writeDebugLog("processCommands() - Starting saveRecording() in background thread...");
+                    // Start saveRecording in a separate thread to avoid blocking the command response
+                    std::thread([this]() {
+                        writeDebugLog("saveRecording thread - Starting...");
+                        saveRecording();
+                        writeDebugLog("saveRecording thread - Completed");
+                    }).detach();
+                    writeDebugLog("processCommands() - saveRecording() thread started, sending immediate response");
+                    response.set_message("Recording started (saving in background)");
                     break;
                 case juggler::v1::CommandRequest::RECORD_CONTINUOUS_START:
                     record_with_yolo_boxes_ = command.record_with_yolo_boxes();
@@ -463,8 +536,16 @@ void Engine::processCommands() {
                     response.set_message("Continuous recording started");
                     break;
                 case juggler::v1::CommandRequest::RECORD_CONTINUOUS_STOP:
-                    stopContinuousRecording();
-                    response.set_message("Continuous recording stopped and saved");
+                    writeDebugLog("processCommands() - RECORD_CONTINUOUS_STOP command received");
+                    writeDebugLog("processCommands() - Starting stopContinuousRecording() in background thread...");
+                    // Start stopContinuousRecording in a separate thread to avoid blocking
+                    std::thread([this]() {
+                        writeDebugLog("stopContinuousRecording thread - Starting...");
+                        stopContinuousRecording();
+                        writeDebugLog("stopContinuousRecording thread - Completed");
+                    }).detach();
+                    writeDebugLog("processCommands() - stopContinuousRecording() thread started, sending immediate response");
+                    response.set_message("Continuous recording stopped (saving in background)");
                     break;
                 case juggler::v1::CommandRequest::CAMERA_STOP:
                     stopCamera();
@@ -637,6 +718,7 @@ void Engine::saveRecording() {
         
         INFO_LOG("Saved ", frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
 
+        writeDebugLog("saveRecording() - Checking for visualizations...");
         // Check if any visualizations are enabled
         bool has_visualizations = record_with_yolo_boxes_ || record_with_bytetrack_boxes_ ||
                                  visualization_states_.show_kalman_predictions() ||
@@ -656,20 +738,41 @@ void Engine::saveRecording() {
                                  visualization_states_.show_trajectory();
 
         if (has_visualizations) {
+            writeDebugLog("saveRecording() - Visualizations enabled, rendering frames...");
             fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
             fs::create_directories(recording_dir_with_viz);
 
             int frame_num_viz = 0;
             for (const auto& rec_frame : frame_buffer_) {
+                if (frame_num_viz % 30 == 0) {
+                    writeDebugLog("saveRecording() - Rendering visualization frame " + std::to_string(frame_num_viz) + "/" + std::to_string(frame_buffer_.size()));
+                }
+                
+                writeDebugLog("saveRecording() - About to call renderVisualizationsOnFrame for frame " + std::to_string(frame_num_viz));
                 cv::Mat frame_with_viz = renderVisualizationsOnFrame(rec_frame.frame, rec_frame);
+                writeDebugLog("saveRecording() - renderVisualizationsOnFrame returned for frame " + std::to_string(frame_num_viz));
                 std::string filename = ss.str() + "_frame_" + std::to_string(frame_num_viz++) + "_viz.jpg";
                 fs::path filepath = recording_dir_with_viz / filename;
+                
+                if (frame_num_viz % 30 == 1) {  // Log every 30th write
+                    writeDebugLog("saveRecording() - About to write visualization frame to: " + filepath.string());
+                }
                 cv::imwrite(filepath.string(), frame_with_viz);
+                if (frame_num_viz % 30 == 1) {
+                    writeDebugLog("saveRecording() - Visualization frame written successfully");
+                }
             }
             INFO_LOG("Saved ", frame_buffer_.size(), " frames with visualizations to ", recording_dir_with_viz.string());
+            writeDebugLog("saveRecording() - Visualization frames saved");
+        } else {
+            writeDebugLog("saveRecording() - No visualizations enabled");
         }
 
+        writeDebugLog("saveRecording() - Complete");
     } catch (const fs::filesystem_error& e) {
+        writeDebugLog("saveRecording() - FILESYSTEM EXCEPTION: " + std::string(e.what()));
+    } catch (const std::exception& e) {
+        writeDebugLog("saveRecording() - EXCEPTION: " + std::string(e.what()));
     }
 }
 
@@ -698,20 +801,39 @@ void Engine::startContinuousRecording() {
 }
 
 void Engine::stopContinuousRecording() {
+    writeDebugLog("stopContinuousRecording() - Starting...");
     if (!continuous_recording_) {
+        writeDebugLog("stopContinuousRecording() - Not recording, returning");
         return;
     }
     
+    writeDebugLog("stopContinuousRecording() - Stopping recording flag");
     continuous_recording_ = false;
     
-    std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
-    
-    if (continuous_frame_buffer_.empty()) {
-        return;
+    // CRITICAL FIX: Copy the buffer while holding the lock, then release it immediately
+    // This prevents deadlock with the main loop trying to add frames
+    std::deque<RecordingFrame> frames_to_save;
+    std::string session_name;
+    {
+        writeDebugLog("stopContinuousRecording() - Acquiring mutex to copy buffer");
+        std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
+        
+        if (continuous_frame_buffer_.empty()) {
+            writeDebugLog("stopContinuousRecording() - Buffer empty, returning");
+            return;
+        }
+        
+        writeDebugLog("stopContinuousRecording() - Copying " + std::to_string(continuous_frame_buffer_.size()) + " frames");
+        frames_to_save = continuous_frame_buffer_;
+        session_name = continuous_recording_session_;
+        continuous_frame_buffer_.clear();
+        writeDebugLog("stopContinuousRecording() - Buffer copied and cleared, releasing mutex");
     }
+    // Mutex is now released - main loop can continue
     
+    writeDebugLog("stopContinuousRecording() - Processing " + std::to_string(frames_to_save.size()) + " frames");
     fs::path data_dir = "engine/data/1_raw_recordings";
-    fs::path recording_dir = data_dir / continuous_recording_session_;
+    fs::path recording_dir = data_dir / session_name;
     fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
 
     try {
@@ -723,8 +845,8 @@ void Engine::stopContinuousRecording() {
         }
         
         int frame_num = 0;
-        for (const auto& rec_frame : continuous_frame_buffer_) {
-            std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num++) + ".jpg";
+        for (const auto& rec_frame : frames_to_save) {
+            std::string filename = session_name + "_frame_" + std::to_string(frame_num++) + ".jpg";
             fs::path filepath = recording_dir_no_boxes / filename;
             cv::imwrite(filepath.string(), rec_frame.frame);
             
@@ -742,7 +864,8 @@ void Engine::stopContinuousRecording() {
         // Close recording logger
         recording_logger_.close();
         
-        INFO_LOG("Saved ", continuous_frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
+        INFO_LOG("Saved ", frames_to_save.size(), " frames to ", recording_dir_no_boxes.string());
+        writeDebugLog("stopContinuousRecording() - Saved " + std::to_string(frames_to_save.size()) + " frames without visualizations");
 
         // Check if any visualizations are enabled
         bool has_visualizations = record_with_yolo_boxes_ || record_with_bytetrack_boxes_ ||
@@ -766,17 +889,31 @@ void Engine::stopContinuousRecording() {
             fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
             fs::create_directories(recording_dir_with_viz);
 
+            writeDebugLog("stopContinuousRecording() - Starting visualization rendering for " + std::to_string(frames_to_save.size()) + " frames");
             int frame_num_viz = 0;
-            for (const auto& rec_frame : continuous_frame_buffer_) {
+            for (const auto& rec_frame : frames_to_save) {
+                if (frame_num_viz % 30 == 0) {
+                    writeDebugLog("stopContinuousRecording() - Processing visualization frame " + std::to_string(frame_num_viz) + "/" + std::to_string(continuous_frame_buffer_.size()));
+                }
+                
                 cv::Mat frame_with_viz = renderVisualizationsOnFrame(rec_frame.frame, rec_frame);
-                std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num_viz++) + "_viz.jpg";
+                std::string filename = continuous_recording_session_ + "_frame_" + std::to_string(frame_num_viz) + "_viz.jpg";
                 fs::path filepath = recording_dir_with_viz / filename;
+                
+                if (frame_num_viz % 30 == 0) {
+                    writeDebugLog("stopContinuousRecording() - About to write frame " + std::to_string(frame_num_viz) + " to: " + filepath.string());
+                }
                 cv::imwrite(filepath.string(), frame_with_viz);
+                if (frame_num_viz % 30 == 0) {
+                    writeDebugLog("stopContinuousRecording() - Frame " + std::to_string(frame_num_viz) + " written successfully");
+                }
+                frame_num_viz++;
             }
-            INFO_LOG("Saved ", continuous_frame_buffer_.size(), " frames with visualizations to ", recording_dir_with_viz.string());
+            writeDebugLog("stopContinuousRecording() - All visualization frames written");
+            INFO_LOG("Saved ", frames_to_save.size(), " frames with visualizations to ", recording_dir_with_viz.string());
+        } else {
+            writeDebugLog("stopContinuousRecording() - No visualizations enabled");
         }
-
-        continuous_frame_buffer_.clear();
         
     } catch (const fs::filesystem_error& e) {
     }
@@ -855,44 +992,65 @@ void Engine::stopCamera() {
 }
 
 void Engine::startCamera() {
+    writeDebugLog("startCamera() - Starting...");
+    
     if (camera_running_) {
+        writeDebugLog("startCamera() - Camera already running, returning");
         return;
     }
 
     DEBUG_LOG("[LOG] Attempting to start camera pipeline...");
+    writeDebugLog("startCamera() - Attempting to start RealSense pipeline...");
 
     try {
+        writeDebugLog("startCamera() - Calling pipe_.start()...");
         rs2::pipeline_profile profile = pipe_.start(rs_config_);
         camera_running_ = true;
         INFO_LOG("[LOG] Camera pipeline started successfully.");
+        writeDebugLog("startCamera() - Pipeline started successfully");
 
         // --- Store Camera Intrinsics ---
+        writeDebugLog("startCamera() - Retrieving camera intrinsics...");
         auto stream = profile.get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
         auto intrinsics = stream.get_intrinsics();
         camera_intrinsics_.fx = intrinsics.fx;
         camera_intrinsics_.fy = intrinsics.fy;
         camera_intrinsics_.ppx = intrinsics.ppx;
         camera_intrinsics_.ppy = intrinsics.ppy;
+        writeDebugLog("startCamera() - Intrinsics: fx=" + std::to_string(intrinsics.fx) +
+                      " fy=" + std::to_string(intrinsics.fy) +
+                      " ppx=" + std::to_string(intrinsics.ppx) +
+                      " ppy=" + std::to_string(intrinsics.ppy));
 
         // Wait for a moment to ensure the device is ready.
+        writeDebugLog("startCamera() - Waiting 500ms for device to stabilize...");
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Apply advanced settings from JSON now that the pipeline is active.
+        writeDebugLog("startCamera() - Applying camera settings...");
         applyCameraSettings();
+        writeDebugLog("startCamera() - Camera settings applied");
 
         // Programmatically enable the IR projector
+        writeDebugLog("startCamera() - Enabling IR projector...");
         try {
             auto sensor = profile.get_device().first<rs2::depth_sensor>();
             if (sensor.supports(RS2_OPTION_EMITTER_ENABLED)) {
                 sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 1.f); // 1.f is for ON
                 ir_projector_active_ = true;
+                writeDebugLog("startCamera() - IR projector enabled");
+            } else {
+                writeDebugLog("startCamera() - IR projector not supported");
             }
         } catch (const rs2::error& e) {
             ir_projector_active_ = false;
+            writeDebugLog("startCamera() - Failed to enable IR projector: " + std::string(e.what()));
         }
 
+        writeDebugLog("startCamera() - Complete");
     } catch (const rs2::error& e) {
         camera_running_ = false;
+        writeDebugLog("startCamera() - EXCEPTION: " + std::string(e.what()));
     }
 }
 
@@ -1411,8 +1569,16 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 for (const auto& traj_point : ball.trajectory.points) {
                     if (!traj_point.verified) continue;
                     
+                    // Validate depth before projection
+                    if (traj_point.position.z <= 0) continue;
+                    
                     float x_2d = (traj_point.position.x * camera_intrinsics_.fx) / traj_point.position.z + camera_intrinsics_.ppx;
                     float y_2d = (traj_point.position.y * camera_intrinsics_.fy) / traj_point.position.z + camera_intrinsics_.ppy;
+                    
+                    // Validate that coordinates are finite and within reasonable bounds
+                    if (!std::isfinite(x_2d) || !std::isfinite(y_2d)) continue;
+                    if (x_2d < -10000 || x_2d > 10000 || y_2d < -10000 || y_2d > 10000) continue;
+                    
                     cv::Point2f point_2d(x_2d, y_2d);
                     
                     if (point_2d.x >= 0 && point_2d.x < temp_result.cols &&
@@ -1421,9 +1587,56 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                     }
                 }
                 
-                // Draw polyline connecting the points
+                // Draw polyline connecting the points - with safety check
                 if (path_2d.size() > 1) {
-                    cv::polylines(temp_result, path_2d, false, ball_color, 2, cv::LINE_AA);
+                    try {
+                        // Convert to vector of vectors as required by cv::polylines
+                        std::vector<std::vector<cv::Point2f>> paths = {path_2d};
+                        cv::polylines(temp_result, paths, false, ball_color, 2, cv::LINE_AA);
+                    } catch (const cv::Exception& e) {
+                        writeDebugLog("renderVisualizationsOnFrame() - cv::polylines exception: " + std::string(e.what()));
+                    }
+                }
+            }
+            
+            // Add trajectory points listing to info panel
+            // Count verified points
+            int verified_count = 0;
+            for (const auto& traj_point : ball.trajectory.points) {
+                if (traj_point.verified) verified_count++;
+            }
+            
+            if (verified_count > 0) {
+                // Add header line
+                char header[256];
+                snprintf(header, sizeof(header), "Ball %d (%s) - IN_FLIGHT",
+                         ball.id, ball.color_name.c_str());
+                info_lines.push_back(header);
+                info_colors.push_back(ball_color);
+                
+                // Add trajectory points count
+                char count_line[256];
+                snprintf(count_line, sizeof(count_line), "  Trajectory Points: %d", verified_count);
+                info_lines.push_back(count_line);
+                info_colors.push_back(cv::Scalar(200, 200, 200));
+                
+                // List each verified trajectory point
+                int point_index = 0;
+                for (const auto& traj_point : ball.trajectory.points) {
+                    if (!traj_point.verified) continue;
+                    
+                    char point_line[512];
+                    snprintf(point_line, sizeof(point_line),
+                             "    [%d] (%.3f, %.3f, %.3f) m | conf=%.2f | t=%llu us",
+                             point_index,
+                             traj_point.position.x,
+                             traj_point.position.y,
+                             traj_point.position.z,
+                             traj_point.confidence,
+                             (unsigned long long)traj_point.timestamp);
+                    info_lines.push_back(point_line);
+                    info_colors.push_back(cv::Scalar(180, 180, 180));
+                    point_index++;
                 }
             }
         }
@@ -1635,5 +1848,6 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
        }
    }
    
+   writeDebugLog("renderVisualizationsOnFrame() - Complete");
    return result;
 }

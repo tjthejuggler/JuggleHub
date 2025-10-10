@@ -1,11 +1,67 @@
 #include "Engine.hpp"
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <signal.h>
+#include <execinfo.h>
+#include <unistd.h>
 
 // Global flag to control debug logging
 bool g_enable_debug_log = false;
 
+// Global debug log file
+std::ofstream g_gpu_debug_log;
+
+void writeDebugLog(const std::string& message) {
+    if (g_gpu_debug_log.is_open()) {
+        auto now = std::chrono::system_clock::now();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+        auto timer = std::chrono::system_clock::to_time_t(now);
+        std::tm bt = *std::localtime(&timer);
+        
+        g_gpu_debug_log << std::put_time(&bt, "%H:%M:%S") << "."
+                        << std::setfill('0') << std::setw(3) << ms.count()
+                        << " | " << message << std::endl;
+        g_gpu_debug_log.flush();
+    }
+}
+
+void signalHandler(int sig) {
+    writeDebugLog("=== SIGNAL CAUGHT: " + std::to_string(sig) + " ===");
+    
+    // Get stack trace
+    void* array[20];
+    size_t size = backtrace(array, 20);
+    
+    writeDebugLog("Stack trace:");
+    char** strings = backtrace_symbols(array, size);
+    for (size_t i = 0; i < size; i++) {
+        writeDebugLog(std::string(strings[i]));
+    }
+    free(strings);
+    
+    g_gpu_debug_log.close();
+    exit(1);
+}
+
 int main(int argc, char* argv[]) {
+    // Install signal handlers
+    signal(SIGSEGV, signalHandler);  // Segmentation fault
+    signal(SIGABRT, signalHandler);  // Abort
+    signal(SIGFPE, signalHandler);   // Floating point exception
+    signal(SIGILL, signalHandler);   // Illegal instruction
+    
+    // Clear and open GPU_debug.log at startup
+    g_gpu_debug_log.open("GPU_debug.log", std::ios::out | std::ios::trunc);
+    if (!g_gpu_debug_log.is_open()) {
+        std::cerr << "Failed to open GPU_debug.log" << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    writeDebugLog("=== ENGINE STARTUP ===");
+    writeDebugLog("Parsing command line arguments...");
     Engine::OutputFormat format = Engine::OutputFormat::DEFAULT;
     bool use_dnn_tracker = false;
     bool verbose = false;
@@ -38,6 +94,14 @@ int main(int argc, char* argv[]) {
             pose_model_name = arg.substr(13);
         }
     }
+    
+    writeDebugLog("Command line arguments parsed successfully");
+    writeDebugLog("Device: " + device_name);
+    writeDebugLog("Model: " + model_name);
+    writeDebugLog("Pose Model: " + pose_model_name);
+    writeDebugLog("Camera Settings: " + (camera_settings_path.empty() ? "none" : camera_settings_path));
+    writeDebugLog("Use DNN Tracker: " + std::string(use_dnn_tracker ? "true" : "false"));
+    writeDebugLog("Verbose: " + std::string(verbose ? "true" : "false"));
 
     // Create debug log file at startup only if debug logging is enabled
     if (g_enable_debug_log) {
@@ -52,10 +116,24 @@ int main(int argc, char* argv[]) {
     }
 
     try {
+        writeDebugLog("Creating Engine instance...");
         Engine engine(camera_settings_path, device_name, model_name, pose_model_name, format, use_dnn_tracker, verbose);
+        writeDebugLog("Engine instance created successfully");
+        
+        writeDebugLog("Starting engine.run()...");
         engine.run();
+        writeDebugLog("engine.run() completed normally");
     } catch (const std::exception& e) {
+        writeDebugLog("EXCEPTION CAUGHT: " + std::string(e.what()));
+        g_gpu_debug_log.close();
+        return EXIT_FAILURE;
+    } catch (...) {
+        writeDebugLog("UNKNOWN EXCEPTION CAUGHT");
+        g_gpu_debug_log.close();
         return EXIT_FAILURE;
     }
+    
+    writeDebugLog("=== ENGINE SHUTDOWN ===");
+    g_gpu_debug_log.close();
     return EXIT_SUCCESS;
 }

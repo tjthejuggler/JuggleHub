@@ -39,7 +39,7 @@ cv::Mat GpuHsvConverter::convertRoiToHsv(const cv::Mat& bgr_frame, const cv::Rec
     if (!gpu_enabled_) {
         // Fallback to CPU conversion
         debug_counters_.hsv_roi_cpu_fallback++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         
         cv::Mat bgr_roi = bgr_frame(roi);
         cv::Mat hsv_roi;
@@ -64,7 +64,7 @@ cv::Mat GpuHsvConverter::convertRoiToHsv(const cv::Mat& bgr_frame, const cv::Rec
         gpu_hsv_roi.copyTo(hsv_roi);
         
         debug_counters_.hsv_roi_gpu_success++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         
         return hsv_roi;
         
@@ -73,7 +73,7 @@ cv::Mat GpuHsvConverter::convertRoiToHsv(const cv::Mat& bgr_frame, const cv::Rec
         std::cerr << "[GpuHsvConverter] Falling back to CPU" << std::endl;
         
         debug_counters_.hsv_roi_cpu_fallback++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         
         // Fallback to CPU
         cv::Mat bgr_roi = bgr_frame(roi);
@@ -89,7 +89,7 @@ cv::Mat GpuHsvConverter::convertToHsv(const cv::Mat& bgr_frame) {
     if (!gpu_enabled_) {
         // Fallback to CPU conversion
         debug_counters_.hsv_full_cpu_fallback++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         
         cv::Mat hsv_frame;
         cv::cvtColor(bgr_frame, hsv_frame, cv::COLOR_BGR2HSV);
@@ -110,7 +110,7 @@ cv::Mat GpuHsvConverter::convertToHsv(const cv::Mat& bgr_frame) {
         gpu_hsv.copyTo(hsv_frame);
         
         debug_counters_.hsv_full_gpu_success++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         
         return hsv_frame;
         
@@ -119,7 +119,7 @@ cv::Mat GpuHsvConverter::convertToHsv(const cv::Mat& bgr_frame) {
         std::cerr << "[GpuHsvConverter] Falling back to CPU" << std::endl;
         
         debug_counters_.hsv_full_cpu_fallback++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         
         // Fallback to CPU
         cv::Mat hsv_frame;
@@ -141,7 +141,7 @@ cv::Point2f GpuHsvConverter::findColorBlob(const cv::Mat& bgr_frame,
     if (!gpu_enabled_) {
         // Fallback to CPU implementation
         debug_counters_.blob_search_cpu_fallback++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         cv::Mat bgr_roi = bgr_frame(roi);
         cv::Mat hsv_roi;
         cv::cvtColor(bgr_roi, hsv_roi, cv::COLOR_BGR2HSV);
@@ -233,7 +233,7 @@ cv::Point2f GpuHsvConverter::findColorBlob(const cv::Mat& bgr_frame,
         }
         
         debug_counters_.blob_search_gpu_success++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         
         return best_center;
         
@@ -242,7 +242,7 @@ cv::Point2f GpuHsvConverter::findColorBlob(const cv::Mat& bgr_frame,
         std::cerr << "[GpuHsvConverter] Falling back to CPU" << std::endl;
         
         debug_counters_.blob_search_cpu_fallback++;
-        logDebugStats();
+        // logDebugStats();  // Commented out to investigate crash
         
         // Fallback to CPU
         cv::Mat bgr_roi = bgr_frame(roi);

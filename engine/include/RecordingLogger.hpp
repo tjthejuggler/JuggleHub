@@ -117,7 +117,7 @@ public:
     // Log a single frame's tracking data
     void logFrame(const std::vector<SimpleBall>& balls,
                   const std::vector<SimpleHand>& hands,
-                  const CameraIntrinsics& intrinsics) {
+                  const CameraIntrinsics& intrinsics [[maybe_unused]]) {
         if (!is_active_) return;
         
         log_file_ << "================================================================================\n";

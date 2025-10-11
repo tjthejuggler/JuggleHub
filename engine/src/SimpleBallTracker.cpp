@@ -2312,8 +2312,7 @@ std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ba
     
     // Update trajectory parameters with current state
     ball.trajectory.initial_velocity = state.velocity;
-    cv::Point3f current_position = state.position;
-    cv::Point3f current_acceleration = state.acceleration;
+    // Note: state.position and state.acceleration are used directly in the prediction loop below
     
     // CPU-ONLY: Predict full trajectory path using simple ballistic equations
     // This replaces the GPU predictor which was causing 48% CPU overhead
@@ -2376,7 +2375,6 @@ const Detection* SimpleBallTracker::searchAlongPredictionLine(
     }
     
     const Detection* best_detection = nullptr;
-    float best_distance = search_radius;
     float best_combined_score = 0.0f;
     
     // Search through all YOLO detections
@@ -2394,7 +2392,6 @@ const Detection* SimpleBallTracker::searchAlongPredictionLine(
                 
                 if (combined_score > best_combined_score) {
                     best_detection = &det;
-                    best_distance = distance;
                     best_combined_score = combined_score;
                 }
             }
@@ -2543,7 +2540,7 @@ void SimpleBallTracker::updateHeldBall(
     const std::vector<SimpleHand>& hands,
     const std::vector<Detection>& yolo_detections,
     const cv::Mat& color_frame,
-    const cv::Mat& depth_frame,
+    const cv::Mat& depth_frame [[maybe_unused]],
     const CameraIntrinsics& intrinsics,
     std::vector<BallEvent>& events) {
     

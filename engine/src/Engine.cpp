@@ -21,22 +21,22 @@ extern void writeDebugLog(const std::string& message);
 
 Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, const std::string& model_name, const std::string& pose_model_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
     : camera_settings_path_(camera_settings_path),
-      running_(false),
       output_format_(format),
+      running_(false),
+      color_module_(std::make_unique<UdpBallColorModule>()),
       use_dnn_tracker_(use_dnn_tracker),
       verbose_(verbose),
       zmq_context_(1),
       zmq_publisher_(zmq_context_, ZMQ_PUB),
       zmq_commander_(zmq_context_, ZMQ_REP),
       align_to_color_(RS2_STREAM_COLOR),
-      color_module_(std::make_unique<UdpBallColorModule>()),
-      frame_counter_(0),
-      continuous_recording_(false),
       camera_running_(false),
       ir_projector_active_(false),
       camera_width_(640),
       camera_height_(480),
       camera_fps_(60),
+      frame_counter_(0),
+      continuous_recording_(false),
       record_with_yolo_boxes_(false),
       video_feed_enabled_(true) {  // Start with video feed enabled by default
    writeDebugLog("Engine constructor: Initializing...");

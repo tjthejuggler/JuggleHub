@@ -98,9 +98,6 @@ extern HandDefaultTypeInternal _Hand_default_instance_;
 class IMUData;
 struct IMUDataDefaultTypeInternal;
 extern IMUDataDefaultTypeInternal _IMUData_default_instance_;
-class KalmanPrediction;
-struct KalmanPredictionDefaultTypeInternal;
-extern KalmanPredictionDefaultTypeInternal _KalmanPrediction_default_instance_;
 class KeyPoint;
 struct KeyPointDefaultTypeInternal;
 extern KeyPointDefaultTypeInternal _KeyPoint_default_instance_;
@@ -122,6 +119,9 @@ extern TrackerAssociationDefaultTypeInternal _TrackerAssociation_default_instanc
 class TrajectoryPoint;
 struct TrajectoryPointDefaultTypeInternal;
 extern TrajectoryPointDefaultTypeInternal _TrajectoryPoint_default_instance_;
+class TrajectoryPrediction;
+struct TrajectoryPredictionDefaultTypeInternal;
+extern TrajectoryPredictionDefaultTypeInternal _TrajectoryPrediction_default_instance_;
 class Vector2;
 struct Vector2DefaultTypeInternal;
 extern Vector2DefaultTypeInternal _Vector2_default_instance_;
@@ -150,7 +150,6 @@ template<> ::juggler::v1::FrameData* Arena::CreateMaybeMessage<::juggler::v1::Fr
 template<> ::juggler::v1::HSVRange* Arena::CreateMaybeMessage<::juggler::v1::HSVRange>(Arena*);
 template<> ::juggler::v1::Hand* Arena::CreateMaybeMessage<::juggler::v1::Hand>(Arena*);
 template<> ::juggler::v1::IMUData* Arena::CreateMaybeMessage<::juggler::v1::IMUData>(Arena*);
-template<> ::juggler::v1::KalmanPrediction* Arena::CreateMaybeMessage<::juggler::v1::KalmanPrediction>(Arena*);
 template<> ::juggler::v1::KeyPoint* Arena::CreateMaybeMessage<::juggler::v1::KeyPoint>(Arena*);
 template<> ::juggler::v1::NewTracker* Arena::CreateMaybeMessage<::juggler::v1::NewTracker>(Arena*);
 template<> ::juggler::v1::OcclusionState* Arena::CreateMaybeMessage<::juggler::v1::OcclusionState>(Arena*);
@@ -158,6 +157,7 @@ template<> ::juggler::v1::SystemStatus* Arena::CreateMaybeMessage<::juggler::v1:
 template<> ::juggler::v1::ThrowCatchEvent* Arena::CreateMaybeMessage<::juggler::v1::ThrowCatchEvent>(Arena*);
 template<> ::juggler::v1::TrackerAssociation* Arena::CreateMaybeMessage<::juggler::v1::TrackerAssociation>(Arena*);
 template<> ::juggler::v1::TrajectoryPoint* Arena::CreateMaybeMessage<::juggler::v1::TrajectoryPoint>(Arena*);
+template<> ::juggler::v1::TrajectoryPrediction* Arena::CreateMaybeMessage<::juggler::v1::TrajectoryPrediction>(Arena*);
 template<> ::juggler::v1::Vector2* Arena::CreateMaybeMessage<::juggler::v1::Vector2>(Arena*);
 template<> ::juggler::v1::Vector3* Arena::CreateMaybeMessage<::juggler::v1::Vector3>(Arena*);
 template<> ::juggler::v1::VisualizationStates* Arena::CreateMaybeMessage<::juggler::v1::VisualizationStates>(Arena*);
@@ -3112,24 +3112,24 @@ class SystemStatus final :
 };
 // -------------------------------------------------------------------
 
-class KalmanPrediction final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.KalmanPrediction) */ {
+class TrajectoryPrediction final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:juggler.v1.TrajectoryPrediction) */ {
  public:
-  inline KalmanPrediction() : KalmanPrediction(nullptr) {}
-  ~KalmanPrediction() override;
-  explicit PROTOBUF_CONSTEXPR KalmanPrediction(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline TrajectoryPrediction() : TrajectoryPrediction(nullptr) {}
+  ~TrajectoryPrediction() override;
+  explicit PROTOBUF_CONSTEXPR TrajectoryPrediction(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  KalmanPrediction(const KalmanPrediction& from);
-  KalmanPrediction(KalmanPrediction&& from) noexcept
-    : KalmanPrediction() {
+  TrajectoryPrediction(const TrajectoryPrediction& from);
+  TrajectoryPrediction(TrajectoryPrediction&& from) noexcept
+    : TrajectoryPrediction() {
     *this = ::std::move(from);
   }
 
-  inline KalmanPrediction& operator=(const KalmanPrediction& from) {
+  inline TrajectoryPrediction& operator=(const TrajectoryPrediction& from) {
     CopyFrom(from);
     return *this;
   }
-  inline KalmanPrediction& operator=(KalmanPrediction&& from) noexcept {
+  inline TrajectoryPrediction& operator=(TrajectoryPrediction&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -3152,20 +3152,20 @@ class KalmanPrediction final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const KalmanPrediction& default_instance() {
+  static const TrajectoryPrediction& default_instance() {
     return *internal_default_instance();
   }
-  static inline const KalmanPrediction* internal_default_instance() {
-    return reinterpret_cast<const KalmanPrediction*>(
-               &_KalmanPrediction_default_instance_);
+  static inline const TrajectoryPrediction* internal_default_instance() {
+    return reinterpret_cast<const TrajectoryPrediction*>(
+               &_TrajectoryPrediction_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     13;
 
-  friend void swap(KalmanPrediction& a, KalmanPrediction& b) {
+  friend void swap(TrajectoryPrediction& a, TrajectoryPrediction& b) {
     a.Swap(&b);
   }
-  inline void Swap(KalmanPrediction* other) {
+  inline void Swap(TrajectoryPrediction* other) {
     if (other == this) return;
   #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
     if (GetOwningArena() != nullptr &&
@@ -3178,7 +3178,7 @@ class KalmanPrediction final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(KalmanPrediction* other) {
+  void UnsafeArenaSwap(TrajectoryPrediction* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -3186,14 +3186,14 @@ class KalmanPrediction final :
 
   // implements Message ----------------------------------------------
 
-  KalmanPrediction* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
-    return CreateMaybeMessage<KalmanPrediction>(arena);
+  TrajectoryPrediction* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<TrajectoryPrediction>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const KalmanPrediction& from);
+  void CopyFrom(const TrajectoryPrediction& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom( const KalmanPrediction& from) {
-    KalmanPrediction::MergeImpl(*this, from);
+  void MergeFrom( const TrajectoryPrediction& from) {
+    TrajectoryPrediction::MergeImpl(*this, from);
   }
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
@@ -3211,15 +3211,15 @@ class KalmanPrediction final :
   void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(KalmanPrediction* other);
+  void InternalSwap(TrajectoryPrediction* other);
 
   private:
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "juggler.v1.KalmanPrediction";
+    return "juggler.v1.TrajectoryPrediction";
   }
   protected:
-  explicit KalmanPrediction(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit TrajectoryPrediction(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   public:
 
@@ -3292,7 +3292,7 @@ class KalmanPrediction final :
   void _internal_set_is_in_freefall(bool value);
   public:
 
-  // @@protoc_insertion_point(class_scope:juggler.v1.KalmanPrediction)
+  // @@protoc_insertion_point(class_scope:juggler.v1.TrajectoryPrediction)
  private:
   class _Internal;
 
@@ -4895,7 +4895,7 @@ class FrameData final :
     kColorTrackedBallsFieldNumber = 14,
     kThrowCatchEventsFieldNumber = 15,
     kUnmatchedDetectionsFieldNumber = 16,
-    kKalmanPredictionsFieldNumber = 17,
+    kTrajectoryPredictionsFieldNumber = 17,
     kFilteredDetectionsFieldNumber = 18,
     kTrackerAssociationsFieldNumber = 19,
     kNewTrackersFieldNumber = 20,
@@ -5038,23 +5038,23 @@ class FrameData final :
   const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D >&
       unmatched_detections() const;
 
-  // repeated .juggler.v1.KalmanPrediction kalman_predictions = 17;
-  int kalman_predictions_size() const;
+  // repeated .juggler.v1.TrajectoryPrediction trajectory_predictions = 17;
+  int trajectory_predictions_size() const;
   private:
-  int _internal_kalman_predictions_size() const;
+  int _internal_trajectory_predictions_size() const;
   public:
-  void clear_kalman_predictions();
-  ::juggler::v1::KalmanPrediction* mutable_kalman_predictions(int index);
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction >*
-      mutable_kalman_predictions();
+  void clear_trajectory_predictions();
+  ::juggler::v1::TrajectoryPrediction* mutable_trajectory_predictions(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrajectoryPrediction >*
+      mutable_trajectory_predictions();
   private:
-  const ::juggler::v1::KalmanPrediction& _internal_kalman_predictions(int index) const;
-  ::juggler::v1::KalmanPrediction* _internal_add_kalman_predictions();
+  const ::juggler::v1::TrajectoryPrediction& _internal_trajectory_predictions(int index) const;
+  ::juggler::v1::TrajectoryPrediction* _internal_add_trajectory_predictions();
   public:
-  const ::juggler::v1::KalmanPrediction& kalman_predictions(int index) const;
-  ::juggler::v1::KalmanPrediction* add_kalman_predictions();
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction >&
-      kalman_predictions() const;
+  const ::juggler::v1::TrajectoryPrediction& trajectory_predictions(int index) const;
+  ::juggler::v1::TrajectoryPrediction* add_trajectory_predictions();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrajectoryPrediction >&
+      trajectory_predictions() const;
 
   // repeated .juggler.v1.FilteredDetection filtered_detections = 18;
   int filtered_detections_size() const;
@@ -5288,7 +5288,7 @@ class FrameData final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ColorTrackedBall > color_tracked_balls_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::ThrowCatchEvent > throw_catch_events_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::BoundingBox2D > unmatched_detections_;
-    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction > kalman_predictions_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrajectoryPrediction > trajectory_predictions_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::FilteredDetection > filtered_detections_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrackerAssociation > tracker_associations_;
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::NewTracker > new_trackers_;
@@ -5939,7 +5939,7 @@ class VisualizationStates final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kShowKalmanPredictionsFieldNumber = 1,
+    kShowTrajectoryPredictionsFieldNumber = 1,
     kShowRawDetectionsFieldNumber = 2,
     kShowFilteredDetectionsFieldNumber = 3,
     kShowAssociationsFieldNumber = 4,
@@ -5955,13 +5955,13 @@ class VisualizationStates final :
     kShowTailsFieldNumber = 14,
     kShowTrajectoryFieldNumber = 15,
   };
-  // bool show_kalman_predictions = 1;
-  void clear_show_kalman_predictions();
-  bool show_kalman_predictions() const;
-  void set_show_kalman_predictions(bool value);
+  // bool show_trajectory_predictions = 1;
+  void clear_show_trajectory_predictions();
+  bool show_trajectory_predictions() const;
+  void set_show_trajectory_predictions(bool value);
   private:
-  bool _internal_show_kalman_predictions() const;
-  void _internal_set_show_kalman_predictions(bool value);
+  bool _internal_show_trajectory_predictions() const;
+  void _internal_set_show_trajectory_predictions(bool value);
   public:
 
   // bool show_raw_detections = 2;
@@ -6098,7 +6098,7 @@ class VisualizationStates final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   struct Impl_ {
-    bool show_kalman_predictions_;
+    bool show_trajectory_predictions_;
     bool show_raw_detections_;
     bool show_filtered_detections_;
     bool show_associations_;
@@ -9347,51 +9347,51 @@ inline void SystemStatus::set_timestamp_us(uint64_t value) {
 
 // -------------------------------------------------------------------
 
-// KalmanPrediction
+// TrajectoryPrediction
 
 // int32 logical_id = 1;
-inline void KalmanPrediction::clear_logical_id() {
+inline void TrajectoryPrediction::clear_logical_id() {
   _impl_.logical_id_ = 0;
 }
-inline int32_t KalmanPrediction::_internal_logical_id() const {
+inline int32_t TrajectoryPrediction::_internal_logical_id() const {
   return _impl_.logical_id_;
 }
-inline int32_t KalmanPrediction::logical_id() const {
-  // @@protoc_insertion_point(field_get:juggler.v1.KalmanPrediction.logical_id)
+inline int32_t TrajectoryPrediction::logical_id() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrajectoryPrediction.logical_id)
   return _internal_logical_id();
 }
-inline void KalmanPrediction::_internal_set_logical_id(int32_t value) {
+inline void TrajectoryPrediction::_internal_set_logical_id(int32_t value) {
   
   _impl_.logical_id_ = value;
 }
-inline void KalmanPrediction::set_logical_id(int32_t value) {
+inline void TrajectoryPrediction::set_logical_id(int32_t value) {
   _internal_set_logical_id(value);
-  // @@protoc_insertion_point(field_set:juggler.v1.KalmanPrediction.logical_id)
+  // @@protoc_insertion_point(field_set:juggler.v1.TrajectoryPrediction.logical_id)
 }
 
 // .juggler.v1.Vector3 predicted_pos = 2;
-inline bool KalmanPrediction::_internal_has_predicted_pos() const {
+inline bool TrajectoryPrediction::_internal_has_predicted_pos() const {
   return this != internal_default_instance() && _impl_.predicted_pos_ != nullptr;
 }
-inline bool KalmanPrediction::has_predicted_pos() const {
+inline bool TrajectoryPrediction::has_predicted_pos() const {
   return _internal_has_predicted_pos();
 }
-inline void KalmanPrediction::clear_predicted_pos() {
+inline void TrajectoryPrediction::clear_predicted_pos() {
   if (GetArenaForAllocation() == nullptr && _impl_.predicted_pos_ != nullptr) {
     delete _impl_.predicted_pos_;
   }
   _impl_.predicted_pos_ = nullptr;
 }
-inline const ::juggler::v1::Vector3& KalmanPrediction::_internal_predicted_pos() const {
+inline const ::juggler::v1::Vector3& TrajectoryPrediction::_internal_predicted_pos() const {
   const ::juggler::v1::Vector3* p = _impl_.predicted_pos_;
   return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
       ::juggler::v1::_Vector3_default_instance_);
 }
-inline const ::juggler::v1::Vector3& KalmanPrediction::predicted_pos() const {
-  // @@protoc_insertion_point(field_get:juggler.v1.KalmanPrediction.predicted_pos)
+inline const ::juggler::v1::Vector3& TrajectoryPrediction::predicted_pos() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrajectoryPrediction.predicted_pos)
   return _internal_predicted_pos();
 }
-inline void KalmanPrediction::unsafe_arena_set_allocated_predicted_pos(
+inline void TrajectoryPrediction::unsafe_arena_set_allocated_predicted_pos(
     ::juggler::v1::Vector3* predicted_pos) {
   if (GetArenaForAllocation() == nullptr) {
     delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.predicted_pos_);
@@ -9402,9 +9402,9 @@ inline void KalmanPrediction::unsafe_arena_set_allocated_predicted_pos(
   } else {
     
   }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.KalmanPrediction.predicted_pos)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.TrajectoryPrediction.predicted_pos)
 }
-inline ::juggler::v1::Vector3* KalmanPrediction::release_predicted_pos() {
+inline ::juggler::v1::Vector3* TrajectoryPrediction::release_predicted_pos() {
   
   ::juggler::v1::Vector3* temp = _impl_.predicted_pos_;
   _impl_.predicted_pos_ = nullptr;
@@ -9419,14 +9419,14 @@ inline ::juggler::v1::Vector3* KalmanPrediction::release_predicted_pos() {
 #endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
   return temp;
 }
-inline ::juggler::v1::Vector3* KalmanPrediction::unsafe_arena_release_predicted_pos() {
-  // @@protoc_insertion_point(field_release:juggler.v1.KalmanPrediction.predicted_pos)
+inline ::juggler::v1::Vector3* TrajectoryPrediction::unsafe_arena_release_predicted_pos() {
+  // @@protoc_insertion_point(field_release:juggler.v1.TrajectoryPrediction.predicted_pos)
   
   ::juggler::v1::Vector3* temp = _impl_.predicted_pos_;
   _impl_.predicted_pos_ = nullptr;
   return temp;
 }
-inline ::juggler::v1::Vector3* KalmanPrediction::_internal_mutable_predicted_pos() {
+inline ::juggler::v1::Vector3* TrajectoryPrediction::_internal_mutable_predicted_pos() {
   
   if (_impl_.predicted_pos_ == nullptr) {
     auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
@@ -9434,12 +9434,12 @@ inline ::juggler::v1::Vector3* KalmanPrediction::_internal_mutable_predicted_pos
   }
   return _impl_.predicted_pos_;
 }
-inline ::juggler::v1::Vector3* KalmanPrediction::mutable_predicted_pos() {
+inline ::juggler::v1::Vector3* TrajectoryPrediction::mutable_predicted_pos() {
   ::juggler::v1::Vector3* _msg = _internal_mutable_predicted_pos();
-  // @@protoc_insertion_point(field_mutable:juggler.v1.KalmanPrediction.predicted_pos)
+  // @@protoc_insertion_point(field_mutable:juggler.v1.TrajectoryPrediction.predicted_pos)
   return _msg;
 }
-inline void KalmanPrediction::set_allocated_predicted_pos(::juggler::v1::Vector3* predicted_pos) {
+inline void TrajectoryPrediction::set_allocated_predicted_pos(::juggler::v1::Vector3* predicted_pos) {
   ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
   if (message_arena == nullptr) {
     delete _impl_.predicted_pos_;
@@ -9456,32 +9456,32 @@ inline void KalmanPrediction::set_allocated_predicted_pos(::juggler::v1::Vector3
     
   }
   _impl_.predicted_pos_ = predicted_pos;
-  // @@protoc_insertion_point(field_set_allocated:juggler.v1.KalmanPrediction.predicted_pos)
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.TrajectoryPrediction.predicted_pos)
 }
 
 // .juggler.v1.Vector2 predicted_pos_2d = 3;
-inline bool KalmanPrediction::_internal_has_predicted_pos_2d() const {
+inline bool TrajectoryPrediction::_internal_has_predicted_pos_2d() const {
   return this != internal_default_instance() && _impl_.predicted_pos_2d_ != nullptr;
 }
-inline bool KalmanPrediction::has_predicted_pos_2d() const {
+inline bool TrajectoryPrediction::has_predicted_pos_2d() const {
   return _internal_has_predicted_pos_2d();
 }
-inline void KalmanPrediction::clear_predicted_pos_2d() {
+inline void TrajectoryPrediction::clear_predicted_pos_2d() {
   if (GetArenaForAllocation() == nullptr && _impl_.predicted_pos_2d_ != nullptr) {
     delete _impl_.predicted_pos_2d_;
   }
   _impl_.predicted_pos_2d_ = nullptr;
 }
-inline const ::juggler::v1::Vector2& KalmanPrediction::_internal_predicted_pos_2d() const {
+inline const ::juggler::v1::Vector2& TrajectoryPrediction::_internal_predicted_pos_2d() const {
   const ::juggler::v1::Vector2* p = _impl_.predicted_pos_2d_;
   return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector2&>(
       ::juggler::v1::_Vector2_default_instance_);
 }
-inline const ::juggler::v1::Vector2& KalmanPrediction::predicted_pos_2d() const {
-  // @@protoc_insertion_point(field_get:juggler.v1.KalmanPrediction.predicted_pos_2d)
+inline const ::juggler::v1::Vector2& TrajectoryPrediction::predicted_pos_2d() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrajectoryPrediction.predicted_pos_2d)
   return _internal_predicted_pos_2d();
 }
-inline void KalmanPrediction::unsafe_arena_set_allocated_predicted_pos_2d(
+inline void TrajectoryPrediction::unsafe_arena_set_allocated_predicted_pos_2d(
     ::juggler::v1::Vector2* predicted_pos_2d) {
   if (GetArenaForAllocation() == nullptr) {
     delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.predicted_pos_2d_);
@@ -9492,9 +9492,9 @@ inline void KalmanPrediction::unsafe_arena_set_allocated_predicted_pos_2d(
   } else {
     
   }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.KalmanPrediction.predicted_pos_2d)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.TrajectoryPrediction.predicted_pos_2d)
 }
-inline ::juggler::v1::Vector2* KalmanPrediction::release_predicted_pos_2d() {
+inline ::juggler::v1::Vector2* TrajectoryPrediction::release_predicted_pos_2d() {
   
   ::juggler::v1::Vector2* temp = _impl_.predicted_pos_2d_;
   _impl_.predicted_pos_2d_ = nullptr;
@@ -9509,14 +9509,14 @@ inline ::juggler::v1::Vector2* KalmanPrediction::release_predicted_pos_2d() {
 #endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
   return temp;
 }
-inline ::juggler::v1::Vector2* KalmanPrediction::unsafe_arena_release_predicted_pos_2d() {
-  // @@protoc_insertion_point(field_release:juggler.v1.KalmanPrediction.predicted_pos_2d)
+inline ::juggler::v1::Vector2* TrajectoryPrediction::unsafe_arena_release_predicted_pos_2d() {
+  // @@protoc_insertion_point(field_release:juggler.v1.TrajectoryPrediction.predicted_pos_2d)
   
   ::juggler::v1::Vector2* temp = _impl_.predicted_pos_2d_;
   _impl_.predicted_pos_2d_ = nullptr;
   return temp;
 }
-inline ::juggler::v1::Vector2* KalmanPrediction::_internal_mutable_predicted_pos_2d() {
+inline ::juggler::v1::Vector2* TrajectoryPrediction::_internal_mutable_predicted_pos_2d() {
   
   if (_impl_.predicted_pos_2d_ == nullptr) {
     auto* p = CreateMaybeMessage<::juggler::v1::Vector2>(GetArenaForAllocation());
@@ -9524,12 +9524,12 @@ inline ::juggler::v1::Vector2* KalmanPrediction::_internal_mutable_predicted_pos
   }
   return _impl_.predicted_pos_2d_;
 }
-inline ::juggler::v1::Vector2* KalmanPrediction::mutable_predicted_pos_2d() {
+inline ::juggler::v1::Vector2* TrajectoryPrediction::mutable_predicted_pos_2d() {
   ::juggler::v1::Vector2* _msg = _internal_mutable_predicted_pos_2d();
-  // @@protoc_insertion_point(field_mutable:juggler.v1.KalmanPrediction.predicted_pos_2d)
+  // @@protoc_insertion_point(field_mutable:juggler.v1.TrajectoryPrediction.predicted_pos_2d)
   return _msg;
 }
-inline void KalmanPrediction::set_allocated_predicted_pos_2d(::juggler::v1::Vector2* predicted_pos_2d) {
+inline void TrajectoryPrediction::set_allocated_predicted_pos_2d(::juggler::v1::Vector2* predicted_pos_2d) {
   ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
   if (message_arena == nullptr) {
     delete _impl_.predicted_pos_2d_;
@@ -9546,27 +9546,27 @@ inline void KalmanPrediction::set_allocated_predicted_pos_2d(::juggler::v1::Vect
     
   }
   _impl_.predicted_pos_2d_ = predicted_pos_2d;
-  // @@protoc_insertion_point(field_set_allocated:juggler.v1.KalmanPrediction.predicted_pos_2d)
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.TrajectoryPrediction.predicted_pos_2d)
 }
 
 // bool is_in_freefall = 4;
-inline void KalmanPrediction::clear_is_in_freefall() {
+inline void TrajectoryPrediction::clear_is_in_freefall() {
   _impl_.is_in_freefall_ = false;
 }
-inline bool KalmanPrediction::_internal_is_in_freefall() const {
+inline bool TrajectoryPrediction::_internal_is_in_freefall() const {
   return _impl_.is_in_freefall_;
 }
-inline bool KalmanPrediction::is_in_freefall() const {
-  // @@protoc_insertion_point(field_get:juggler.v1.KalmanPrediction.is_in_freefall)
+inline bool TrajectoryPrediction::is_in_freefall() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.TrajectoryPrediction.is_in_freefall)
   return _internal_is_in_freefall();
 }
-inline void KalmanPrediction::_internal_set_is_in_freefall(bool value) {
+inline void TrajectoryPrediction::_internal_set_is_in_freefall(bool value) {
   
   _impl_.is_in_freefall_ = value;
 }
-inline void KalmanPrediction::set_is_in_freefall(bool value) {
+inline void TrajectoryPrediction::set_is_in_freefall(bool value) {
   _internal_set_is_in_freefall(value);
-  // @@protoc_insertion_point(field_set:juggler.v1.KalmanPrediction.is_in_freefall)
+  // @@protoc_insertion_point(field_set:juggler.v1.TrajectoryPrediction.is_in_freefall)
 }
 
 // -------------------------------------------------------------------
@@ -11581,44 +11581,44 @@ FrameData::throw_catch_events() const {
   return _impl_.throw_catch_events_;
 }
 
-// repeated .juggler.v1.KalmanPrediction kalman_predictions = 17;
-inline int FrameData::_internal_kalman_predictions_size() const {
-  return _impl_.kalman_predictions_.size();
+// repeated .juggler.v1.TrajectoryPrediction trajectory_predictions = 17;
+inline int FrameData::_internal_trajectory_predictions_size() const {
+  return _impl_.trajectory_predictions_.size();
 }
-inline int FrameData::kalman_predictions_size() const {
-  return _internal_kalman_predictions_size();
+inline int FrameData::trajectory_predictions_size() const {
+  return _internal_trajectory_predictions_size();
 }
-inline void FrameData::clear_kalman_predictions() {
-  _impl_.kalman_predictions_.Clear();
+inline void FrameData::clear_trajectory_predictions() {
+  _impl_.trajectory_predictions_.Clear();
 }
-inline ::juggler::v1::KalmanPrediction* FrameData::mutable_kalman_predictions(int index) {
-  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.kalman_predictions)
-  return _impl_.kalman_predictions_.Mutable(index);
+inline ::juggler::v1::TrajectoryPrediction* FrameData::mutable_trajectory_predictions(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.FrameData.trajectory_predictions)
+  return _impl_.trajectory_predictions_.Mutable(index);
 }
-inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction >*
-FrameData::mutable_kalman_predictions() {
-  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.kalman_predictions)
-  return &_impl_.kalman_predictions_;
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrajectoryPrediction >*
+FrameData::mutable_trajectory_predictions() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.FrameData.trajectory_predictions)
+  return &_impl_.trajectory_predictions_;
 }
-inline const ::juggler::v1::KalmanPrediction& FrameData::_internal_kalman_predictions(int index) const {
-  return _impl_.kalman_predictions_.Get(index);
+inline const ::juggler::v1::TrajectoryPrediction& FrameData::_internal_trajectory_predictions(int index) const {
+  return _impl_.trajectory_predictions_.Get(index);
 }
-inline const ::juggler::v1::KalmanPrediction& FrameData::kalman_predictions(int index) const {
-  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.kalman_predictions)
-  return _internal_kalman_predictions(index);
+inline const ::juggler::v1::TrajectoryPrediction& FrameData::trajectory_predictions(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.FrameData.trajectory_predictions)
+  return _internal_trajectory_predictions(index);
 }
-inline ::juggler::v1::KalmanPrediction* FrameData::_internal_add_kalman_predictions() {
-  return _impl_.kalman_predictions_.Add();
+inline ::juggler::v1::TrajectoryPrediction* FrameData::_internal_add_trajectory_predictions() {
+  return _impl_.trajectory_predictions_.Add();
 }
-inline ::juggler::v1::KalmanPrediction* FrameData::add_kalman_predictions() {
-  ::juggler::v1::KalmanPrediction* _add = _internal_add_kalman_predictions();
-  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.kalman_predictions)
+inline ::juggler::v1::TrajectoryPrediction* FrameData::add_trajectory_predictions() {
+  ::juggler::v1::TrajectoryPrediction* _add = _internal_add_trajectory_predictions();
+  // @@protoc_insertion_point(field_add:juggler.v1.FrameData.trajectory_predictions)
   return _add;
 }
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KalmanPrediction >&
-FrameData::kalman_predictions() const {
-  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.kalman_predictions)
-  return _impl_.kalman_predictions_;
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::TrajectoryPrediction >&
+FrameData::trajectory_predictions() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.FrameData.trajectory_predictions)
+  return _impl_.trajectory_predictions_;
 }
 
 // repeated .juggler.v1.FilteredDetection filtered_detections = 18;
@@ -12610,24 +12610,24 @@ inline void CommandRequest::set_video_feed_enabled(bool value) {
 
 // VisualizationStates
 
-// bool show_kalman_predictions = 1;
-inline void VisualizationStates::clear_show_kalman_predictions() {
-  _impl_.show_kalman_predictions_ = false;
+// bool show_trajectory_predictions = 1;
+inline void VisualizationStates::clear_show_trajectory_predictions() {
+  _impl_.show_trajectory_predictions_ = false;
 }
-inline bool VisualizationStates::_internal_show_kalman_predictions() const {
-  return _impl_.show_kalman_predictions_;
+inline bool VisualizationStates::_internal_show_trajectory_predictions() const {
+  return _impl_.show_trajectory_predictions_;
 }
-inline bool VisualizationStates::show_kalman_predictions() const {
-  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_kalman_predictions)
-  return _internal_show_kalman_predictions();
+inline bool VisualizationStates::show_trajectory_predictions() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_trajectory_predictions)
+  return _internal_show_trajectory_predictions();
 }
-inline void VisualizationStates::_internal_set_show_kalman_predictions(bool value) {
+inline void VisualizationStates::_internal_set_show_trajectory_predictions(bool value) {
   
-  _impl_.show_kalman_predictions_ = value;
+  _impl_.show_trajectory_predictions_ = value;
 }
-inline void VisualizationStates::set_show_kalman_predictions(bool value) {
-  _internal_set_show_kalman_predictions(value);
-  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_kalman_predictions)
+inline void VisualizationStates::set_show_trajectory_predictions(bool value) {
+  _internal_set_show_trajectory_predictions(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_trajectory_predictions)
 }
 
 // bool show_raw_detections = 2;

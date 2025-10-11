@@ -177,7 +177,6 @@ struct TrackingSettings {
     float yolo_confidence_weight = 2.0f;
     float yolo_class_weight = 3.0f;
     float color_match_weight = 1.0f;
-    float kalman_proximity_weight = 0.0f;
     int color_sample_radius = 1;
     float min_yolo_score_threshold = 0.0f;
     float override_confidence_threshold = 0.7f;  // DEPRECATED: kept for backward compatibility
@@ -193,8 +192,6 @@ struct TrackingSettings {
     float max_tracker_distance_per_frame = 0.50f;
     float temporal_consistency_bonus = 0.25f;
     float spatial_threshold = 0.40f;
-    float kalman_prediction_bonus = 0.50f;
-    float kalman_prediction_threshold = 0.30f;
     float override_min_confidence_tracked = 0.50f;
     float override_min_color_score_tracked = 0.60f;
     float override_min_confidence_missing = 0.70f;
@@ -202,10 +199,10 @@ struct TrackingSettings {
     int held_color_search_radius = 120;
     float held_color_min_score = 0.30f;
     float held_color_max_distance = 0.25f;
-    bool kalman_glob_detection_enabled = true;
-    int kalman_glob_search_radius = 100;
-    float kalman_glob_min_color_score = 0.50f;
-    float kalman_glob_max_depth_diff = 0.30f;
+    bool color_blob_search_enabled = true;
+    int color_blob_search_radius = 100;
+    float color_blob_min_color_score = 0.50f;
+    float color_blob_max_depth_diff = 0.30f;
     float max_euclidean_distance = 0.15f;
     float min_euclidean_color_score = 0.30f;
     float max_depth_jump_strict = 0.20f;
@@ -256,9 +253,13 @@ public:
     bool updateSetting(const std::string& key, const std::string& value);
     
     // Color calibration
-    bool calibrateColor(const std::string& color_name, 
+    bool calibrateColor(const std::string& color_name,
                        const cv::Point& click_point,
                        std::string& error_message);
+    
+    // Override evaluation - calculates override criteria for all detections
+    // PERFORMANCE NOTE: This is expensive (detections × colors), only call when recording
+    void evaluateOverrideCriteria(std::vector<Detection>& detections, const cv::Mat& color_frame);
     
     // Getters
     const std::vector<ColorProfile>& getColorProfiles() const { return color_profiles_; }
@@ -299,9 +300,6 @@ private:
     
     // Color matching (OPTIMIZED: now takes color_frame and converts only ROIs to HSV)
     float matchColor(const Detection& det, const ColorProfile& profile, const cv::Mat& color_frame);
-    
-    // Override evaluation - calculates override criteria for all detections
-    void evaluateOverrideCriteria(std::vector<Detection>& detections, const cv::Mat& color_frame);
     
     // State detection
     bool isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands);
@@ -359,10 +357,14 @@ private:
     std::vector<SimpleBall> balls_;
     std::vector<SimpleHand> hands_;
     std::vector<SimpleHand> last_known_hands_;  // Store last known hand positions for persistence
-    std::vector<Detection> last_raw_detections_;
+    std::vector<Detection> last_raw_detections_;  // Filtered detections (after confidence threshold, before NMS)
     std::string settings_file_;
     cv::Mat last_color_frame_;  // For calibration
     TrackingSettings tracking_settings_;  // Tracking configuration
+    
+    // PERFORMANCE: HSV frame cache to avoid redundant GPU conversions
+    cv::Mat cached_hsv_frame_;      // Full frame HSV conversion (cached per frame)
+    cv::Mat cached_color_frame_;    // Reference to validate cache
     
     // Timing
     std::chrono::steady_clock::time_point last_update_time_;

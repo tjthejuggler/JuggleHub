@@ -2,7 +2,18 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-10 16:16 CEST
+**Last Updated:** 2025-10-11 13:19 CEST
+
+**Recent Changes (2025-10-11):**
+- **🎯 UI TOGGLE CLARITY IMPROVEMENTS**
+  - **Issue Fixed**: Confusion over which toggles controlled which visualization markers
+  - **Removed**: `unfiltered_detections` toggle (showed ALL YOLO outputs before filtering - not useful)
+  - **Improved**: `raw_detections` toggle now shows color-coded boxes (green=ball, blue=ball_held)
+  - **Renamed**: `filtered_detections` → `nms_detections` for clarity about what filtering stage it represents
+  - **Detection Pipeline**: YOLO → Confidence Filter → `raw_detections` → NMS → `nms_detections` → Tracking
+  - **Color Coding**: Green boxes for 'ball' class (in-flight), blue boxes for 'ball_held' class
+  - **Class Labels**: Each detection box now shows its class name for easy identification
+  - **Files Modified**: [`hub/components/ui.py`](hub/components/ui.py), [`engine/include/SimpleBallTracker.hpp`](engine/include/SimpleBallTracker.hpp), [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp), [`engine/src/Engine.cpp`](engine/src/Engine.cpp), [`api/v1/juggler.proto`](api/v1/juggler.proto)
 
 **Recent Changes (2025-10-10):**
 - **🎯 TRAJECTORY PREDICTION FIX - PROPER PARABOLIC ARCS**

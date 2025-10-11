@@ -10,7 +10,7 @@
 
 /**
  * RecordingLogger - Creates detailed log files during recording sessions
- * Captures frame-by-frame information about Kalman filter history,
+ * Captures frame-by-frame information about trajectory-based tracking,
  * color tracker positions, and prediction details for debugging
  */
 class RecordingLogger {

@@ -349,21 +349,21 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.held_color_max_distance = std::stof(value);
             return true;
         }
-        // Kalman glob detection settings
-        else if (key == "kalman_glob_detection_enabled") {
-            tracking_settings_.kalman_glob_detection_enabled = (value == "true" || value == "1");
+        // Color blob search settings
+        else if (key == "color_blob_search_enabled") {
+            tracking_settings_.color_blob_search_enabled = (value == "true" || value == "1");
             return true;
         }
-        else if (key == "kalman_glob_search_radius") {
-            tracking_settings_.kalman_glob_search_radius = std::stoi(value);
+        else if (key == "color_blob_search_radius") {
+            tracking_settings_.color_blob_search_radius = std::stoi(value);
             return true;
         }
-        else if (key == "kalman_glob_min_color_score") {
-            tracking_settings_.kalman_glob_min_color_score = std::stof(value);
+        else if (key == "color_blob_min_color_score") {
+            tracking_settings_.color_blob_min_color_score = std::stof(value);
             return true;
         }
-        else if (key == "kalman_glob_max_depth_diff") {
-            tracking_settings_.kalman_glob_max_depth_diff = std::stof(value);
+        else if (key == "color_blob_max_depth_diff") {
+            tracking_settings_.color_blob_max_depth_diff = std::stof(value);
             return true;
         }
         // Identity swap prevention settings
@@ -461,16 +461,25 @@ float SimpleBallTracker::matchColor(const Detection& det, const ColorProfile& pr
         return 0.0f;
     }
     
-    // GPU-ACCELERATED: Convert only the ROI around detection center to HSV using GPU
-    // Sample region: 5x5 for calibrated, 15x15 for legacy (radius of 2 vs 7)
+    // PERFORMANCE FIX: Use cached HSV frame instead of GPU conversion
+    // The entire frame was converted to HSV once at the start of update()
+    // This avoids redundant GPU conversions (was ~15-20 per frame, now just 1)
+    cv::Mat hsv_roi;
     const int max_sample_radius = 7;  // Legacy mode uses larger radius
     int roi_x = std::max(0, static_cast<int>(center.x) - max_sample_radius);
     int roi_y = std::max(0, static_cast<int>(center.y) - max_sample_radius);
     int roi_width = std::min(color_frame.cols - roi_x, max_sample_radius * 2 + 1);
     int roi_height = std::min(color_frame.rows - roi_y, max_sample_radius * 2 + 1);
     
-    cv::Rect roi(roi_x, roi_y, roi_width, roi_height);
-    cv::Mat hsv_roi = gpu_hsv_converter_->convertRoiToHsv(color_frame, roi);
+    // Extract ROI from cached HSV frame
+    if (!cached_hsv_frame_.empty() && cached_color_frame_.data == color_frame.data) {
+        cv::Rect roi(roi_x, roi_y, roi_width, roi_height);
+        hsv_roi = cached_hsv_frame_(roi);
+    } else {
+        // Fallback: cache not available, use GPU conversion
+        cv::Rect roi(roi_x, roi_y, roi_width, roi_height);
+        hsv_roi = gpu_hsv_converter_->convertRoiToHsv(color_frame, roi);
+    }
     
     // NEW: If profile has calibrated avg_hue and avg_saturation, use euclidean distance
     if (profile.avg_hue >= 0.0f && profile.avg_saturation >= 0.0f) {
@@ -558,6 +567,10 @@ float SimpleBallTracker::matchColor(const Detection& det, const ColorProfile& pr
 }
 
 void SimpleBallTracker::evaluateOverrideCriteria(std::vector<Detection>& detections, const cv::Mat& color_frame) {
+    // PERFORMANCE NOTE: This method is expensive (detections × colors color matching operations)
+    // Only call this when needed for recording/debugging visualization
+    // For normal tracking, use lazy per-ball evaluation instead
+    
     // Evaluate each detection against all enabled color profiles
     for (auto& det : detections) {
         det.override_evals.clear();
@@ -926,14 +939,22 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
 
     // Initialize events vector for this frame
     std::vector<BallEvent> events;
+    
+    // PERFORMANCE FIX: Convert entire frame to HSV once at start
+    // This avoids redundant GPU conversions in matchColor() calls
+    // Cache it for the duration of this frame
+    cached_hsv_frame_ = cv::Mat();
+    cv::cvtColor(color_frame, cached_hsv_frame_, cv::COLOR_BGR2HSV);
+    cached_color_frame_ = color_frame;  // Store reference for cache validation
 
     // Run YOLO detection
     std::vector<Detection> yolo_detections = runBallDetection(color_frame, depth_frame, intrinsics);
     
-    // Evaluate override criteria for all detections
-    evaluateOverrideCriteria(yolo_detections, color_frame);
+    // PERFORMANCE FIX: Only evaluate override criteria for recording/debugging
+    // During normal operation, we evaluate lazily per-ball (much faster)
+    // This reduces color matching from (detections × colors) to just what's needed
     
-    // CRITICAL: Store detections AFTER override evaluation so they include override_evals
+    // Store detections for recording (will be used by Engine.cpp)
     last_raw_detections_ = yolo_detections;
     
     // OVERRIDE LOGIC: Check if any detection has a successful override for any ball
@@ -954,39 +975,51 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         if (!profile) continue;
         
         // Check all detections for override match
-        for (const auto& det : yolo_detections) {
-            // Find the override evaluation for this ball's color
-            bool found_override = false;
-            for (const auto& eval : det.override_evals) {
-                if (eval.ball_color == ball.color_name && eval.would_override) {
-                    // OVERRIDE DETECTED - force ball to this detection
-                    ball.position = det.world_pos;
-                    ball.pixel_pos = cv::Point2f(det.box.x + det.box.width / 2.0f,
-                                                 det.box.y + det.box.height / 2.0f);
-                    ball.bbox = det.box;
-                    ball.has_yolo_detection = true;
-                    ball.yolo_confidence = det.confidence;
-                    ball.yolo_class_id = det.class_id;
-                    ball.color_match_score = eval.color_score;
-                    ball.tracking_reason = "OVERRIDE_forced";
-                    
-                    // Mark this ball as overridden so we skip normal update logic
-                    overridden_balls.insert(ball.id);
-                    
-                    DEBUG_LOG(debug_log, {
-                        OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "[OVERRIDE] Ball " << ball.id << " (" << ball.color_name
-                                  << ") forced to detection: conf=" << det.confidence
-                                  << ", color=" << eval.color_score << std::endl;
-                        debug_log.close();
-                    });
-                    
-                    found_override = true;
-                    break;
-                }
-            }
+        // PERFORMANCE FIX: Evaluate override criteria ONLY for this specific ball color
+        for (auto& det : yolo_detections) {
+            // Calculate color score for THIS ball's color only
+            float color_score = matchColor(det, *profile, color_frame);
             
-            if (found_override) break;
+            // Check override criteria using class-specific thresholds
+            float confidence_threshold = (det.class_id == 0) ?
+                tracking_settings_.override_ball_confidence_threshold :
+                tracking_settings_.override_ball_held_confidence_threshold;
+            
+            float color_threshold = (det.class_id == 0) ?
+                tracking_settings_.override_ball_color_threshold :
+                tracking_settings_.override_ball_held_color_threshold;
+            
+            bool meets_confidence = (det.confidence >= confidence_threshold);
+            bool meets_color = (color_score >= color_threshold);
+            bool meets_class = !tracking_settings_.override_require_ball_class || (det.class_id == 0);
+            
+            bool would_override = meets_confidence && meets_color && meets_class;
+            
+            if (would_override) {
+                // OVERRIDE DETECTED - force ball to this detection
+                ball.position = det.world_pos;
+                ball.pixel_pos = cv::Point2f(det.box.x + det.box.width / 2.0f,
+                                             det.box.y + det.box.height / 2.0f);
+                ball.bbox = det.box;
+                ball.has_yolo_detection = true;
+                ball.yolo_confidence = det.confidence;
+                ball.yolo_class_id = det.class_id;
+                ball.color_match_score = color_score;
+                ball.tracking_reason = "OVERRIDE_forced";
+                
+                // Mark this ball as overridden so we skip normal update logic
+                overridden_balls.insert(ball.id);
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "[OVERRIDE] Ball " << ball.id << " (" << ball.color_name
+                              << ") forced to detection: conf=" << det.confidence
+                              << ", color=" << color_score << std::endl;
+                    debug_log.close();
+                });
+                
+                break;  // Found override for this ball, stop checking detections
+            }
         }
     }
 
@@ -1452,6 +1485,7 @@ std::vector<Detection> SimpleBallTracker::runBallDetection(
     
     // NOTE: last_raw_detections_ is now set in update() AFTER evaluateOverrideCriteria()
     // so that override_evals are included in the stored detections
+    
     return filtered_detections;
 }
 

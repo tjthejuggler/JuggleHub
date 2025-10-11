@@ -136,8 +136,8 @@ message SystemStatus {
   uint64 timestamp_us = 7;          // Status timestamp
 }
 
-// STEP 2: Kalman Predictions - Predicted positions before detection
-message KalmanPrediction {
+// STEP 2: Trajectory Predictions - Physics-based predicted positions
+message TrajectoryPrediction {
   int32 logical_id = 1;             // Tracker ID
   Vector3 predicted_pos = 2;        // Predicted 3D position
   Vector2 predicted_pos_2d = 3;     // Projected 2D position
@@ -226,7 +226,7 @@ message FrameData {
   uint32 frame_number = 9;          // Sequential frame number
   
   // Optional image data (base64 encoded for streaming)
-  repeated BoundingBox2D raw_detections = 10; // All raw YOLO detections (STEP 3)
+  repeated BoundingBox2D raw_detections = 10; // YOLO detections after confidence threshold, before NMS (STEP 3)
   repeated BoundingBox2D unmatched_detections = 16; // Detections that passed filtering but weren't matched (STEP 13)
   bytes color_image_b64 = 11;      // Base64 encoded color image
   bytes depth_image_b64 = 12;      // Base64 encoded depth image
@@ -235,8 +235,8 @@ message FrameData {
   repeated ThrowCatchEvent throw_catch_events = 15; // Throw and catch events for apps
   
   // NEW: Visualization data for pipeline steps
-  repeated KalmanPrediction kalman_predictions = 17;      // STEP 2: Predicted positions
-  repeated FilteredDetection filtered_detections = 18;    // STEP 4: Rejected detections
+  repeated TrajectoryPrediction trajectory_predictions = 17;  // STEP 2: Physics-based predicted positions
+  repeated FilteredDetection filtered_detections = 18;        // STEP 4: Rejected detections
   repeated TrackerAssociation tracker_associations = 19;  // STEP 5: Matching visualization
   repeated NewTracker new_trackers = 20;                  // STEP 6: Auto-initialized trackers
   repeated BallState ball_states = 21;                    // STEP 8: Throw/catch states
@@ -300,7 +300,7 @@ message CommandRequest {
 
 // Visualization states for recording with overlays
 message VisualizationStates {
-  bool show_kalman_predictions = 1;
+  bool show_trajectory_predictions = 1;
   bool show_raw_detections = 2;
   bool show_filtered_detections = 3;
   bool show_associations = 4;

@@ -185,6 +185,11 @@ void Engine::run() {
             // Get the raw detections for recording/visualization
             last_raw_detections_ = simple_tracker_->getLastRawDetections();
             
+            // PERFORMANCE FIX: Only evaluate override criteria when recording
+            // This is expensive (detections × colors) and only needed for recording visualization
+            if (continuous_recording_ || !frame_buffer_.empty()) {
+                simple_tracker_->evaluateOverrideCriteria(last_raw_detections_, color_image);
+            }
 
             // Populate hands
             for (const auto& hand_obj : tracked_hands) {
@@ -226,8 +231,8 @@ void Engine::run() {
                     keypoint->set_confidence(hand_obj.confidence);
                 }
             }
-
-            // Populate raw detections in protobuf
+            
+            // Populate raw detections (after confidence threshold, before NMS) in protobuf
             for (const auto& det : last_raw_detections_) {
                 auto* raw_det_pb = frame_data.add_raw_detections();
                 raw_det_pb->set_x(det.box.x);
@@ -288,7 +293,7 @@ void Engine::run() {
         }
 
         // Populate trajectory-based predictions for visualization
-        // NEW: Uses trajectory physics instead of Kalman filter
+        // Uses physics-based trajectory prediction with gravity
         if (use_dnn_tracker_ && simple_tracker_) {
             for (const auto& ball : tracked_balls) {
                 // Only create prediction if we have enough trajectory data
@@ -296,8 +301,8 @@ void Engine::run() {
                     continue;  // Skip balls without sufficient trajectory
                 }
                 
-                auto* kalman_pred = frame_data.add_kalman_predictions();
-                kalman_pred->set_logical_id(ball.id);
+                auto* traj_pred = frame_data.add_trajectory_predictions();
+                traj_pred->set_logical_id(ball.id);
                 
                 // Get predicted position from trajectory
                 // Use first point in predicted path (next frame)
@@ -311,19 +316,19 @@ void Engine::run() {
                     continue;
                 }
                 
-                auto* pred_pos = kalman_pred->mutable_predicted_pos();
+                auto* pred_pos = traj_pred->mutable_predicted_pos();
                 pred_pos->set_x(pred_pos_3d.x);
                 pred_pos->set_y(pred_pos_3d.y);
                 pred_pos->set_z(pred_pos_3d.z);
                 
                 // Project to 2D
                 cv::Point2f pred_pos_2d = SimpleBallTracker::project_3d_to_2d(pred_pos_3d, camera_intrinsics_);
-                auto* pred_2d = kalman_pred->mutable_predicted_pos_2d();
+                auto* pred_2d = traj_pred->mutable_predicted_pos_2d();
                 pred_2d->set_x(pred_pos_2d.x);
                 pred_2d->set_y(pred_pos_2d.y);
                 
                 // Determine if in freefall (not held)
-                kalman_pred->set_is_in_freefall(!ball.is_held);
+                traj_pred->set_is_in_freefall(!ball.is_held);
             }
         }
         
@@ -721,14 +726,12 @@ void Engine::saveRecording() {
         writeDebugLog("saveRecording() - Checking for visualizations...");
         // Check if any visualizations are enabled
         bool has_visualizations = record_with_yolo_boxes_ || record_with_bytetrack_boxes_ ||
-                                 visualization_states_.show_kalman_predictions() ||
+                                 visualization_states_.show_trajectory_predictions() ||
                                  visualization_states_.show_raw_detections() ||
                                  visualization_states_.show_filtered_detections() ||
-                                 visualization_states_.show_associations() ||
-                                 visualization_states_.show_new_trackers() ||
+                                 // NOTE: show_associations, show_new_trackers, show_occlusion removed (not populated)
                                  visualization_states_.show_hand_tracking() ||
                                  visualization_states_.show_ball_states() ||
-                                 visualization_states_.show_occlusion() ||
                                  visualization_states_.show_skeleton() ||
                                  visualization_states_.show_color_search() ||
                                  visualization_states_.show_color_tracker() ||
@@ -869,14 +872,12 @@ void Engine::stopContinuousRecording() {
 
         // Check if any visualizations are enabled
         bool has_visualizations = record_with_yolo_boxes_ || record_with_bytetrack_boxes_ ||
-                                 visualization_states_.show_kalman_predictions() ||
+                                 visualization_states_.show_trajectory_predictions() ||
                                  visualization_states_.show_raw_detections() ||
                                  visualization_states_.show_filtered_detections() ||
-                                 visualization_states_.show_associations() ||
-                                 visualization_states_.show_new_trackers() ||
+                                 // NOTE: show_associations, show_new_trackers, show_occlusion removed (not populated)
                                  visualization_states_.show_hand_tracking() ||
                                  visualization_states_.show_ball_states() ||
-                                 visualization_states_.show_occlusion() ||
                                  visualization_states_.show_skeleton() ||
                                  visualization_states_.show_color_search() ||
                                  visualization_states_.show_color_tracker() ||
@@ -1738,8 +1739,8 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     }
     
     // Draw trajectory-based prediction circles
-    // NEW: Shows predicted search region based on trajectory physics
-    if (viz.show_kalman_predictions()) {
+    // Shows predicted search region based on trajectory physics
+    if (viz.show_trajectory_predictions()) {
         for (const auto& ball : rec_frame.tracked_balls) {
             // Only draw if we have enough trajectory data
             if (ball.trajectory.verified_point_count < 3) {

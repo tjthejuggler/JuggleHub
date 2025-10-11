@@ -100,6 +100,9 @@ struct SimpleBall {
     int held_by_hand_id;             // -1 if not held, 0=left, 1=right
     int previous_held_by_hand_id;    // Previous frame's hand ID (for detecting hand switches)
     
+    // Throw tracking (NEW: prevent immediate re-catch by throwing hand)
+    int was_just_thrown_by_hand_id;  // -1 if not just thrown, 0=left, 1=right (lasts 1 frame)
+    
     // Trajectory (NEW: replaces Kalman and ColorBasedPredictor in Phase 3)
     BallTrajectory trajectory;       // Only valid when IN_FLIGHT
     cv::Point3f last_held_position;  // Position when last held (for velocity estimation)
@@ -123,6 +126,7 @@ struct SimpleBall {
     
     SimpleBall() : id(-1), state(HELD), is_held(false),
                    held_by_hand_id(-1), previous_held_by_hand_id(-1),
+                   was_just_thrown_by_hand_id(-1),
                    has_yolo_detection(false),
                    frames_without_verified_detection(0),
                    unverified_trajectory_points(0),

@@ -973,6 +973,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     
     // CRITICAL: Reset detection flags at start of frame
     // This prevents balls from keeping stale "has_yolo_detection" flags
+    // NOTE: was_just_thrown_by_hand_id is NOT reset here - it's reset when:
+    //   1. A catch is prevented (so it can be caught next frame)
+    //   2. A catch happens to a different hand
+    //   3. Ball stays in flight for multiple frames
     for (auto& ball : balls_) {
         ball.has_yolo_detection = false;
     }
@@ -1037,7 +1041,12 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     // Find the catching hand and call initiateCatch() to properly handle state transition
                     bool was_in_flight = (ball.previous_state == IN_FLIGHT);
                     
-                    if (was_in_flight) {
+                    // CRITICAL: Check if this hand just threw the ball (prevent immediate re-catch)
+                    bool is_throwing_hand = (closest_hand_id == ball.was_just_thrown_by_hand_id);
+                    
+                    if (was_in_flight && !is_throwing_hand) {
+                        // Clear the throw tracking since we're catching with a different hand
+                        ball.was_just_thrown_by_hand_id = -1;
                         // Find the catching hand
                         const SimpleHand* catching_hand = nullptr;
                         for (const auto& h : hands_) {
@@ -1069,6 +1078,22 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                 debug_log.close();
                             });
                         }
+                    } else if (was_in_flight && is_throwing_hand) {
+                        // Ball is near throwing hand - keep IN_FLIGHT to prevent immediate re-catch
+                        ball.state = IN_FLIGHT;
+                        ball.is_held = false;
+                        
+                        // CRITICAL: Clear the throw tracking after preventing the catch
+                        // This allows the ball to be caught next frame if still near the hand
+                        ball.was_just_thrown_by_hand_id = -1;
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  Override: Ball kept IN_FLIGHT - throwing hand " << closest_hand_id
+                                      << " prevented from immediate re-catch (was_just_thrown_by="
+                                      << closest_hand_id << ", now cleared)" << std::endl;
+                            debug_log.close();
+                        });
                     } else {
                         // Ball was already HELD, just update state
                         ball.state = HELD;
@@ -2206,17 +2231,35 @@ void SimpleBallTracker::updateInFlightBall(
         }
         
         // If we found a hand within threshold, catch to it
+        // CRITICAL: Check if this is the hand that just threw the ball
         if (closest_hand != nullptr) {
-            DEBUG_LOG(debug_log, {
-                OPEN_DEBUG_LOG(debug_log);
-                debug_log << "  CATCH DETECTED to CLOSEST hand " << closest_hand->id
-                          << ": dist=" << min_dist
-                          << "m, threshold=" << tracking_settings_.hand_distance_threshold << "m" << std::endl;
-                debug_log.close();
-            });
-            
-            initiateCatch(ball, *closest_hand, events);
-            return;
+            // Prevent immediate re-catch by throwing hand
+            if (closest_hand->id == ball.was_just_thrown_by_hand_id) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  CATCH PREVENTED: Hand " << closest_hand->id
+                              << " just threw this ball (was_just_thrown_by="
+                              << ball.was_just_thrown_by_hand_id << ")" << std::endl;
+                    debug_log.close();
+                });
+                // Clear the throw tracking after preventing the catch
+                // This allows the ball to be caught next frame if still near the hand
+                ball.was_just_thrown_by_hand_id = -1;
+                // Don't catch - let ball stay in flight
+            } else {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  CATCH DETECTED to CLOSEST hand " << closest_hand->id
+                              << ": dist=" << min_dist
+                              << "m, threshold=" << tracking_settings_.hand_distance_threshold << "m" << std::endl;
+                    debug_log.close();
+                });
+                
+                // Clear the throw tracking since we're catching with a different hand
+                ball.was_just_thrown_by_hand_id = -1;
+                initiateCatch(ball, *closest_hand, events);
+                return;
+            }
         }
     } else {
         DEBUG_LOG(debug_log, {
@@ -2266,8 +2309,11 @@ void SimpleBallTracker::initiateThrow(
     // 1. Store last held position (for reference, but not used for velocity)
     if (hand != nullptr) {
         ball.last_held_position = hand->wrist_pos_3d;
+        // CRITICAL: Mark which hand threw the ball (prevents immediate re-catch)
+        ball.was_just_thrown_by_hand_id = hand->id;
     } else {
         ball.last_held_position = ball.position;
+        ball.was_just_thrown_by_hand_id = ball.held_by_hand_id;  // Use last known hand
     }
     
     // 2. Clear trajectory list completely
@@ -2336,6 +2382,9 @@ void SimpleBallTracker::initiateCatch(
     // LOCKUP PREVENTION: Reset counters when ball is caught
     ball.frames_without_verified_detection = 0;
     ball.unverified_trajectory_points = 0;
+    
+    // CRITICAL: Clear throw tracking when ball is caught
+    ball.was_just_thrown_by_hand_id = -1;
     
     // 2. Reset physics parameters
     ball.trajectory.initial_velocity = cv::Point3f(0, 0, 0);

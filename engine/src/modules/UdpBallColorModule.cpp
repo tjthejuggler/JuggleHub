@@ -11,7 +11,8 @@ void UdpBallColorModule::setup() {
     std::cout << "UdpBallColorModule setup" << std::endl;
 }
 
-void UdpBallColorModule::update(const juggler::v1::FrameData& frame_data, const CommandCallback& command_callback) {
+void UdpBallColorModule::update(const juggler::v1::FrameData& frame_data [[maybe_unused]],
+                                 const CommandCallback& command_callback [[maybe_unused]]) {
     // This module doesn't do anything in the update loop.
     // It only responds to commands.
 }

@@ -307,7 +307,7 @@ cv::Point3f GpuTrajectoryPredictor::estimateInitialVelocity(
 
 GpuTrajectoryPredictor::TrajectoryInitialConditions GpuTrajectoryPredictor::estimateInitialConditionsCpu(
     const std::vector<TrajectoryPoint>& points,
-    float gravity
+    float gravity [[maybe_unused]]
 ) {
     int n = points.size();
     

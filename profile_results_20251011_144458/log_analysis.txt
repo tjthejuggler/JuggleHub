@@ -1,0 +1,14 @@
+Searching for log files...
+-rw-rw-r-- 1 twain twain 3.8M Oct 11 01:24 ./engine/data/1_raw_recordings/continuous_2025-10-11_01-24-46/recording.log
+-rw-rw-r-- 1 twain twain 1.3M Oct 11 01:19 ./engine/data/1_raw_recordings/continuous_2025-10-11_01-19-45/recording.log
+-rw-rw-r-- 1 twain twain 660K Oct 11 01:18 ./engine/data/1_raw_recordings/continuous_2025-10-11_01-18-17/recording.log
+-rw-rw-r-- 1 twain twain 517 Oct  3 15:53 ./color_matching.log
+-rw-rw-r-- 1 twain twain 0 Oct 10 23:01 ./trajectory_debug.log
+-rw-rw-r-- 1 twain twain 0 Oct 10 23:01 ./test_output.log
+-rw-rw-r-- 1 twain twain 0 Oct 10 23:01 ./GPU_debug.log
+
+Searching for recording.log files...
+-rw-rw-r-- 1 twain twain 1.3M Oct 11 01:19 ./engine/data/1_raw_recordings/continuous_2025-10-11_01-19-45/recording.log
+-rw-rw-r-- 1 twain twain 660K Oct 11 01:18 ./engine/data/1_raw_recordings/continuous_2025-10-11_01-18-17/recording.log
+-rw-rw-r-- 1 twain twain 3.8M Oct 11 01:24 ./engine/data/1_raw_recordings/continuous_2025-10-11_01-24-46/recording.log
+Total log file size: 5 MB

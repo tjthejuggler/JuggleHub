@@ -2,7 +2,16 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-11 13:19 CEST
+**Last Updated:** 2025-10-11 14:44 CEST
+
+**Recent Changes (2025-10-11):**
+- **🔍 PERFORMANCE PROFILING TOOLS**
+  - **New Feature**: Comprehensive profiling scripts for finding performance bottlenecks
+  - **Three Profiling Scripts**: System-wide profiler, engine profiler, and hub profiler
+  - **Automated Analysis**: Scripts automatically check system resources, log files, and performance metrics
+  - **Easy to Use**: Simple command-line interface with detailed documentation
+  - **Files Created**: [`scripts/profile_system.sh`](scripts/profile_system.sh), [`scripts/profile_engine.sh`](scripts/profile_engine.sh), [`scripts/profile_hub.sh`](scripts/profile_hub.sh), [`PROFILING_GUIDE.md`](PROFILING_GUIDE.md)
+  - **Use Case**: Quickly identify FPS bottlenecks, large log files, and system resource issues
 
 **Recent Changes (2025-10-11):**
 - **🎯 UI TOGGLE CLARITY IMPROVEMENTS**

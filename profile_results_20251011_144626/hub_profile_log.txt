@@ -1,0 +1,7 @@
+py-spy> Sampling process 100 times a second. Press Control-C to exit.
+
+/home/twain/Projects/JuggleHub/hub/.venv/bin/python: Error while finding module specification for 'hub.main' (ModuleNotFoundError: No module named 'hub')
+
+py-spy> Stopped sampling because process exited
+[2025-10-11T12:46:30.470325638Z ERROR inferno::flamegraph] No stack counts found
+Error: Failed to write flamegraph: No stack counts found

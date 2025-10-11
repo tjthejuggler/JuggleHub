@@ -40,7 +40,7 @@ message BoundingBox2D {
 }
 
 message Ball {
-  int32 id = 1; // The raw bytetrack ID, can change. May be -1 if predicted.
+  int32 id = 1; // The tracker ID. May be -1 if predicted.
   Vector3 position = 2;
   BoundingBox2D bounding_box_2d = 3; // For video overlay
   string class_name = 4;
@@ -280,7 +280,7 @@ message CommandRequest {
   int32 logical_id_to_calibrate = 10;
   Vector2 calibration_pixel_pos = 11;
   bool record_with_yolo_boxes = 12;
-  bool record_with_bytetrack_boxes = 13;
+  // Field 13 removed (was record_with_bytetrack_boxes)
   bool pose_model_enabled = 14;
   
   // Visualization states for recording

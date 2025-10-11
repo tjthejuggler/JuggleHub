@@ -67,32 +67,6 @@ if ! command -v protoc &> /dev/null; then
     exit 1
 fi
 
-# Generate Python Protocol Buffer files if they don't exist or are outdated
-PROTO_FILE="$API_DIR/juggler.proto"
-PY_PROTO_FILE="$HUB_DIR/juggler_pb2.py"
-
-if [ ! -f "$PY_PROTO_FILE" ] || [ "$PROTO_FILE" -nt "$PY_PROTO_FILE" ]; then
-    echo -e "${YELLOW}🔄 Generating Python Protocol Buffer files...${NC}"
-    
-    # Generate the file directly into the hub directory
-    # Use grpc_tools.protoc to generate both message and gRPC stub files
-    python3 -m grpc_tools.protoc -I="$API_DIR" --python_out="$HUB_DIR" --grpc_python_out="$HUB_DIR" "$API_DIR/juggler.proto"
-    
-    # Ensure the hub directory is treated as a package
-    touch "$HUB_DIR/__init__.py"
-    
-    if [ -f "$HUB_DIR/juggler_pb2.py" ] && [ -f "$HUB_DIR/juggler_pb2_grpc.py" ]; then
-        echo -e "${GREEN}✅ Protocol Buffer and gRPC files generated${NC}"
-    else
-        echo -e "${RED}❌ Error: Failed to generate Protocol Buffer files${NC}"
-        exit 1
-    fi
-    
-    # No need to change directories anymore
-else
-    echo -e "${GREEN}✅ Protocol Buffer files are up to date${NC}"
-fi
-
 # Check if virtual environment should be used
 USE_VENV=false
 VENV_DIR="$PROJECT_ROOT/hub/.venv"
@@ -234,6 +208,31 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
 fi
 
 echo -e "${GREEN}✅ All required dependencies found${NC}"
+
+# Generate Python Protocol Buffer files if they don't exist or are outdated
+# NOTE: This must happen AFTER venv activation to use venv's grpcio-tools
+PROTO_FILE="$API_DIR/juggler.proto"
+PY_PROTO_FILE="$HUB_DIR/juggler_pb2.py"
+
+if [ ! -f "$PY_PROTO_FILE" ] || [ "$PROTO_FILE" -nt "$PY_PROTO_FILE" ]; then
+    echo -e "${YELLOW}🔄 Generating Python Protocol Buffer files...${NC}"
+    
+    # Generate the file directly into the hub directory
+    # Use grpc_tools.protoc to generate both message and gRPC stub files
+    python3 -m grpc_tools.protoc -I="$API_DIR" --python_out="$HUB_DIR" --grpc_python_out="$HUB_DIR" "$API_DIR/juggler.proto"
+    
+    # Ensure the hub directory is treated as a package
+    touch "$HUB_DIR/__init__.py"
+    
+    if [ -f "$HUB_DIR/juggler_pb2.py" ] && [ -f "$HUB_DIR/juggler_pb2_grpc.py" ]; then
+        echo -e "${GREEN}✅ Protocol Buffer and gRPC files generated${NC}"
+    else
+        echo -e "${RED}❌ Error: Failed to generate Protocol Buffer files${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✅ Protocol Buffer files are up to date${NC}"
+fi
 
 # --- C++ Engine Management ---
 ENGINE_EXECUTABLE="$PROJECT_ROOT/engine/build/juggle_engine"

@@ -38,7 +38,6 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       camera_height_(480),
       camera_fps_(60),
       record_with_yolo_boxes_(false),
-      record_with_bytetrack_boxes_(false),
       video_feed_enabled_(true) {  // Start with video feed enabled by default
    writeDebugLog("Engine constructor: Initializing...");
    
@@ -522,7 +521,6 @@ void Engine::processCommands() {
                 case juggler::v1::CommandRequest::RECORD_START:
                     writeDebugLog("processCommands() - RECORD_START command received");
                     record_with_yolo_boxes_ = command.record_with_yolo_boxes();
-                    record_with_bytetrack_boxes_ = command.record_with_bytetrack_boxes();
                     if (command.has_visualization_states()) {
                         visualization_states_ = command.visualization_states();
                         writeDebugLog("processCommands() - Visualization states set");
@@ -539,7 +537,6 @@ void Engine::processCommands() {
                     break;
                 case juggler::v1::CommandRequest::RECORD_CONTINUOUS_START:
                     record_with_yolo_boxes_ = command.record_with_yolo_boxes();
-                    record_with_bytetrack_boxes_ = command.record_with_bytetrack_boxes();
                     if (command.has_visualization_states()) {
                         visualization_states_ = command.visualization_states();
                     }
@@ -731,7 +728,7 @@ void Engine::saveRecording() {
 
         writeDebugLog("saveRecording() - Checking for visualizations...");
         // Check if any visualizations are enabled
-        bool has_visualizations = record_with_yolo_boxes_ || record_with_bytetrack_boxes_ ||
+        bool has_visualizations = record_with_yolo_boxes_ ||
                                  visualization_states_.show_trajectory_predictions() ||
                                  visualization_states_.show_raw_detections() ||
                                  visualization_states_.show_filtered_detections() ||
@@ -877,7 +874,7 @@ void Engine::stopContinuousRecording() {
         writeDebugLog("stopContinuousRecording() - Saved " + std::to_string(frames_to_save.size()) + " frames without visualizations");
 
         // Check if any visualizations are enabled
-        bool has_visualizations = record_with_yolo_boxes_ || record_with_bytetrack_boxes_ ||
+        bool has_visualizations = record_with_yolo_boxes_ ||
                                  visualization_states_.show_trajectory_predictions() ||
                                  visualization_states_.show_raw_detections() ||
                                  visualization_states_.show_filtered_detections() ||
@@ -1391,13 +1388,6 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             }
             
             det_num++;
-        }
-    }
-    
-    // Draw ByteTrack boxes (legacy support)
-    if (record_with_bytetrack_boxes_ || viz.show_tracked_boxes()) {
-        for (const auto& obj : rec_frame.tracked_objects) {
-            cv::rectangle(temp_result, obj.box, cv::Scalar(0, 165, 255), 3); // Orange for ByteTrack, thicker
         }
     }
     

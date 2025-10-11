@@ -756,7 +756,6 @@ if PYQT_AVAILABLE:
             <p><b>Features:</b></p>
             <ul>
                 <li>Real-time ball tracking with YOLO object detection</li>
-                <li>ByteTrack multi-object tracking</li>
                 <li>Color-based ball identification</li>
                 <li>3D position estimation</li>
                 <li>Camera calibration tools</li>
@@ -1525,8 +1524,7 @@ if PYQT_AVAILABLE:
             
             command = juggler_pb2.CommandRequest(
                 type=juggler_pb2.CommandRequest.CommandType.RECORD_START,
-                record_with_yolo_boxes=self.show_raw_detections_toggle.isChecked(),
-                record_with_bytetrack_boxes=self.show_tracked_boxes_toggle.isChecked()
+                record_with_yolo_boxes=self.show_raw_detections_toggle.isChecked()
             )
             command.visualization_states.CopyFrom(viz_states)
             
@@ -1543,8 +1541,7 @@ if PYQT_AVAILABLE:
             
             command = juggler_pb2.CommandRequest(
                 type=command_type,
-                record_with_yolo_boxes=self.show_raw_detections_toggle.isChecked(),
-                record_with_bytetrack_boxes=self.show_tracked_boxes_toggle.isChecked()
+                record_with_yolo_boxes=self.show_raw_detections_toggle.isChecked()
             )
             
             # Add visualization states if starting recording

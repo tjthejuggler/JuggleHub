@@ -44,11 +44,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(asio)
 
-# --- Add the ByteTrack Sub-Project ---
-# This is a more robust way to include the library.
-# It tells CMake to build the bytetrack target from its own CMakeLists.txt.
-add_subdirectory(${CMAKE_SOURCE_DIR}/vendor/ByteTrack-cpp)
-
 # --- Protobuf Generation ---
 set(PROTOBUF_GENERATE_CPP_APPEND_PATH ON)
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ../api/v1/juggler.proto)
@@ -69,9 +64,6 @@ add_executable(juggle_engine
 
 # --- Link All Libraries to the Executable ---
 target_link_libraries(juggle_engine PRIVATE
-    # Our compiled bytetrack library target
-    bytetrack
-
     # OpenVINO and OpenCV
     openvino
     ${OpenCV_LIBS}
@@ -89,10 +81,8 @@ target_include_directories(juggle_engine PRIVATE
     ${CMAKE_BINARY_DIR} # For generated proto headers
     ${ZeroMQ_INCLUDE_DIRS}
     /opt/intel/openvino_2025.2.0/runtime/include
-    ${CMAKE_SOURCE_DIR}/vendor/ByteTrack-cpp/include
 )
 target_include_directories(juggle_engine PRIVATE ${asio_SOURCE_DIR}/include)
-target_link_libraries(juggle_engine PUBLIC bytetrack)
 
 # --- Installation (Good Practice) ---
 install(TARGETS juggle_engine DESTINATION bin)

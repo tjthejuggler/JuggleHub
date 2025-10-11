@@ -55,7 +55,7 @@ class JugglingSystemManager:
         Processes a single frame of data from the C++ engine.
         
         NEW APPROACH: Direct color-based tracking with INSTANT position updates.
-        No Kalman smoothing, no ByteTrack IDs - just pure color identity.
+        No Kalman smoothing - just pure color identity.
 
         Args:
             frame_data (FrameData): The protobuf message from the engine.

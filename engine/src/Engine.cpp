@@ -714,10 +714,11 @@ void Engine::saveRecording() {
             if (recording_logger_.isActive()) {
                 // Log events first
                 recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls, rec_frame.tracked_hands_simple);
-                // Then log frame data
+                // Then log frame data with visualization states
                 recording_logger_.logFrame(rec_frame.tracked_balls,
                                           rec_frame.tracked_hands_simple,
-                                          camera_intrinsics_);
+                                          camera_intrinsics_,
+                                          visualization_states_);
             }
         }
         
@@ -860,10 +861,11 @@ void Engine::stopContinuousRecording() {
             if (recording_logger_.isActive()) {
                 // Log events first
                 recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls, rec_frame.tracked_hands_simple);
-                // Then log frame data
+                // Then log frame data with visualization states
                 recording_logger_.logFrame(rec_frame.tracked_balls,
                                           rec_frame.tracked_hands_simple,
-                                          camera_intrinsics_);
+                                          camera_intrinsics_,
+                                          visualization_states_);
             }
         }
         

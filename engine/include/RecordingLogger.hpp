@@ -7,11 +7,15 @@
 #include <iomanip>
 #include <sstream>
 #include "SimpleBallTracker.hpp"
+#include "juggler.pb.h"
 
 /**
  * RecordingLogger - Creates detailed log files during recording sessions
  * Captures frame-by-frame information about trajectory-based tracking,
  * color tracker positions, and prediction details for debugging
+ *
+ * Logging is now conditional based on visualization toggles - only logs
+ * information for visualizations that are enabled in the UI
  */
 class RecordingLogger {
 public:
@@ -114,12 +118,14 @@ public:
         }
     }
     
-    // Log a single frame's tracking data
+    // Log a single frame's tracking data (with visualization-based filtering)
     void logFrame(const std::vector<SimpleBall>& balls,
                   const std::vector<SimpleHand>& hands,
-                  const CameraIntrinsics& intrinsics [[maybe_unused]]) {
+                  const CameraIntrinsics& intrinsics [[maybe_unused]],
+                  const juggler::v1::VisualizationStates& viz_states = juggler::v1::VisualizationStates()) {
         if (!is_active_) return;
         
+        // ALWAYS log: Frame header, frame number, hand positions, ball locations and state
         log_file_ << "================================================================================\n";
         log_file_ << "FRAME " << frame_number_ << "\n";
         log_file_ << "================================================================================\n";
@@ -127,14 +133,14 @@ public:
         log_file_ << "Number of tracked balls: " << balls.size() << "\n";
         log_file_ << "Number of detected hands: " << hands.size() << "\n\n";
         
-        // Log hand positions first
+        // ALWAYS log hand positions
         if (!hands.empty()) {
             log_file_ << "--- HAND POSITIONS ---\n";
             for (const auto& hand : hands) {
                 log_file_ << "  Hand " << hand.id << " (" << (hand.id == 0 ? "LEFT" : "RIGHT") << "):\n";
                 log_file_ << "    Wrist 3D: (" << std::fixed << std::setprecision(4)
-                         << hand.wrist_pos_3d.x << ", " 
-                         << hand.wrist_pos_3d.y << ", " 
+                         << hand.wrist_pos_3d.x << ", "
+                         << hand.wrist_pos_3d.y << ", "
                          << hand.wrist_pos_3d.z << ") m\n";
                 log_file_ << "    Visible: " << (hand.is_visible ? "YES" : "NO") << "\n";
                 log_file_ << "    Confidence: " << std::setprecision(3) << hand.confidence << "\n";
@@ -142,18 +148,18 @@ public:
             log_file_ << "\n";
         }
         
-        // Log each ball's detailed information
+        // ALWAYS log each ball's basic information
         for (const auto& ball : balls) {
             log_file_ << "--- BALL " << ball.id << " (" << ball.color_name << ") ---\n";
             
-            // Current state
+            // ALWAYS log: Current state (position, bbox, held/flight state)
             log_file_ << "  Current State:\n";
             log_file_ << "    Position 3D: (" << std::fixed << std::setprecision(4)
-                     << ball.position.x << ", " 
-                     << ball.position.y << ", " 
+                     << ball.position.x << ", "
+                     << ball.position.y << ", "
                      << ball.position.z << ") m\n";
             log_file_ << "    Position 2D (pixel): (" << std::setprecision(2)
-                     << ball.pixel_pos.x << ", " 
+                     << ball.pixel_pos.x << ", "
                      << ball.pixel_pos.y << ")\n";
             log_file_ << "    BBox: [" << std::setprecision(1)
                      << ball.bbox.x << ", " << ball.bbox.y << ", "
@@ -161,88 +167,98 @@ public:
             log_file_ << "    State: " << (ball.is_held ? "HELD" : "IN_FLIGHT") << "\n";
             log_file_ << "    Held by hand: " << (ball.held_by_hand_id >= 0 ?
                      std::to_string(ball.held_by_hand_id) : "NONE") << "\n";
-            log_file_ << "    Has YOLO detection: " << (ball.has_yolo_detection ? "YES" : "NO") << "\n";
-            log_file_ << "    YOLO confidence: " << std::setprecision(3) << ball.yolo_confidence << "\n";
-            log_file_ << "    YOLO class: " << (ball.yolo_class_id == 0 ? "ball" : "ball_held") << "\n";
-            log_file_ << "    Color match score: " << std::setprecision(3) << ball.color_match_score << "\n";
-            log_file_ << "    Tracking reason: " << ball.tracking_reason << "\n\n";
             
-            // Trajectory-based tracking info
-            log_file_ << "  TRAJECTORY TRACKING:\n";
-            const auto& trajectory = ball.trajectory;
-            log_file_ << "    Verified points: " << trajectory.verified_point_count << "\n";
-            log_file_ << "    Trajectory confidence: " << std::setprecision(3)
-                     << trajectory.trajectory_confidence << "\n";
-            log_file_ << "    Search radius: " << std::setprecision(4)
-                     << trajectory.search_radius_m << " m\n";
-            log_file_ << "    Has enough data for prediction: "
-                     << (trajectory.verified_point_count >= 3 ? "YES" : "NO") << "\n";
-            
-            if (!trajectory.points.empty()) {
-                log_file_ << "    Trajectory points (oldest to newest):\n";
-                for (size_t i = 0; i < trajectory.points.size(); ++i) {
-                    const auto& point = trajectory.points[i];
-                    log_file_ << "      [" << i << "] Position: ("
-                             << std::fixed << std::setprecision(4)
-                             << point.position.x << ", "
-                             << point.position.y << ", "
-                             << point.position.z << ") m, Verified: "
-                             << (point.verified ? "YES" : "NO") << ", Confidence: "
-                             << std::setprecision(3) << point.confidence << "\n";
-                }
-                
-                // Log velocity from trajectory
-                if (trajectory.verified_point_count >= 2) {
-                    cv::Point3f velocity = trajectory.initial_velocity;
-                    log_file_ << "    Initial velocity: ("
-                             << std::fixed << std::setprecision(4)
-                             << velocity.x << ", "
-                             << velocity.y << ", "
-                             << velocity.z << ") m/s\n";
-                    
-                    float speed = std::sqrt(velocity.x * velocity.x +
-                                          velocity.y * velocity.y +
-                                          velocity.z * velocity.z);
-                    log_file_ << "    Speed magnitude: " << std::setprecision(4) << speed << " m/s\n";
-                }
-            } else {
-                log_file_ << "    (No trajectory points available)\n";
+            // CONDITIONAL: Color tracker details (only if show_color_tracker enabled)
+            if (viz_states.show_color_tracker()) {
+                log_file_ << "    Has YOLO detection: " << (ball.has_yolo_detection ? "YES" : "NO") << "\n";
+                log_file_ << "    YOLO confidence: " << std::setprecision(3) << ball.yolo_confidence << "\n";
+                log_file_ << "    YOLO class: " << (ball.yolo_class_id == 0 ? "ball" : "ball_held") << "\n";
+                log_file_ << "    Color match score: " << std::setprecision(3) << ball.color_match_score << "\n";
+                log_file_ << "    Tracking reason: " << ball.tracking_reason << "\n";
             }
             log_file_ << "\n";
             
-            // Prediction details
-            if (trajectory.verified_point_count >= 3 && !trajectory.predicted_path.empty()) {
-                log_file_ << "  PREDICTION DETAILS:\n";
-                log_file_ << "    Predicted path points: " << trajectory.predicted_path.size() << "\n";
-                log_file_ << "    Gravity: " << std::setprecision(4) << trajectory.gravity << " m/s²\n";
-                log_file_ << "    Prediction valid: " << (trajectory.prediction_valid ? "YES" : "NO") << "\n";
+            // CONDITIONAL: Trajectory tracking info (only if show_trajectory enabled)
+            if (viz_states.show_trajectory()) {
+                log_file_ << "  TRAJECTORY TRACKING:\n";
+                const auto& trajectory = ball.trajectory;
+                log_file_ << "    Verified points: " << trajectory.verified_point_count << "\n";
+                log_file_ << "    Trajectory confidence: " << std::setprecision(3)
+                         << trajectory.trajectory_confidence << "\n";
+                log_file_ << "    Search radius: " << std::setprecision(4)
+                         << trajectory.search_radius_m << " m\n";
+                log_file_ << "    Has enough data for prediction: "
+                         << (trajectory.verified_point_count >= 3 ? "YES" : "NO") << "\n";
                 
-                // Show first predicted position
-                if (!trajectory.predicted_path.empty()) {
-                    const auto& pred_pos = trajectory.predicted_path[0];
-                    log_file_ << "    Next predicted position: ("
-                             << std::fixed << std::setprecision(4)
-                             << pred_pos.x << ", "
-                             << pred_pos.y << ", "
-                             << pred_pos.z << ") m\n";
-                    log_file_ << "    Search radius: " << std::setprecision(4)
-                             << trajectory.search_radius_m << " m\n";
-                    
-                    // Calculate prediction error if we have current position
-                    if (ball.has_yolo_detection && pred_pos.z > 0) {
-                        float dx = ball.position.x - pred_pos.x;
-                        float dy = ball.position.y - pred_pos.y;
-                        float dz = ball.position.z - pred_pos.z;
-                        float error = std::sqrt(dx*dx + dy*dy + dz*dz);
-                        
-                        log_file_ << "    Prediction error: " << std::setprecision(4) << error << " m\n";
-                        log_file_ << "    Error components: dx=" << dx << ", dy=" << dy << ", dz=" << dz << " m\n";
+                if (!trajectory.points.empty()) {
+                    log_file_ << "    Trajectory points (oldest to newest):\n";
+                    for (size_t i = 0; i < trajectory.points.size(); ++i) {
+                        const auto& point = trajectory.points[i];
+                        log_file_ << "      [" << i << "] Position: ("
+                                 << std::fixed << std::setprecision(4)
+                                 << point.position.x << ", "
+                                 << point.position.y << ", "
+                                 << point.position.z << ") m, Verified: "
+                                 << (point.verified ? "YES" : "NO") << ", Confidence: "
+                                 << std::setprecision(3) << point.confidence << "\n";
                     }
+                    
+                    // Log velocity from trajectory
+                    if (trajectory.verified_point_count >= 2) {
+                        cv::Point3f velocity = trajectory.initial_velocity;
+                        log_file_ << "    Initial velocity: ("
+                                 << std::fixed << std::setprecision(4)
+                                 << velocity.x << ", "
+                                 << velocity.y << ", "
+                                 << velocity.z << ") m/s\n";
+                        
+                        float speed = std::sqrt(velocity.x * velocity.x +
+                                              velocity.y * velocity.y +
+                                              velocity.z * velocity.z);
+                        log_file_ << "    Speed magnitude: " << std::setprecision(4) << speed << " m/s\n";
+                    }
+                } else {
+                    log_file_ << "    (No trajectory points available)\n";
                 }
-            } else {
-                log_file_ << "  PREDICTION: Not enough trajectory data (need 3+ verified points)\n";
+                log_file_ << "\n";
             }
-            log_file_ << "\n";
+            
+            // CONDITIONAL: Prediction details (only if show_trajectory_predictions enabled)
+            if (viz_states.show_trajectory_predictions()) {
+                const auto& trajectory = ball.trajectory;
+                if (trajectory.verified_point_count >= 3 && !trajectory.predicted_path.empty()) {
+                    log_file_ << "  PREDICTION DETAILS:\n";
+                    log_file_ << "    Predicted path points: " << trajectory.predicted_path.size() << "\n";
+                    log_file_ << "    Gravity: " << std::setprecision(4) << trajectory.gravity << " m/s²\n";
+                    log_file_ << "    Prediction valid: " << (trajectory.prediction_valid ? "YES" : "NO") << "\n";
+                    
+                    // Show first predicted position
+                    if (!trajectory.predicted_path.empty()) {
+                        const auto& pred_pos = trajectory.predicted_path[0];
+                        log_file_ << "    Next predicted position: ("
+                                 << std::fixed << std::setprecision(4)
+                                 << pred_pos.x << ", "
+                                 << pred_pos.y << ", "
+                                 << pred_pos.z << ") m\n";
+                        log_file_ << "    Search radius: " << std::setprecision(4)
+                                 << trajectory.search_radius_m << " m\n";
+                        
+                        // Calculate prediction error if we have current position
+                        if (ball.has_yolo_detection && pred_pos.z > 0) {
+                            float dx = ball.position.x - pred_pos.x;
+                            float dy = ball.position.y - pred_pos.y;
+                            float dz = ball.position.z - pred_pos.z;
+                            float error = std::sqrt(dx*dx + dy*dy + dz*dz);
+                            
+                            log_file_ << "    Prediction error: " << std::setprecision(4) << error << " m\n";
+                            log_file_ << "    Error components: dx=" << dx << ", dy=" << dy << ", dz=" << dz << " m\n";
+                        }
+                    }
+                } else {
+                    log_file_ << "  PREDICTION: Not enough trajectory data (need 3+ verified points)\n";
+                }
+                log_file_ << "\n";
+            }
         }
         
         log_file_ << "\n";

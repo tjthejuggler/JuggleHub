@@ -424,8 +424,8 @@ if PYQT_AVAILABLE:
             toggle_buttons.append(self.hide_video_feed_toggle)
             
             # Add buttons to grid layout - they will wrap automatically
-            # Use 6 columns for better packing
-            max_columns = 6
+            # Use 5 columns for better packing
+            max_columns = 5
             for i, button in enumerate(toggle_buttons):
                 row = i // max_columns
                 col = i % max_columns
@@ -455,8 +455,8 @@ if PYQT_AVAILABLE:
             settings_group = QGroupBox("⚙️ Tracking Settings")
             settings_layout = QVBoxLayout(settings_group)
             
-            # Create settings widget and add it directly
-            self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance)
+            # Create settings widget and add it directly, passing main window reference
+            self.settings_widget = CalibrationSettingsWidget(self.udp_client, self.zmq_client, self.hub_instance, main_window=self)
             settings_layout.addWidget(self.settings_widget)
             
             right_panel_layout.addWidget(settings_group)

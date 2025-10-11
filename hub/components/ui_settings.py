@@ -35,11 +35,12 @@ if PYQT_AVAILABLE:
 
 if PYQT_AVAILABLE:
     class CalibrationSettingsWidget(QWidget):
-        def __init__(self, udp_client, zmq_client, hub_instance=None, parent=None):
+        def __init__(self, udp_client, zmq_client, hub_instance=None, parent=None, main_window=None):
             super().__init__(parent)
             self.udp_client = udp_client
             self.zmq_client = zmq_client
             self.hub_instance = hub_instance
+            self.main_window = main_window  # Store reference to main window for accessing visualization toggles
             self.settings_file = os.path.join("hub", "config", "calibration_settings.json")
             self.calibration_saves_dir = os.path.join("hub", "calibration_saves")
             self._loading_settings = True  # Flag to prevent auto-save during initialization and load
@@ -1688,6 +1689,37 @@ if PYQT_AVAILABLE:
                 'show_catch_distance_threshold': self.show_catch_distance_threshold_toggle.isChecked() if hasattr(self, 'show_catch_distance_threshold_toggle') else True,
             }
             
+            # Add visualization toggle states from main window
+            if self.main_window:
+                if hasattr(self.main_window, 'show_raw_detections_toggle'):
+                    settings['viz_show_raw_detections'] = self.main_window.show_raw_detections_toggle.isChecked()
+                if hasattr(self.main_window, 'show_hand_tracking_toggle'):
+                    settings['viz_show_hand_tracking'] = self.main_window.show_hand_tracking_toggle.isChecked()
+                if hasattr(self.main_window, 'show_ball_states_toggle'):
+                    settings['viz_show_ball_states'] = self.main_window.show_ball_states_toggle.isChecked()
+                if hasattr(self.main_window, 'show_skeleton_toggle'):
+                    settings['viz_show_skeleton'] = self.main_window.show_skeleton_toggle.isChecked()
+                if hasattr(self.main_window, 'show_color_search_toggle'):
+                    settings['viz_show_color_search'] = self.main_window.show_color_search_toggle.isChecked()
+                if hasattr(self.main_window, 'show_color_tracker_toggle'):
+                    settings['viz_show_color_tracker'] = self.main_window.show_color_tracker_toggle.isChecked()
+                if hasattr(self.main_window, 'show_tracked_boxes_toggle'):
+                    settings['viz_show_tracked_boxes'] = self.main_window.show_tracked_boxes_toggle.isChecked()
+                if hasattr(self.main_window, 'show_unmatched_detections_toggle'):
+                    settings['viz_show_unmatched_detections'] = self.main_window.show_unmatched_detections_toggle.isChecked()
+                if hasattr(self.main_window, 'show_trajectory_toggle'):
+                    settings['viz_show_trajectory'] = self.main_window.show_trajectory_toggle.isChecked()
+                if hasattr(self.main_window, 'show_trajectory_points_toggle'):
+                    settings['viz_show_trajectory_points'] = self.main_window.show_trajectory_points_toggle.isChecked()
+                if hasattr(self.main_window, 'show_throw_threshold_toggle'):
+                    settings['viz_show_throw_threshold'] = self.main_window.show_throw_threshold_toggle.isChecked()
+                if hasattr(self.main_window, 'show_catch_threshold_toggle'):
+                    settings['viz_show_catch_threshold'] = self.main_window.show_catch_threshold_toggle.isChecked()
+                if hasattr(self.main_window, 'show_tails_toggle'):
+                    settings['viz_show_tails'] = self.main_window.show_tails_toggle.isChecked()
+                if hasattr(self.main_window, 'hide_video_feed_toggle'):
+                    settings['viz_hide_video_feed'] = self.main_window.hide_video_feed_toggle.isChecked()
+            
             # Add ball profile settings
             if hasattr(self, 'ball_checkboxes') and hasattr(self, 'ball_hue_sliders'):
                 ball_tracking = {}
@@ -1882,6 +1914,37 @@ if PYQT_AVAILABLE:
             
             if 'show_catch_distance_threshold' in settings and hasattr(self, 'show_catch_distance_threshold_toggle'):
                 self.show_catch_distance_threshold_toggle.setChecked(settings['show_catch_distance_threshold'])
+            
+            # Restore visualization toggle states to main window
+            if self.main_window:
+                if 'viz_show_raw_detections' in settings and hasattr(self.main_window, 'show_raw_detections_toggle'):
+                    self.main_window.show_raw_detections_toggle.setChecked(settings['viz_show_raw_detections'])
+                if 'viz_show_hand_tracking' in settings and hasattr(self.main_window, 'show_hand_tracking_toggle'):
+                    self.main_window.show_hand_tracking_toggle.setChecked(settings['viz_show_hand_tracking'])
+                if 'viz_show_ball_states' in settings and hasattr(self.main_window, 'show_ball_states_toggle'):
+                    self.main_window.show_ball_states_toggle.setChecked(settings['viz_show_ball_states'])
+                if 'viz_show_skeleton' in settings and hasattr(self.main_window, 'show_skeleton_toggle'):
+                    self.main_window.show_skeleton_toggle.setChecked(settings['viz_show_skeleton'])
+                if 'viz_show_color_search' in settings and hasattr(self.main_window, 'show_color_search_toggle'):
+                    self.main_window.show_color_search_toggle.setChecked(settings['viz_show_color_search'])
+                if 'viz_show_color_tracker' in settings and hasattr(self.main_window, 'show_color_tracker_toggle'):
+                    self.main_window.show_color_tracker_toggle.setChecked(settings['viz_show_color_tracker'])
+                if 'viz_show_tracked_boxes' in settings and hasattr(self.main_window, 'show_tracked_boxes_toggle'):
+                    self.main_window.show_tracked_boxes_toggle.setChecked(settings['viz_show_tracked_boxes'])
+                if 'viz_show_unmatched_detections' in settings and hasattr(self.main_window, 'show_unmatched_detections_toggle'):
+                    self.main_window.show_unmatched_detections_toggle.setChecked(settings['viz_show_unmatched_detections'])
+                if 'viz_show_trajectory' in settings and hasattr(self.main_window, 'show_trajectory_toggle'):
+                    self.main_window.show_trajectory_toggle.setChecked(settings['viz_show_trajectory'])
+                if 'viz_show_trajectory_points' in settings and hasattr(self.main_window, 'show_trajectory_points_toggle'):
+                    self.main_window.show_trajectory_points_toggle.setChecked(settings['viz_show_trajectory_points'])
+                if 'viz_show_throw_threshold' in settings and hasattr(self.main_window, 'show_throw_threshold_toggle'):
+                    self.main_window.show_throw_threshold_toggle.setChecked(settings['viz_show_throw_threshold'])
+                if 'viz_show_catch_threshold' in settings and hasattr(self.main_window, 'show_catch_threshold_toggle'):
+                    self.main_window.show_catch_threshold_toggle.setChecked(settings['viz_show_catch_threshold'])
+                if 'viz_show_tails' in settings and hasattr(self.main_window, 'show_tails_toggle'):
+                    self.main_window.show_tails_toggle.setChecked(settings['viz_show_tails'])
+                if 'viz_hide_video_feed' in settings and hasattr(self.main_window, 'hide_video_feed_toggle'):
+                    self.main_window.hide_video_feed_toggle.setChecked(settings['viz_hide_video_feed'])
             
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:

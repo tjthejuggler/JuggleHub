@@ -1387,10 +1387,11 @@ std::vector<SimpleHand> SimpleBallTracker::runPoseEstimation(
     const float keypoint_confidence_threshold = 0.5f;
     
     for (int i = 0; i < output_buffer.rows; ++i) {
-        float cx = output_buffer.at<float>(i, 0);
-        float cy = output_buffer.at<float>(i, 1);
-        float w = output_buffer.at<float>(i, 2);
-        float h = output_buffer.at<float>(i, 3);
+        // Extract bounding box (not used for hand tracking, only keypoints)
+        // float cx = output_buffer.at<float>(i, 0);
+        // float cy = output_buffer.at<float>(i, 1);
+        // float w = output_buffer.at<float>(i, 2);
+        // float h = output_buffer.at<float>(i, 3);
         float person_confidence = output_buffer.at<float>(i, 4);
         
         if (person_confidence < pose_confidence_threshold) continue;
@@ -1933,7 +1934,6 @@ void SimpleBallTracker::updateInFlightBall(
         
         // NEW FIX: Check if ball is very close to any hand - if so, snap to hand position
         // This prevents tracker from getting stuck in air when ball returns to hand
-        bool snapped_to_hand = false;
         for (const auto& hand : hands_) {
             if (!hand.is_visible) continue;
             
@@ -1955,7 +1955,6 @@ void SimpleBallTracker::updateInFlightBall(
                 ball.yolo_confidence = 0.5f;
                 ball.yolo_class_id = 0;  // ball class (transitioning to catch)
                 ball.tracking_reason = "IN_FLIGHT_near_hand_fallback";
-                snapped_to_hand = true;
                 
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);

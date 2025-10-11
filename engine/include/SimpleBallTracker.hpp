@@ -95,6 +95,7 @@ struct SimpleBall {
     
     // State (NEW: simplified state machine)
     BallState state;                 // HELD or IN_FLIGHT
+    BallState previous_state;        // Previous frame's state (for detecting state transitions)
     bool is_held;                    // In hand or in flight (kept for compatibility)
     int held_by_hand_id;             // -1 if not held, 0=left, 1=right
     int previous_held_by_hand_id;    // Previous frame's hand ID (for detecting hand switches)
@@ -171,7 +172,6 @@ struct TrackingSettings {
     
     // LEGACY SETTINGS (kept for backward compatibility during transition)
     // These will be removed in Phase 3
-    float wrist_proximity_threshold = 0.15f;
     float undetected_near_hand_threshold = 0.20f;
     int min_frames_for_state_change = 2;
     float min_throw_distance = 0.20f;
@@ -220,6 +220,8 @@ struct TrajectoryVisualizationSettings {
     bool show_search_radius = true;        // Show current search area
     bool show_confidence = true;           // Show confidence indicator
     bool show_max_distance = true;         // Show max tracker distance circle
+    bool show_throw_distance_threshold = true;  // Show throw distance threshold circles around hands
+    bool show_catch_distance_threshold = true;  // Show catch distance threshold circles around hands
     
     // Colors (BGR format for OpenCV)
     cv::Scalar trajectory_color = cv::Scalar(255, 255, 0);      // Cyan
@@ -227,6 +229,8 @@ struct TrajectoryVisualizationSettings {
     cv::Scalar predicted_point_color = cv::Scalar(0, 255, 255); // Yellow
     cv::Scalar search_radius_color = cv::Scalar(255, 0, 255);   // Magenta
     cv::Scalar max_distance_color = cv::Scalar(0, 0, 255);      // Red
+    cv::Scalar throw_distance_color = cv::Scalar(0, 165, 255);  // Orange (BGR)
+    cv::Scalar catch_distance_color = cv::Scalar(0, 255, 0);    // Green (BGR)
     
     // Sizes
     int trajectory_thickness = 2;
@@ -287,7 +291,17 @@ public:
      * @param intrinsics Camera intrinsics for 3D-to-2D projection
      */
     void drawTrajectory(cv::Mat& frame, const SimpleBall& ball, const CameraIntrinsics& intrinsics) const;
-    const TrackingSettings& getTrackingSettings() const { return tracking_settings_; }
+   
+   /**
+    * Draw hand threshold circles on frame
+    *
+    * @param frame Frame to draw on (modified in-place)
+    * @param hands Hands to draw thresholds around
+    * @param intrinsics Camera intrinsics for 3D-to-2D projection
+    */
+   void drawHandThresholds(cv::Mat& frame, const std::vector<SimpleHand>& hands, const CameraIntrinsics& intrinsics) const;
+   
+   const TrackingSettings& getTrackingSettings() const { return tracking_settings_; }
     void setTrackingSettings(const TrackingSettings& settings) { tracking_settings_ = settings; }
     
     // Utility for projection

@@ -316,138 +316,122 @@ if PYQT_AVAILABLE:
             calibration_layout.addWidget(self.color_profile_status_label)
             
             # --- Visualization Toggles (Pipeline Steps) ---
-            # Row 1: Early pipeline steps
-            toggles_row1 = QHBoxLayout()
-            toggles_row1.setSpacing(5)
+            # Use a flow layout that wraps buttons to the next row automatically
+            toggles_container = QWidget()
+            toggles_flow_layout = QGridLayout(toggles_container)
+            toggles_flow_layout.setSpacing(5)
+            toggles_flow_layout.setContentsMargins(0, 0, 0, 0)
+            
+            # Create all toggle buttons
+            toggle_buttons = []
             
             self.show_raw_detections_toggle = QPushButton("raw_detections")
             self.show_raw_detections_toggle.setCheckable(True)
             self.show_raw_detections_toggle.setChecked(False)
             self.show_raw_detections_toggle.clicked.connect(self.toggle_overlays)
-            self.show_raw_detections_toggle.setMaximumWidth(180)
             self.show_raw_detections_toggle.setToolTip("frame_data.raw_detections - YOLO detections after confidence threshold, before NMS (color-coded: green=ball, blue=ball_held)")
-            toggles_row1.addWidget(self.show_raw_detections_toggle)
-            
-            toggles_row1.addStretch()
-            calibration_layout.addLayout(toggles_row1)
-            
-            # Row 2: Matching and initialization
-            toggles_row2 = QHBoxLayout()
-            toggles_row2.setSpacing(5)
-            
+            toggle_buttons.append(self.show_raw_detections_toggle)
             
             self.show_hand_tracking_toggle = QPushButton("hands")
             self.show_hand_tracking_toggle.setCheckable(True)
             self.show_hand_tracking_toggle.setChecked(False)
             self.show_hand_tracking_toggle.clicked.connect(self.toggle_overlays)
-            self.show_hand_tracking_toggle.setMaximumWidth(100)
             self.show_hand_tracking_toggle.setToolTip("frame_data.hands - Hand/wrist detections")
-            toggles_row2.addWidget(self.show_hand_tracking_toggle)
-            
-            toggles_row2.addStretch()
-            calibration_layout.addLayout(toggles_row2)
-            
-            # Row 3: State and occlusion
-            toggles_row3 = QHBoxLayout()
-            toggles_row3.setSpacing(5)
+            toggle_buttons.append(self.show_hand_tracking_toggle)
             
             self.show_ball_states_toggle = QPushButton("ball_states")
             self.show_ball_states_toggle.setCheckable(True)
             self.show_ball_states_toggle.setChecked(False)
             self.show_ball_states_toggle.clicked.connect(self.toggle_overlays)
-            self.show_ball_states_toggle.setMaximumWidth(120)
             self.show_ball_states_toggle.setToolTip("frame_data.ball_states - Throw/catch/flight states")
-            toggles_row3.addWidget(self.show_ball_states_toggle)
-            
+            toggle_buttons.append(self.show_ball_states_toggle)
             
             self.show_skeleton_toggle = QPushButton("keypoints")
             self.show_skeleton_toggle.setCheckable(True)
             self.show_skeleton_toggle.setChecked(False)
             self.show_skeleton_toggle.clicked.connect(self.toggle_overlays)
-            self.show_skeleton_toggle.setMaximumWidth(120)
             self.show_skeleton_toggle.setToolTip("hand.keypoints - Pose estimation skeleton")
-            toggles_row3.addWidget(self.show_skeleton_toggle)
-            
-            toggles_row3.addStretch()
-            calibration_layout.addLayout(toggles_row3)
-            
-            # Row 4: Color tracking and final results
-            toggles_row4 = QHBoxLayout()
-            toggles_row4.setSpacing(5)
+            toggle_buttons.append(self.show_skeleton_toggle)
             
             self.show_color_search_toggle = QPushButton("color_search_regions")
             self.show_color_search_toggle.setCheckable(True)
             self.show_color_search_toggle.setChecked(False)
             self.show_color_search_toggle.clicked.connect(self.toggle_overlays)
-            self.show_color_search_toggle.setMaximumWidth(180)
             self.show_color_search_toggle.setToolTip("frame_data.color_search_regions - Color tracking search areas")
-            toggles_row4.addWidget(self.show_color_search_toggle)
+            toggle_buttons.append(self.show_color_search_toggle)
             
             self.show_color_tracker_toggle = QPushButton("color_tracked_balls")
             self.show_color_tracker_toggle.setCheckable(True)
             self.show_color_tracker_toggle.setChecked(True)
             self.show_color_tracker_toggle.clicked.connect(self.toggle_overlays)
-            self.show_color_tracker_toggle.setMaximumWidth(180)
             self.show_color_tracker_toggle.setToolTip("frame_data.color_tracked_balls - Active color trackers")
-            toggles_row4.addWidget(self.show_color_tracker_toggle)
+            toggle_buttons.append(self.show_color_tracker_toggle)
             
             self.show_tracked_boxes_toggle = QPushButton("color_tracked_balls (final)")
             self.show_tracked_boxes_toggle.setCheckable(True)
             self.show_tracked_boxes_toggle.setChecked(False)
             self.show_tracked_boxes_toggle.clicked.connect(self.toggle_overlays)
-            self.show_tracked_boxes_toggle.setMaximumWidth(200)
             self.show_tracked_boxes_toggle.setToolTip("frame_data.color_tracked_balls - Persistent tracker visualization")
-            toggles_row4.addWidget(self.show_tracked_boxes_toggle)
-            
-            toggles_row4.addStretch()
-            calibration_layout.addLayout(toggles_row4)
-            
-            # Row 5: Unmatched and utility
-            toggles_row5 = QHBoxLayout()
-            toggles_row5.setSpacing(5)
+            toggle_buttons.append(self.show_tracked_boxes_toggle)
             
             self.show_unmatched_detections_toggle = QPushButton("unmatched_detections")
             self.show_unmatched_detections_toggle.setCheckable(True)
             self.show_unmatched_detections_toggle.setChecked(True)
             self.show_unmatched_detections_toggle.clicked.connect(self.toggle_overlays)
-            self.show_unmatched_detections_toggle.setMaximumWidth(190)
             self.show_unmatched_detections_toggle.setToolTip("frame_data.unmatched_detections - Detections not matched to trackers")
-            toggles_row5.addWidget(self.show_unmatched_detections_toggle)
+            toggle_buttons.append(self.show_unmatched_detections_toggle)
             
             self.show_trajectory_toggle = QPushButton("trajectory_points (path)")
             self.show_trajectory_toggle.setCheckable(True)
             self.show_trajectory_toggle.setChecked(False)
             self.show_trajectory_toggle.clicked.connect(self.toggle_overlays)
-            self.show_trajectory_toggle.setMaximumWidth(190)
             self.show_trajectory_toggle.setToolTip("ball_state.trajectory_points - Predicted trajectory path lines")
-            toggles_row5.addWidget(self.show_trajectory_toggle)
+            toggle_buttons.append(self.show_trajectory_toggle)
             
             self.show_trajectory_points_toggle = QPushButton("trajectory_points (dots)")
             self.show_trajectory_points_toggle.setCheckable(True)
             self.show_trajectory_points_toggle.setChecked(False)
             self.show_trajectory_points_toggle.clicked.connect(self.toggle_overlays)
-            self.show_trajectory_points_toggle.setMaximumWidth(190)
             self.show_trajectory_points_toggle.setToolTip("ball_state.trajectory_points - Verified trajectory points as circles")
-            toggles_row5.addWidget(self.show_trajectory_points_toggle)
+            toggle_buttons.append(self.show_trajectory_points_toggle)
+            
+            self.show_throw_threshold_toggle = QPushButton("throw_threshold")
+            self.show_throw_threshold_toggle.setCheckable(True)
+            self.show_throw_threshold_toggle.setChecked(False)
+            self.show_throw_threshold_toggle.clicked.connect(self.toggle_overlays)
+            self.show_throw_threshold_toggle.setToolTip("tracking_settings.throw_distance_threshold - Orange circles around hands showing throw distance")
+            toggle_buttons.append(self.show_throw_threshold_toggle)
+            
+            self.show_catch_threshold_toggle = QPushButton("catch_threshold")
+            self.show_catch_threshold_toggle.setCheckable(True)
+            self.show_catch_threshold_toggle.setChecked(False)
+            self.show_catch_threshold_toggle.clicked.connect(self.toggle_overlays)
+            self.show_catch_threshold_toggle.setToolTip("tracking_settings.catch_distance_threshold - Green circles around hands showing catch distance")
+            toggle_buttons.append(self.show_catch_threshold_toggle)
             
             self.show_tails_toggle = QPushButton("tracker_history")
             self.show_tails_toggle.setCheckable(True)
             self.show_tails_toggle.setChecked(False)
             self.show_tails_toggle.clicked.connect(self.toggle_overlays)
-            self.show_tails_toggle.setMaximumWidth(140)
             self.show_tails_toggle.setToolTip("UI tracker_history - Historical position trails")
-            toggles_row5.addWidget(self.show_tails_toggle)
+            toggle_buttons.append(self.show_tails_toggle)
             
             self.hide_video_feed_toggle = QPushButton("Hide Video Feed")
             self.hide_video_feed_toggle.setCheckable(True)
             self.hide_video_feed_toggle.setChecked(False)
             self.hide_video_feed_toggle.clicked.connect(self.toggle_video_feed)
             self.hide_video_feed_toggle.setToolTip("Hide the video feed but keep overlays visible (FPS boost)")
-            self.hide_video_feed_toggle.setMaximumWidth(140)
-            toggles_row5.addWidget(self.hide_video_feed_toggle)
+            toggle_buttons.append(self.hide_video_feed_toggle)
             
-            toggles_row5.addStretch()
-            calibration_layout.addLayout(toggles_row5)
+            # Add buttons to grid layout - they will wrap automatically
+            # Use 6 columns for better packing
+            max_columns = 6
+            for i, button in enumerate(toggle_buttons):
+                row = i // max_columns
+                col = i % max_columns
+                toggles_flow_layout.addWidget(button, row, col)
+            
+            calibration_layout.addWidget(toggles_container)
 
             # --- Tail Length Slider ---
             tail_layout = QHBoxLayout()

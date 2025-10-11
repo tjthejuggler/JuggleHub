@@ -38,7 +38,6 @@ These settings are currently hooked up and actively used in the tracking system:
 - ✅ **pose_model_enabled** - Active
 
 ### Ball State Detection
-- ✅ **wrist_proximity_threshold** - Active
 - ✅ **undetected_near_hand_threshold** - Active
 - ✅ **min_frames_for_state_change** - Active
 - ✅ **throw_distance_threshold** - Active (NEW trajectory-based)
@@ -107,7 +106,10 @@ These settings were found to be dead code and have been **REMOVED** from both UI
 - ❌ **ml_ball_held_weight** - DEAD CODE (part of unused `isBallHeld()` function)
 - ❌ **wrist_proximity_weight** - DEAD CODE (part of unused `isBallHeld()` function)
 
-**Total Removed:** 10 dead settings
+### Ball State Detection - Redundant Threshold (REMOVED - 2025-10-11)
+- ❌ **wrist_proximity_threshold** - DEAD CODE (redundant with throw/catch distance thresholds)
+
+**Total Removed:** 11 dead settings
 
 ---
 
@@ -209,7 +211,7 @@ The tracking system now uses:
 
 ## Conclusion
 
-Successfully identified and removed 10 dead settings from the old Kalman-based tracking system and unused weighted scoring system. The UI now only contains settings that are actively used in the current trajectory-based tracking architecture. This cleanup:
+Successfully identified and removed 11 dead settings from the old Kalman-based tracking system and unused weighted scoring system. The UI now only contains settings that are actively used in the current trajectory-based tracking architecture. This cleanup:
 
 - ✅ Reduces confusion for users
 - ✅ Simplifies the codebase

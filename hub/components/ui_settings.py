@@ -340,22 +340,6 @@ if PYQT_AVAILABLE:
             layout.addWidget(QLabel("Distance Thresholds:"), row, 0, 1, 3)
             row += 1
             
-            # Wrist proximity threshold (for YOLO-detected balls)
-            self.tc_wrist_proximity_slider, self.tc_wrist_proximity_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Detected Ball Proximity (cm)",
-                tooltip_text="Distance between YOLO-detected ball and wrist to consider as held.\n"
-                             "Range: 5-30cm. Default: 15cm.\n"
-                             "Lower = stricter, Higher = more lenient.",
-                range_min=5,
-                range_max=30,
-                initial_value=15,
-                update_func=lambda v: self.update_setting('wrist_proximity_threshold', v / 100.0),  # Convert cm to m
-                is_float=False  # Display as integer cm
-            )
-            row += 1
-            
             # Undetected near hand threshold (for occluded balls)
             self.tc_undetected_near_hand_slider, self.tc_undetected_near_hand_label = self._create_slider_widget(
                 parent_layout=layout,
@@ -396,7 +380,7 @@ if PYQT_AVAILABLE:
             self.tc_throw_distance_threshold_slider, self.tc_throw_distance_threshold_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Throw Distance Threshold (cm)",
+                label_text="throw_distance_threshold (cm)",
                 tooltip_text="Distance ball must be from hand to detect a throw (trajectory-based).\n"
                              "Range: 5-50 cm. Default: 20 cm.\n"
                              "When ball moves this far from hand, it's considered thrown.\n"
@@ -415,7 +399,7 @@ if PYQT_AVAILABLE:
             self.tc_catch_distance_threshold_slider, self.tc_catch_distance_threshold_label = self._create_slider_widget(
                 parent_layout=layout,
                 row=row,
-                label_text="Catch Distance Threshold (cm)",
+                label_text="catch_distance_threshold (cm)",
                 tooltip_text="Maximum distance from hand to detect a catch (trajectory-based).\n"
                              "Range: 10-50 cm. Default: 30 cm.\n"
                              "When ball gets within this distance of hand, it's considered caught.\n"
@@ -1043,6 +1027,36 @@ if PYQT_AVAILABLE:
             )
             row += 1
             
+            # Separator for visualization toggles
+            layout.addWidget(QLabel("Threshold Visualization:"), row, 0, 1, 3)
+            row += 1
+            
+            # Show throw_distance_threshold toggle
+            self.show_throw_distance_threshold_toggle = QPushButton("show_throw_distance_threshold")
+            self.show_throw_distance_threshold_toggle.setCheckable(True)
+            self.show_throw_distance_threshold_toggle.setChecked(True)
+            self.show_throw_distance_threshold_toggle.clicked.connect(
+                lambda: self.update_setting('show_throw_distance_threshold',
+                                           1 if self.show_throw_distance_threshold_toggle.isChecked() else 0))
+            layout.addWidget(self.show_throw_distance_threshold_toggle, row, 0, 1, 3)
+            row += 1
+            
+            # Show catch_distance_threshold toggle
+            self.show_catch_distance_threshold_toggle = QPushButton("show_catch_distance_threshold")
+            self.show_catch_distance_threshold_toggle.setCheckable(True)
+            self.show_catch_distance_threshold_toggle.setChecked(True)
+            self.show_catch_distance_threshold_toggle.clicked.connect(
+                lambda: self.update_setting('show_catch_distance_threshold',
+                                           1 if self.show_catch_distance_threshold_toggle.isChecked() else 0))
+            layout.addWidget(self.show_catch_distance_threshold_toggle, row, 0, 1, 3)
+            row += 1
+            
+            # Info about visualization
+            viz_info_label = QLabel("ℹ️ Orange circle = throw threshold, Green circle = catch threshold (around hands)")
+            viz_info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+            viz_info_label.setWordWrap(True)
+            layout.addWidget(viz_info_label, row, 0, 1, 3)
+            
             return section
 
         def _calculate_hsv_range_from_rgb(self, rgb):
@@ -1587,7 +1601,7 @@ if PYQT_AVAILABLE:
                 'ball_confidence_slider', 'ball_held_confidence_slider', 'nms_slider',
                 'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo',
                 # Distance and state sliders
-                'tc_wrist_proximity_slider', 'tc_undetected_near_hand_slider', 'tc_min_frames_slider',
+                'tc_undetected_near_hand_slider', 'tc_min_frames_slider',
                 'tc_max_tracker_distance_slider',
                 # Throw/catch sound toggles
                 'tc_sound_on_catch_toggle', 'tc_sound_on_throw_toggle'
@@ -1608,7 +1622,6 @@ if PYQT_AVAILABLE:
                 'pose_model_enabled': self.pose_model_toggle.isChecked(),
                 
                 # Tracking Detection settings
-                'wrist_proximity_threshold': self.tc_wrist_proximity_slider.value() / 100.0,  # cm to m
                 'undetected_near_hand_threshold': self.tc_undetected_near_hand_slider.value() / 100.0,  # cm to m
                 'min_frames_for_state_change': self.tc_min_frames_slider.value(),
                 'throw_distance_threshold': self.tc_throw_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_throw_distance_threshold_slider') else 0.20,  # cm to m
@@ -1669,6 +1682,10 @@ if PYQT_AVAILABLE:
                 'traj_color_match_threshold': self._safe_get_slider_value(self.traj_color_match_threshold_slider, 50) / 100.0 if hasattr(self, 'traj_color_match_threshold_slider') else 0.50,
                 'traj_velocity_estimation_time': self._safe_get_slider_value(self.traj_velocity_estimation_time_slider, 10) / 100.0 if hasattr(self, 'traj_velocity_estimation_time_slider') else 0.10,
                 'traj_max_search_distance': self._safe_get_slider_value(self.traj_max_search_distance_slider, 50) / 100.0 if hasattr(self, 'traj_max_search_distance_slider') else 0.50,
+                
+                # Threshold visualization toggles
+                'show_throw_distance_threshold': self.show_throw_distance_threshold_toggle.isChecked() if hasattr(self, 'show_throw_distance_threshold_toggle') else True,
+                'show_catch_distance_threshold': self.show_catch_distance_threshold_toggle.isChecked() if hasattr(self, 'show_catch_distance_threshold_toggle') else True,
             }
             
             # Add ball profile settings
@@ -1726,9 +1743,6 @@ if PYQT_AVAILABLE:
                 self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
             
             # Tracking Detection settings
-            if 'wrist_proximity_threshold' in settings:
-                self.tc_wrist_proximity_slider.setValue(int(settings['wrist_proximity_threshold'] * 100))  # m to cm
-            
             if 'undetected_near_hand_threshold' in settings:
                 self.tc_undetected_near_hand_slider.setValue(int(settings['undetected_near_hand_threshold'] * 100))  # m to cm
             
@@ -1862,6 +1876,13 @@ if PYQT_AVAILABLE:
             if 'traj_max_search_distance' in settings and hasattr(self, 'traj_max_search_distance_slider'):
                 self.traj_max_search_distance_slider.setValue(int(settings['traj_max_search_distance'] * 100))  # m to cm
             
+            # Threshold visualization toggles
+            if 'show_throw_distance_threshold' in settings and hasattr(self, 'show_throw_distance_threshold_toggle'):
+                self.show_throw_distance_threshold_toggle.setChecked(settings['show_throw_distance_threshold'])
+            
+            if 'show_catch_distance_threshold' in settings and hasattr(self, 'show_catch_distance_threshold_toggle'):
+                self.show_catch_distance_threshold_toggle.setChecked(settings['show_catch_distance_threshold'])
+            
             if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
                 if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:
                     self.adaptive_color_section.toggle_collapsed()
@@ -1962,9 +1983,6 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('show_raw_yolo_detections', 1 if settings['show_raw_yolo_detections'] else 0)
             
             # Throw/Catch Detection settings
-            if 'wrist_proximity_threshold' in settings:
-                self.udp_client.send_setting('wrist_proximity_threshold', settings['wrist_proximity_threshold'])
-            
             if 'undetected_near_hand_threshold' in settings:
                 self.udp_client.send_setting('undetected_near_hand_threshold', settings['undetected_near_hand_threshold'])
             
@@ -2076,6 +2094,13 @@ if PYQT_AVAILABLE:
             
             if 'traj_max_search_distance' in settings:
                 self.udp_client.send_setting('traj_max_search_distance', settings['traj_max_search_distance'])
+            
+            # Threshold visualization toggles
+            if 'show_throw_distance_threshold' in settings:
+                self.udp_client.send_setting('show_throw_distance_threshold', 1 if settings['show_throw_distance_threshold'] else 0)
+            
+            if 'show_catch_distance_threshold' in settings:
+                self.udp_client.send_setting('show_catch_distance_threshold', 1 if settings['show_catch_distance_threshold'] else 0)
             
             # Ball tracking enabled states
             if 'ball_tracking_enabled' in settings:

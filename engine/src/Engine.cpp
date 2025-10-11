@@ -1539,6 +1539,65 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         }
     }
     
+    // Draw "Final Tracker" visualization (white circle with colored letter)
+    // This matches the UI's "color_tracked_balls (final)" toggle
+    if (viz.show_tracked_boxes()) {
+        // Load color profiles to get RGB colors for each ball
+        std::map<std::string, cv::Scalar> color_map;
+        try {
+            std::ifstream color_file("hub/color_profiles.json");
+            if (color_file.is_open()) {
+                nlohmann::json color_profiles;
+                color_file >> color_profiles;
+                
+                for (const auto& profile : color_profiles) {
+                    std::string name = profile["name"];
+                    std::vector<int> rgb = profile["rgb"];
+                    // Convert RGB to BGR for OpenCV
+                    color_map[name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
+                }
+            }
+        } catch (...) {
+            // If loading fails, use default colors
+        }
+        
+        for (const auto& ball : rec_frame.tracked_balls) {
+            // Get color for this ball
+            cv::Scalar color = cv::Scalar(255, 255, 255);  // Default white
+            auto it = color_map.find(ball.color_name);
+            if (it != color_map.end()) {
+                color = it->second;
+            }
+            
+            // Use pixel_pos which snaps to wrist when held (same as trajectory system)
+            int center_x = static_cast<int>(ball.pixel_pos.x);
+            int center_y = static_cast<int>(ball.pixel_pos.y);
+            
+            // Draw the color letter (first letter of color name)
+            std::string label = ball.color_name.empty() ? "?" : ball.color_name.substr(0, 1);
+            
+            // Draw white circle BORDER only (no fill) - so you can see the ball behind it
+            int label_radius = 15;
+            cv::circle(temp_result, cv::Point(center_x, center_y), label_radius, cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
+            
+            // If held, draw dashed circle to indicate held state
+            if (ball.is_held) {
+                // Simulate dashed circle with multiple arc segments
+                for (int angle = 0; angle < 360; angle += 20) {
+                    cv::ellipse(temp_result, cv::Point(center_x, center_y),
+                               cv::Size(label_radius + 3, label_radius + 3),
+                               0, angle, angle + 10, color, 2, cv::LINE_AA);
+                }
+            }
+            
+            // Draw the color letter with black outline for visibility
+            cv::putText(temp_result, label, cv::Point(center_x - 8, center_y + 8),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 4, cv::LINE_AA);
+            cv::putText(temp_result, label, cv::Point(center_x - 8, center_y + 8),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv::LINE_AA);
+        }
+    }
+    
     // Draw trajectory visualization for in-flight balls
     // Shows verified tracking points as colored circles
     if (viz.show_trajectory() && simple_tracker_) {
@@ -1732,6 +1791,12 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 }
             }
         }
+    }
+    
+    // Draw hand threshold circles (throw/catch distance thresholds)
+    // Shows orange circle for throw threshold and green circle for catch threshold around each hand
+    if (simple_tracker_) {
+        simple_tracker_->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics_);
     }
     
     // Draw trajectory-based prediction circles

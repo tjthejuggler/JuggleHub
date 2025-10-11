@@ -92,6 +92,7 @@ SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
             ball.id = ball_id++;
             ball.color_name = profile.name;
             ball.state = HELD;  // CRITICAL: Initialize state
+            ball.previous_state = HELD;  // Initialize previous state
             ball.held_by_hand_id = -1;  // No hand assigned yet
             ball.position = cv::Point3f(0, 0, 0);  // Will be set in first update
             
@@ -254,10 +255,6 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             return true;
         }
         // Handle tracking settings
-        else if (key == "wrist_proximity_threshold") {
-            tracking_settings_.wrist_proximity_threshold = std::stof(value);
-            return true;
-        }
         else if (key == "undetected_near_hand_threshold") {
             tracking_settings_.undetected_near_hand_threshold = std::stof(value);
             return true;
@@ -390,6 +387,14 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         }
         else if (key == "show_max_distance") {
             viz_settings_.show_max_distance = (value == "true" || value == "1");
+            return true;
+        }
+        else if (key == "show_throw_distance_threshold") {
+            viz_settings_.show_throw_distance_threshold = (value == "true" || value == "1");
+            return true;
+        }
+        else if (key == "show_catch_distance_threshold") {
+            viz_settings_.show_catch_distance_threshold = (value == "true" || value == "1");
             return true;
         }
         // Trajectory-based tracking settings
@@ -744,7 +749,8 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
                       << ", held_by_hand=" << ball.held_by_hand_id << std::endl;
         });
         
-        // Update previous_held_by_hand_id for next frame
+        // Update previous state and hand ID for next frame
+        ball.previous_state = ball.state;
         ball.previous_held_by_hand_id = ball.held_by_hand_id;
     }
     
@@ -1932,37 +1938,24 @@ void SimpleBallTracker::updateInFlightBall(
             debug_log.close();
         });
         
-        // NEW FIX: Check if ball is very close to any hand - if so, snap to hand position
+        // NEW FIX: Check if ball is very close to any hand - if so, initiate catch immediately
         // This prevents tracker from getting stuck in air when ball returns to hand
+        // and prevents spurious catch/throw events from the ball being snapped to hand while IN_FLIGHT
         for (const auto& hand : hands_) {
             if (!hand.is_visible) continue;
             
             float dist = cv::norm(predicted_next - hand.wrist_pos_3d);
             if (dist < 0.15f) {  // Very close to hand (15cm)
-                // Snap to hand position instead of using stale prediction
-                ball.position = hand.wrist_pos_3d;
-                ball.pixel_pos = project_3d_to_2d(hand.wrist_pos_3d, intrinsics);
-                
-                // CRITICAL: Set bbox and detection flag for visualization
-                float bbox_size = 30.0f;
-                ball.bbox = cv::Rect_<float>(
-                    ball.pixel_pos.x - bbox_size/2,
-                    ball.pixel_pos.y - bbox_size/2,
-                    bbox_size,
-                    bbox_size
-                );
-                ball.has_yolo_detection = true;
-                ball.yolo_confidence = 0.5f;
-                ball.yolo_class_id = 0;  // ball class (transitioning to catch)
-                ball.tracking_reason = "IN_FLIGHT_near_hand_fallback";
-                
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
                     debug_log << "  NEAR-HAND FALLBACK: Ball within 0.15m of hand " << hand.id
-                              << " (dist=" << dist << "m) - snapping to hand position" << std::endl;
+                              << " (dist=" << dist << "m) - initiating catch" << std::endl;
                     debug_log.close();
                 });
-                break;
+                
+                // Immediately transition to HELD state and generate catch event
+                initiateCatch(ball, hand, events);
+                return;  // Exit early, ball is now caught
             }
         }
     }
@@ -2024,45 +2017,15 @@ void SimpleBallTracker::updateInFlightBall(
     
     // Step 5: Check for catch - ball must be IN_FLIGHT and close to hand
     // CRITICAL: Only balls that are IN_FLIGHT can be caught!
-    if (ball.state == IN_FLIGHT) {
-        // CRITICAL FIX: Use appropriate position for distance calculation
-        // - If we have < 3 trajectory points: use last verified position (or current if no trajectory)
-        // - If we have >= 3 trajectory points: use predicted position (more accurate with physics)
-        cv::Point3f position_for_catch;
-        if (ball.trajectory.verified_point_count < 3) {
-            // Use last verified position or current position
-            if (!ball.trajectory.points.empty()) {
-                // Find last verified point
-                for (int i = ball.trajectory.points.size() - 1; i >= 0; i--) {
-                    if (ball.trajectory.points[i].verified) {
-                        position_for_catch = ball.trajectory.points[i].position;
-                        break;
-                    }
-                }
-                if (position_for_catch.z == 0) {
-                    position_for_catch = ball.position;  // Fallback
-                }
-            } else {
-                position_for_catch = ball.position;
-            }
-            
-            DEBUG_LOG(debug_log, {
-                OPEN_DEBUG_LOG(debug_log);
-                debug_log << "  Using last verified position for catch detection (< 3 points)" << std::endl;
-                debug_log.close();
-            });
-        } else {
-            // Use predicted/current position (already has good trajectory)
-            position_for_catch = ball.position;
-            
-            DEBUG_LOG(debug_log, {
-                OPEN_DEBUG_LOG(debug_log);
-                debug_log << "  Using predicted position for catch detection (>= 3 points)" << std::endl;
-                debug_log.close();
-            });
-        }
+    // NEW FIX: Only register catch when ball was IN_FLIGHT in the previous frame
+    // This prevents multiple catches when ball is just passing through catch zone
+    if (ball.state == IN_FLIGHT && ball.previous_state == IN_FLIGHT) {
+        // Ball was truly in flight last frame, check for catch
         
-        // CRITICAL FIX: Find the CLOSEST hand within threshold, not just the first one
+        // Use current ball position for catch detection
+        cv::Point3f position_for_catch = ball.position;
+        
+        // Find the CLOSEST hand within threshold
         float min_dist = tracking_settings_.catch_distance_threshold;
         const SimpleHand* closest_hand = nullptr;
         
@@ -2079,40 +2042,6 @@ void SimpleBallTracker::updateInFlightBall(
             });
             
             if (dist_to_hand < min_dist) {
-                // CRITICAL FIX: Check if ball has moved away from hand before allowing catch
-                // This prevents spurious catch events when a ball briefly transitions to IN_FLIGHT
-                // due to tracking issues (e.g., YOLO override) but never actually left the hand
-                if (ball.held_by_hand_id == hand.id) {
-                    // Calculate max distance ball has been from this hand during flight
-                    float max_distance = 0.0f;
-                    for (const auto& point : ball.trajectory.points) {
-                        float dist = cv::norm(point.position - hand.wrist_pos_3d);
-                        max_distance = std::max(max_distance, dist);
-                    }
-                    
-                    // Only prevent catch if ball never moved away significantly
-                    // Use 2x throw_distance_threshold to ensure ball actually traveled
-                    if (max_distance < tracking_settings_.throw_distance_threshold * 2.0f) {
-                        // Ball never really left hand, prevent spurious catch
-                        DEBUG_LOG(debug_log, {
-                            OPEN_DEBUG_LOG(debug_log);
-                            debug_log << "  CATCH PREVENTED: Ball never moved away from hand " << hand.id
-                                      << " (max_dist=" << max_distance << "m, threshold="
-                                      << (tracking_settings_.throw_distance_threshold * 2.0f) << "m)" << std::endl;
-                            debug_log.close();
-                        });
-                        continue;  // Skip this hand, check other hands
-                    }
-                    
-                    // Ball traveled away and came back - allow catch
-                    DEBUG_LOG(debug_log, {
-                        OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  CATCH ALLOWED: Ball traveled away from hand " << hand.id
-                                  << " (max_dist=" << max_distance << "m) and returned" << std::endl;
-                        debug_log.close();
-                    });
-                }
-                
                 // This hand is closer - update closest hand
                 min_dist = dist_to_hand;
                 closest_hand = &hand;
@@ -2126,8 +2055,6 @@ void SimpleBallTracker::updateInFlightBall(
                 debug_log << "  CATCH DETECTED to CLOSEST hand " << closest_hand->id
                           << ": dist=" << min_dist
                           << "m, threshold=" << tracking_settings_.catch_distance_threshold << "m" << std::endl;
-                debug_log << "  Ball was previously held by hand " << ball.held_by_hand_id
-                          << ", now catching with hand " << closest_hand->id << std::endl;
                 debug_log.close();
             });
             
@@ -2531,6 +2458,61 @@ void SimpleBallTracker::drawTrajectory(
         cv::putText(frame, conf_text, text_pos,
                     cv::FONT_HERSHEY_SIMPLEX, 0.5,
                     viz_settings_.trajectory_color, 1);
+    }
+}
+
+void SimpleBallTracker::drawHandThresholds(
+    cv::Mat& frame,
+    const std::vector<SimpleHand>& hands,
+    const CameraIntrinsics& intrinsics
+) const {
+    // Draw threshold circles around each hand's wrist
+    for (const auto& hand : hands) {
+        if (!hand.is_visible) continue;
+        
+        // Project wrist 3D position to 2D
+        cv::Point2f wrist_2d = project_3d_to_2d(hand.wrist_pos_3d, intrinsics);
+        
+        // Check if on-screen
+        if (wrist_2d.x < 0 || wrist_2d.x >= frame.cols ||
+            wrist_2d.y < 0 || wrist_2d.y >= frame.rows) {
+            continue;
+        }
+        
+        // Calculate pixel radius from meters using camera intrinsics
+        // radius_pixels = radius_meters * focal_length / depth
+        float depth = hand.wrist_pos_3d.z;
+        if (depth <= 0) continue;
+        
+        // Draw throw distance threshold circle (orange)
+        if (viz_settings_.show_throw_distance_threshold) {
+            float throw_radius_px = tracking_settings_.throw_distance_threshold * intrinsics.fx / depth;
+            cv::circle(frame, wrist_2d, static_cast<int>(throw_radius_px),
+                      viz_settings_.throw_distance_color, 2);
+            
+            // Add label
+            std::string label = cv::format("Throw: %.0fcm",
+                                          tracking_settings_.throw_distance_threshold * 100);
+            cv::Point text_pos(wrist_2d.x + 10, wrist_2d.y - static_cast<int>(throw_radius_px) - 5);
+            cv::putText(frame, label, text_pos,
+                       cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                       viz_settings_.throw_distance_color, 1);
+        }
+        
+        // Draw catch distance threshold circle (green)
+        if (viz_settings_.show_catch_distance_threshold) {
+            float catch_radius_px = tracking_settings_.catch_distance_threshold * intrinsics.fx / depth;
+            cv::circle(frame, wrist_2d, static_cast<int>(catch_radius_px),
+                      viz_settings_.catch_distance_color, 2);
+            
+            // Add label
+            std::string label = cv::format("Catch: %.0fcm",
+                                          tracking_settings_.catch_distance_threshold * 100);
+            cv::Point text_pos(wrist_2d.x + 10, wrist_2d.y + static_cast<int>(catch_radius_px) + 15);
+            cv::putText(frame, label, text_pos,
+                       cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                       viz_settings_.catch_distance_color, 1);
+        }
     }
 }
 

@@ -721,7 +721,7 @@ BallTrajectory GpuTrajectoryPredictor::refineTrajectory(
     
     // Re-estimate initial velocity from all verified points
     if (trajectory.verified_point_count >= 3) {
-        refined.initial_velocity = estimateInitialVelocity(
+        refined.initial_velocity = estimateCurrentVelocity(
             trajectory.points, trajectory.gravity
         );
         

@@ -106,6 +106,10 @@ struct SimpleBall {
     // Tracking
     bool has_yolo_detection;         // True if YOLO sees it this frame
     
+    // Lockup prevention (NEW: track frames without verified detection)
+    int frames_without_verified_detection;  // Counter for frames without real detection
+    int unverified_trajectory_points;       // Counter for unverified points added
+    
     // Confidence scores (for UI display and override detection)
     float yolo_confidence;           // YOLO detection confidence (0.0-1.0)
     float color_match_score;         // How well it matches assigned color (0.0-1.0)
@@ -119,6 +123,8 @@ struct SimpleBall {
     SimpleBall() : id(-1), state(HELD), is_held(false),
                    held_by_hand_id(-1), previous_held_by_hand_id(-1),
                    has_yolo_detection(false),
+                   frames_without_verified_detection(0),
+                   unverified_trajectory_points(0),
                    yolo_confidence(0.0f), color_match_score(0.0f),
                    yolo_class_id(0),
                    matched_detection_confidence(0.0f),

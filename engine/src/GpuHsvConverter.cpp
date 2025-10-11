@@ -33,6 +33,18 @@ GpuHsvConverter::GpuHsvConverter() : gpu_enabled_(false) {
 cv::Mat GpuHsvConverter::convertRoiToHsv(const cv::Mat& bgr_frame, const cv::Rect& roi) {
     std::lock_guard<std::mutex> lock(mutex_);
     
+    // CRITICAL FIX: Validate ROI bounds before accessing
+    // This prevents crashes when ball goes out of frame
+    if (roi.x < 0 || roi.y < 0 ||
+        roi.x + roi.width > bgr_frame.cols ||
+        roi.y + roi.height > bgr_frame.rows ||
+        roi.width <= 0 || roi.height <= 0) {
+        std::cerr << "[GpuHsvConverter] Invalid ROI: x=" << roi.x << " y=" << roi.y
+                  << " w=" << roi.width << " h=" << roi.height
+                  << " (frame: " << bgr_frame.cols << "x" << bgr_frame.rows << ")" << std::endl;
+        return cv::Mat();  // Return empty mat
+    }
+    
     if (!gpu_enabled_) {
         // Fallback to CPU conversion
         debug_counters_.hsv_roi_cpu_fallback++;
@@ -128,6 +140,18 @@ cv::Point2f GpuHsvConverter::findColorBlob(const cv::Mat& bgr_frame,
                                           int roi_offset_x,
                                           int roi_offset_y) {
     std::lock_guard<std::mutex> lock(mutex_);
+    
+    // CRITICAL FIX: Validate ROI bounds before accessing
+    // This prevents crashes when ball goes out of frame
+    if (roi.x < 0 || roi.y < 0 ||
+        roi.x + roi.width > bgr_frame.cols ||
+        roi.y + roi.height > bgr_frame.rows ||
+        roi.width <= 0 || roi.height <= 0) {
+        std::cerr << "[GpuHsvConverter] Invalid ROI in findColorBlob: x=" << roi.x << " y=" << roi.y
+                  << " w=" << roi.width << " h=" << roi.height
+                  << " (frame: " << bgr_frame.cols << "x" << bgr_frame.rows << ")" << std::endl;
+        return cv::Point2f(-1, -1);  // Return invalid point
+    }
     
     if (!gpu_enabled_) {
         // Fallback to CPU implementation

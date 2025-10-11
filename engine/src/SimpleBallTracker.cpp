@@ -765,6 +765,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // Increment frame counter
     frame_counter_++;
     
+    // LOCKUP DEBUG: Always log frame start to console
+    std::cout << "[FRAME " << frame_counter_ << "] Update started" << std::endl;
+    
     DEBUG_LOG(debug_log, {
         OPEN_DEBUG_LOG(debug_log);
         debug_log << "\n\n========================================" << std::endl;
@@ -794,7 +797,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     cached_color_frame_ = color_frame;  // Store reference for cache validation
 
     // Run YOLO detection
+    std::cout << "[FRAME " << frame_counter_ << "] Running YOLO detection..." << std::endl;
     std::vector<Detection> yolo_detections = runBallDetection(color_frame, depth_frame, intrinsics);
+    std::cout << "[FRAME " << frame_counter_ << "] YOLO detection complete: " << yolo_detections.size() << " detections" << std::endl;
     
     // PERFORMANCE FIX: Only evaluate override criteria for recording/debugging
     // During normal operation, we evaluate lazily per-ball (much faster)
@@ -881,7 +886,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     });
 
     // Run pose estimation
+    std::cout << "[FRAME " << frame_counter_ << "] Running pose estimation..." << std::endl;
     std::vector<SimpleHand> hands = runPoseEstimation(color_frame, depth_frame, intrinsics);
+    std::cout << "[FRAME " << frame_counter_ << "] Pose estimation complete: " << hands.size() << " hands" << std::endl;
     
     // HAND PERSISTENCE: Fill in missing hands with last known positions
     // This prevents tracking issues when a hand temporarily disappears from pose detection
@@ -1072,11 +1079,17 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             continue;  // Skip normal update logic
         }
         
+        std::cout << "[FRAME " << frame_counter_ << "] Updating ball " << ball.id
+                  << " (" << ball.color_name << ") state="
+                  << (ball.state == HELD ? "HELD" : "IN_FLIGHT") << std::endl;
+        
         if (ball.state == HELD) {
             updateHeldBall(ball, hands, yolo_detections, color_frame, depth_frame, intrinsics, events);
         } else {  // IN_FLIGHT
             updateInFlightBall(ball, yolo_detections, color_frame, depth_frame, intrinsics, events);
         }
+        
+        std::cout << "[FRAME " << frame_counter_ << "] Ball " << ball.id << " update complete" << std::endl;
     }
     
     // DEBUG: Log ball positions after update
@@ -1110,6 +1123,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         debug_log_end << "========================================\n" << std::endl;
         debug_log_end.close();
     });
+    
+    std::cout << "[FRAME " << frame_counter_ << "] Update complete, returning results" << std::endl;
     
     return {balls_, events};
 }
@@ -1485,8 +1500,113 @@ void SimpleBallTracker::updateInFlightBall(
         OPEN_DEBUG_LOG(debug_log);
         debug_log << "\n[updateInFlightBall] Ball " << ball.id << " (" << ball.color_name << ")" << std::endl;
         debug_log << "  verified_point_count: " << ball.trajectory.verified_point_count << std::endl;
+        debug_log << "  frames_without_verified_detection: " << ball.frames_without_verified_detection << std::endl;
+        debug_log << "  unverified_trajectory_points: " << ball.unverified_trajectory_points << std::endl;
         debug_log.close();
     });
+    
+    // LOCKUP PREVENTION: Check if ball has been lost for too long
+    // If we've gone 90 frames (~3 seconds at 30fps) without a verified detection, force a catch
+    const int MAX_FRAMES_WITHOUT_DETECTION = 90;
+    const int MAX_UNVERIFIED_POINTS = 30;  // ~1 second at 30fps
+    
+    if (ball.frames_without_verified_detection > MAX_FRAMES_WITHOUT_DETECTION) {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  LOCKUP PREVENTION: Ball lost for " << ball.frames_without_verified_detection
+                      << " frames (>" << MAX_FRAMES_WITHOUT_DETECTION << ") - forcing catch to nearest hand" << std::endl;
+            debug_log.close();
+        });
+        
+        // Find nearest hand and force catch
+        if (!hands_.empty()) {
+            float min_dist = std::numeric_limits<float>::max();
+            const SimpleHand* nearest_hand = nullptr;
+            
+            for (const auto& hand : hands_) {
+                if (!hand.is_visible) continue;
+                float dist = cv::norm(ball.position - hand.wrist_pos_3d);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    nearest_hand = &hand;
+                }
+            }
+            
+            if (nearest_hand) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  FORCED CATCH to hand " << nearest_hand->id << " (dist=" << min_dist << "m)" << std::endl;
+                    debug_log.close();
+                });
+                initiateCatch(ball, *nearest_hand, events);
+                return;
+            }
+        }
+        
+        // If no hands available, reset trajectory and keep at last position
+        ball.trajectory.points.clear();
+        ball.trajectory.verified_point_count = 0;
+        ball.frames_without_verified_detection = 0;
+        ball.unverified_trajectory_points = 0;
+        ball.tracking_reason = "IN_FLIGHT_timeout_reset";
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  No hands available - trajectory reset, keeping last position" << std::endl;
+            debug_log.close();
+        });
+        return;
+    }
+    
+    // LOCKUP PREVENTION: Check if we've accumulated too many unverified points
+    if (ball.unverified_trajectory_points > MAX_UNVERIFIED_POINTS) {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  LOCKUP PREVENTION: Too many unverified points (" << ball.unverified_trajectory_points
+                      << " > " << MAX_UNVERIFIED_POINTS << ") - forcing catch" << std::endl;
+            debug_log.close();
+        });
+        
+        // Find nearest hand within reasonable distance
+        if (!hands_.empty()) {
+            float min_dist = std::numeric_limits<float>::max();
+            const SimpleHand* nearest_hand = nullptr;
+            
+            for (const auto& hand : hands_) {
+                if (!hand.is_visible) continue;
+                float dist = cv::norm(ball.position - hand.wrist_pos_3d);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    nearest_hand = &hand;
+                }
+            }
+            
+            // Force catch if hand is within 3x max_tracker_distance
+            if (nearest_hand && min_dist < tracking_settings_.max_tracker_distance_per_frame * 3.0f) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  FORCED CATCH to hand " << nearest_hand->id << " (dist=" << min_dist << "m)" << std::endl;
+                    debug_log.close();
+                });
+                initiateCatch(ball, *nearest_hand, events);
+                return;
+            }
+        }
+        
+        // If no suitable hand, reset trajectory
+        ball.trajectory.points.clear();
+        ball.trajectory.verified_point_count = 0;
+        ball.frames_without_verified_detection = 0;
+        ball.unverified_trajectory_points = 0;
+        ball.tracking_reason = "IN_FLIGHT_unverified_limit_reset";
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  No suitable hand - trajectory reset" << std::endl;
+            debug_log.close();
+        });
+        return;
+    }
     
     // Step 1: Determine prediction strategy based on point count
     int point_count = ball.trajectory.verified_point_count;
@@ -1806,6 +1926,8 @@ void SimpleBallTracker::updateInFlightBall(
             debug_log << "  Added UNVERIFIED trajectory point to prevent stuck prediction" << std::endl;
             debug_log << "  Total points: " << ball.trajectory.points.size()
                       << ", verified: " << ball.trajectory.verified_point_count << std::endl;
+            debug_log << "  Frames without detection: " << ball.frames_without_verified_detection << std::endl;
+            debug_log << "  Unverified points: " << ball.unverified_trajectory_points << std::endl;
             debug_log.close();
         });
         
@@ -2104,6 +2226,10 @@ void SimpleBallTracker::initiateCatch(
     ball.trajectory.prediction_valid = false;
     ball.trajectory.prediction_failure_reason = "TRAJECTORY_CLEARED: initiateCatch() - ball caught";
     
+    // LOCKUP PREVENTION: Reset counters when ball is caught
+    ball.frames_without_verified_detection = 0;
+    ball.unverified_trajectory_points = 0;
+    
     // 2. Reset physics parameters
     ball.trajectory.initial_velocity = cv::Point3f(0, 0, 0);
     ball.trajectory.initial_position = cv::Point3f(0, 0, 0);
@@ -2224,6 +2350,8 @@ std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ba
         ball.trajectory.prediction_valid = true;
         ball.trajectory.prediction_failure_reason = "";
     }
+    
+    std::cout << "[PREDICT] predictFullTrajectory complete" << std::endl;
     
     return predicted_path;
 }

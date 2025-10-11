@@ -336,58 +336,6 @@ if PYQT_AVAILABLE:
             layout.addWidget(info_label, row, 0, 1, 3)
             row += 1
             
-            # Detection weights section (for YOLO-detected balls)
-            layout.addWidget(QLabel("YOLO Detection Weights:"), row, 0, 1, 3)
-            row += 1
-            
-            # ML ball (in-air) weight
-            self.tc_ml_ball_weight_slider, self.tc_ml_ball_weight_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="ML 'Ball' Weight",
-                tooltip_text="Weight for ML model detecting ball as 'in-air'.\n"
-                             "Range: 0.0-1.0. Default: 0.4.\n"
-                             "Higher = trust ML more for in-air detection.",
-                range_min=0,
-                range_max=100,
-                initial_value=40,
-                update_func=lambda v: self.update_setting('ml_ball_weight', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # ML ball_held weight
-            self.tc_ml_ball_held_weight_slider, self.tc_ml_ball_held_weight_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="ML 'Ball Held' Weight",
-                tooltip_text="Weight for ML model detecting ball as 'held'.\n"
-                             "Range: 0.0-1.0. Default: 0.4.\n"
-                             "Higher = trust ML more for held detection.",
-                range_min=0,
-                range_max=100,
-                initial_value=40,
-                update_func=lambda v: self.update_setting('ml_ball_held_weight', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Wrist proximity weight
-            self.tc_wrist_proximity_weight_slider, self.tc_wrist_proximity_weight_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Wrist Proximity Weight",
-                tooltip_text="Weight for wrist proximity detection.\n"
-                             "Range: 0.0-1.0. Default: 0.2.\n"
-                             "Higher = trust proximity more.",
-                range_min=0,
-                range_max=100,
-                initial_value=20,
-                update_func=lambda v: self.update_setting('wrist_proximity_weight', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
             # Separator
             layout.addWidget(QLabel("Distance Thresholds:"), row, 0, 1, 3)
             row += 1
@@ -1638,9 +1586,6 @@ if PYQT_AVAILABLE:
             required_attrs = [
                 'ball_confidence_slider', 'ball_held_confidence_slider', 'nms_slider',
                 'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo',
-                # Tracking weight sliders
-                'tc_ml_ball_weight_slider', 'tc_ml_ball_held_weight_slider',
-                'tc_wrist_proximity_weight_slider',
                 # Distance and state sliders
                 'tc_wrist_proximity_slider', 'tc_undetected_near_hand_slider', 'tc_min_frames_slider',
                 'tc_max_tracker_distance_slider',
@@ -1663,9 +1608,6 @@ if PYQT_AVAILABLE:
                 'pose_model_enabled': self.pose_model_toggle.isChecked(),
                 
                 # Tracking Detection settings
-                'ml_ball_weight': self.tc_ml_ball_weight_slider.value() / 100.0,
-                'ml_ball_held_weight': self.tc_ml_ball_held_weight_slider.value() / 100.0,
-                'wrist_proximity_weight': self.tc_wrist_proximity_weight_slider.value() / 100.0,
                 'wrist_proximity_threshold': self.tc_wrist_proximity_slider.value() / 100.0,  # cm to m
                 'undetected_near_hand_threshold': self.tc_undetected_near_hand_slider.value() / 100.0,  # cm to m
                 'min_frames_for_state_change': self.tc_min_frames_slider.value(),
@@ -1784,15 +1726,6 @@ if PYQT_AVAILABLE:
                 self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
             
             # Tracking Detection settings
-            if 'ml_ball_weight' in settings:
-                self.tc_ml_ball_weight_slider.setValue(int(settings['ml_ball_weight'] * 100))
-            
-            if 'ml_ball_held_weight' in settings:
-                self.tc_ml_ball_held_weight_slider.setValue(int(settings['ml_ball_held_weight'] * 100))
-            
-            if 'wrist_proximity_weight' in settings:
-                self.tc_wrist_proximity_weight_slider.setValue(int(settings['wrist_proximity_weight'] * 100))
-            
             if 'wrist_proximity_threshold' in settings:
                 self.tc_wrist_proximity_slider.setValue(int(settings['wrist_proximity_threshold'] * 100))  # m to cm
             
@@ -2029,15 +1962,6 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('show_raw_yolo_detections', 1 if settings['show_raw_yolo_detections'] else 0)
             
             # Throw/Catch Detection settings
-            if 'ml_ball_weight' in settings:
-                self.udp_client.send_setting('ml_ball_weight', settings['ml_ball_weight'])
-            
-            if 'ml_ball_held_weight' in settings:
-                self.udp_client.send_setting('ml_ball_held_weight', settings['ml_ball_held_weight'])
-            
-            if 'wrist_proximity_weight' in settings:
-                self.udp_client.send_setting('wrist_proximity_weight', settings['wrist_proximity_weight'])
-            
             if 'wrist_proximity_threshold' in settings:
                 self.udp_client.send_setting('wrist_proximity_threshold', settings['wrist_proximity_threshold'])
             

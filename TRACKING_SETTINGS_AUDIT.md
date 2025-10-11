@@ -38,9 +38,6 @@ These settings are currently hooked up and actively used in the tracking system:
 - ✅ **pose_model_enabled** - Active
 
 ### Ball State Detection
-- ✅ **ml_ball_weight** - Active
-- ✅ **ml_ball_held_weight** - Active
-- ✅ **wrist_proximity_weight** - Active
 - ✅ **wrist_proximity_threshold** - Active
 - ✅ **undetected_near_hand_threshold** - Active
 - ✅ **min_frames_for_state_change** - Active
@@ -105,7 +102,12 @@ These settings were found to be dead code and have been **REMOVED** from both UI
 ### Color Tracker Weights (REMOVED)
 - ❌ **max_kalman_prediction_jump** - DEAD CODE (never read/used)
 
-**Total Removed:** 7 dead settings
+### Ball State Detection - Weighted Scoring (REMOVED - 2025-10-11)
+- ❌ **ml_ball_weight** - DEAD CODE (part of unused `isBallHeld()` function)
+- ❌ **ml_ball_held_weight** - DEAD CODE (part of unused `isBallHeld()` function)
+- ❌ **wrist_proximity_weight** - DEAD CODE (part of unused `isBallHeld()` function)
+
+**Total Removed:** 10 dead settings
 
 ---
 
@@ -132,7 +134,7 @@ The Kalman settings failed step 3 - they were stored but never used.
 
 ## Files Modified
 
-### Engine Files
+### Engine Files (Initial Cleanup)
 1. **engine/src/SimpleBallTracker.cpp**
    - Removed 7 dead setting handlers from `updateSetting()` method
    - Lines removed: 285-293, 363-377, 377-380
@@ -141,7 +143,7 @@ The Kalman settings failed step 3 - they were stored but never used.
    - Removed `max_kalman_prediction_jump` from `TrackingSettings` struct
    - Line removed: 211
 
-### UI Files
+### UI Files (Initial Cleanup)
 1. **hub/components/ui_settings.py**
    - Removed entire "Kalman Prediction" section (lines 637-684)
    - Removed entire "Kalman Glob Detection" section (lines 686-771)
@@ -150,6 +152,23 @@ The Kalman settings failed step 3 - they were stored but never used.
    - Removed all references in `apply_settings()` method
    - Removed all references in `_send_all_settings_to_engine()` method
    - Removed collapsed state handling for Kalman sections
+
+### Engine Files (2025-10-11 - Weighted Scoring Cleanup)
+1. **engine/include/SimpleBallTracker.hpp**
+   - Removed `ml_ball_weight`, `ml_ball_held_weight`, `wrist_proximity_weight` from `TrackingSettings` struct
+   - Removed unused `isBallHeld()` function declaration
+
+2. **engine/src/SimpleBallTracker.cpp**
+   - Removed 3 setting handlers from `updateSetting()` method (ml_ball_weight, ml_ball_held_weight, wrist_proximity_weight)
+   - Removed entire `isBallHeld()` function (145 lines of unused weighted scoring logic)
+
+### UI Files (2025-10-11 - Weighted Scoring Cleanup)
+1. **hub/components/ui_settings.py**
+   - Removed 3 weight sliders from Ball State Detection section (lines 339-391)
+   - Removed settings from `required_attrs` list in `get_current_settings()`
+   - Removed settings from `get_current_settings()` method
+   - Removed settings from `apply_settings()` method
+   - Removed settings from `_send_all_settings_to_engine()` method
 
 ---
 
@@ -190,7 +209,7 @@ The tracking system now uses:
 
 ## Conclusion
 
-Successfully identified and removed 7 dead settings from the old Kalman-based tracking system. The UI now only contains settings that are actively used in the current trajectory-based tracking architecture. This cleanup:
+Successfully identified and removed 10 dead settings from the old Kalman-based tracking system and unused weighted scoring system. The UI now only contains settings that are actively used in the current trajectory-based tracking architecture. This cleanup:
 
 - ✅ Reduces confusion for users
 - ✅ Simplifies the codebase

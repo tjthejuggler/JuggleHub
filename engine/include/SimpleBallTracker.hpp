@@ -165,9 +165,6 @@ struct TrackingSettings {
     
     // LEGACY SETTINGS (kept for backward compatibility during transition)
     // These will be removed in Phase 3
-    float ml_ball_weight = 0.3f;
-    float ml_ball_held_weight = 0.3f;
-    float wrist_proximity_weight = 0.4f;
     float wrist_proximity_threshold = 0.15f;
     float undetected_near_hand_threshold = 0.20f;
     int min_frames_for_state_change = 2;
@@ -216,12 +213,14 @@ struct TrajectoryVisualizationSettings {
     bool show_predicted_path = true;       // Show full predicted path
     bool show_search_radius = true;        // Show current search area
     bool show_confidence = true;           // Show confidence indicator
+    bool show_max_distance = true;         // Show max tracker distance circle
     
     // Colors (BGR format for OpenCV)
     cv::Scalar trajectory_color = cv::Scalar(255, 255, 0);      // Cyan
     cv::Scalar verified_point_color = cv::Scalar(0, 255, 0);    // Green
     cv::Scalar predicted_point_color = cv::Scalar(0, 255, 255); // Yellow
     cv::Scalar search_radius_color = cv::Scalar(255, 0, 255);   // Magenta
+    cv::Scalar max_distance_color = cv::Scalar(0, 0, 255);      // Red
     
     // Sizes
     int trajectory_thickness = 2;
@@ -302,7 +301,6 @@ private:
     float matchColor(const Detection& det, const ColorProfile& profile, const cv::Mat& color_frame);
     
     // State detection
-    bool isBallHeld(SimpleBall& ball, const std::vector<SimpleHand>& hands);
     std::vector<BallEvent> detectStatesAndEvents(std::vector<SimpleBall>& balls,
                                                  const std::vector<SimpleHand>& hands);
     

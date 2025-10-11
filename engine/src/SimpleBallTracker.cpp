@@ -1802,28 +1802,91 @@ void SimpleBallTracker::updateInFlightBall(
                     // Verify blob is within search distance
                     float dist = cv::norm(blob_3d - predicted_next);
                     if (dist < tracking_settings_.traj_max_search_distance) {
-                        ball.position = blob_3d;
-                        ball.pixel_pos = blob;
+                        // TRAJECTORY CONSISTENCY CHECK: Verify the blob follows expected motion
+                        bool trajectory_consistent = true;
                         
-                        // CRITICAL: Set has_yolo_detection to TRUE for visualization
-                        ball.has_yolo_detection = true;
-                        ball.yolo_confidence = 0.6f;  // Good confidence for color blob
-                        ball.yolo_class_id = 0;  // ball (in-flight) class
-                        ball.tracking_reason = "IN_FLIGHT_color_blob";
+                        if (ball.trajectory.verified_point_count >= 2) {
+                            // Get last known position and velocity
+                            cv::Point3f last_pos = ball.trajectory.points.back().position;
+                            cv::Point3f motion_vector = blob_3d - last_pos;
+                            
+                            // Calculate expected motion direction from velocity
+                            cv::Point3f expected_direction = ball.trajectory.initial_velocity;
+                            float expected_speed = cv::norm(expected_direction);
+                            
+                            if (expected_speed > 0.1f) {  // Only check if we have significant velocity
+                                expected_direction = expected_direction / expected_speed;  // Normalize
+                                
+                                // Normalize actual motion
+                                float actual_distance = cv::norm(motion_vector);
+                                if (actual_distance > 0.01f) {
+                                    cv::Point3f actual_direction = motion_vector / actual_distance;
+                                    
+                                    // Check if motion is in roughly the same direction (dot product)
+                                    float direction_similarity = expected_direction.dot(actual_direction);
+                                    
+                                    // Reject if moving in opposite direction or perpendicular
+                                    // (dot product < 0.5 means angle > 60 degrees)
+                                    if (direction_similarity < 0.5f) {
+                                        trajectory_consistent = false;
+                                        
+                                        DEBUG_LOG(debug_log, {
+                                            OPEN_DEBUG_LOG(debug_log);
+                                            debug_log << "  Color blob REJECTED: inconsistent trajectory direction" << std::endl;
+                                            debug_log << "    Direction similarity: " << direction_similarity << " (need >= 0.5)" << std::endl;
+                                            debug_log << "    Expected direction: (" << expected_direction.x << ", "
+                                                      << expected_direction.y << ", " << expected_direction.z << ")" << std::endl;
+                                            debug_log << "    Actual direction: (" << actual_direction.x << ", "
+                                                      << actual_direction.y << ", " << actual_direction.z << ")" << std::endl;
+                                            debug_log.close();
+                                        });
+                                    }
+                                    
+                                    // Also check if speed change is reasonable (not more than 3x or less than 0.3x)
+                                    float time_delta = 0.033f;  // Assume 30 FPS
+                                    float expected_distance = expected_speed * time_delta;
+                                    float speed_ratio = actual_distance / expected_distance;
+                                    
+                                    if (speed_ratio > 3.0f || speed_ratio < 0.3f) {
+                                        trajectory_consistent = false;
+                                        
+                                        DEBUG_LOG(debug_log, {
+                                            OPEN_DEBUG_LOG(debug_log);
+                                            debug_log << "  Color blob REJECTED: unreasonable speed change" << std::endl;
+                                            debug_log << "    Speed ratio: " << speed_ratio << " (need 0.3-3.0)" << std::endl;
+                                            debug_log << "    Expected distance: " << expected_distance << "m" << std::endl;
+                                            debug_log << "    Actual distance: " << actual_distance << "m" << std::endl;
+                                            debug_log.close();
+                                        });
+                                    }
+                                }
+                            }
+                        }
                         
-                        float bbox_size = 30.0f;
-                        ball.bbox = cv::Rect_<float>(
-                            blob.x - bbox_size/2, blob.y - bbox_size/2,
-                            bbox_size, bbox_size
-                        );
-                        
-                        verified = true;
-                        
-                        DEBUG_LOG(debug_log, {
-                            OPEN_DEBUG_LOG(debug_log);
-                            debug_log << "  Color blob found!" << std::endl;
-                            debug_log.close();
-                        });
+                        if (trajectory_consistent) {
+                            ball.position = blob_3d;
+                            ball.pixel_pos = blob;
+                            
+                            // CRITICAL: Set has_yolo_detection to TRUE for visualization
+                            ball.has_yolo_detection = true;
+                            ball.yolo_confidence = 0.6f;  // Good confidence for color blob
+                            ball.yolo_class_id = 0;  // ball (in-flight) class
+                            ball.tracking_reason = "IN_FLIGHT_color_blob";
+                            
+                            float bbox_size = 30.0f;
+                            ball.bbox = cv::Rect_<float>(
+                                blob.x - bbox_size/2, blob.y - bbox_size/2,
+                                bbox_size, bbox_size
+                            );
+                            
+                            verified = true;
+                            
+                            DEBUG_LOG(debug_log, {
+                                OPEN_DEBUG_LOG(debug_log);
+                                debug_log << "  Color blob found and trajectory consistent!" << std::endl;
+                                debug_log.close();
+                            });
+                        }
                     }
                 }
             }
@@ -1881,6 +1944,25 @@ void SimpleBallTracker::updateInFlightBall(
         // Don't add this as a verified point, but DO update the ball position for rendering
         // The trajectory prediction will continue from the last verified point
         
+        // CRITICAL FIX: Add the predicted position as an UNVERIFIED point
+        // This allows the trajectory to advance even when we lose tracking
+        // The prediction will use these unverified points to continue forward
+        TrajectoryPoint predicted_point;
+        predicted_point.position = predicted_next;
+        predicted_point.timestamp = current_timestamp;
+        predicted_point.verified = false;  // Mark as unverified
+        predicted_point.confidence = 0.3f;  // Low confidence
+        ball.trajectory.points.push_back(predicted_point);
+        // Don't increment verified_point_count since this is unverified
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  Added UNVERIFIED trajectory point to prevent stuck prediction" << std::endl;
+            debug_log << "  Total points: " << ball.trajectory.points.size()
+                      << ", verified: " << ball.trajectory.verified_point_count << std::endl;
+            debug_log.close();
+        });
+        
         // NEW FIX: Check if ball is very close to any hand - if so, snap to hand position
         // This prevents tracker from getting stuck in air when ball returns to hand
         bool snapped_to_hand = false;
@@ -1916,12 +1998,6 @@ void SimpleBallTracker::updateInFlightBall(
                 break;
             }
         }
-        
-        DEBUG_LOG(debug_log, {
-            OPEN_DEBUG_LOG(debug_log);
-            debug_log << "  Skipping trajectory point addition (using prediction, not verified)" << std::endl;
-            debug_log.close();
-        });
     }
     
     // CRITICAL GUARANTEE: If ball position is still invalid (z <= 0), force catch to nearest hand
@@ -2524,73 +2600,31 @@ void SimpleBallTracker::updateHeldBall(
         }
     }
     
-    // CRITICAL: Search for YOLO detection near hand that matches ball color
-    const Detection* best_det = nullptr;
-    float best_score = 0.0f;
-    const float HAND_SEARCH_RADIUS = 0.30f;  // 30cm around hand
+    // HELD BALLS ALWAYS USE WRIST POSITION
+    // This ensures stable, predictable tracking for held balls
+    ball.position = hand->wrist_pos_3d;
+    ball.pixel_pos = project_3d_to_2d(hand->wrist_pos_3d, intrinsics);
     
-    for (const auto& det : yolo_detections) {
-        // Check if detection is near hand
-        float dist_to_hand = cv::norm(det.world_pos - hand->wrist_pos_3d);
-        if (dist_to_hand > HAND_SEARCH_RADIUS) continue;
-        
-        // Check color match
-        float color_score = matchColor(det, *profile, color_frame);
-        if (color_score < tracking_settings_.min_color_match_score) continue;
-        
-        // Calculate combined score
-        float combined_score = det.confidence * color_score;
-        if (combined_score > best_score) {
-            best_score = combined_score;
-            best_det = &det;
-        }
-    }
+    // Set bbox for visualization
+    float bbox_size = 30.0f;
+    ball.bbox = cv::Rect_<float>(
+        ball.pixel_pos.x - bbox_size/2,
+        ball.pixel_pos.y - bbox_size/2,
+        bbox_size,
+        bbox_size
+    );
     
-    // Use detection if found, otherwise fall back to wrist
-    if (best_det) {
-        ball.position = best_det->world_pos;
-        ball.pixel_pos = cv::Point2f(best_det->box.x + best_det->box.width / 2.0f,
-                                     best_det->box.y + best_det->box.height / 2.0f);
-        ball.bbox = best_det->box;
-        ball.has_yolo_detection = true;
-        ball.yolo_confidence = best_det->confidence;
-        ball.yolo_class_id = best_det->class_id;
-        ball.color_match_score = matchColor(*best_det, *profile, color_frame);
-        ball.tracking_reason = "HELD_yolo_matched";
-        
-        DEBUG_LOG(debug_log, {
-            OPEN_DEBUG_LOG(debug_log);
-            debug_log << "  YOLO detection matched! conf=" << best_det->confidence
-                      << ", color_score=" << ball.color_match_score << std::endl;
-            debug_log.close();
-        });
-    } else {
-        // Fallback: place at wrist
-        ball.position = hand->wrist_pos_3d;
-        ball.pixel_pos = project_3d_to_2d(hand->wrist_pos_3d, intrinsics);
-        
-        // CRITICAL: Always set bbox for visualization, even in fallback
-        float bbox_size = 30.0f;
-        ball.bbox = cv::Rect_<float>(
-            ball.pixel_pos.x - bbox_size/2,
-            ball.pixel_pos.y - bbox_size/2,
-            bbox_size,
-            bbox_size
-        );
-        
-        // CRITICAL: Set has_yolo_detection to TRUE even for fallback
-        // This ensures the color tracker visualization stays on
-        ball.has_yolo_detection = true;
-        ball.yolo_confidence = 0.5f;  // Moderate confidence for fallback
-        ball.yolo_class_id = 1;  // ball_held class
-        ball.tracking_reason = "HELD@wrist_fallback";
-        
-        DEBUG_LOG(debug_log, {
-            OPEN_DEBUG_LOG(debug_log);
-            debug_log << "  No YOLO match - using wrist position" << std::endl;
-            debug_log.close();
-        });
-    }
+    // Set detection flags for visualization
+    ball.has_yolo_detection = true;
+    ball.yolo_confidence = 0.8f;  // High confidence for wrist tracking
+    ball.yolo_class_id = 1;  // ball_held class
+    ball.tracking_reason = "HELD@wrist";
+    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  Ball positioned at wrist of hand " << hand->id << std::endl;
+        debug_log.close();
+    });
     
     // Check for THROW: Look for detection moving away from hand
     for (const auto& det : yolo_detections) {

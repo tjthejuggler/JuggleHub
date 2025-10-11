@@ -645,9 +645,12 @@ void initiateCatch(SimpleBall& ball, const SimpleHand& hand) {
 ```cpp
 struct TrackingSettings {
     // State transition thresholds
-    float throw_distance_threshold = 0.20f;   // Min distance to detect throw
-    float catch_distance_threshold = 0.15f;   // Max distance to detect catch
+    float hand_distance_threshold = 0.30f;    // Distance threshold for hand-ball proximity
     int min_frames_for_transition = 2;        // Debouncing
+    
+    // DEPRECATED (kept for backward compatibility)
+    float throw_distance_threshold = 0.30f;   // DEPRECATED: Use hand_distance_threshold
+    float catch_distance_threshold = 0.30f;   // DEPRECATED: Use hand_distance_threshold
     
     // Trajectory parameters
     float gravity = 9.81f;                    // m/s²

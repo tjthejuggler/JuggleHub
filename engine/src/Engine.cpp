@@ -1138,28 +1138,29 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         // Get actual threshold values from SimpleBallTracker settings
         if (simple_tracker_) {
             const auto& settings = simple_tracker_->getTrackingSettings();
-            if (event.type == BallEvent::CATCH) {
-                threshold = settings.catch_distance_threshold;
-            } else {  // THROW
-                threshold = settings.throw_distance_threshold;
-            }
+            // Use unified hand_distance_threshold (legacy thresholds kept for backward compatibility)
+            threshold = settings.hand_distance_threshold;
         } else {
             // Fallback to default values if tracker not available
-            if (event.type == BallEvent::CATCH) {
-                threshold = 0.15f;  // default catch_distance_threshold
-            } else {  // THROW
-                threshold = 0.20f;  // default throw_distance_threshold
-            }
+            // Use default hand_distance_threshold
+            threshold = 0.30f;  // default hand_distance_threshold
         }
         
         // Create event text with distance information
-        // THROW events trigger when distance > threshold
-        // CATCH events trigger when distance < threshold
+        // For THROW: Show that detection was found far from hand (distance > threshold)
+        // For CATCH: Show that ball came close to hand (distance < threshold)
         char event_text[256];
-        const char* comparison = (event.type == BallEvent::THROW) ? ">" : "<";
-        snprintf(event_text, sizeof(event_text), "%s %s (%s) | %.3fm %s %.3fm",
-                 event_type.c_str(), hand_side.c_str(), ball_color.c_str(),
-                 distance, comparison, threshold);
+        if (event.type == BallEvent::THROW) {
+            // THROW: Detection was found at distance > threshold from hand
+            snprintf(event_text, sizeof(event_text), "%s %s (%s) | detection %.3fm > %.3fm from hand",
+                     event_type.c_str(), hand_side.c_str(), ball_color.c_str(),
+                     distance, threshold);
+        } else {
+            // CATCH: Ball came within threshold distance of hand
+            snprintf(event_text, sizeof(event_text), "%s %s (%s) | ball %.3fm < %.3fm to hand",
+                     event_type.c_str(), hand_side.c_str(), ball_color.c_str(),
+                     distance, threshold);
+        }
         
         // Add to the beginning of info lines
         info_lines.insert(info_lines.begin(), std::string(event_text));

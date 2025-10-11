@@ -145,8 +145,13 @@ struct BallEvent {
 // Tracking settings for trajectory-based tracking
 struct TrackingSettings {
     // State transition thresholds
-    float throw_distance_threshold = 0.20f;   // Min distance to detect throw (m)
-    float catch_distance_threshold = 0.30f;   // Max distance to detect catch (m) - increased to match typical juggling catches
+    // UNIFIED: Single threshold for hand-ball distance (replaces separate catch/throw thresholds)
+    float hand_distance_threshold = 0.30f;    // Distance threshold for hand-ball proximity (m)
+    
+    // DEPRECATED: Legacy thresholds kept for backward compatibility
+    float throw_distance_threshold = 0.20f;   // DEPRECATED: Use hand_distance_threshold instead
+    float catch_distance_threshold = 0.30f;   // DEPRECATED: Use hand_distance_threshold instead
+    
     int min_frames_for_transition = 2;        // Debouncing for state changes
     
     // Trajectory parameters
@@ -220,8 +225,10 @@ struct TrajectoryVisualizationSettings {
     bool show_search_radius = true;        // Show current search area
     bool show_confidence = true;           // Show confidence indicator
     bool show_max_distance = true;         // Show max tracker distance circle
-    bool show_throw_distance_threshold = true;  // Show throw distance threshold circles around hands
-    bool show_catch_distance_threshold = true;  // Show catch distance threshold circles around hands
+    bool show_hand_distance_threshold = true;  // Show unified hand distance threshold circles around hands
+    // DEPRECATED: Keep for backward compatibility
+    bool show_throw_distance_threshold = true;  // DEPRECATED: Use show_hand_distance_threshold instead
+    bool show_catch_distance_threshold = true;  // DEPRECATED: Use show_hand_distance_threshold instead
     
     // Colors (BGR format for OpenCV)
     cv::Scalar trajectory_color = cv::Scalar(255, 255, 0);      // Cyan

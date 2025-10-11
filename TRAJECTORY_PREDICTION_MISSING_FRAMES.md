@@ -61,7 +61,7 @@ else if (!verified && ball.position.z > 0) {
 ### Catch Detection
 
 The catch detection logic remains unchanged - a ball is caught when:
-- Ball position (whether verified or predicted) is within [`catch_distance_threshold`](engine/include/SimpleBallTracker.hpp:142) of a hand
+- Ball position (whether verified or predicted) is within [`hand_distance_threshold`](engine/include/SimpleBallTracker.hpp:149) of a hand
 - Default threshold: 0.30m (30cm)
 
 This means:
@@ -81,7 +81,7 @@ This means:
 Relevant settings in [`TrackingSettings`](engine/include/SimpleBallTracker.hpp:139):
 
 ```cpp
-float catch_distance_threshold = 0.30f;   // Max distance to detect catch (m)
+float hand_distance_threshold = 0.30f;    // Distance threshold for hand-ball proximity (m)
 float traj_search_radius = 0.15f;         // Search radius along trajectory (m)
 float traj_max_search_distance = 0.50f;   // Maximum search distance from prediction (m)
 ```

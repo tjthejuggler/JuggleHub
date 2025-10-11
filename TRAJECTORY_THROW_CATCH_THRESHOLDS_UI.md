@@ -1,163 +1,204 @@
-# Trajectory Throw/Catch Thresholds Added to UI
+# Hand Distance Threshold UI Control
 
-**Date:** 2025-10-10  
-**Status:** ✅ Implemented
+**Date:** 2025-10-11 (Updated from 2025-10-10)
+**Status:** ✅ Implemented & Consolidated
 
 ## Overview
 
-Added UI controls for the trajectory-based throw and catch distance thresholds that were previously only configurable in code. These are the thresholds you see in debug logs when throws and catches are detected.
+The trajectory-based tracking system now uses a **unified hand distance threshold** that controls all hand-ball proximity checks. This replaces the previous separate throw and catch thresholds with a single, simpler control.
 
-## Problem
+## Evolution
 
-The trajectory-based tracking system uses two critical thresholds:
-- **`throw_distance_threshold`**: Distance ball must be from hand to detect a throw (default: 0.20m = 20cm)
-- **`catch_distance_threshold`**: Maximum distance from hand to detect a catch (default: 0.30m = 30cm)
+### Original Implementation (2025-10-10)
+Added separate UI controls for throw and catch distance thresholds.
 
-These were hardcoded in [`TrackingSettings`](engine/include/SimpleBallTracker.hpp:141-142) and not exposed in the UI, making it difficult for users to tune them for their juggling style.
+### Consolidation (2025-10-11)
+Consolidated into a single **`hand_distance_threshold`** for simpler, more consistent behavior.
 
-## Solution
+## Current System
 
-Added two new sliders to the "🎯 Ball State Detection" section in the UI settings:
+The tracking system uses one critical threshold:
+- **`hand_distance_threshold`**: Distance threshold for hand-ball proximity (default: 0.30m = 30cm)
 
-### 1. Throw Distance Threshold
-- **Range**: 5-50 cm
-- **Default**: 20 cm
-- **Purpose**: When a ball moves this far from a hand, it's considered thrown
-- **Effect**: 
-  - Lower = more sensitive (detects throws earlier)
-  - Higher = less sensitive (requires ball to be farther from hand)
+This single threshold is used for:
+- **Throw detection**: Ball moving away from hand beyond threshold
+- **Catch detection**: Ball moving toward hand within threshold
+- **Override state verification**: Determining if ball is HELD or IN_FLIGHT based on distance
 
-### 2. Catch Distance Threshold
-- **Range**: 10-50 cm  
+See [TRACKING_THRESHOLD_CONSOLIDATION.md](TRACKING_THRESHOLD_CONSOLIDATION.md) for details on why this change was made.
+
+## UI Control
+
+### Hand Distance Threshold
+- **Range**: 15-50 cm
 - **Default**: 30 cm
-- **Purpose**: When a ball gets within this distance of a hand, it's considered caught
+- **Purpose**: Defines "how close must a ball be to a hand to be considered held"
 - **Effect**:
-  - Lower = stricter (must be very close to hand)
-  - Higher = more lenient (catches from farther away)
+  - Lower (15-25 cm) = stricter detection, requires closer proximity
+  - Higher (35-50 cm) = more lenient, allows greater distance
+  - Affects both throw and catch detection consistently
+
+### Visualization Toggle
+- **`show_hand_distance_threshold`**: Shows circles around hands at the threshold distance
+- Helps visualize the detection zone for throws and catches
 
 ## Implementation Details
 
-### Changes Made
+### Current Implementation
 
 #### 1. UI Settings (`hub/components/ui_settings.py`)
 
-Added two new sliders in [`create_throw_catch_section()`](hub/components/ui_settings.py:330):
+Single slider in the "🎯 Ball State Detection" section:
 
 ```python
-# Throw Distance Threshold
-self.tc_throw_distance_threshold_slider, self.tc_throw_distance_threshold_label = self._create_slider_widget(
+# Hand Distance Threshold (Unified)
+self.hand_distance_threshold_slider, self.hand_distance_threshold_label = self._create_slider_widget(
     parent_layout=layout,
     row=row,
-    label_text="Throw Distance Threshold (cm)",
-    tooltip_text="Distance ball must be from hand to detect a throw (trajectory-based).\n"
-                 "Range: 5-50 cm. Default: 20 cm.\n"
-                 "When ball moves this far from hand, it's considered thrown.\n"
-                 "Lower = more sensitive (detects throws earlier)\n"
-                 "Higher = less sensitive (requires ball to be farther)\n"
+    label_text="Hand Distance Threshold (cm)",
+    tooltip_text="Distance threshold for hand-ball proximity (unified).\n"
+                 "Range: 15-50 cm. Default: 30 cm.\n"
+                 "Defines 'how close must a ball be to a hand to be considered held'.\n"
+                 "Used for throw detection (ball moving away) and catch detection (ball moving toward).\n"
+                 "Lower = stricter (requires closer proximity)\n"
+                 "Higher = more lenient (allows greater distance)\n"
                  "⚠️ This is the threshold you see in debug logs!",
-    range_min=5,
+    range_min=15,
     range_max=50,
-    initial_value=20,
-    update_func=lambda v: self.update_setting('throw_distance_threshold', v / 100.0),
+    initial_value=30,
+    update_func=lambda v: self.update_setting('hand_distance_threshold', v / 100.0),
     is_float=False
 )
 
-# Catch Distance Threshold  
-self.tc_catch_distance_threshold_slider, self.tc_catch_distance_threshold_label = self._create_slider_widget(
+# Visualization toggle
+self.show_hand_distance_threshold_checkbox = self._create_checkbox_widget(
     parent_layout=layout,
     row=row,
-    label_text="Catch Distance Threshold (cm)",
-    tooltip_text="Maximum distance from hand to detect a catch (trajectory-based).\n"
-                 "Range: 10-50 cm. Default: 30 cm.\n"
-                 "When ball gets within this distance of hand, it's considered caught.\n"
-                 "Lower = stricter (must be very close to hand)\n"
-                 "Higher = more lenient (catches from farther away)\n"
-                 "⚠️ Increase if catches are being missed!",
-    range_min=10,
-    range_max=50,
-    initial_value=30,
-    update_func=lambda v: self.update_setting('catch_distance_threshold', v / 100.0),
-    is_float=False
+    label_text="Show Hand Distance Threshold",
+    tooltip_text="Show circles around hands at the hand distance threshold.\n"
+                 "Helps visualize the detection zone for throws and catches.",
+    initial_value=True,
+    update_func=lambda v: self.update_setting('show_hand_distance_threshold', v)
 )
 ```
 
 #### 2. Settings Persistence
 
-Added to [`get_current_settings()`](hub/components/ui_settings.py:1757):
+Added to [`get_current_settings()`](hub/components/ui_settings.py):
 ```python
-'throw_distance_threshold': self.tc_throw_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_throw_distance_threshold_slider') else 0.20,
-'catch_distance_threshold': self.tc_catch_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_catch_distance_threshold_slider') else 0.30,
+'hand_distance_threshold': self.hand_distance_threshold_slider.value() / 100.0 if hasattr(self, 'hand_distance_threshold_slider') else 0.30,
+'show_hand_distance_threshold': self.show_hand_distance_threshold_checkbox.isChecked() if hasattr(self, 'show_hand_distance_threshold_checkbox') else True,
 ```
 
-Added to [`apply_settings()`](hub/components/ui_settings.py:1883):
+Added to [`apply_settings()`](hub/components/ui_settings.py):
 ```python
-if 'throw_distance_threshold' in settings and hasattr(self, 'tc_throw_distance_threshold_slider'):
-    self.tc_throw_distance_threshold_slider.setValue(int(settings['throw_distance_threshold'] * 100))
+if 'hand_distance_threshold' in settings and hasattr(self, 'hand_distance_threshold_slider'):
+    self.hand_distance_threshold_slider.setValue(int(settings['hand_distance_threshold'] * 100))
 
-if 'catch_distance_threshold' in settings and hasattr(self, 'tc_catch_distance_threshold_slider'):
-    self.tc_catch_distance_threshold_slider.setValue(int(settings['catch_distance_threshold'] * 100))
+if 'show_hand_distance_threshold' in settings and hasattr(self, 'show_hand_distance_threshold_checkbox'):
+    self.show_hand_distance_threshold_checkbox.setChecked(settings['show_hand_distance_threshold'])
 ```
 
-Added to [`_send_all_settings_to_engine()`](hub/components/ui_settings.py:2169):
+Added to [`_send_all_settings_to_engine()`](hub/components/ui_settings.py):
 ```python
-if 'throw_distance_threshold' in settings:
-    self.udp_client.send_setting('throw_distance_threshold', settings['throw_distance_threshold'])
+if 'hand_distance_threshold' in settings:
+    self.udp_client.send_setting('hand_distance_threshold', settings['hand_distance_threshold'])
 
-if 'catch_distance_threshold' in settings:
-    self.udp_client.send_setting('catch_distance_threshold', settings['catch_distance_threshold'])
+if 'show_hand_distance_threshold' in settings:
+    self.udp_client.send_setting('show_hand_distance_threshold', settings['show_hand_distance_threshold'])
 ```
+
+### Backward Compatibility
+
+The engine automatically handles old setting names:
+- `throw_distance_threshold` → automatically updates `hand_distance_threshold`
+- `catch_distance_threshold` → automatically updates `hand_distance_threshold`
+- `show_throw_distance_threshold` → automatically updates `show_hand_distance_threshold`
+- `show_catch_distance_threshold` → automatically updates `show_hand_distance_threshold`
+
+See [`SimpleBallTracker::updateSetting()`](engine/src/SimpleBallTracker.cpp:407-422) for implementation.
 
 ## Usage
 
 1. **Open Settings**: Navigate to the "🎯 Ball State Detection" section in the UI
-2. **Adjust Throw Threshold**: Move the "Throw Distance Threshold" slider
-   - If throws are detected too early: increase the value
-   - If throws are detected too late: decrease the value
-3. **Adjust Catch Threshold**: Move the "Catch Distance Threshold" slider
-   - If catches are being missed: increase the value
-   - If false catches occur: decrease the value
+2. **Adjust Hand Distance Threshold**: Move the "Hand Distance Threshold" slider
+   - If throws are detected too early OR catches are too lenient: decrease the value
+   - If throws are detected too late OR catches are being missed: increase the value
+3. **Enable Visualization**: Check "Show Hand Distance Threshold" to see circles around hands
 4. **Settings Auto-Save**: Changes are automatically saved and sent to the engine
 
 ## Debug Logs
 
 When you see messages like:
 ```
-THROW DETECTED: ball 0.201m from hand (threshold: 0.200m)
+THROW DETECTED: ball 0.301m from hand (threshold: 0.300m)
+CATCH DETECTED: ball 0.285m from hand (threshold: 0.300m)
+Override: Ball set to HELD (distance-based: hand 0, dist=0.25m < threshold=0.30m)
 ```
 
-The `0.200m` threshold is now the value from the "Throw Distance Threshold" slider (20cm by default).
+The threshold value is from the "Hand Distance Threshold" slider (30cm by default).
 
-## Related Settings
+## Tuning Guide
 
-### Legacy Setting (Kept for Backward Compatibility)
-- **Min Throw Distance**: The old setting, now marked as `[LEGACY]` in the UI
-- Still functional but users should use the new "Throw Distance Threshold" instead
+### Start with Default (30cm)
+Good balance for most juggling patterns.
+
+### Increase Threshold (35-50cm)
+Use when:
+- Catches are being missed frequently
+- You juggle with wide hand movements
+- You want more forgiving detection
+
+### Decrease Threshold (15-25cm)
+Use when:
+- False catches occur (ball caught too early)
+- You want stricter, more precise detection
+- You juggle with tight, controlled patterns
 
 ## Benefits
 
-1. **User Control**: Users can now tune throw/catch detection without editing code
-2. **Real-time Adjustment**: Changes take effect immediately
-3. **Persistent**: Settings are saved and restored on restart
-4. **Clear Feedback**: Tooltips explain what each threshold does
-5. **Debug Alignment**: The UI values match what you see in debug logs
+1. **Simpler**: One threshold instead of two - easier to understand and tune
+2. **Consistent**: Same threshold for all hand-ball proximity checks
+3. **User Control**: Tune detection without editing code
+4. **Real-time Adjustment**: Changes take effect immediately
+5. **Persistent**: Settings are saved and restored on restart
+6. **Clear Feedback**: Tooltips explain what the threshold does
+7. **Debug Alignment**: UI values match what you see in debug logs
+8. **Visualization**: See the threshold as circles around hands
+9. **Backward Compatible**: Old settings automatically convert
 
-## Testing Recommendations
+## Why Consolidation?
 
-1. Start with default values (20cm throw, 30cm catch)
-2. If throws trigger too early, increase throw threshold to 25-30cm
-3. If catches are missed, increase catch threshold to 35-40cm
-4. If false catches occur, decrease catch threshold to 20-25cm
-5. Monitor debug logs to see actual distances when events occur
+The separate throw/catch thresholds were conceptually the same thing: "how close is close to a hand?"
+
+**Problems with separate thresholds:**
+- ❌ Two values to tune for the same concept
+- ❌ Inconsistent behavior (throw: 20cm, catch: 30cm)
+- ❌ Confusing for override state verification
+- ❌ More complex UI
+
+**Benefits of unified threshold:**
+- ✅ Single source of truth
+- ✅ Consistent behavior across all state transitions
+- ✅ Simpler mental model
+- ✅ Easier to tune
+- ✅ Clearer code
+
+See [TRACKING_THRESHOLD_CONSOLIDATION.md](TRACKING_THRESHOLD_CONSOLIDATION.md) for full details.
 
 ## Related Files
 
 - [`hub/components/ui_settings.py`](hub/components/ui_settings.py) - UI implementation
-- [`engine/include/SimpleBallTracker.hpp`](engine/include/SimpleBallTracker.hpp:141-142) - Threshold definitions
-- [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:2405-2422) - Throw detection logic
-- [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:1838-1863) - Catch detection logic
+- [`engine/include/SimpleBallTracker.hpp`](engine/include/SimpleBallTracker.hpp:149) - Unified threshold definition
+- [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:407-422) - Settings update with backward compatibility
+- [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:1021-1091) - Override state verification
+- [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:2856-2920) - Throw detection logic
+- [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:2101-2206) - Catch detection logic
 
 ## See Also
 
+- [BALL_TRACKER_POSITION_LOGIC.md](BALL_TRACKER_POSITION_LOGIC.md) - Complete tracking logic documentation
+- [TRACKING_THRESHOLD_CONSOLIDATION.md](TRACKING_THRESHOLD_CONSOLIDATION.md) - Changelog and migration guide
 - [TRAJECTORY_PREDICTION_MISSING_FRAMES.md](TRAJECTORY_PREDICTION_MISSING_FRAMES.md) - Trajectory prediction improvements
 - [UI_SETTINGS_CHANGE_CHECKLIST.md](UI_SETTINGS_CHANGE_CHECKLIST.md) - How to add/remove UI settings
 - [TRACKING_TUNING_GUIDE.md](TRACKING_TUNING_GUIDE.md) - User-facing tuning guide

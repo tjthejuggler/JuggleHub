@@ -389,20 +389,36 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             viz_settings_.show_max_distance = (value == "true" || value == "1");
             return true;
         }
+        else if (key == "show_hand_distance_threshold") {
+            viz_settings_.show_hand_distance_threshold = (value == "true" || value == "1");
+            return true;
+        }
+        // BACKWARD COMPATIBILITY: Accept old visualization toggle names
         else if (key == "show_throw_distance_threshold") {
-            viz_settings_.show_throw_distance_threshold = (value == "true" || value == "1");
+            viz_settings_.show_hand_distance_threshold = (value == "true" || value == "1");
             return true;
         }
         else if (key == "show_catch_distance_threshold") {
-            viz_settings_.show_catch_distance_threshold = (value == "true" || value == "1");
+            viz_settings_.show_hand_distance_threshold = (value == "true" || value == "1");
             return true;
         }
         // Trajectory-based tracking settings
+        // NEW: Unified hand_distance_threshold
+        else if (key == "hand_distance_threshold") {
+            tracking_settings_.hand_distance_threshold = std::stof(value);
+            // Also update legacy thresholds for backward compatibility
+            tracking_settings_.catch_distance_threshold = std::stof(value);
+            tracking_settings_.throw_distance_threshold = std::stof(value);
+            return true;
+        }
+        // BACKWARD COMPATIBILITY: Accept old threshold names and map to unified threshold
         else if (key == "catch_distance_threshold") {
+            tracking_settings_.hand_distance_threshold = std::stof(value);
             tracking_settings_.catch_distance_threshold = std::stof(value);
             return true;
         }
         else if (key == "throw_distance_threshold") {
+            tracking_settings_.hand_distance_threshold = std::stof(value);
             tracking_settings_.throw_distance_threshold = std::stof(value);
             return true;
         }
@@ -986,34 +1002,116 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             });
             
             // CRITICAL FIX: When ball is overridden, we must still update its state
-            // based on the YOLO detection that triggered the override
-            // This prevents the wrist fallback from overriding the override!
+            // based on DISTANCE to hands, NOT YOLO class_id
+            // This prevents incorrect state assignments from YOLO misclassifications
             
-            // Update state based on YOLO class_id
-            if (ball.yolo_class_id == 1) {  // ball_held
-                ball.state = HELD;
-                ball.is_held = true;
-                // Keep held_by_hand_id as is (may have been set by proximity)
+            // Calculate distance from override detection position to each hand
+            float min_dist = std::numeric_limits<float>::max();
+            int closest_hand_id = -1;
+            
+            for (const auto& h : hands_) {
+                if (!h.is_visible) continue;
+                float dist = cv::norm(ball.position - h.wrist_pos_3d);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    closest_hand_id = h.id;
+                }
+            }
+            
+            // Use distance-based state determination (ignore YOLO class_id)
+            // If distance < hand_distance_threshold: HELD state, assign to that hand
+            // If distance >= hand_distance_threshold: IN_FLIGHT state
+            if (closest_hand_id >= 0 && min_dist < tracking_settings_.hand_distance_threshold) {
+                // Ball is near a hand - set to HELD state
                 
-                DEBUG_LOG(debug_log, {
-                    OPEN_DEBUG_LOG(debug_log);
-                    debug_log << "  Override: Ball set to HELD (YOLO class=ball_held)" << std::endl;
-                    debug_log.close();
-                });
-            } else if (ball.yolo_class_id == 0) {  // ball (in-flight)
-                // CRITICAL FIX: When override positions the ball, TRUST the override position
-                // The override system has already verified the ball is at the color tracker location
-                // Don't second-guess based on proximity to hand - that causes the tracker to snap back
+                // CRITICAL RULE: Cannot catch with the same hand that just threw in the previous frame
+                // This prevents immediate re-catch during throw motion
+                // BUT: Allow catch if ball has traveled (has multiple verified trajectory points)
+                bool is_immediate_recatch = (ball.previous_state == IN_FLIGHT &&
+                                            closest_hand_id == ball.held_by_hand_id &&
+                                            closest_hand_id >= 0 &&
+                                            ball.trajectory.verified_point_count < 3);  // Less than 3 points = just thrown
+                
+                if (!is_immediate_recatch) {
+                    // CRITICAL FIX: Generate catch event when transitioning IN_FLIGHT→HELD
+                    // Find the catching hand and call initiateCatch() to properly handle state transition
+                    bool was_in_flight = (ball.previous_state == IN_FLIGHT);
+                    
+                    if (was_in_flight) {
+                        // Find the catching hand
+                        const SimpleHand* catching_hand = nullptr;
+                        for (const auto& h : hands_) {
+                            if (h.id == closest_hand_id) {
+                                catching_hand = &h;
+                                break;
+                            }
+                        }
+                        
+                        if (catching_hand) {
+                            // Generate catch event using initiateCatch
+                            DEBUG_LOG(debug_log, {
+                                OPEN_DEBUG_LOG(debug_log);
+                                debug_log << "  Override: Ball transitioning IN_FLIGHT→HELD via initiateCatch() (distance-based: hand "
+                                          << closest_hand_id << ", dist=" << min_dist << "m < threshold="
+                                          << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
+                                debug_log.close();
+                            });
+                            initiateCatch(ball, *catching_hand, events);
+                        } else {
+                            // Fallback: just set state without event (shouldn't happen)
+                            ball.state = HELD;
+                            ball.is_held = true;
+                            ball.held_by_hand_id = closest_hand_id;
+                            
+                            DEBUG_LOG(debug_log, {
+                                OPEN_DEBUG_LOG(debug_log);
+                                debug_log << "  Override: Ball set to HELD without event (hand not found)" << std::endl;
+                                debug_log.close();
+                            });
+                        }
+                    } else {
+                        // Ball was already HELD, just update state
+                        ball.state = HELD;
+                        ball.is_held = true;
+                        ball.held_by_hand_id = closest_hand_id;
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  Override: Ball set to HELD (distance-based: hand "
+                                      << closest_hand_id << ", dist=" << min_dist << "m < threshold="
+                                      << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
+                            debug_log.close();
+                        });
+                    }
+                } else {
+                    // Immediate re-catch prevented - treat as IN_FLIGHT
+                    ball.state = IN_FLIGHT;
+                    ball.is_held = false;
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  Override: Ball set to IN_FLIGHT (immediate re-catch by throwing hand "
+                                  << closest_hand_id << " prevented)" << std::endl;
+                        debug_log.close();
+                    });
+                }
+            } else {
+                // Ball is far from hands - transition to IN_FLIGHT
                 bool was_held = (ball.state == HELD);
                 
-                // ALWAYS transition to IN_FLIGHT when override says so
-                // The override has positioned the ball correctly, so trust it
                 ball.state = IN_FLIGHT;
                 ball.is_held = false;
                 
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
-                    debug_log << "  Override: Ball set to IN_FLIGHT (YOLO class=ball, trusting override position)" << std::endl;
+                    debug_log << "  Override: Ball set to IN_FLIGHT (distance-based: ";
+                    if (closest_hand_id >= 0) {
+                        debug_log << "dist=" << min_dist << "m >= threshold="
+                                  << tracking_settings_.hand_distance_threshold << "m)";
+                    } else {
+                        debug_log << "no visible hands)";
+                    }
+                    debug_log << std::endl;
                     debug_log << "  Was previously HELD: " << (was_held ? "YES" : "NO") << std::endl;
                     debug_log << "  Ball position: (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
                     debug_log.close();
@@ -1047,37 +1145,28 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         debug_log.close();
                     });
                 }
+            }
+            
+            // Add trajectory point for overridden in-flight balls (only if actually IN_FLIGHT)
+            if (ball.state == IN_FLIGHT && ball.position.z > 0) {
+                uint64_t current_timestamp = getCurrentTimestamp();
+                addVerifiedPoint(ball, ball.position, current_timestamp);
                 
-                // Add trajectory point for overridden in-flight balls
-                if (ball.position.z > 0) {
-                    uint64_t current_timestamp = getCurrentTimestamp();
-                    addVerifiedPoint(ball, ball.position, current_timestamp);
-                    
-                    // CRITICAL: Recalculate prediction immediately after adding point
-                    // This ensures prediction is valid for rendering in recordings
-                    // Need >= 3 points (not > 3) to start prediction
-                    if (ball.trajectory.verified_point_count >= tracking_settings_.traj_min_points_for_prediction) {
-                        predictFullTrajectory(ball);
-                    }
-                    
-                    DEBUG_LOG(debug_log, {
-                        OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  Added trajectory point for overridden ball: #"
-                                  << ball.trajectory.verified_point_count << std::endl;
-                        if (ball.trajectory.verified_point_count >= tracking_settings_.traj_min_points_for_prediction) {
-                            debug_log << "  Prediction recalculated: valid=" << ball.trajectory.prediction_valid
-                                      << ", path_size=" << ball.trajectory.predicted_path.size() << std::endl;
-                        }
-                        debug_log.close();
-                    });
+                // CRITICAL: Recalculate prediction immediately after adding point
+                // This ensures prediction is valid for rendering in recordings
+                // Need >= 3 points (not > 3) to start prediction
+                if (ball.trajectory.verified_point_count >= tracking_settings_.traj_min_points_for_prediction) {
+                    predictFullTrajectory(ball);
                 }
                 
-                // CRITICAL: NO catch detection for overridden balls
-                // The override has positioned the ball based on YOLO - trust it
-                // Catch detection will happen in normal tracking on subsequent frames
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
-                    debug_log << "  Skipping catch detection for overridden ball (trust YOLO classification)" << std::endl;
+                    debug_log << "  Added trajectory point for overridden ball: #"
+                              << ball.trajectory.verified_point_count << std::endl;
+                    if (ball.trajectory.verified_point_count >= tracking_settings_.traj_min_points_for_prediction) {
+                        debug_log << "  Prediction recalculated: valid=" << ball.trajectory.prediction_valid
+                                  << ", path_size=" << ball.trajectory.predicted_path.size() << std::endl;
+                    }
                     debug_log.close();
                 });
             }
@@ -2025,8 +2114,22 @@ void SimpleBallTracker::updateInFlightBall(
         // Use current ball position for catch detection
         cv::Point3f position_for_catch = ball.position;
         
-        // CRITICAL FIX: Check if ball has moved significantly away from throw position
-        // This prevents immediate catch right after throw when ball is still near hand
+        // CRITICAL FIX: Require minimum number of verified trajectory points before allowing catch
+        // This prevents immediate catch right after throw when ball hasn't traveled far enough
+        const int MIN_POINTS_BEFORE_CATCH = 3;  // Need at least 3 verified points (~2-3 frames)
+        
+        if (ball.trajectory.verified_point_count < MIN_POINTS_BEFORE_CATCH) {
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  Skipping catch detection - only " << ball.trajectory.verified_point_count
+                          << " verified points (need >= " << MIN_POINTS_BEFORE_CATCH << ")" << std::endl;
+                debug_log.close();
+            });
+            return;
+        }
+        
+        // ADDITIONAL CHECK: Ball must have moved significantly away from throw position
+        // This provides a secondary safety check
         bool has_moved_away = false;
         if (!ball.trajectory.points.empty()) {
             // Get the first trajectory point (throw position)
@@ -2035,12 +2138,12 @@ void SimpleBallTracker::updateInFlightBall(
             
             // Ball must have moved at least the throw threshold distance away
             // This ensures the ball has actually left the hand before we can catch it
-            has_moved_away = (distance_from_throw >= tracking_settings_.throw_distance_threshold);
+            has_moved_away = (distance_from_throw >= tracking_settings_.hand_distance_threshold);
             
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
                 debug_log << "  Distance from throw position: " << distance_from_throw
-                          << "m, threshold: " << tracking_settings_.throw_distance_threshold
+                          << "m, threshold: " << tracking_settings_.hand_distance_threshold
                           << "m, has_moved_away: " << (has_moved_away ? "YES" : "NO") << std::endl;
                 debug_log.close();
             });
@@ -2059,7 +2162,9 @@ void SimpleBallTracker::updateInFlightBall(
         }
         
         // Find the CLOSEST hand within threshold
-        float min_dist = tracking_settings_.catch_distance_threshold;
+        // CRITICAL: Also check that ball is far enough from the THROWING hand
+        // This prevents immediate re-catch by the same hand that just threw
+        float min_dist = tracking_settings_.hand_distance_threshold;
         const SimpleHand* closest_hand = nullptr;
         
         for (const auto& hand : hands_) {
@@ -2067,10 +2172,29 @@ void SimpleBallTracker::updateInFlightBall(
             
             float dist_to_hand = cv::norm(position_for_catch - hand.wrist_pos_3d);
             
+            // CRITICAL FIX: If this is the hand that threw the ball, it must be far enough away
+            // to prevent immediate re-catch during the throw motion
+            // BUT: Only apply this check if we don't have many verified points yet
+            // After the ball has been in flight for a while (many points), allow catch by any hand
+            if (hand.id == ball.held_by_hand_id && ball.trajectory.verified_point_count < 10) {
+                // This is the throwing hand and ball hasn't been in flight long - require distance
+                if (dist_to_hand < tracking_settings_.hand_distance_threshold) {
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  Skipping catch for throwing hand " << hand.id
+                                  << ": dist=" << dist_to_hand
+                                  << "m < hand_threshold=" << tracking_settings_.hand_distance_threshold
+                                  << "m (verified_points=" << ball.trajectory.verified_point_count << " < 10)" << std::endl;
+                        debug_log.close();
+                    });
+                    continue;  // Skip this hand - ball too close to throwing hand
+                }
+            }
+            
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
                 debug_log << "  Checking catch for hand " << hand.id << ": dist=" << dist_to_hand
-                          << "m, threshold=" << tracking_settings_.catch_distance_threshold << "m" << std::endl;
+                          << "m, hand_threshold=" << tracking_settings_.hand_distance_threshold << "m" << std::endl;
                 debug_log.close();
             });
             
@@ -2087,7 +2211,7 @@ void SimpleBallTracker::updateInFlightBall(
                 OPEN_DEBUG_LOG(debug_log);
                 debug_log << "  CATCH DETECTED to CLOSEST hand " << closest_hand->id
                           << ": dist=" << min_dist
-                          << "m, threshold=" << tracking_settings_.catch_distance_threshold << "m" << std::endl;
+                          << "m, threshold=" << tracking_settings_.hand_distance_threshold << "m" << std::endl;
                 debug_log.close();
             });
             
@@ -2101,6 +2225,30 @@ void SimpleBallTracker::updateInFlightBall(
                       << (ball.state == HELD ? "HELD" : "UNKNOWN") << ")" << std::endl;
             debug_log.close();
         });
+    }
+    
+    // CRITICAL SAFETY CHECK: If ball is still IN_FLIGHT but within catch distance of ANY hand,
+    // force a catch immediately. This prevents the ball from being stuck in IN_FLIGHT state
+    // when it's clearly at a hand position.
+    if (ball.state == IN_FLIGHT) {
+        for (const auto& hand : hands_) {
+            if (!hand.is_visible) continue;
+            
+            float dist_to_hand = cv::norm(ball.position - hand.wrist_pos_3d);
+            
+            if (dist_to_hand < tracking_settings_.hand_distance_threshold) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  SAFETY CATCH: Ball within " << dist_to_hand
+                              << "m of hand " << hand.id << " (threshold: "
+                              << tracking_settings_.hand_distance_threshold << "m) - forcing catch" << std::endl;
+                    debug_log.close();
+                });
+                
+                initiateCatch(ball, hand, events);
+                return;
+            }
+        }
     }
 }
 
@@ -2730,21 +2878,46 @@ void SimpleBallTracker::updateHeldBall(
         float dist_from_hand = cv::norm(det.world_pos - hand->wrist_pos_3d);
         float dist_from_ball = cv::norm(det.world_pos - ball.position);
         
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  [THROW CHECK] Evaluating detection:" << std::endl;
+            debug_log << "    det.world_pos: (" << det.world_pos.x << ", " << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
+            debug_log << "    hand.wrist_pos_3d: (" << hand->wrist_pos_3d.x << ", " << hand->wrist_pos_3d.y << ", " << hand->wrist_pos_3d.z << ")" << std::endl;
+            debug_log << "    ball.position: (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
+            debug_log << "    dist_from_hand: " << dist_from_hand << "m" << std::endl;
+            debug_log << "    dist_from_ball: " << dist_from_ball << "m" << std::endl;
+            debug_log.close();
+        });
+        
         // CRITICAL FIX: Detection must be far from hand AND within max tracker distance from ball
         // This prevents false throws when a detection (e.g., other hand) is far from current hand
         // but also far from the ball's current position
-        if (dist_from_hand > tracking_settings_.throw_distance_threshold &&
+        if (dist_from_hand > tracking_settings_.hand_distance_threshold &&
             dist_from_ball < tracking_settings_.max_tracker_distance_per_frame) {
             float color_score = matchColor(det, *profile, color_frame);
             
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    color_score: " << color_score << " (threshold: " << tracking_settings_.min_color_match_score << ")" << std::endl;
+                debug_log.close();
+            });
+            
             if (color_score > tracking_settings_.min_color_match_score) {
-                // ADDITIONAL CHECK: Verify ball has actually moved away from its previous position
-                // Calculate distance moved from last known position
-                float distance_moved = cv::norm(det.world_pos - ball.position);
+                // CRITICAL FIX: Use dist_from_hand as the distance_moved
+                // The ball is currently at the wrist, so we need to check if the detection
+                // is far enough from the hand to constitute a throw
+                float distance_moved = dist_from_hand;
                 
                 // CRITICAL: Ball must have moved at least half the throw threshold distance
                 // This prevents false throws from small jitter or hand movement
-                float min_movement_threshold = tracking_settings_.throw_distance_threshold * 0.5f;
+                float min_movement_threshold = tracking_settings_.hand_distance_threshold * 0.5f;
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "    distance_moved (=dist_from_hand): " << distance_moved << "m" << std::endl;
+                    debug_log << "    min_movement_threshold: " << min_movement_threshold << "m" << std::endl;
+                    debug_log.close();
+                });
                 
                 if (distance_moved >= min_movement_threshold) {
                     // THROW DETECTED - initiate throw transition
@@ -2752,7 +2925,7 @@ void SimpleBallTracker::updateHeldBall(
                         OPEN_DEBUG_LOG(debug_log);
                         debug_log << "  THROW DETECTED: ball " << dist_from_hand
                                   << "m from hand (threshold: "
-                                  << tracking_settings_.throw_distance_threshold << "m)"
+                                  << tracking_settings_.hand_distance_threshold << "m)"
                                   << ", dist_from_ball: " << dist_from_ball
                                   << "m (max: " << tracking_settings_.max_tracker_distance_per_frame << "m)"
                                   << ", distance_moved: " << distance_moved
@@ -2765,7 +2938,7 @@ void SimpleBallTracker::updateHeldBall(
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
                         debug_log << "  THROW REJECTED: distance_moved " << distance_moved
-                                  << "m < min_movement " << min_movement_threshold << "m (ball too close to previous position)" << std::endl;
+                                  << "m < min_movement " << min_movement_threshold << "m (ball too close to hand)" << std::endl;
                         debug_log.close();
                     });
                 }
@@ -2780,9 +2953,9 @@ void SimpleBallTracker::updateHeldBall(
         } else {
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
-                if (dist_from_hand <= tracking_settings_.throw_distance_threshold) {
+                if (dist_from_hand <= tracking_settings_.hand_distance_threshold) {
                     debug_log << "  THROW REJECTED: dist_from_hand " << dist_from_hand
-                              << "m <= threshold " << tracking_settings_.throw_distance_threshold << "m" << std::endl;
+                              << "m <= threshold " << tracking_settings_.hand_distance_threshold << "m" << std::endl;
                 }
                 if (dist_from_ball >= tracking_settings_.max_tracker_distance_per_frame) {
                     debug_log << "  THROW REJECTED: dist_from_ball " << dist_from_ball

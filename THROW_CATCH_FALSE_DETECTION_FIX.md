@@ -21,12 +21,12 @@ This created spurious events and incorrect state transitions, making the trackin
 From the logs (Frames 73-81), the issue occurred because:
 
 1. **Throw Detection Too Sensitive**: The throw detection in [`updateHeldBall()`](engine/src/SimpleBallTracker.cpp:2693) only checked:
-   - Distance from hand > `throw_distance_threshold` (0.20m)
+   - Distance from hand > [`hand_distance_threshold`](engine/include/SimpleBallTracker.hpp:149) (default: 0.30m, previously `throw_distance_threshold`)
    - Distance from ball < `max_tracker_distance_per_frame`
    
    But it didn't verify that the ball had **actually moved significantly** from its previous position. Small jitter or hand movement could trigger false throws.
 
-2. **Catch Detection Too Eager**: The catch detection in [`updateInFlightBall()`](engine/src/SimpleBallTracker.cpp:2018) would immediately catch the ball if it came within `catch_distance_threshold` of a hand, even if the ball had just been thrown and was still very close to the throwing hand.
+2. **Catch Detection Too Eager**: The catch detection in [`updateInFlightBall()`](engine/src/SimpleBallTracker.cpp:2018) would immediately catch the ball if it came within [`hand_distance_threshold`](engine/include/SimpleBallTracker.hpp:149) (previously `catch_distance_threshold`) of a hand, even if the ball had just been thrown and was still very close to the throwing hand.
 
 ## Solution
 
@@ -41,7 +41,7 @@ float distance_moved = cv::norm(det.world_pos - ball.position);
 
 // CRITICAL: Ball must have moved at least half the throw threshold distance
 // This prevents false throws from small jitter or hand movement
-float min_movement_threshold = tracking_settings_.throw_distance_threshold * 0.5f;
+float min_movement_threshold = tracking_settings_.hand_distance_threshold * 0.5f;
 
 if (distance_moved >= min_movement_threshold) {
     // THROW DETECTED - initiate throw transition
@@ -70,7 +70,7 @@ if (!ball.trajectory.points.empty()) {
     
     // Ball must have moved at least the throw threshold distance away
     // This ensures the ball has actually left the hand before we can catch it
-    has_moved_away = (distance_from_throw >= tracking_settings_.throw_distance_threshold);
+    has_moved_away = (distance_from_throw >= tracking_settings_.hand_distance_threshold);
 }
 
 if (!has_moved_away) {

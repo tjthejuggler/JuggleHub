@@ -40,8 +40,9 @@ These settings are currently hooked up and actively used in the tracking system:
 ### Ball State Detection
 - ✅ **undetected_near_hand_threshold** - Active
 - ✅ **min_frames_for_state_change** - Active
-- ✅ **throw_distance_threshold** - Active (NEW trajectory-based)
-- ✅ **catch_distance_threshold** - Active (NEW trajectory-based)
+- ✅ **hand_distance_threshold** - Active (NEW unified threshold, replaces throw/catch thresholds)
+- ⚠️ **throw_distance_threshold** - DEPRECATED (auto-converts to hand_distance_threshold)
+- ⚠️ **catch_distance_threshold** - DEPRECATED (auto-converts to hand_distance_threshold)
 - ✅ **min_throw_distance** - Active (LEGACY, kept for compatibility)
 - ✅ **max_tracker_distance_per_frame** - Active
 - ✅ **tc_sound_on_catch** - Active
@@ -205,7 +206,8 @@ The tracking system now uses:
 1. ✅ **COMPLETED:** Remove all dead Kalman settings from UI and engine
 2. ✅ **COMPLETED:** Clean up code to prevent confusion
 3. 📝 **SUGGESTED:** Update user documentation to reflect trajectory-based system
-4. 📝 **SUGGESTED:** Consider removing legacy `min_throw_distance` in future (replaced by `throw_distance_threshold`)
+4. ✅ **COMPLETED:** Consolidated throw/catch thresholds into unified `hand_distance_threshold` (see [TRACKING_THRESHOLD_CONSOLIDATION.md](TRACKING_THRESHOLD_CONSOLIDATION.md))
+5. 📝 **SUGGESTED:** Consider removing legacy `min_throw_distance` in future (replaced by `hand_distance_threshold`)
 
 ---
 

@@ -119,8 +119,7 @@ Track   Prediction
 ```json
 {
   "tracking_settings": {
-    "throw_distance_threshold": 0.20,
-    "catch_distance_threshold": 0.15,
+    "hand_distance_threshold": 0.30,
     "min_frames_for_transition": 2,
     "gravity": 9.81,
     "trajectory_time_step": 0.033,
@@ -144,8 +143,7 @@ Track   Prediction
 
 1. **Test the system** with real juggling footage
 2. **Tune parameters** in `ball_settings.json`:
-   - `throw_distance_threshold` - adjust for throw sensitivity
-   - `catch_distance_threshold` - adjust for catch sensitivity
+   - `hand_distance_threshold` - adjust for hand-ball proximity detection (affects both throws and catches)
    - `initial_search_radius` - adjust for tracking robustness
    - `min_color_match_score` - adjust for color matching strictness
 3. **Enable visualization** to see trajectories in real-time
@@ -165,14 +163,14 @@ z(t) = z0 + vz0 * t - 0.5 * g * t²
 ### State Transitions
 ```cpp
 // HELD → IN_FLIGHT (Throw)
-if (distance_from_wrist > throw_distance_threshold) {
+if (distance_from_wrist > hand_distance_threshold) {
     estimate_velocity_from_recent_points();
     compute_trajectory_on_gpu();
     state = IN_FLIGHT;
 }
 
 // IN_FLIGHT → HELD (Catch)
-if (distance_to_wrist < catch_distance_threshold) {
+if (distance_to_wrist < hand_distance_threshold) {
     state = HELD;
     follow_wrist_position();
 }

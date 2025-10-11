@@ -131,10 +131,13 @@ struct TrackingSettings {
     float trajectory_initial_velocity_scale = 1.0f; // Scale factor for initial velocity estimation
     float trajectory_max_velocity = 15.0f;          // Maximum reasonable velocity (m/s)
     
-    // === EXISTING SETTINGS (keep for backward compatibility) ===
-    float throw_distance_threshold = 0.20f;
-    float catch_distance_threshold = 0.30f;
+    // === UNIFIED THRESHOLD (replaces separate throw/catch thresholds) ===
+    float hand_distance_threshold = 0.30f;    // Distance threshold for hand-ball proximity
     int min_frames_for_transition = 2;
+    
+    // === DEPRECATED (kept for backward compatibility) ===
+    float throw_distance_threshold = 0.30f;   // DEPRECATED: Use hand_distance_threshold
+    float catch_distance_threshold = 0.30f;   // DEPRECATED: Use hand_distance_threshold
     // ... rest of existing settings ...
 };
 ```
@@ -208,7 +211,7 @@ for (auto& ball : balls_) {
 ```
 1. Track ball at wrist position of holding hand
 2. Search for YOLO detections near wrist
-3. If detection found far from wrist (> throw_distance_threshold):
+3. If detection found far from wrist (> hand_distance_threshold):
    a. Call initiateThrow()
    b. Transition to IN_FLIGHT
 4. Update ball position to wrist location
@@ -273,7 +276,7 @@ FUNCTION updateInFlightBall(ball, yolo_detections, color_frame, depth_frame, int
             updateConfidence(ball)
             
             // Check for catch
-            IF nearAnyHand(detection.world_pos, hands, catch_distance_threshold):
+            IF nearAnyHand(detection.world_pos, hands, hand_distance_threshold):
                 closest_hand = findClosestHand(detection.world_pos, hands)
                 initiateCatch(ball, closest_hand, events)
                 RETURN

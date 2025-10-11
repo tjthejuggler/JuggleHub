@@ -93,7 +93,7 @@ if (ball.held_by_hand_id == -1 && !hands.empty()) {
 
 ### Hand Changes (Legitimate Catches)
 - Hand ID only changes through catch detection in [`initiateCatch()`](engine/src/SimpleBallTracker.cpp:1934)
-- Catch detection requires ball to be within [`catch_distance_threshold`](engine/include/SimpleBallTracker.hpp:142) of a hand
+- Catch detection requires ball to be within [`hand_distance_threshold`](engine/include/SimpleBallTracker.hpp:149) of a hand
 - This is the ONLY legitimate way for hand ID to change
 
 ## Benefits

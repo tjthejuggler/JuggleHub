@@ -118,6 +118,27 @@ public:
         }
     }
     
+    // Log throw/catch decision details for debugging
+    void logThrowCatchDecision(const std::string& decision_type,
+                               int ball_id,
+                               const std::string& ball_color,
+                               int hand_id,
+                               const std::string& hand_side,
+                               float ball_to_hand_dist,
+                               float threshold,
+                               bool decision_made,
+                               const std::string& reason) {
+        if (!is_active_) return;
+        
+        log_file_ << "  [" << decision_type << " CHECK] Ball " << ball_id << " (" << ball_color << ")\n";
+        log_file_ << "    Hand: " << hand_id << " (" << hand_side << ")\n";
+        log_file_ << "    Distance ball→hand: " << std::fixed << std::setprecision(4) << ball_to_hand_dist << "m\n";
+        log_file_ << "    Threshold: " << std::setprecision(4) << threshold << "m\n";
+        log_file_ << "    Decision: " << (decision_made ? "YES" : "NO") << "\n";
+        log_file_ << "    Reason: " << reason << "\n";
+        log_file_.flush();
+    }
+    
     // Log a single frame's tracking data (with visualization-based filtering)
     void logFrame(const std::vector<SimpleBall>& balls,
                   const std::vector<SimpleHand>& hands,
@@ -167,6 +188,38 @@ public:
             log_file_ << "    State: " << (ball.is_held ? "HELD" : "IN_FLIGHT") << "\n";
             log_file_ << "    Held by hand: " << (ball.held_by_hand_id >= 0 ?
                      std::to_string(ball.held_by_hand_id) : "NONE") << "\n";
+            
+            // ALWAYS log: Distance to each hand (for throw/catch debugging)
+            if (!hands.empty()) {
+                log_file_ << "\n  THROW/CATCH DISTANCES:\n";
+                for (const auto& hand : hands) {
+                    float dx = ball.position.x - hand.wrist_pos_3d.x;
+                    float dy = ball.position.y - hand.wrist_pos_3d.y;
+                    float dz = ball.position.z - hand.wrist_pos_3d.z;
+                    float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    log_file_ << "    Distance to Hand " << hand.id << " ("
+                             << (hand.id == 0 ? "LEFT" : "RIGHT") << "): "
+                             << std::fixed << std::setprecision(4) << dist << "m\n";
+                    
+                    // Show if within throw/catch thresholds
+                    // Default thresholds: throw=0.20m, catch=0.30m
+                    const float THROW_THRESHOLD = 0.20f;
+                    const float CATCH_THRESHOLD = 0.30f;
+                    
+                    if (ball.is_held && dist > THROW_THRESHOLD) {
+                        log_file_ << "      → BEYOND THROW THRESHOLD (" << THROW_THRESHOLD << "m)\n";
+                    } else if (ball.is_held && dist <= THROW_THRESHOLD) {
+                        log_file_ << "      → Within throw threshold (HELD state)\n";
+                    }
+                    
+                    if (!ball.is_held && dist < CATCH_THRESHOLD) {
+                        log_file_ << "      → WITHIN CATCH THRESHOLD (" << CATCH_THRESHOLD << "m)\n";
+                    } else if (!ball.is_held && dist >= CATCH_THRESHOLD) {
+                        log_file_ << "      → Beyond catch threshold (IN_FLIGHT state)\n";
+                    }
+                }
+            }
             
             // CONDITIONAL: Color tracker details (only if show_color_tracker enabled)
             if (viz_states.show_color_tracker()) {

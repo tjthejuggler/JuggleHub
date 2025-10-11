@@ -2172,7 +2172,7 @@ cv::Point3f SimpleBallTracker::predictWithTwoPoints(SimpleBall& ball) {
 }
 
 std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ball) {
-    // Use GPU-accelerated trajectory predictor for full physics
+    // PERFORMANCE FIX: Use CPU-only trajectory prediction (GPU overhead was 48% of CPU time!)
     // Requirement: need at least traj_min_points_for_prediction points (default 3)
     if (ball.trajectory.points.size() < static_cast<size_t>(tracking_settings_.traj_min_points_for_prediction)) {
         // Not enough points yet, return empty
@@ -2183,8 +2183,8 @@ std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ba
         return std::vector<cv::Point3f>();
     }
     
-    // NEW: Use general parabolic fit to estimate position, velocity, AND acceleration
-    // This replaces the old physics-constrained approach
+    // CPU-ONLY: Use general parabolic fit to estimate position, velocity, AND acceleration
+    // This is MUCH faster than GPU for small trajectory calculations
     GpuTrajectoryPredictor::ParabolicFitResult state =
         gpu_trajectory_predictor_->estimateCurrentStateCpu(ball.trajectory.points);
     
@@ -2193,19 +2193,28 @@ std::vector<cv::Point3f> SimpleBallTracker::predictFullTrajectory(SimpleBall& ba
     cv::Point3f current_position = state.position;
     cv::Point3f current_acceleration = state.acceleration;
     
-    // Predict full trajectory path from current state
-    // Now using position, velocity, AND acceleration from parabolic fit!
-    TrajectoryPredictionParams params;
-    params.time_step = tracking_settings_.traj_time_step;
-    params.max_time = tracking_settings_.traj_max_time;
-    params.gravity = tracking_settings_.traj_gravity;
+    // CPU-ONLY: Predict full trajectory path using simple ballistic equations
+    // This replaces the GPU predictor which was causing 48% CPU overhead
+    std::vector<cv::Point3f> predicted_path;
     
-    std::vector<cv::Point3f> predicted_path = gpu_trajectory_predictor_->predictTrajectory(
-        state.position,      // Current position from fit
-        state.velocity,      // Current velocity from fit
-        state.acceleration,  // Current acceleration from fit (not just gravity!)
-        params
-    );
+    float time_step = tracking_settings_.traj_time_step;
+    float max_time = tracking_settings_.traj_max_time;
+    int num_steps = static_cast<int>(max_time / time_step);
+    
+    for (int i = 0; i < num_steps; ++i) {
+        float t = i * time_step;
+        
+        // Ballistic motion: p(t) = p0 + v0*t + 0.5*a*t^2
+        cv::Point3f predicted;
+        predicted.x = state.position.x + state.velocity.x * t + 0.5f * state.acceleration.x * t * t;
+        predicted.y = state.position.y + state.velocity.y * t + 0.5f * state.acceleration.y * t * t;
+        predicted.z = state.position.z + state.velocity.z * t + 0.5f * state.acceleration.z * t * t;
+        
+        // Stop if ball goes below ground (z < 0)
+        if (predicted.z < 0) break;
+        
+        predicted_path.push_back(predicted);
+    }
     
     // Cache prediction
     ball.trajectory.predicted_path = predicted_path;

@@ -12,7 +12,13 @@ endif()
 # Compiler flags for different build types
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+# FPS OPTIMIZATION: Aggressive optimization with CPU-specific instructions
+# -O3: Maximum optimization level (includes vectorization, loop unrolling, etc.)
+# -march=native: Generate code optimized for the current CPU architecture
+# -mtune=native: Tune code scheduling for the current CPU
+# -ffast-math: Allow aggressive floating-point optimizations (safe for our use case)
+# Expected gain: 5-10% performance improvement from better CPU utilization
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -mtune=native -ffast-math -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
 set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os -DNDEBUG")
 

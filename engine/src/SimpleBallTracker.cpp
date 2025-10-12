@@ -2942,7 +2942,8 @@ void SimpleBallTracker::updateHeldBall(
         // This prevents false throws when a detection (e.g., other hand) is far from current hand
         // but also far from the ball's current position
         if (dist_from_hand > tracking_settings_.hand_distance_threshold &&
-            dist_from_ball < tracking_settings_.max_tracker_distance_per_frame) {
+            dist_from_ball < tracking_settings_.max_tracker_distance_per_frame &&
+            det.class_id == 0) {  // CRITICAL: Detection must be class 'ball' (in-flight) to trigger throw
             float color_score = matchColor(det, *profile, color_frame);
             
             DEBUG_LOG(debug_log, {

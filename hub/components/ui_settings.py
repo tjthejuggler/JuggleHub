@@ -229,6 +229,19 @@ if PYQT_AVAILABLE:
             self.ir_status_label = QLabel("🔆 IR Projector: Unknown")
             camera_layout.addWidget(self.ir_status_label, 5, 0, 1, 2)
             
+            # Tracking System Selection
+            camera_layout.addWidget(QLabel("Tracking System:"), 6, 0)
+            self.tracking_system_combo = QComboBox()
+            self.tracking_system_combo.addItem("Depth-Based 3D (Current)", "depth_based")
+            self.tracking_system_combo.addItem("Simple 2D (New)", "simple_2d")
+            self.tracking_system_combo.currentIndexChanged.connect(self.on_tracking_system_changed)
+            self.tracking_system_combo.setToolTip(
+                "Select which tracking system to use:\n"
+                "• Depth-Based 3D: Uses RealSense depth data for 3D tracking (current system)\n"
+                "• Simple 2D: 2D-only tracking without depth (new system - to be implemented)"
+            )
+            camera_layout.addWidget(self.tracking_system_combo, 6, 1)
+            
             return section
 
         def create_yolo_section(self):
@@ -1643,6 +1656,33 @@ if PYQT_AVAILABLE:
         def on_resolution_changed(self):
             """Handle resolution change to update FPS options."""
             self.populate_fps_options()
+        
+        def on_tracking_system_changed(self):
+            """Handle tracking system selection change"""
+            tracker_type = self.tracking_system_combo.currentData()
+            
+            print(f"🔄 Switching to tracker: {tracker_type}")
+            
+            # Send command to engine to switch tracker
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.SET_TRACKER_TYPE
+            command.tracker_type = tracker_type
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ {response.message}")
+                    # Auto-save settings after successful switch
+                    if not self._loading_settings:
+                        self.save_settings()
+                else:
+                    print(f"❌ Failed to switch tracker: {response.message}")
+                    QMessageBox.warning(self, "Tracker Switch Failed",
+                                      f"Failed to switch tracking system:\n{response.message}")
+            except Exception as e:
+                print(f"❌ Error switching tracker: {e}")
+                QMessageBox.critical(self, "Error",
+                                   f"Error switching tracking system:\n{str(e)}")
 
         def stop_camera_feed(self):
             """Stop the camera feed."""
@@ -1743,6 +1783,7 @@ if PYQT_AVAILABLE:
                 'camera_settings_profile': self.camera_settings_combo.currentData(),
                 'resolution': self.resolution_combo.currentText(),
                 'fps': self.fps_combo.currentData(),
+                'tracking_system': self.tracking_system_combo.currentData(),
                 'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0,
                 'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0,
                 'nms_threshold': self.nms_slider.value() / 100.0,
@@ -1891,6 +1932,12 @@ if PYQT_AVAILABLE:
                 index = self.fps_combo.findData(settings['fps'])
                 if index >= 0:
                     self.fps_combo.setCurrentIndex(index)
+            
+            # Tracking system
+            if 'tracking_system' in settings:
+                index = self.tracking_system_combo.findData(settings['tracking_system'])
+                if index >= 0:
+                    self.tracking_system_combo.setCurrentIndex(index)
             
             # DNN Tracker settings
             if 'ball_confidence_threshold' in settings:

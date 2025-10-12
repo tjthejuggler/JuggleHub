@@ -1122,6 +1122,22 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         debug_log.close();
     });
     
+    // CRITICAL: Increment flight frame counter for ALL in-flight balls BEFORE any processing
+    // This ensures the cooldown counter works for all code paths (override, normal, etc.)
+    for (auto& ball : balls_) {
+        if (ball.state == IN_FLIGHT && ball.last_throwing_hand_id >= 0) {
+            ball.frames_in_flight_since_throw++;
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "[COOLDOWN] Ball " << ball.id << " in flight: frames_since_throw="
+                          << ball.frames_in_flight_since_throw << ", last_throwing_hand="
+                          << ball.last_throwing_hand_id << std::endl;
+                debug_log.close();
+            });
+        }
+    }
+    
     // CRITICAL: Process each ball based on its state
     // BUT skip balls that have been overridden - they're already positioned correctly
     for (auto& ball : balls_) {
@@ -1395,7 +1411,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
 }
 
 bool SimpleBallTracker::calibrateColor(const std::string& color_name,
-                                      const cv::Point& click_point,
+                                      cv::Point click_point,
                                       std::string& error_message) {
     // Use last raw detections and last color frame
     if (last_color_frame_.empty()) {
@@ -1762,26 +1778,21 @@ void SimpleBallTracker::updateInFlightBall(
     const CameraIntrinsics& intrinsics,
     std::vector<BallEvent>& events) {
     
-    // CRITICAL: Increment flight frame counter for GLOBAL 3-FRAME RULE
-    if (ball.last_throwing_hand_id >= 0) {
-        ball.frames_in_flight_since_throw++;
-        
-        DEBUG_LOG(debug_log, {
-            OPEN_DEBUG_LOG(debug_log);
-            debug_log << "\n[updateInFlightBall] Ball " << ball.id << " (" << ball.color_name << ")" << std::endl;
-            debug_log << "  GLOBAL 3-FRAME RULE ACTIVE:" << std::endl;
+    // NOTE: Flight frame counter is now incremented globally in update() before ball processing
+    // This ensures it works for all code paths (override, normal, etc.)
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\n[updateInFlightBall] Ball " << ball.id << " (" << ball.color_name << ")" << std::endl;
+        if (ball.last_throwing_hand_id >= 0) {
+            debug_log << "  GLOBAL COOLDOWN RULE ACTIVE:" << std::endl;
             debug_log << "    last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
             debug_log << "    frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
-            debug_log << "    (Hand " << ball.last_throwing_hand_id << " cannot catch until 3+ frames)" << std::endl;
-            debug_log.close();
-        });
-    } else {
-        DEBUG_LOG(debug_log, {
-            OPEN_DEBUG_LOG(debug_log);
-            debug_log << "\n[updateInFlightBall] Ball " << ball.id << " (" << ball.color_name << ")" << std::endl;
-            debug_log.close();
-        });
-    }
+            debug_log << "    min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
+            debug_log << "    (Hand " << ball.last_throwing_hand_id << " cannot catch until "
+                      << tracking_settings_.min_frames_before_catch << "+ frames)" << std::endl;
+        }
+        debug_log.close();
+    });
     
     DEBUG_LOG(debug_log, {
         OPEN_DEBUG_LOG(debug_log);
@@ -2225,6 +2236,21 @@ void SimpleBallTracker::updateInFlightBall(
             
             float dist = cv::norm(predicted_next - hand.wrist_pos_3d);
             if (dist < 0.15f) {  // Very close to hand (15cm)
+                // CRITICAL: Check catch cooldown before allowing catch
+                if (ball.last_throwing_hand_id >= 0 &&
+                    hand.id == ball.last_throwing_hand_id &&
+                    ball.frames_in_flight_since_throw < tracking_settings_.min_frames_before_catch) {
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  ✗ NEAR-HAND CATCH BLOCKED: Same hand that threw, only "
+                                  << ball.frames_in_flight_since_throw << " frames in flight (need "
+                                  << tracking_settings_.min_frames_before_catch << "+)" << std::endl;
+                        debug_log.close();
+                    });
+                    continue;  // Skip this hand, cooldown not satisfied
+                }
+                
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
                     debug_log << "  NEAR-HAND FALLBACK: Ball within 0.15m of hand " << hand.id
@@ -2492,6 +2518,21 @@ void SimpleBallTracker::updateInFlightBall(
             float dist_to_hand = cv::norm(ball.position - hand.wrist_pos_3d);
             
             if (dist_to_hand < tracking_settings_.hand_distance_threshold) {
+                // CRITICAL: Check catch cooldown before allowing catch
+                if (ball.last_throwing_hand_id >= 0 &&
+                    hand.id == ball.last_throwing_hand_id &&
+                    ball.frames_in_flight_since_throw < tracking_settings_.min_frames_before_catch) {
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  ✗ SAFETY CATCH BLOCKED: Same hand that threw, only "
+                                  << ball.frames_in_flight_since_throw << " frames in flight (need "
+                                  << tracking_settings_.min_frames_before_catch << "+)" << std::endl;
+                        debug_log.close();
+                    });
+                    continue;  // Skip this hand, cooldown not satisfied
+                }
+                
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
                     debug_log << "  SAFETY CATCH: Ball within " << dist_to_hand
@@ -2988,7 +3029,7 @@ void SimpleBallTracker::drawHandThresholds(
     cv::Mat& frame,
     const std::vector<SimpleHand>& hands,
     const CameraIntrinsics& intrinsics
-) const {
+) {
     // Draw threshold circles around each hand's wrist
     for (const auto& hand : hands) {
         if (!hand.is_visible) continue;

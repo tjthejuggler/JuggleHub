@@ -267,6 +267,7 @@ message CommandRequest {
     ENABLE_FEATURE = 14; // Enable an engine feature for apps
     DISABLE_FEATURE = 15; // Disable an engine feature for apps
     SET_VIDEO_FEED_ENABLED = 16; // Enable or disable video feed encoding
+    SET_TRACKER_TYPE = 17; // Switch between tracking system implementations
   }
   
   CommandType type = 1;
@@ -299,6 +300,9 @@ message CommandRequest {
   
   // For SET_VIDEO_FEED_ENABLED
   bool video_feed_enabled = 20;     // Whether to encode video feed
+  
+  // For SET_TRACKER_TYPE
+  string tracker_type = 21;         // Tracker type: "depth_based" or "simple_2d"
 }
 
 // Visualization states for recording with overlays

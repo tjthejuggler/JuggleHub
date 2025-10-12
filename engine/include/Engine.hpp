@@ -4,6 +4,7 @@
 #include "../src/modules/ModuleBase.hpp"
 #include "../src/modules/UdpBallColorModule.hpp"
 #include "../src/modules/UdpBallSettingsModule.hpp"
+#include "IBallTracker.hpp" // Include the tracker interface
 #include "SimpleBallTracker.hpp" // Include the simplified ball tracker
 #include "RecordingLogger.hpp" // Include recording logger
 #include "json.hpp" // Include nlohmann/json
@@ -54,6 +55,10 @@ public:
 
     void run();
     void stop();
+    
+    // Tracker management
+    void setTrackerType(const std::string& tracker_type);
+    std::string getTrackerType() const { return current_tracker_type_; }
 
 private:
     void processCommands();
@@ -82,7 +87,13 @@ private:
     std::unique_ptr<ModuleBase> active_module_;
     std::unique_ptr<UdpBallColorModule> color_module_;
     std::unique_ptr<juggler::modules::UdpBallSettingsModule> settings_module_;
-    std::shared_ptr<SimpleBallTracker> simple_tracker_;
+    
+    // Tracker system (polymorphic - can be any IBallTracker implementation)
+    std::shared_ptr<IBallTracker> tracker_;
+    std::string current_tracker_type_;  // "depth_based" or "simple_2d"
+    
+    // Legacy compatibility
+    std::shared_ptr<SimpleBallTracker> simple_tracker_;  // Keep for backward compatibility during transition
     bool use_dnn_tracker_; // Flag to switch between old/new tracker (kept for compatibility)
     bool verbose_;
 

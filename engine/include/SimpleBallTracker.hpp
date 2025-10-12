@@ -9,6 +9,7 @@
 #include "json.hpp"
 #include "GpuHsvConverter.hpp"
 #include "GpuTrajectoryPredictor.hpp"
+#include "IBallTracker.hpp"
 
 using json = nlohmann::json;
 
@@ -287,7 +288,7 @@ struct TrajectoryVisualizationSettings {
 };
 
 
-class SimpleBallTracker {
+class SimpleBallTracker : public IBallTracker {
 public:
     SimpleBallTracker(const std::string& ball_model_path,
                      const std::string& pose_model_path,
@@ -307,10 +308,10 @@ public:
     void saveSettings();
     bool updateSetting(const std::string& key, const std::string& value);
     
-    // Color calibration
+    // Color calibration (override from IBallTracker)
     bool calibrateColor(const std::string& color_name,
-                       const cv::Point& click_point,
-                       std::string& error_message);
+                       cv::Point click_point,
+                       std::string& error_message) override;
     
     // Override evaluation - calculates override criteria for all detections
     // PERFORMANCE NOTE: This is expensive (detections × colors), only call when recording
@@ -345,9 +346,10 @@ public:
     * @param hands Hands to draw thresholds around
     * @param intrinsics Camera intrinsics for 3D-to-2D projection
     */
-   void drawHandThresholds(cv::Mat& frame, const std::vector<SimpleHand>& hands, const CameraIntrinsics& intrinsics) const;
+   void drawHandThresholds(cv::Mat& frame, const std::vector<SimpleHand>& hands, const CameraIntrinsics& intrinsics) override;
    
    const TrackingSettings& getTrackingSettings() const { return tracking_settings_; }
+    TrackingSettings& getTrackingSettings() override { return tracking_settings_; }
     void setTrackingSettings(const TrackingSettings& settings) { tracking_settings_ = settings; }
     
     // Utility for projection

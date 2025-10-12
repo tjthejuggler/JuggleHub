@@ -260,12 +260,13 @@ enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_ENABLE_FEATURE = 14,
   CommandRequest_CommandType_DISABLE_FEATURE = 15,
   CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED = 16,
+  CommandRequest_CommandType_SET_TRACKER_TYPE = 17,
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool CommandRequest_CommandType_IsValid(int value);
 constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MIN = CommandRequest_CommandType_UNKNOWN;
-constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED;
+constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_SET_TRACKER_TYPE;
 constexpr int CommandRequest_CommandType_CommandType_ARRAYSIZE = CommandRequest_CommandType_CommandType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor();
@@ -5546,6 +5547,8 @@ class CommandRequest final :
     CommandRequest_CommandType_DISABLE_FEATURE;
   static constexpr CommandType SET_VIDEO_FEED_ENABLED =
     CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED;
+  static constexpr CommandType SET_TRACKER_TYPE =
+    CommandRequest_CommandType_SET_TRACKER_TYPE;
   static inline bool CommandType_IsValid(int value) {
     return CommandRequest_CommandType_IsValid(value);
   }
@@ -5579,6 +5582,7 @@ class CommandRequest final :
     kCameraSettingsFileFieldNumber = 6,
     kColorNameFieldNumber = 15,
     kFeatureNameFieldNumber = 18,
+    kTrackerTypeFieldNumber = 21,
     kColorCommandFieldNumber = 4,
     kCalibrationPixelPosFieldNumber = 11,
     kVisualizationStatesFieldNumber = 19,
@@ -5665,6 +5669,20 @@ class CommandRequest final :
   const std::string& _internal_feature_name() const;
   inline PROTOBUF_ALWAYS_INLINE void _internal_set_feature_name(const std::string& value);
   std::string* _internal_mutable_feature_name();
+  public:
+
+  // string tracker_type = 21;
+  void clear_tracker_type();
+  const std::string& tracker_type() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_tracker_type(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_tracker_type();
+  PROTOBUF_NODISCARD std::string* release_tracker_type();
+  void set_allocated_tracker_type(std::string* tracker_type);
+  private:
+  const std::string& _internal_tracker_type() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_tracker_type(const std::string& value);
+  std::string* _internal_mutable_tracker_type();
   public:
 
   // .juggler.v1.ColorCommand color_command = 4;
@@ -5837,6 +5855,7 @@ class CommandRequest final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr camera_settings_file_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_name_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr feature_name_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr tracker_type_;
     ::juggler::v1::ColorCommand* color_command_;
     ::juggler::v1::Vector2* calibration_pixel_pos_;
     ::juggler::v1::VisualizationStates* visualization_states_;
@@ -12785,6 +12804,56 @@ inline void CommandRequest::_internal_set_video_feed_enabled(bool value) {
 inline void CommandRequest::set_video_feed_enabled(bool value) {
   _internal_set_video_feed_enabled(value);
   // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.video_feed_enabled)
+}
+
+// string tracker_type = 21;
+inline void CommandRequest::clear_tracker_type() {
+  _impl_.tracker_type_.ClearToEmpty();
+}
+inline const std::string& CommandRequest::tracker_type() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.tracker_type)
+  return _internal_tracker_type();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void CommandRequest::set_tracker_type(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.tracker_type_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.tracker_type)
+}
+inline std::string* CommandRequest::mutable_tracker_type() {
+  std::string* _s = _internal_mutable_tracker_type();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.CommandRequest.tracker_type)
+  return _s;
+}
+inline const std::string& CommandRequest::_internal_tracker_type() const {
+  return _impl_.tracker_type_.Get();
+}
+inline void CommandRequest::_internal_set_tracker_type(const std::string& value) {
+  
+  _impl_.tracker_type_.Set(value, GetArenaForAllocation());
+}
+inline std::string* CommandRequest::_internal_mutable_tracker_type() {
+  
+  return _impl_.tracker_type_.Mutable(GetArenaForAllocation());
+}
+inline std::string* CommandRequest::release_tracker_type() {
+  // @@protoc_insertion_point(field_release:juggler.v1.CommandRequest.tracker_type)
+  return _impl_.tracker_type_.Release();
+}
+inline void CommandRequest::set_allocated_tracker_type(std::string* tracker_type) {
+  if (tracker_type != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.tracker_type_.SetAllocated(tracker_type, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.tracker_type_.IsDefault()) {
+    _impl_.tracker_type_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.tracker_type)
 }
 
 // -------------------------------------------------------------------

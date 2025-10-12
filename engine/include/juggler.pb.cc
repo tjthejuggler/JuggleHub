@@ -440,6 +440,7 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.camera_settings_file_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.color_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.feature_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.tracker_type_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.color_command_)*/nullptr
   , /*decltype(_impl_.calibration_pixel_pos_)*/nullptr
   , /*decltype(_impl_.visualization_states_)*/nullptr
@@ -831,6 +832,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.click_y_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.feature_name_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.video_feed_enabled_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.tracker_type_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -896,9 +898,9 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 239, -1, -1, sizeof(::juggler::v1::FrameData)},
   { 268, 276, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
   { 278, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 303, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
-  { 325, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 333, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 304, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
+  { 326, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 334, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -1044,7 +1046,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "r.v1.BallState\0224\n\020occlusion_states\030\026 \003(\013"
   "2\032.juggler.v1.OcclusionState\022;\n\024color_se"
   "arch_regions\030\027 \003(\0132\035.juggler.v1.ColorSea"
-  "rchRegion\"\270\010\n\016CommandRequest\0224\n\004type\030\001 \001"
+  "rchRegion\"\344\010\n\016CommandRequest\0224\n\004type\030\001 \001"
   "(\0162&.juggler.v1.CommandRequest.CommandTy"
   "pe\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestamp_us\030"
   "\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.juggler.v"
@@ -1060,37 +1062,39 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "v1.VisualizationStates\022\022\n\ncolor_name\030\017 \001"
   "(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014"
   "feature_name\030\022 \001(\t\022\032\n\022video_feed_enabled"
-  "\030\024 \001(\010\0321\n\017ModuleArgsEntry\022\013\n\003key\030\001 \001(\t\022\r"
-  "\n\005value\030\002 \001(\t:\0028\001\"\210\003\n\013CommandType\022\013\n\007UNK"
-  "NOWN\020\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rUNLOAD_MODULE"
-  "\020\002\022\026\n\022SEND_COLOR_COMMAND\020\003\022\024\n\020CONFIGURE_"
-  "MODULE\020\004\022\020\n\014RECORD_START\020\005\022\033\n\027RECORD_CON"
-  "TINUOUS_START\020\006\022\032\n\026RECORD_CONTINUOUS_STO"
-  "P\020\007\022 \n\034RESTART_WITH_CAMERA_SETTINGS\020\010\022\017\n"
-  "\013CAMERA_STOP\020\t\022\020\n\014CAMERA_START\020\n\022\024\n\020CALI"
-  "BRATE_OBJECT\020\013\022\032\n\026SET_POSE_MODEL_ENABLED"
-  "\020\014\022\023\n\017CALIBRATE_COLOR\020\r\022\022\n\016ENABLE_FEATUR"
-  "E\020\016\022\023\n\017DISABLE_FEATURE\020\017\022\032\n\026SET_VIDEO_FE"
-  "ED_ENABLED\020\020\"\330\003\n\023VisualizationStates\022#\n\033"
-  "show_trajectory_predictions\030\001 \001(\010\022\033\n\023sho"
-  "w_raw_detections\030\002 \001(\010\022 \n\030show_filtered_"
-  "detections\030\003 \001(\010\022\031\n\021show_associations\030\004 "
-  "\001(\010\022\031\n\021show_new_trackers\030\005 \001(\010\022\032\n\022show_h"
-  "and_tracking\030\006 \001(\010\022\030\n\020show_ball_states\030\007"
-  " \001(\010\022\026\n\016show_occlusion\030\010 \001(\010\022\025\n\rshow_ske"
-  "leton\030\t \001(\010\022\031\n\021show_color_search\030\n \001(\010\022\032"
-  "\n\022show_color_tracker\030\013 \001(\010\022\032\n\022show_track"
-  "ed_boxes\030\014 \001(\010\022!\n\031show_unmatched_detecti"
-  "ons\030\r \001(\010\022\022\n\nshow_tails\030\016 \001(\010\022\027\n\017show_tr"
-  "ajectory\030\017 \001(\010\022\037\n\027show_hand_velocity_zon"
-  "e\030\020 \001(\010\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t"
-  "\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017Co"
-  "mmandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007messag"
-  "e\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
+  "\030\024 \001(\010\022\024\n\014tracker_type\030\025 \001(\t\0321\n\017ModuleAr"
+  "gsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\""
+  "\236\003\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MOD"
+  "ULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_C"
+  "OMMAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD"
+  "_START\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n"
+  "\026RECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WIT"
+  "H_CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014"
+  "CAMERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026"
+  "SET_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_CO"
+  "LOR\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_FEA"
+  "TURE\020\017\022\032\n\026SET_VIDEO_FEED_ENABLED\020\020\022\024\n\020SE"
+  "T_TRACKER_TYPE\020\021\"\330\003\n\023VisualizationStates"
+  "\022#\n\033show_trajectory_predictions\030\001 \001(\010\022\033\n"
+  "\023show_raw_detections\030\002 \001(\010\022 \n\030show_filte"
+  "red_detections\030\003 \001(\010\022\031\n\021show_association"
+  "s\030\004 \001(\010\022\031\n\021show_new_trackers\030\005 \001(\010\022\032\n\022sh"
+  "ow_hand_tracking\030\006 \001(\010\022\030\n\020show_ball_stat"
+  "es\030\007 \001(\010\022\026\n\016show_occlusion\030\010 \001(\010\022\025\n\rshow"
+  "_skeleton\030\t \001(\010\022\031\n\021show_color_search\030\n \001"
+  "(\010\022\032\n\022show_color_tracker\030\013 \001(\010\022\032\n\022show_t"
+  "racked_boxes\030\014 \001(\010\022!\n\031show_unmatched_det"
+  "ections\030\r \001(\010\022\022\n\nshow_tails\030\016 \001(\010\022\027\n\017sho"
+  "w_trajectory\030\017 \001(\010\022\037\n\027show_hand_velocity"
+  "_zone\030\020 \001(\010\"A\n\014ColorCommand\022\017\n\007ball_id\030\001"
+  " \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color\"I"
+  "\n\017CommandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007me"
+  "ssage\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto"
+  "3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 6197, descriptor_table_protodef_juggler_2eproto,
+    false, false, 6241, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 27,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -1195,6 +1199,7 @@ bool CommandRequest_CommandType_IsValid(int value) {
     case 14:
     case 15:
     case 16:
+    case 17:
       return true;
     default:
       return false;
@@ -1219,6 +1224,7 @@ constexpr CommandRequest_CommandType CommandRequest::CALIBRATE_COLOR;
 constexpr CommandRequest_CommandType CommandRequest::ENABLE_FEATURE;
 constexpr CommandRequest_CommandType CommandRequest::DISABLE_FEATURE;
 constexpr CommandRequest_CommandType CommandRequest::SET_VIDEO_FEED_ENABLED;
+constexpr CommandRequest_CommandType CommandRequest::SET_TRACKER_TYPE;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MIN;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MAX;
 constexpr int CommandRequest::CommandType_ARRAYSIZE;
@@ -9489,6 +9495,7 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.camera_settings_file_){}
     , decltype(_impl_.color_name_){}
     , decltype(_impl_.feature_name_){}
+    , decltype(_impl_.tracker_type_){}
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.calibration_pixel_pos_){nullptr}
     , decltype(_impl_.visualization_states_){nullptr}
@@ -9539,6 +9546,14 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     _this->_impl_.feature_name_.Set(from._internal_feature_name(), 
       _this->GetArenaForAllocation());
   }
+  _impl_.tracker_type_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.tracker_type_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_tracker_type().empty()) {
+    _this->_impl_.tracker_type_.Set(from._internal_tracker_type(), 
+      _this->GetArenaForAllocation());
+  }
   if (from._internal_has_color_command()) {
     _this->_impl_.color_command_ = new ::juggler::v1::ColorCommand(*from._impl_.color_command_);
   }
@@ -9564,6 +9579,7 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.camera_settings_file_){}
     , decltype(_impl_.color_name_){}
     , decltype(_impl_.feature_name_){}
+    , decltype(_impl_.tracker_type_){}
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.calibration_pixel_pos_){nullptr}
     , decltype(_impl_.visualization_states_){nullptr}
@@ -9596,6 +9612,10 @@ inline void CommandRequest::SharedCtor(
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.feature_name_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.tracker_type_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.tracker_type_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 CommandRequest::~CommandRequest() {
@@ -9616,6 +9636,7 @@ inline void CommandRequest::SharedDtor() {
   _impl_.camera_settings_file_.Destroy();
   _impl_.color_name_.Destroy();
   _impl_.feature_name_.Destroy();
+  _impl_.tracker_type_.Destroy();
   if (this != internal_default_instance()) delete _impl_.color_command_;
   if (this != internal_default_instance()) delete _impl_.calibration_pixel_pos_;
   if (this != internal_default_instance()) delete _impl_.visualization_states_;
@@ -9640,6 +9661,7 @@ void CommandRequest::Clear() {
   _impl_.camera_settings_file_.ClearToEmpty();
   _impl_.color_name_.ClearToEmpty();
   _impl_.feature_name_.ClearToEmpty();
+  _impl_.tracker_type_.ClearToEmpty();
   if (GetArenaForAllocation() == nullptr && _impl_.color_command_ != nullptr) {
     delete _impl_.color_command_;
   }
@@ -9830,6 +9852,16 @@ const char* CommandRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext
         } else
           goto handle_unusual;
         continue;
+      // string tracker_type = 21;
+      case 21:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 170)) {
+          auto str = _internal_mutable_tracker_type();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.CommandRequest.tracker_type"));
+        } else
+          goto handle_unusual;
+        continue;
       default:
         goto handle_unusual;
     }  // switch
@@ -10017,6 +10049,16 @@ uint8_t* CommandRequest::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(20, this->_internal_video_feed_enabled(), target);
   }
 
+  // string tracker_type = 21;
+  if (!this->_internal_tracker_type().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_tracker_type().data(), static_cast<int>(this->_internal_tracker_type().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "juggler.v1.CommandRequest.tracker_type");
+    target = stream->WriteStringMaybeAliased(
+        21, this->_internal_tracker_type(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -10068,6 +10110,13 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += 2 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
         this->_internal_feature_name());
+  }
+
+  // string tracker_type = 21;
+  if (!this->_internal_tracker_type().empty()) {
+    total_size += 2 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_tracker_type());
   }
 
   // .juggler.v1.ColorCommand color_command = 4;
@@ -10182,6 +10231,9 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (!from._internal_feature_name().empty()) {
     _this->_internal_set_feature_name(from._internal_feature_name());
   }
+  if (!from._internal_tracker_type().empty()) {
+    _this->_internal_set_tracker_type(from._internal_tracker_type());
+  }
   if (from._internal_has_color_command()) {
     _this->_internal_mutable_color_command()->::juggler::v1::ColorCommand::MergeFrom(
         from._internal_color_command());
@@ -10262,6 +10314,10 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.feature_name_, lhs_arena,
       &other->_impl_.feature_name_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.tracker_type_, lhs_arena,
+      &other->_impl_.tracker_type_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.click_y_)

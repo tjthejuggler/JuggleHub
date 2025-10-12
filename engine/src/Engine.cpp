@@ -24,6 +24,7 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       output_format_(format),
       running_(false),
       color_module_(std::make_unique<UdpBallColorModule>()),
+      current_tracker_type_("depth_based"),  // Default to depth-based tracking
       use_dnn_tracker_(use_dnn_tracker),
       verbose_(verbose),
       zmq_context_(1),
@@ -47,9 +48,9 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
    zmq_commander_.bind("tcp://127.0.0.1:5565");
    writeDebugLog("Engine constructor: ZMQ sockets bound successfully");
 
-    // Initialize SimpleBallTracker with model paths
+    // Initialize default tracker (depth-based SimpleBallTracker)
     try {
-        writeDebugLog("Engine constructor: Initializing SimpleBallTracker...");
+        writeDebugLog("Engine constructor: Initializing default tracker (depth_based)...");
         const std::string ball_model_path = "engine/models/" + model_name + ".xml";
         const std::string pose_model_path = "engine/models/" + pose_model_name + ".xml";
         writeDebugLog("Engine constructor: Ball model path: " + ball_model_path);
@@ -57,9 +58,10 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
         
         simple_tracker_ = std::make_shared<SimpleBallTracker>(
             ball_model_path, pose_model_path, device_name, "hub/ball_settings.json");
-        writeDebugLog("Engine constructor: SimpleBallTracker initialized successfully");
+        tracker_ = simple_tracker_;  // Set polymorphic pointer to default tracker
+        writeDebugLog("Engine constructor: Default tracker initialized successfully");
     } catch (const std::exception& e) {
-        writeDebugLog("Engine constructor: EXCEPTION in SimpleBallTracker init: " + std::string(e.what()));
+        writeDebugLog("Engine constructor: EXCEPTION in tracker init: " + std::string(e.what()));
         return;
     }
 
@@ -91,9 +93,9 @@ void Engine::run() {
     startCamera();
     writeDebugLog("Engine::run() - Camera started");
 
-    // Initialize settings module with SimpleBallTracker
+    // Initialize settings module with current tracker
     writeDebugLog("Engine::run() - Initializing settings module...");
-    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_);
+    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_);  // Still uses simple_tracker_ for settings
     settings_module_->setup();
     writeDebugLog("Engine::run() - Settings module initialized");
 
@@ -179,28 +181,28 @@ void Engine::run() {
         std::vector<SimpleHand> tracked_hands;
         
         if (use_dnn_tracker_) {
-            if (!simple_tracker_) return; // Safety check
+            if (!tracker_) return; // Safety check
             
             // Set recording frame number if recording is active
             if (recording_logger_.isActive()) {
-                simple_tracker_->setRecordingFrameNumber(recording_logger_.getFrameNumber());
+                tracker_->setRecordingFrameNumber(recording_logger_.getFrameNumber());
             } else {
-                simple_tracker_->setRecordingFrameNumber(-1);  // Not recording
+                tracker_->setRecordingFrameNumber(-1);  // Not recording
             }
             
-            // Update SimpleBallTracker (includes YOLO detection and pose estimation internally)
-            auto [balls, events] = simple_tracker_->update(color_image, depth_image, camera_intrinsics_);
+            // Update current tracker (polymorphic - works with any IBallTracker implementation)
+            auto [balls, events] = tracker_->update(color_image, depth_image, camera_intrinsics_);
             tracked_balls = balls;
             ball_events = events;
-            tracked_hands = simple_tracker_->getHands();
+            tracked_hands = tracker_->getHands();
             
             // Get the raw detections for recording/visualization
-            last_raw_detections_ = simple_tracker_->getLastRawDetections();
+            last_raw_detections_ = tracker_->getLastRawDetections();
             
             // PERFORMANCE FIX: Only evaluate override criteria when recording
             // This is expensive (detections × colors) and only needed for recording visualization
             if (continuous_recording_ || !frame_buffer_.empty()) {
-                simple_tracker_->evaluateOverrideCriteria(last_raw_detections_, color_image);
+                tracker_->evaluateOverrideCriteria(last_raw_detections_, color_image);
             }
 
             // Populate hands
@@ -321,7 +323,7 @@ void Engine::run() {
 
         // Populate trajectory-based predictions for visualization
         // Uses physics-based trajectory prediction with gravity
-        if (use_dnn_tracker_ && simple_tracker_) {
+        if (use_dnn_tracker_ && tracker_) {
             for (const auto& ball : tracked_balls) {
                 // Only create prediction if we have enough trajectory data
                 if (ball.trajectory.verified_point_count < 3) {
@@ -611,10 +613,10 @@ void Engine::processCommands() {
                     response.set_message("Pose model is always enabled in SimpleBallTracker");
                     break;
                 case juggler::v1::CommandRequest::CALIBRATE_COLOR:
-                    if (simple_tracker_) {
+                    if (tracker_) {
                         cv::Point click_point(command.click_x(), command.click_y());
                         std::string error_message;
-                        bool success = simple_tracker_->calibrateColor(command.color_name(), click_point, error_message);
+                        bool success = tracker_->calibrateColor(command.color_name(), click_point, error_message);
                         
                         if (success) {
                             response.set_message("Color profile '" + command.color_name() + "' calibrated successfully");
@@ -638,6 +640,15 @@ void Engine::processCommands() {
                 case juggler::v1::CommandRequest::SET_VIDEO_FEED_ENABLED:
                     video_feed_enabled_ = command.video_feed_enabled();
                     response.set_message(std::string("Video feed encoding ") + (video_feed_enabled_ ? "enabled" : "disabled"));
+                    break;
+                case juggler::v1::CommandRequest::SET_TRACKER_TYPE:
+                    try {
+                        setTrackerType(command.tracker_type());
+                        response.set_message("Switched to tracker: " + command.tracker_type());
+                    } catch (const std::exception& e) {
+                        response.set_success(false);
+                        response.set_message(std::string("Failed to switch tracker: ") + e.what());
+                    }
                     break;
                 default:
                     response.set_success(false);
@@ -1159,9 +1170,9 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             }
         }
         
-        // Get actual threshold values from SimpleBallTracker settings
-        if (simple_tracker_) {
-            const auto& settings = simple_tracker_->getTrackingSettings();
+        // Get actual threshold values from tracker settings
+        if (tracker_) {
+            const auto& settings = tracker_->getTrackingSettings();
             // Use unified hand_distance_threshold (legacy thresholds kept for backward compatibility)
             threshold = settings.hand_distance_threshold;
         } else {
@@ -1544,8 +1555,8 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             
             // Get min_frames_before_catch setting
             int min_frames_setting = 3;  // Default value
-            if (simple_tracker_) {
-                min_frames_setting = simple_tracker_->getTrackingSettings().min_frames_before_catch;
+            if (tracker_) {
+                min_frames_setting = tracker_->getTrackingSettings().min_frames_before_catch;
             }
             
             // Add frames in flight info to the main status line
@@ -1642,7 +1653,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     
     // Draw trajectory visualization for in-flight balls
     // Shows verified tracking points as colored circles
-    if (viz.show_trajectory() && simple_tracker_) {
+    if (viz.show_trajectory() && tracker_) {
         for (const auto& ball : rec_frame.tracked_balls) {
             // Only draw trajectory for in-flight balls
             if (ball.state != IN_FLIGHT) continue;
@@ -1652,7 +1663,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             
             // Get ball color (convert HSV to BGR)
             cv::Scalar ball_color(0, 255, 0);  // Default green
-            for (const auto& profile : simple_tracker_->getColorProfiles()) {
+            for (const auto& profile : tracker_->getColorProfiles()) {
                 if (profile.name == ball.color_name && profile.avg_hue >= 0) {
                     cv::Mat hsv_color(1, 1, CV_8UC3, cv::Scalar(profile.avg_hue, profile.avg_saturation, 255));
                     cv::Mat bgr_color;
@@ -1837,14 +1848,14 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     
     // Draw hand threshold circles (throw/catch distance thresholds)
     // Shows orange circle for throw threshold and green circle for catch threshold around each hand
-    if (simple_tracker_) {
-        simple_tracker_->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics_);
+    if (tracker_) {
+        tracker_->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics_);
     }
     
     // Draw hand velocity zone visualization
     // Shows purple circles around hands when velocity exceeds threshold and hand position history
-    if (viz.show_hand_velocity_zone() && simple_tracker_) {
-        const auto& settings = simple_tracker_->getTrackingSettings();
+    if (viz.show_hand_velocity_zone() && tracker_) {
+        const auto& settings = tracker_->getTrackingSettings();
         float hand_velocity_threshold = settings.hand_velocity_threshold;
         float hand_velocity_radius = settings.hand_velocity_detection_radius;
         
@@ -2009,8 +2020,8 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             
             // Add frames in flight info with 3-frame rule tracking
             int min_frames_setting = 3;  // Default value
-            if (simple_tracker_) {
-                min_frames_setting = simple_tracker_->getTrackingSettings().min_frames_before_catch;
+            if (tracker_) {
+                min_frames_setting = tracker_->getTrackingSettings().min_frames_before_catch;
             }
             char frames_info[256];
             snprintf(frames_info, sizeof(frames_info), "  Frames in flight: %d / %d (3-frame rule: %s)",
@@ -2165,4 +2176,33 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
    
    writeDebugLog("renderVisualizationsOnFrame() - Complete");
    return result;
+}
+
+void Engine::setTrackerType(const std::string& tracker_type) {
+    writeDebugLog("setTrackerType() - Switching to: " + tracker_type);
+    
+    if (tracker_type == current_tracker_type_) {
+        writeDebugLog("setTrackerType() - Already using " + tracker_type + ", no change needed");
+        return;
+    }
+    
+    if (tracker_type == "depth_based") {
+        // Switch to depth-based SimpleBallTracker
+        if (!simple_tracker_) {
+            throw std::runtime_error("SimpleBallTracker not initialized");
+        }
+        tracker_ = simple_tracker_;
+        current_tracker_type_ = "depth_based";
+        writeDebugLog("setTrackerType() - Switched to depth_based tracker");
+        
+    } else if (tracker_type == "simple_2d") {
+        // TODO: Switch to 2D tracker when implemented
+        // For now, throw an error
+        throw std::runtime_error("simple_2d tracker not yet implemented. Please implement your new tracker class.");
+        
+    } else {
+        throw std::runtime_error("Unknown tracker type: " + tracker_type);
+    }
+    
+    INFO_LOG("Tracker switched to: ", tracker_type);
 }

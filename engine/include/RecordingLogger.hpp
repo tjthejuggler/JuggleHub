@@ -222,6 +222,11 @@ public:
             log_file_ << "    Held by hand: " << (ball.held_by_hand_id >= 0 ?
                      std::to_string(ball.held_by_hand_id) : "NONE") << "\n";
             
+            // GLOBAL 3-FRAME RULE tracking
+            log_file_ << "    Last throwing hand: " << (ball.last_throwing_hand_id >= 0 ?
+                     std::to_string(ball.last_throwing_hand_id) : "NONE") << "\n";
+            log_file_ << "    Frames in flight since throw: " << ball.frames_in_flight_since_throw << "\n";
+            
             // ALWAYS log: Distance to each hand (for throw/catch debugging)
             if (!hands.empty()) {
                 log_file_ << "\n  THROW/CATCH DISTANCES:\n";

@@ -484,6 +484,12 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.hand_velocity_distance_reduction = std::stof(value);
             return true;
         }
+        else if (key == "min_frames_before_catch") {
+            int val = std::stoi(value);
+            // Clamp value to 0-10 range
+            tracking_settings_.min_frames_before_catch = std::max(0, std::min(10, val));
+            return true;
+        }
     } catch (const std::exception& e) {
         return false;
     }
@@ -1149,26 +1155,58 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             // If distance < hand_distance_threshold: HELD state, assign to that hand
             // If distance >= hand_distance_threshold: IN_FLIGHT state
             if (closest_hand_id >= 0 && min_dist < tracking_settings_.hand_distance_threshold) {
-                // Ball is near a hand - set to HELD state
+                // Ball is near a hand - check if catch is allowed
                 
-                // CRITICAL RULE: Cannot catch with the same hand that just threw in the previous frame
-                // This prevents immediate re-catch during throw motion
-                // BUT: Allow catch if ball has traveled (has multiple verified trajectory points)
-                bool is_immediate_recatch = (ball.previous_state == IN_FLIGHT &&
-                                            closest_hand_id == ball.held_by_hand_id &&
-                                            closest_hand_id >= 0 &&
-                                            ball.trajectory.verified_point_count < 3);  // Less than 3 points = just thrown
+                // CRITICAL: Check if this is the hand that threw the ball
+                // Apply the SAME cooldown logic as normal catch detection
+                bool was_in_flight = (ball.previous_state == IN_FLIGHT);
                 
-                if (!is_immediate_recatch) {
-                    // CRITICAL FIX: Generate catch event when transitioning IN_FLIGHT→HELD
-                    // Find the catching hand and call initiateCatch() to properly handle state transition
-                    bool was_in_flight = (ball.previous_state == IN_FLIGHT);
+                if (was_in_flight) {
+                    // Ball was in flight - check cooldown before allowing catch
                     
-                    // CRITICAL: Check if this hand just threw the ball (prevent immediate re-catch)
-                    bool is_throwing_hand = (closest_hand_id == ball.was_just_thrown_by_hand_id);
+                    // CRITICAL: GLOBAL min_frames_before_catch RULE
+                    // A hand that just threw the ball CANNOT catch it again until min_frames_before_catch frames have passed
+                    if (ball.last_throwing_hand_id >= 0 &&
+                        closest_hand_id == ball.last_throwing_hand_id) {
+                        bool has_enough_flight_frames = (ball.frames_in_flight_since_throw >= tracking_settings_.min_frames_before_catch);
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  [OVERRIDE CATCH CHECK] Ball was thrown by hand " << ball.last_throwing_hand_id << std::endl;
+                            debug_log << "    Current hand: " << closest_hand_id << std::endl;
+                            debug_log << "    Frames in flight since throw: " << ball.frames_in_flight_since_throw << std::endl;
+                            debug_log << "    Min frames required: " << tracking_settings_.min_frames_before_catch << std::endl;
+                            debug_log << "    Has enough flight frames: " << (has_enough_flight_frames ? "YES" : "NO") << std::endl;
+                            debug_log.close();
+                        });
+                        
+                        if (!has_enough_flight_frames) {
+                            // CATCH BLOCKED: Same hand that threw, not enough frames have passed
+                            ball.state = IN_FLIGHT;
+                            ball.is_held = false;
+                            
+                            DEBUG_LOG(debug_log, {
+                                OPEN_DEBUG_LOG(debug_log);
+                                debug_log << "  ✗ OVERRIDE CATCH BLOCKED: Same hand that threw, only "
+                                          << ball.frames_in_flight_since_throw << " frames in flight (need "
+                                          << tracking_settings_.min_frames_before_catch << "+)" << std::endl;
+                                debug_log.close();
+                            });
+                            
+                            continue;  // Skip to next ball, don't allow catch
+                        }
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  ✓ OVERRIDE CATCH ALLOWED: " << ball.frames_in_flight_since_throw << " frames passed" << std::endl;
+                            debug_log.close();
+                        });
+                    }
                     
-                    if (was_in_flight && !is_throwing_hand) {
-                        // Clear the throw tracking since we're catching with a different hand
+                    // Catch is allowed - find the catching hand and initiate catch
+                    // CRITICAL: Check against last_throwing_hand_id (GLOBAL RULE), not legacy was_just_thrown_by_hand_id
+                    if (closest_hand_id != ball.last_throwing_hand_id) {
+                        // Clear the legacy throw tracking since we're catching with a different hand
                         ball.was_just_thrown_by_hand_id = -1;
                         // Find the catching hand
                         const SimpleHand* catching_hand = nullptr;
@@ -1201,45 +1239,29 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                                 debug_log.close();
                             });
                         }
-                    } else if (was_in_flight && is_throwing_hand) {
-                        // Ball is near throwing hand - keep IN_FLIGHT to prevent immediate re-catch
+                    } else {
+                        // Legacy check for was_just_thrown_by_hand_id (should not happen with new cooldown logic)
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  Override: Legacy throw tracking prevented catch (was_just_thrown_by="
+                                      << ball.was_just_thrown_by_hand_id << ")" << std::endl;
+                            debug_log.close();
+                        });
                         ball.state = IN_FLIGHT;
                         ball.is_held = false;
-                        
-                        // CRITICAL: Clear the throw tracking after preventing the catch
-                        // This allows the ball to be caught next frame if still near the hand
                         ball.was_just_thrown_by_hand_id = -1;
-                        
-                        DEBUG_LOG(debug_log, {
-                            OPEN_DEBUG_LOG(debug_log);
-                            debug_log << "  Override: Ball kept IN_FLIGHT - throwing hand " << closest_hand_id
-                                      << " prevented from immediate re-catch (was_just_thrown_by="
-                                      << closest_hand_id << ", now cleared)" << std::endl;
-                            debug_log.close();
-                        });
-                    } else {
-                        // Ball was already HELD, just update state
-                        ball.state = HELD;
-                        ball.is_held = true;
-                        ball.held_by_hand_id = closest_hand_id;
-                        
-                        DEBUG_LOG(debug_log, {
-                            OPEN_DEBUG_LOG(debug_log);
-                            debug_log << "  Override: Ball set to HELD (distance-based: hand "
-                                      << closest_hand_id << ", dist=" << min_dist << "m < threshold="
-                                      << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
-                            debug_log.close();
-                        });
                     }
                 } else {
-                    // Immediate re-catch prevented - treat as IN_FLIGHT
-                    ball.state = IN_FLIGHT;
-                    ball.is_held = false;
+                    // Ball was not in flight (was HELD) - just update state
+                    ball.state = HELD;
+                    ball.is_held = true;
+                    ball.held_by_hand_id = closest_hand_id;
                     
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  Override: Ball set to IN_FLIGHT (immediate re-catch by throwing hand "
-                                  << closest_hand_id << " prevented)" << std::endl;
+                        debug_log << "  Override: Ball set to HELD (distance-based: hand "
+                                  << closest_hand_id << ", dist=" << min_dist << "m < threshold="
+                                  << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
                         debug_log.close();
                     });
                 }
@@ -1740,9 +1762,29 @@ void SimpleBallTracker::updateInFlightBall(
     const CameraIntrinsics& intrinsics,
     std::vector<BallEvent>& events) {
     
+    // CRITICAL: Increment flight frame counter for GLOBAL 3-FRAME RULE
+    if (ball.last_throwing_hand_id >= 0) {
+        ball.frames_in_flight_since_throw++;
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "\n[updateInFlightBall] Ball " << ball.id << " (" << ball.color_name << ")" << std::endl;
+            debug_log << "  GLOBAL 3-FRAME RULE ACTIVE:" << std::endl;
+            debug_log << "    last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+            debug_log << "    frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+            debug_log << "    (Hand " << ball.last_throwing_hand_id << " cannot catch until 3+ frames)" << std::endl;
+            debug_log.close();
+        });
+    } else {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "\n[updateInFlightBall] Ball " << ball.id << " (" << ball.color_name << ")" << std::endl;
+            debug_log.close();
+        });
+    }
+    
     DEBUG_LOG(debug_log, {
         OPEN_DEBUG_LOG(debug_log);
-        debug_log << "\n[updateInFlightBall] Ball " << ball.id << " (" << ball.color_name << ")" << std::endl;
         debug_log << "  verified_point_count: " << ball.trajectory.verified_point_count << std::endl;
         debug_log << "  frames_without_verified_detection: " << ball.frames_without_verified_detection << std::endl;
         debug_log << "  unverified_trajectory_points: " << ball.unverified_trajectory_points << std::endl;
@@ -2356,18 +2398,47 @@ void SimpleBallTracker::updateInFlightBall(
         // If we found a hand within threshold, catch to it
         // CRITICAL: Check if this is the hand that just threw the ball
         if (closest_hand != nullptr) {
-            // CRITICAL: Check if ball was thrown in hand velocity zone
-            // If so, it can ONLY be caught by the OTHER hand
-            if (ball.thrown_in_hand_velocity_zone && closest_hand->id == ball.held_by_hand_id) {
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  [CATCH CHECK] Closest hand found: " << closest_hand->id << std::endl;
+                debug_log << "    ball.last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                debug_log << "    ball.frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                debug_log << "    ball.held_by_hand_id: " << ball.held_by_hand_id << std::endl;
+                debug_log << "    closest_hand->id: " << closest_hand->id << std::endl;
+                debug_log.close();
+            });
+            
+            // CRITICAL: GLOBAL 3-FRAME RULE
+            // A hand that just threw the ball CANNOT catch it again until min_frames_before_catch frames have passed
+            if (ball.last_throwing_hand_id >= 0 &&
+                closest_hand->id == ball.last_throwing_hand_id) {
+                bool has_enough_flight_frames = (ball.frames_in_flight_since_throw >= tracking_settings_.min_frames_before_catch);
+                
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
-                    debug_log << "  CATCH PREVENTED: Ball was thrown in hand velocity zone by hand "
-                              << ball.held_by_hand_id << ", can only be caught by other hand" << std::endl;
-                    debug_log << "    Attempted catch by same hand " << closest_hand->id << " rejected" << std::endl;
+                    debug_log << "  [GLOBAL 3-FRAME RULE CHECK]" << std::endl;
+                    debug_log << "    Ball was thrown by hand " << ball.last_throwing_hand_id << std::endl;
+                    debug_log << "    Current hand: " << closest_hand->id << std::endl;
+                    debug_log << "    Frames in flight since throw: " << ball.frames_in_flight_since_throw << std::endl;
+                    debug_log << "    Has enough flight frames (>=3): " << (has_enough_flight_frames ? "YES" : "NO") << std::endl;
                     debug_log.close();
                 });
-                // Keep ball in flight - don't clear the flag yet
-                // It will be cleared when caught by the other hand
+                
+                if (!has_enough_flight_frames) {
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  ✗ CATCH BLOCKED: Same hand that threw, only "
+                                  << ball.frames_in_flight_since_throw << " frames in flight (need 3+)" << std::endl;
+                        debug_log.close();
+                    });
+                    return;  // Block the catch
+                }
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ✓ CATCH ALLOWED: " << ball.frames_in_flight_since_throw << " frames passed" << std::endl;
+                    debug_log.close();
+                });
             }
             // Prevent immediate re-catch by throwing hand (legacy check)
             else if (closest_hand->id == ball.was_just_thrown_by_hand_id) {
@@ -2388,17 +2459,16 @@ void SimpleBallTracker::updateInFlightBall(
                     debug_log << "  CATCH DETECTED to CLOSEST hand " << closest_hand->id
                               << ": dist=" << min_dist
                               << "m, threshold=" << tracking_settings_.hand_distance_threshold << "m" << std::endl;
-                    if (ball.thrown_in_hand_velocity_zone) {
-                        debug_log << "    Ball was thrown in velocity zone by hand " << ball.held_by_hand_id
-                                  << ", now caught by other hand " << closest_hand->id << std::endl;
-                    }
+                    
+                    // No special logging needed - 3-frame rule is global
                     debug_log.close();
                 });
                 
                 // Clear the throw tracking since we're catching with a different hand
                 ball.was_just_thrown_by_hand_id = -1;
-                // Clear velocity zone flag when caught by other hand
-                ball.thrown_in_hand_velocity_zone = false;
+                
+                // 3-frame rule will be cleared in initiateCatch()
+                
                 initiateCatch(ball, *closest_hand, events);
                 return;
             }
@@ -2527,7 +2597,8 @@ void SimpleBallTracker::initiateCatch(
     
     // CRITICAL: Clear throw tracking when ball is caught
     ball.was_just_thrown_by_hand_id = -1;
-    ball.thrown_in_hand_velocity_zone = false;  // Clear velocity zone flag
+    ball.last_throwing_hand_id = -1;  // Clear throwing hand ID (GLOBAL 3-FRAME RULE)
+    ball.frames_in_flight_since_throw = 0;  // Reset flight frame counter
     
     // 2. Reset physics parameters
     ball.trajectory.initial_velocity = cv::Point3f(0, 0, 0);
@@ -3344,7 +3415,8 @@ void SimpleBallTracker::updateHeldBall(
                     debug_log << "      Detection distance from wrist: " << dist_from_wrist << "m" << std::endl;
                     debug_log << "      Reduced threshold: " << tracking_settings_.hand_velocity_distance_reduction << "m" << std::endl;
                     debug_log << "      Detection class: " << (det.class_id == 0 ? "ball" : "ball_held") << std::endl;
-                    debug_log << "      MARKING AS VELOCITY ZONE THROW - only catchable by other hand" << std::endl;
+                    debug_log << "      MARKING AS VELOCITY ZONE THROW by hand " << hand->id << std::endl;
+                    debug_log << "      Ball can only be caught by other hand OR after 3+ flight frames" << std::endl;
                     debug_log.close();
                 });
             }
@@ -3464,8 +3536,17 @@ void SimpleBallTracker::updateHeldBall(
                         debug_log.close();
                     });
                     
-                    // Set the velocity zone flag before initiating throw
-                    ball.thrown_in_hand_velocity_zone = is_velocity_zone_throw;
+                    // Set the throwing hand ID and reset frame counter (GLOBAL 3-FRAME RULE)
+                    ball.last_throwing_hand_id = hand->id;
+                    ball.frames_in_flight_since_throw = 0;
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "      Setting last_throwing_hand_id = " << hand->id << std::endl;
+                        debug_log << "      Resetting frames_in_flight_since_throw = 0" << std::endl;
+                        debug_log << "      GLOBAL RULE: Hand " << hand->id << " cannot catch for 3 frames" << std::endl;
+                        debug_log.close();
+                    });
                     
                     initiateThrow(ball, det, hand, events);
                     return;

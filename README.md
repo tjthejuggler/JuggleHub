@@ -2,7 +2,18 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-11 14:44 CEST
+**Last Updated:** 2025-10-12 20:52 CEST
+
+**Recent Changes (2025-10-12):**
+- **📊 RECORDING VISUALIZATION - FRAMES IN FLIGHT DISPLAY**
+  - **New Feature**: Recording visualizations now display frames_in_flight_since_throw information
+  - **Current Frames**: Shows the current number of frames a ball has been in flight since throw
+  - **Maximum Setting**: Displays the min_frames_before_catch setting value (3-frame rule)
+  - **Visual Indicators**: Color-coded status (green=ready for catch, yellow=cooldown active)
+  - **Multiple Locations**: Information shown in both trajectory predictions and ball state panels
+  - **Format**: "Frames in flight: X / Y (3-frame rule: READY/COOLDOWN)"
+  - **Use Case**: Helps users understand when the 3-frame rule is active and preventing immediate catches
+  - **Files Modified**: [`engine/src/Engine.cpp`](engine/src/Engine.cpp:1536-1567,1973-2002)
 
 **Recent Changes (2025-10-11):**
 - **🔍 PERFORMANCE PROFILING TOOLS**

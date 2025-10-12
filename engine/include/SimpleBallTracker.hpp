@@ -112,7 +112,8 @@ struct SimpleBall {
     
     // Throw tracking (NEW: prevent immediate re-catch by throwing hand)
     int was_just_thrown_by_hand_id;  // -1 if not just thrown, 0=left, 1=right (lasts 1 frame)
-    bool thrown_in_hand_velocity_zone;  // True if thrown in hand velocity zone (only catchable by other hand)
+    int last_throwing_hand_id;  // Hand ID that last threw this ball (-1 if never thrown)
+    int frames_in_flight_since_throw;  // Counter for frames in flight since last throw
     
     // Trajectory (NEW: replaces Kalman and ColorBasedPredictor in Phase 3)
     BallTrajectory trajectory;       // Only valid when IN_FLIGHT
@@ -144,7 +145,8 @@ struct SimpleBall {
     SimpleBall() : id(-1), state(HELD), is_held(false),
                    held_by_hand_id(-1), previous_held_by_hand_id(-1),
                    was_just_thrown_by_hand_id(-1),
-                   thrown_in_hand_velocity_zone(false),
+                   last_throwing_hand_id(-1),
+                   frames_in_flight_since_throw(0),
                    has_yolo_detection(false),
                    frames_without_verified_detection(0),
                    unverified_trajectory_points(0),
@@ -179,6 +181,7 @@ struct TrackingSettings {
     float catch_distance_threshold = 0.30f;   // DEPRECATED: Use hand_distance_threshold instead
     
     int min_frames_for_transition = 2;        // Debouncing for state changes
+    int min_frames_before_catch = 3;          // Minimum frames in flight before same hand can catch (0-10)
     
     // Hand velocity tracking settings (for throw prediction)
     bool hand_velocity_enabled = true;                    // Enable hand velocity-based throw prediction

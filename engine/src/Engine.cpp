@@ -1542,9 +1542,24 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 hand_info = " [" + std::string(ball.held_by_hand_id == 0 ? "L" : "R") + "]";
             }
             
-            snprintf(info_text, sizeof(info_text), "%s: %s%s z=%.2fm | %s",
+            // Get min_frames_before_catch setting
+            int min_frames_setting = 3;  // Default value
+            if (simple_tracker_) {
+                min_frames_setting = simple_tracker_->getTrackingSettings().min_frames_before_catch;
+            }
+            
+            // Add frames in flight info to the main status line
+            char frames_status[64];
+            if (!ball.is_held) {
+                snprintf(frames_status, sizeof(frames_status), " | Frames: %d/%d",
+                         ball.frames_in_flight_since_throw, min_frames_setting);
+            } else {
+                frames_status[0] = '\0';  // Empty string for held balls
+            }
+            
+            snprintf(info_text, sizeof(info_text), "%s: %s%s z=%.2fm%s | %s",
                      ball.color_name.c_str(), state.c_str(), hand_info.c_str(),
-                     ball.position.z, ball.tracking_reason.c_str());
+                     ball.position.z, frames_status, ball.tracking_reason.c_str());
             info_lines.push_back(info_text);
             info_colors.push_back(ball_color);
             
@@ -1970,8 +1985,13 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             // Draw center point
             cv::circle(temp_result, cv::Point(pred_x, pred_y), 4, circle_color, -1, cv::LINE_AA);
             
-            // Draw label with detailed prediction info
-            std::string label = "P" + std::to_string(ball.id) + "(" + std::string(ball.is_held ? "H" : "F") + ")";
+            // Draw label with detailed prediction info including 3-frame rule tracking
+            std::string throwing_hand = (ball.last_throwing_hand_id >= 0) ?
+                                       std::to_string(ball.last_throwing_hand_id) : "N";
+            std::string label = "P" + std::to_string(ball.id) +
+                              "(" + std::string(ball.is_held ? "H" : "F") + ")" +
+                              " TH:" + throwing_hand +
+                              " FF:" + std::to_string(ball.frames_in_flight_since_throw);
             cv::putText(temp_result, label, cv::Point(pred_x + 10, pred_y - 10),
                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
             cv::putText(temp_result, label, cv::Point(pred_x + 10, pred_y - 10),
@@ -1986,6 +2006,23 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                      ball.is_held ? "OFF" : "ON");
             info_lines.push_back(pred_info);
             info_colors.push_back(circle_color);
+            
+            // Add frames in flight info with 3-frame rule tracking
+            int min_frames_setting = 3;  // Default value
+            if (simple_tracker_) {
+                min_frames_setting = simple_tracker_->getTrackingSettings().min_frames_before_catch;
+            }
+            char frames_info[256];
+            snprintf(frames_info, sizeof(frames_info), "  Frames in flight: %d / %d (3-frame rule: %s)",
+                     ball.frames_in_flight_since_throw,
+                     min_frames_setting,
+                     ball.frames_in_flight_since_throw >= min_frames_setting ? "READY" : "COOLDOWN");
+            info_lines.push_back(frames_info);
+            // Color: green if ready for catch, yellow if in cooldown
+            cv::Scalar frames_color = ball.frames_in_flight_since_throw >= min_frames_setting ?
+                                     cv::Scalar(0, 255, 0) :      // Green - ready
+                                     cv::Scalar(0, 255, 255);     // Yellow - cooldown
+            info_colors.push_back(frames_color);
             
             // Add velocity info from trajectory
             cv::Point3f velocity = ball.trajectory.initial_velocity;

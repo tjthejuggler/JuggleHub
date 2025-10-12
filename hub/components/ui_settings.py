@@ -398,6 +398,25 @@ if PYQT_AVAILABLE:
                 is_float=False
             )
             row += 1
+            
+            # Min Frames Before Catch
+            self.tc_min_frames_before_catch_slider, self.tc_min_frames_before_catch_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Catch Cooldown Frames",
+                tooltip_text="Minimum frames a ball must be in flight after a throw before the same hand can catch it again.\n"
+                             "Range: 0-10 frames. Default: 3.\n"
+                             "Prevents immediate re-catch of the same ball by the throwing hand.\n"
+                             "0 = no cooldown (allows instant re-catch)\n"
+                             "Higher values = longer cooldown period\n"
+                             "⚠️ Set this based on your juggling speed and throw height!",
+                range_min=0,
+                range_max=10,
+                initial_value=3,
+                update_func=lambda v: self.update_setting('min_frames_before_catch', v),
+                is_float=False
+            )
+            row += 1
 
             # Min Throw Distance (LEGACY - kept for backward compatibility)
             self.tc_min_throw_distance_slider, self.tc_min_throw_distance_label = self._create_slider_widget(
@@ -1735,6 +1754,7 @@ if PYQT_AVAILABLE:
                 'min_frames_for_state_change': self.tc_min_frames_slider.value(),
                 'hand_distance_threshold': self.tc_hand_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_hand_distance_threshold_slider') else 0.25,  # cm to m
                 'min_throw_distance': self.tc_min_throw_distance_slider.value() / 100.0 if hasattr(self, 'tc_min_throw_distance_slider') else 0.20,  # cm to m
+                'min_frames_before_catch': self.tc_min_frames_before_catch_slider.value() if hasattr(self, 'tc_min_frames_before_catch_slider') else 3,
                 'max_tracker_distance_per_frame': self.tc_max_tracker_distance_slider.value() / 100.0,  # cm to m
                 'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked(),
                 'tc_sound_on_throw': self.tc_sound_on_throw_toggle.isChecked(),
@@ -1910,6 +1930,9 @@ if PYQT_AVAILABLE:
             
             if 'min_throw_distance' in settings and hasattr(self, 'tc_min_throw_distance_slider'):
                 self.tc_min_throw_distance_slider.setValue(int(settings['min_throw_distance'] * 100))  # m to cm
+            
+            if 'min_frames_before_catch' in settings and hasattr(self, 'tc_min_frames_before_catch_slider'):
+                self.tc_min_frames_before_catch_slider.setValue(settings['min_frames_before_catch'])
 
             if 'max_tracker_distance_per_frame' in settings:
                 self.tc_max_tracker_distance_slider.setValue(int(settings['max_tracker_distance_per_frame'] * 100))  # m to cm
@@ -2211,6 +2234,9 @@ if PYQT_AVAILABLE:
             
             if 'min_throw_distance' in settings:
                 self.udp_client.send_setting('min_throw_distance', settings['min_throw_distance'])
+            
+            if 'min_frames_before_catch' in settings:
+                self.udp_client.send_setting('min_frames_before_catch', settings['min_frames_before_catch'])
 
             if 'max_tracker_distance_per_frame' in settings:
                 self.udp_client.send_setting('max_tracker_distance_per_frame', settings['max_tracker_distance_per_frame'])

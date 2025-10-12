@@ -59,6 +59,7 @@ Makefile
 
 # Python virtual environment
 venv/
+.venv/
 env/
 .env
 

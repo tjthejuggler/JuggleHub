@@ -18,7 +18,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE_DIR="$PROJECT_ROOT/engine"
 HUB_DIR="$PROJECT_ROOT/hub"
 BUILD_DIR="$ENGINE_DIR/build"
-VENV_DIR="$HUB_DIR/.venv"
+VENV_DIR="$PROJECT_ROOT/venv"
 API_PORT=5000
 API_BASE_URL="http://localhost:$API_PORT/api"
 

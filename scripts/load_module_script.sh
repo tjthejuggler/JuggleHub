@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 HUB_DIR="$PROJECT_ROOT/hub"
 API_DIR="$PROJECT_ROOT/api/v1"
-VENV_DIR="$HUB_DIR/.venv" # Assuming venv is inside hub directory
+VENV_DIR="$PROJECT_ROOT/venv"
 
 # Change to hub directory
 cd "$HUB_DIR"

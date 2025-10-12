@@ -181,6 +181,13 @@ void Engine::run() {
         if (use_dnn_tracker_) {
             if (!simple_tracker_) return; // Safety check
             
+            // Set recording frame number if recording is active
+            if (recording_logger_.isActive()) {
+                simple_tracker_->setRecordingFrameNumber(recording_logger_.getFrameNumber());
+            } else {
+                simple_tracker_->setRecordingFrameNumber(-1);  // Not recording
+            }
+            
             // Update SimpleBallTracker (includes YOLO detection and pose estimation internally)
             auto [balls, events] = simple_tracker_->update(color_image, depth_image, camera_intrinsics_);
             tracked_balls = balls;
@@ -214,6 +221,21 @@ void Engine::run() {
                 
                 hand->set_confidence(hand_obj.confidence);
                 hand->set_is_visible(hand_obj.is_visible);
+                
+                // Add velocity data
+                auto* velocity = hand->mutable_velocity_3d();
+                velocity->set_x(hand_obj.velocity.x);
+                velocity->set_y(hand_obj.velocity.y);
+                velocity->set_z(hand_obj.velocity.z);
+                hand->set_has_valid_velocity(hand_obj.has_valid_velocity);
+                
+                // Add position history for visualization
+                for (const auto& hist_pos : hand_obj.position_history) {
+                    auto* hist = hand->add_position_history();
+                    hist->set_x(hist_pos.x);
+                    hist->set_y(hist_pos.y);
+                    hist->set_z(hist_pos.z);
+                }
 
                 cv::Point2f wrist_2d = SimpleBallTracker::project_3d_to_2d(hand_obj.wrist_pos_3d, camera_intrinsics_);
                 auto* hand_pos_2d = hand->mutable_position_2d();
@@ -742,7 +764,8 @@ void Engine::saveRecording() {
                                  visualization_states_.show_tracked_boxes() ||
                                  visualization_states_.show_unmatched_detections() ||
                                  visualization_states_.show_tails() ||
-                                 visualization_states_.show_trajectory();
+                                 visualization_states_.show_trajectory() ||
+                                 visualization_states_.show_hand_velocity_zone();
 
         if (has_visualizations) {
             writeDebugLog("saveRecording() - Visualizations enabled, rendering frames...");
@@ -889,7 +912,8 @@ void Engine::stopContinuousRecording() {
                                  visualization_states_.show_tracked_boxes() ||
                                  visualization_states_.show_unmatched_detections() ||
                                  visualization_states_.show_tails() ||
-                                 visualization_states_.show_trajectory();
+                                 visualization_states_.show_trajectory() ||
+                                 visualization_states_.show_hand_velocity_zone();
 
         if (has_visualizations) {
             fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
@@ -1800,6 +1824,100 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     // Shows orange circle for throw threshold and green circle for catch threshold around each hand
     if (simple_tracker_) {
         simple_tracker_->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics_);
+    }
+    
+    // Draw hand velocity zone visualization
+    // Shows purple circles around hands when velocity exceeds threshold and hand position history
+    if (viz.show_hand_velocity_zone() && simple_tracker_) {
+        const auto& settings = simple_tracker_->getTrackingSettings();
+        float hand_velocity_threshold = settings.hand_velocity_threshold;
+        float hand_velocity_radius = settings.hand_velocity_detection_radius;
+        
+        for (const auto& hand : rec_frame.tracked_hands_simple) {
+            // Check if hand has valid velocity information
+            if (!hand.is_visible || !hand.has_valid_velocity) continue;
+            
+            // Calculate hand velocity magnitude
+            float velocity_magnitude = std::sqrt(
+                hand.velocity.x * hand.velocity.x +
+                hand.velocity.y * hand.velocity.y +
+                hand.velocity.z * hand.velocity.z
+            );
+            
+            // Check if a ball is held by this hand
+            bool ball_held = false;
+            std::string held_ball_color;
+            for (const auto& ball : rec_frame.tracked_balls) {
+                if (ball.held_by_hand_id == hand.id) {
+                    ball_held = true;
+                    held_ball_color = ball.color_name;
+                    break;
+                }
+            }
+            
+            // Only draw if velocity exceeds threshold OR if a ball is held (to show history)
+            bool show_velocity_zone = velocity_magnitude >= hand_velocity_threshold;
+            bool show_history = ball_held && !hand.position_history.empty();
+            
+            if (!show_velocity_zone && !show_history) continue;
+            
+            // Project hand wrist position to 2D
+            if (hand.wrist_pos_3d.z <= 0) continue;
+            
+            int center_x = static_cast<int>((hand.wrist_pos_3d.x * camera_intrinsics_.fx) / hand.wrist_pos_3d.z + camera_intrinsics_.ppx);
+            int center_y = static_cast<int>((hand.wrist_pos_3d.y * camera_intrinsics_.fy) / hand.wrist_pos_3d.z + camera_intrinsics_.ppy);
+            
+            // Check if on-screen
+            if (center_x < 0 || center_x >= temp_result.cols || center_y < 0 || center_y >= temp_result.rows) {
+                continue;
+            }
+            
+            // Draw velocity zone if hand is moving fast
+            if (show_velocity_zone) {
+                // Calculate radius in pixels (approximate projection)
+                int radius_pixels = static_cast<int>((hand_velocity_radius * camera_intrinsics_.fx) / hand.wrist_pos_3d.z);
+                
+                // Draw purple circle showing detection zone
+                cv::circle(temp_result, cv::Point(center_x, center_y), radius_pixels, cv::Scalar(255, 0, 128), 3, cv::LINE_AA);
+                
+                // Draw velocity magnitude text
+                char velocity_text[64];
+                snprintf(velocity_text, sizeof(velocity_text), "Hand velocity: %.2f m/s", velocity_magnitude);
+                cv::putText(temp_result, velocity_text,
+                           cv::Point(center_x + radius_pixels + 10, center_y - 20),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+            }
+            
+            // Draw hand position history if ball is held
+            if (show_history) {
+                // Draw position history trail
+                cv::Point prev_point(-1, -1);
+                for (const auto& hist_pos : hand.position_history) {
+                    if (hist_pos.z <= 0) continue;
+                    
+                    // Project history position to 2D
+                    int hist_x = static_cast<int>((hist_pos.x * camera_intrinsics_.fx) / hist_pos.z + camera_intrinsics_.ppx);
+                    int hist_y = static_cast<int>((hist_pos.y * camera_intrinsics_.fy) / hist_pos.z + camera_intrinsics_.ppy);
+                    
+                    // Draw small circle at history point
+                    cv::circle(temp_result, cv::Point(hist_x, hist_y), 3, cv::Scalar(0, 255, 255), -1, cv::LINE_AA);
+                    
+                    // Draw line connecting to previous point
+                    if (prev_point.x >= 0) {
+                        cv::line(temp_result, prev_point, cv::Point(hist_x, hist_y), cv::Scalar(0, 255, 255, 150), 2, cv::LINE_AA);
+                    }
+                    
+                    prev_point = cv::Point(hist_x, hist_y);
+                }
+                
+                // Draw text showing history
+                std::string history_text = "Hand locations history when " + held_ball_color + " ball is held";
+                int text_y = show_velocity_zone ? center_y : center_y - 20;
+                cv::putText(temp_result, history_text,
+                           cv::Point(center_x + 10, text_y),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 1, cv::LINE_AA);
+            }
+        }
     }
     
     // Draw trajectory-based prediction circles

@@ -86,6 +86,9 @@ message Hand {
   repeated KeyPoint keypoints = 6;  // All keypoints for the hand
   string side = 7;                  // "left" or "right" for compatibility
   Vector3 position_3d = 8;          // Alias for wrist_pos_3d for compatibility
+  Vector3 velocity_3d = 9;          // Hand velocity vector (m/s)
+  bool has_valid_velocity = 10;     // True if velocity data is valid
+  repeated Vector3 position_history = 11;  // Recent position history for visualization
 }
 
 // IMU data from smartwatches
@@ -315,6 +318,7 @@ message VisualizationStates {
   bool show_unmatched_detections = 13;
   bool show_tails = 14;
   bool show_trajectory = 15;  // Show trajectory path for in-flight balls
+  bool show_hand_velocity_zone = 16;  // Show hand velocity detection zones
 }
 
 message ColorCommand {

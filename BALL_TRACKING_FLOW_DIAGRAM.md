@@ -140,15 +140,33 @@ flowchart TD
     AssignHand --> SetWrist
     ForceAssign --> SetWrist
     
-    SetWrist --> ThrowCheck[Check for THROW]
+    SetWrist --> HandVelCheck[Check Hand Velocity]
+    HandVelCheck --> CalcHandVel{hand_velocity_enabled<br/>AND hand.has_valid_velocity?}
+    CalcHandVel -->|Yes| CheckSpeed{hand_speed ><br/>velocity_threshold?}
+    CalcHandVel -->|No| ThrowCheck[Check for THROW]
+    CheckSpeed -->|Yes| SetFastFlag[hand_is_moving_fast = true<br/>Calculate velocity direction]
+    CheckSpeed -->|No| ThrowCheck
+    SetFastFlag --> ThrowCheck
+    
     ThrowCheck --> DetLoop[For Each YOLO Detection]
     
     DetLoop --> CalcDistHand[Calculate dist_from_hand / Calculate dist_from_ball]
     
-    CalcDistHand --> CheckThrowDist{dist_from_hand > / hand_distance_threshold / AND / dist_from_ball < / max_tracker_distance / AND / det.class_id == 0?}
+    CalcDistHand --> CheckVelDir{hand_is_moving_fast?}
+    CheckVelDir -->|Yes| CalcDetDir[Calculate detection direction<br/>from hand position]
+    CheckVelDir -->|No| UseStdThresh[Use standard thresholds]
+    
+    CalcDetDir --> CheckDirMatch{direction_similarity > 0.5<br/>AND within detection_radius?}
+    CheckDirMatch -->|Yes| LowerThresh[Lower confidence & color thresholds<br/>by velocity_confidence_reduction<br/>Optionally ignore class requirement]
+    CheckDirMatch -->|No| UseStdThresh
+    
+    LowerThresh --> CheckThrowDist
+    UseStdThresh --> CheckThrowDist
+    
+    CheckThrowDist{dist_from_hand > / hand_distance_threshold / AND / dist_from_ball < / max_tracker_distance / AND / meets_class_requirement?}
     
     CheckThrowDist -->|No| NextDet[Next Detection]
-    CheckThrowDist -->|Yes| CheckThrowColor{color_score > / min_color_match_ / score?}
+    CheckThrowDist -->|Yes| CheckThrowColor{color_score > / effective_color_threshold<br/>AND<br/>confidence >= / effective_confidence_threshold?}
     
     CheckThrowColor -->|No| NextDet
     CheckThrowColor -->|Yes| CheckMovement{distance_moved >= / hand_distance_threshold / * 0.5?}
@@ -301,5 +319,51 @@ flowchart TD
 1. **Near Hand**: `min_dist < hand_distance_threshold` → HELD (with re-catch prevention)
 2. **Far from Hands**: `min_dist >= hand_distance_threshold` → IN_FLIGHT (generate throw if was HELD)
 
+## Hand Velocity Tracking
+
+### Overview
+Hand velocity tracking enhances throw detection by monitoring hand movement patterns. When a hand holding a ball moves with sufficient speed in a consistent direction, the system lowers detection thresholds for balls appearing in that direction.
+
+### Key Components
+
+1. **Position History**: Each hand maintains a history of its last 3 positions
+2. **Velocity Calculation**: Velocity is computed from position changes over time
+3. **Direction Analysis**: Detection direction is compared to hand velocity direction
+4. **Threshold Adjustment**: Confidence and color thresholds are reduced for detections in the velocity direction
+
+### Settings
+
+- `hand_velocity_enabled`: Enable/disable hand velocity tracking (default: true)
+- `hand_velocity_threshold`: Minimum hand speed to trigger enhanced detection (default: 1.0 m/s)
+- `hand_velocity_confidence_reduction`: Amount to reduce thresholds by (default: 0.3)
+- `hand_velocity_ignore_class`: Ignore class requirement when hand is moving fast (default: false)
+- `hand_velocity_detection_radius`: Radius of detection zone in velocity direction (default: 0.15 m)
+
+### Algorithm
+
+1. **Update Hand Velocity** (after pose estimation):
+   - Add current wrist position to position_history
+   - Keep only last 3 positions
+   - Calculate velocity: `(current_pos - previous_pos) / dt`
+   - Mark as valid if at least 2 positions available
+
+2. **Throw Detection Enhancement** (in updateHeldBall):
+   - Check if hand speed exceeds threshold
+   - For each detection:
+     - Calculate direction from hand to detection
+     - Compare with hand velocity direction (dot product)
+     - If aligned (dot > 0.5) and within radius:
+       - Reduce confidence threshold
+       - Reduce color threshold
+       - Optionally ignore class requirement
+   - Apply adjusted thresholds to throw detection logic
+
+### Benefits
+
+- **Earlier Throw Detection**: Catches throws before ball moves far from hand
+- **Reduced False Negatives**: Detects throws even with lower confidence detections
+- **Motion-Aware**: Uses hand movement as additional context for throw prediction
+- **Configurable**: All parameters adjustable via UI settings
+
 ## Timestamp
-Last Updated: 2025-10-12T10:15:00Z
+Last Updated: 2025-10-12T10:49:00Z

@@ -83,6 +83,16 @@ struct SimpleHand {
     bool is_visible;           // Detected this frame
     float confidence;          // Detection confidence
     std::vector<cv::Point3f> keypoints;  // All pose keypoints
+    
+    // Hand velocity tracking (for throw prediction)
+    std::vector<cv::Point3f> position_history;  // Last 3 positions for velocity calculation
+    cv::Point3f velocity;                        // Current velocity vector (m/s)
+    bool has_valid_velocity;                     // True if we have enough history to calculate velocity
+    uint64_t last_update_timestamp;              // Timestamp of last position update
+    
+    SimpleHand() : id(-1), is_visible(false), confidence(0.0f),
+                   velocity(0, 0, 0), has_valid_velocity(false),
+                   last_update_timestamp(0) {}
 };
 
 // Simple ball state
@@ -102,6 +112,7 @@ struct SimpleBall {
     
     // Throw tracking (NEW: prevent immediate re-catch by throwing hand)
     int was_just_thrown_by_hand_id;  // -1 if not just thrown, 0=left, 1=right (lasts 1 frame)
+    bool thrown_in_hand_velocity_zone;  // True if thrown in hand velocity zone (only catchable by other hand)
     
     // Trajectory (NEW: replaces Kalman and ColorBasedPredictor in Phase 3)
     BallTrajectory trajectory;       // Only valid when IN_FLIGHT
@@ -124,9 +135,16 @@ struct SimpleBall {
     // Debug info for visualization
     std::string tracking_reason;     // Why this position was chosen (for debugging)
     
+    // Hand velocity visualization (for debugging)
+    bool hand_velocity_active;       // True if hand velocity detection is active this frame
+    cv::Point3f hand_velocity_center; // Center of velocity detection zone
+    cv::Point3f hand_velocity_direction; // Direction of hand movement
+    float hand_velocity_radius;      // Radius of detection zone
+    
     SimpleBall() : id(-1), state(HELD), is_held(false),
                    held_by_hand_id(-1), previous_held_by_hand_id(-1),
                    was_just_thrown_by_hand_id(-1),
+                   thrown_in_hand_velocity_zone(false),
                    has_yolo_detection(false),
                    frames_without_verified_detection(0),
                    unverified_trajectory_points(0),
@@ -134,7 +152,11 @@ struct SimpleBall {
                    yolo_class_id(0),
                    matched_detection_confidence(0.0f),
                    matched_detection_color_score(0.0f),
-                   tracking_reason("") {}
+                   tracking_reason(""),
+                   hand_velocity_active(false),
+                   hand_velocity_center(0, 0, 0),
+                   hand_velocity_direction(0, 0, 0),
+                   hand_velocity_radius(0.0f) {}
 };
 
 // Ball event (throw/catch)
@@ -157,6 +179,14 @@ struct TrackingSettings {
     float catch_distance_threshold = 0.30f;   // DEPRECATED: Use hand_distance_threshold instead
     
     int min_frames_for_transition = 2;        // Debouncing for state changes
+    
+    // Hand velocity tracking settings (for throw prediction)
+    bool hand_velocity_enabled = true;                    // Enable hand velocity-based throw prediction
+    float hand_velocity_threshold = 1.0f;                 // Minimum hand velocity to trigger enhanced detection (m/s)
+    float hand_velocity_confidence_reduction = 0.3f;      // Reduce confidence threshold by this amount (0.0-1.0)
+    bool hand_velocity_ignore_class = false;              // If true, ignore class requirement when hand is moving fast
+    float hand_velocity_detection_radius = 0.15f;         // Radius of detection zone in direction of hand movement (m)
+    float hand_velocity_distance_reduction = 0.10f;       // Reduce hand_distance_threshold to this value when velocity zone is active (m)
     
     // Trajectory parameters
     float traj_gravity = 9.81f;                        // Gravitational acceleration (m/s²)
@@ -230,6 +260,7 @@ struct TrajectoryVisualizationSettings {
     bool show_confidence = true;           // Show confidence indicator
     bool show_max_distance = true;         // Show max tracker distance circle
     bool show_hand_distance_threshold = true;  // Show unified hand distance threshold circles around hands
+    bool show_hand_velocity_zone = false;  // Show hand velocity detection zone (purple circle)
     // DEPRECATED: Keep for backward compatibility
     bool show_throw_distance_threshold = true;  // DEPRECATED: Use show_hand_distance_threshold instead
     bool show_catch_distance_threshold = true;  // DEPRECATED: Use show_hand_distance_threshold instead
@@ -242,6 +273,7 @@ struct TrajectoryVisualizationSettings {
     cv::Scalar max_distance_color = cv::Scalar(0, 0, 255);      // Red
     cv::Scalar throw_distance_color = cv::Scalar(0, 165, 255);  // Orange (BGR)
     cv::Scalar catch_distance_color = cv::Scalar(0, 255, 0);    // Green (BGR)
+    cv::Scalar hand_velocity_zone_color = cv::Scalar(255, 0, 255); // Purple/Magenta (BGR)
     
     // Sizes
     int trajectory_thickness = 2;
@@ -365,9 +397,12 @@ private:
     
     // Utility
     float getDepthAtPoint(const cv::Mat& depth_frame, const cv::Point2f& point);
-    cv::Point3f deprojectToWorld(const cv::Point2f& pixel, float depth, 
+    cv::Point3f deprojectToWorld(const cv::Point2f& pixel, float depth,
                                 const CameraIntrinsics& intrinsics);
     uint64_t getCurrentTimestamp();
+    
+    // Hand velocity tracking
+    void updateHandVelocity(SimpleHand& hand, uint64_t current_timestamp);
     
     // OpenVINO models
     ov::Core core_;
@@ -400,6 +435,15 @@ private:
     
     // Frame counter for debug logging
     uint64_t frame_counter_ = 0;
+    
+    // Recording frame counter (set by Engine when recording is active)
+    int recording_frame_number_ = -1;  // -1 means not recording
+    
+public:
+    // Set the current recording frame number (called by Engine during recording)
+    void setRecordingFrameNumber(int frame_num) { recording_frame_number_ = frame_num; }
+    
+private:
     
     // Model parameters
     int input_width_ = 640;

@@ -126,6 +126,9 @@ if PYQT_AVAILABLE:
             self.trajectory_section = self.create_trajectory_section()
             container_layout.addWidget(self.trajectory_section)
             
+            self.hand_velocity_section = self.create_hand_velocity_section()
+            container_layout.addWidget(self.hand_velocity_section)
+            
             self.ball_profiles_section = self.create_ball_profiles_section()
             container_layout.addWidget(self.ball_profiles_section)
             
@@ -1023,11 +1026,145 @@ if PYQT_AVAILABLE:
             layout.addWidget(self.show_hand_distance_threshold_toggle, row, 0, 1, 3)
             row += 1
             
+            # Show hand velocity zone toggle
+            self.show_hand_velocity_zone_toggle = QPushButton("show_hand_velocity_zone")
+            self.show_hand_velocity_zone_toggle.setCheckable(True)
+            self.show_hand_velocity_zone_toggle.setChecked(False)
+            self.show_hand_velocity_zone_toggle.clicked.connect(
+                lambda: self.update_setting('show_hand_velocity_zone',
+                                           1 if self.show_hand_velocity_zone_toggle.isChecked() else 0))
+            layout.addWidget(self.show_hand_velocity_zone_toggle, row, 0, 1, 3)
+            row += 1
+            
             # Info about visualization
             viz_info_label = QLabel("ℹ️ Blue circle = unified hand distance threshold (around hands)")
             viz_info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
             viz_info_label.setWordWrap(True)
             layout.addWidget(viz_info_label, row, 0, 1, 3)
+            
+            return section
+        
+        def create_hand_velocity_section(self):
+            """Create the Hand Velocity Tracking section"""
+            section = CollapsibleGroupBox("🤚 Hand Velocity Tracking", collapsed=False)
+            layout = QGridLayout()
+            section.get_content_layout().addLayout(layout)
+            
+            row = 0
+            
+            # Info label
+            info_label = QLabel("ℹ️ Use hand movement to predict throws and lower detection thresholds")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            info_label.setWordWrap(True)
+            layout.addWidget(info_label, row, 0, 1, 3)
+            row += 1
+            
+            # Enable toggle
+            self.hand_velocity_enabled_toggle = QPushButton("Enable Hand Velocity Tracking")
+            self.hand_velocity_enabled_toggle.setCheckable(True)
+            self.hand_velocity_enabled_toggle.setChecked(True)
+            self.hand_velocity_enabled_toggle.clicked.connect(
+                lambda: self.update_setting('hand_velocity_enabled',
+                                           1 if self.hand_velocity_enabled_toggle.isChecked() else 0))
+            layout.addWidget(self.hand_velocity_enabled_toggle, row, 0, 1, 3)
+            row += 1
+            
+            # Velocity Threshold
+            self.hand_velocity_threshold_slider, self.hand_velocity_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Velocity Threshold (m/s)",
+                tooltip_text="Minimum hand speed to trigger enhanced throw detection.\n"
+                             "Range: 0.1-5.0 m/s. Default: 1.0 m/s.\n"
+                             "Lower = more sensitive (triggers with slower hand movement)\n"
+                             "Higher = less sensitive (requires faster hand movement)",
+                range_min=10,
+                range_max=500,
+                initial_value=100,
+                update_func=lambda v: self.update_setting('hand_velocity_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Confidence Reduction
+            self.hand_velocity_confidence_reduction_slider, self.hand_velocity_confidence_reduction_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Confidence Reduction",
+                tooltip_text="Amount to reduce confidence threshold when hand is moving fast.\n"
+                             "Range: 0.0-0.9. Default: 0.3 (30% reduction).\n"
+                             "Higher = more aggressive detection (much lower thresholds)\n"
+                             "Lower = more conservative detection\n"
+                             "⚠️ Values above 0.7 may cause false positives!",
+                range_min=0,
+                range_max=90,
+                initial_value=30,
+                update_func=lambda v: self.update_setting('hand_velocity_confidence_reduction', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Detection Radius
+            self.hand_velocity_detection_radius_slider, self.hand_velocity_detection_radius_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Detection Radius (cm)",
+                tooltip_text="Radius of detection zone in direction of hand movement.\n"
+                             "Range: 5-100 cm. Default: 15 cm.\n"
+                             "Defines the area where reduced thresholds apply.\n"
+                             "Larger = wider detection zone, smaller = more precise\n"
+                             "⚠️ Very large values may affect unrelated detections!",
+                range_min=5,
+                range_max=100,
+                initial_value=15,
+                update_func=lambda v: self.update_setting('hand_velocity_detection_radius', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Distance Reduction
+            self.hand_velocity_distance_reduction_slider, self.hand_velocity_distance_reduction_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Distance Reduction (cm)",
+                tooltip_text="Reduced hand_distance_threshold when hand velocity zone is active.\n"
+                             "Range: 0-30 cm. Default: 10 cm.\n"
+                             "This is the effective hand_distance_threshold used for throw detection\n"
+                             "when the ball is within the velocity zone (moving hand direction).\n"
+                             "0 = no distance requirement (immediate throw detection)\n"
+                             "Lower = allows throws to be detected closer to the hand\n"
+                             "Higher = requires ball to be farther from hand even in velocity zone\n"
+                             "⚠️ Should be lower than normal hand_distance_threshold (25cm)!",
+                range_min=0,
+                range_max=30,
+                initial_value=10,
+                update_func=lambda v: self.update_setting('hand_velocity_distance_reduction', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Ignore Class Toggle
+            self.hand_velocity_ignore_class_toggle = QPushButton("Ignore Class Requirement")
+            self.hand_velocity_ignore_class_toggle.setCheckable(True)
+            self.hand_velocity_ignore_class_toggle.setChecked(False)
+            self.hand_velocity_ignore_class_toggle.clicked.connect(
+                lambda: self.update_setting('hand_velocity_ignore_class',
+                                           1 if self.hand_velocity_ignore_class_toggle.isChecked() else 0))
+            self.hand_velocity_ignore_class_toggle.setToolTip(
+                "When enabled, detections in the velocity direction don't need to be 'ball' class.\n"
+                "This allows 'ball_held' detections to trigger throws when hand is moving fast.\n"
+                "Use this if throws are being missed due to class misclassification.")
+            layout.addWidget(self.hand_velocity_ignore_class_toggle, row, 0, 1, 3)
+            row += 1
+            
+            # Info about how it works
+            how_it_works_label = QLabel("💡 How it works: The system tracks the last 3 hand positions to calculate velocity. "
+                                        "When a hand holding a ball moves faster than the threshold, detection requirements "
+                                        "are lowered for balls appearing in the direction of movement. This helps catch throws "
+                                        "earlier, even with lower confidence detections.")
+            how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
+            how_it_works_label.setWordWrap(True)
+            layout.addWidget(how_it_works_label, row, 0, 1, 3)
             
             return section
 
@@ -1656,6 +1793,15 @@ if PYQT_AVAILABLE:
                 
                 # Threshold visualization toggle
                 'show_hand_distance_threshold': self.show_hand_distance_threshold_toggle.isChecked() if hasattr(self, 'show_hand_distance_threshold_toggle') else True,
+                'show_hand_velocity_zone': self.show_hand_velocity_zone_toggle.isChecked() if hasattr(self, 'show_hand_velocity_zone_toggle') else False,
+                
+                # Hand Velocity Tracking settings
+                'hand_velocity_enabled': self.hand_velocity_enabled_toggle.isChecked() if hasattr(self, 'hand_velocity_enabled_toggle') else True,
+                'hand_velocity_threshold': self._safe_get_slider_value(self.hand_velocity_threshold_slider, 100) / 100.0 if hasattr(self, 'hand_velocity_threshold_slider') else 1.0,
+                'hand_velocity_confidence_reduction': self._safe_get_slider_value(self.hand_velocity_confidence_reduction_slider, 30) / 100.0 if hasattr(self, 'hand_velocity_confidence_reduction_slider') else 0.3,
+                'hand_velocity_detection_radius': self._safe_get_slider_value(self.hand_velocity_detection_radius_slider, 15) / 100.0 if hasattr(self, 'hand_velocity_detection_radius_slider') else 0.15,
+                'hand_velocity_distance_reduction': self._safe_get_slider_value(self.hand_velocity_distance_reduction_slider, 10) / 100.0 if hasattr(self, 'hand_velocity_distance_reduction_slider') else 0.10,
+                'hand_velocity_ignore_class': self.hand_velocity_ignore_class_toggle.isChecked() if hasattr(self, 'hand_velocity_ignore_class_toggle') else False,
             }
             
             # Add visualization toggle states from main window
@@ -1892,6 +2038,29 @@ if PYQT_AVAILABLE:
                     show_throw = settings.get('show_throw_distance_threshold', True)
                     show_catch = settings.get('show_catch_distance_threshold', True)
                     self.show_hand_distance_threshold_toggle.setChecked(show_throw or show_catch)
+            
+            # Hand velocity zone visualization toggle
+            if 'show_hand_velocity_zone' in settings and hasattr(self, 'show_hand_velocity_zone_toggle'):
+                self.show_hand_velocity_zone_toggle.setChecked(settings['show_hand_velocity_zone'])
+            
+            # Hand Velocity Tracking settings
+            if 'hand_velocity_enabled' in settings and hasattr(self, 'hand_velocity_enabled_toggle'):
+                self.hand_velocity_enabled_toggle.setChecked(settings['hand_velocity_enabled'])
+            
+            if 'hand_velocity_threshold' in settings and hasattr(self, 'hand_velocity_threshold_slider'):
+                self.hand_velocity_threshold_slider.setValue(int(settings['hand_velocity_threshold'] * 100))
+            
+            if 'hand_velocity_confidence_reduction' in settings and hasattr(self, 'hand_velocity_confidence_reduction_slider'):
+                self.hand_velocity_confidence_reduction_slider.setValue(int(settings['hand_velocity_confidence_reduction'] * 100))
+            
+            if 'hand_velocity_detection_radius' in settings and hasattr(self, 'hand_velocity_detection_radius_slider'):
+                self.hand_velocity_detection_radius_slider.setValue(int(settings['hand_velocity_detection_radius'] * 100))
+            
+            if 'hand_velocity_distance_reduction' in settings and hasattr(self, 'hand_velocity_distance_reduction_slider'):
+                self.hand_velocity_distance_reduction_slider.setValue(int(settings['hand_velocity_distance_reduction'] * 100))
+            
+            if 'hand_velocity_ignore_class' in settings and hasattr(self, 'hand_velocity_ignore_class_toggle'):
+                self.hand_velocity_ignore_class_toggle.setChecked(settings['hand_velocity_ignore_class'])
             
             # Restore visualization toggle states to main window
             if self.main_window:
@@ -2140,6 +2309,25 @@ if PYQT_AVAILABLE:
             if 'traj_max_search_distance' in settings:
                 self.udp_client.send_setting('traj_max_search_distance', settings['traj_max_search_distance'])
             
+            # Hand Velocity Tracking settings
+            if 'hand_velocity_enabled' in settings:
+                self.udp_client.send_setting('hand_velocity_enabled', 1 if settings['hand_velocity_enabled'] else 0)
+            
+            if 'hand_velocity_threshold' in settings:
+                self.udp_client.send_setting('hand_velocity_threshold', settings['hand_velocity_threshold'])
+            
+            if 'hand_velocity_confidence_reduction' in settings:
+                self.udp_client.send_setting('hand_velocity_confidence_reduction', settings['hand_velocity_confidence_reduction'])
+            
+            if 'hand_velocity_ignore_class' in settings:
+                self.udp_client.send_setting('hand_velocity_ignore_class', 1 if settings['hand_velocity_ignore_class'] else 0)
+            
+            if 'hand_velocity_detection_radius' in settings:
+                self.udp_client.send_setting('hand_velocity_detection_radius', settings['hand_velocity_detection_radius'])
+            
+            if 'hand_velocity_distance_reduction' in settings:
+                self.udp_client.send_setting('hand_velocity_distance_reduction', settings['hand_velocity_distance_reduction'])
+            
             # Threshold visualization toggle with backward compatibility
             if 'show_hand_distance_threshold' in settings:
                 self.udp_client.send_setting('show_hand_distance_threshold', 1 if settings['show_hand_distance_threshold'] else 0)
@@ -2148,6 +2336,10 @@ if PYQT_AVAILABLE:
                 show_throw = settings.get('show_throw_distance_threshold', True)
                 show_catch = settings.get('show_catch_distance_threshold', True)
                 self.udp_client.send_setting('show_hand_distance_threshold', 1 if (show_throw or show_catch) else 0)
+            
+            # Hand velocity zone visualization toggle
+            if 'show_hand_velocity_zone' in settings:
+                self.udp_client.send_setting('show_hand_velocity_zone', 1 if settings['show_hand_velocity_zone'] else 0)
             
             # Ball tracking enabled states
             if 'ball_tracking_enabled' in settings:

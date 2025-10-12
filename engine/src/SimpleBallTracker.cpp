@@ -393,6 +393,10 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             viz_settings_.show_hand_distance_threshold = (value == "true" || value == "1");
             return true;
         }
+        else if (key == "show_hand_velocity_zone") {
+            viz_settings_.show_hand_velocity_zone = (value == "true" || value == "1");
+            return true;
+        }
         // BACKWARD COMPATIBILITY: Accept old visualization toggle names
         else if (key == "show_throw_distance_threshold") {
             viz_settings_.show_hand_distance_threshold = (value == "true" || value == "1");
@@ -453,6 +457,31 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         }
         else if (key == "traj_max_search_distance") {
             tracking_settings_.traj_max_search_distance = std::stof(value);
+            return true;
+        }
+        // Hand velocity tracking settings
+        else if (key == "hand_velocity_enabled") {
+            tracking_settings_.hand_velocity_enabled = (value == "true" || value == "1");
+            return true;
+        }
+        else if (key == "hand_velocity_threshold") {
+            tracking_settings_.hand_velocity_threshold = std::stof(value);
+            return true;
+        }
+        else if (key == "hand_velocity_confidence_reduction") {
+            tracking_settings_.hand_velocity_confidence_reduction = std::stof(value);
+            return true;
+        }
+        else if (key == "hand_velocity_ignore_class") {
+            tracking_settings_.hand_velocity_ignore_class = (value == "true" || value == "1");
+            return true;
+        }
+        else if (key == "hand_velocity_detection_radius") {
+            tracking_settings_.hand_velocity_detection_radius = std::stof(value);
+            return true;
+        }
+        else if (key == "hand_velocity_distance_reduction") {
+            tracking_settings_.hand_velocity_distance_reduction = std::stof(value);
             return true;
         }
     } catch (const std::exception& e) {
@@ -736,6 +765,72 @@ uint64_t SimpleBallTracker::getCurrentTimestamp() {
         std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
+void SimpleBallTracker::updateHandVelocity(SimpleHand& hand, uint64_t current_timestamp) {
+    // CRITICAL FIX: Only add position if it's different from the last one
+    // This prevents duplicate positions from being added when hand is stationary
+    bool should_add = true;
+    if (!hand.position_history.empty()) {
+        cv::Point3f last_pos = hand.position_history.back();
+        float dist = cv::norm(hand.wrist_pos_3d - last_pos);
+        // Only add if hand moved at least 1cm
+        if (dist < 0.01f) {
+            should_add = false;
+        }
+    }
+    
+    if (should_add) {
+        hand.position_history.push_back(hand.wrist_pos_3d);
+        
+        // Keep only last 3 positions
+        if (hand.position_history.size() > 3) {
+            hand.position_history.erase(hand.position_history.begin());
+        }
+    }
+    
+    // Need at least 3 positions to calculate velocity reliably
+    if (hand.position_history.size() < 3) {
+        hand.has_valid_velocity = false;
+        hand.velocity = cv::Point3f(0, 0, 0);
+        hand.last_update_timestamp = current_timestamp;
+        return;
+    }
+    
+    // Calculate time span from first to last position in history
+    // This gives us a more stable velocity estimate over ~3 frames
+    float dt = 0.1f;  // Default to 100ms (3 frames at 30 FPS)
+    if (hand.last_update_timestamp > 0) {
+        dt = (current_timestamp - hand.last_update_timestamp) / 1000000.0f;  // Convert microseconds to seconds
+        // Clamp dt to reasonable range (10ms to 1s)
+        dt = std::max(0.01f, std::min(dt, 1.0f));
+    }
+    
+    // Calculate velocity from first to last position in history (more stable than frame-to-frame)
+    cv::Point3f pos_diff = hand.position_history[2] - hand.position_history[0];
+    float distance = cv::norm(pos_diff);
+    
+    // Only update velocity if hand actually moved
+    if (distance > 0.001f) {  // Moved at least 1mm
+        // Divide by 2*dt because we're spanning ~2 frame intervals (3 positions = 2 intervals)
+        hand.velocity = pos_diff / (dt * 2.0f);
+        hand.has_valid_velocity = true;
+    } else {
+        // Hand is stationary
+        hand.velocity = cv::Point3f(0, 0, 0);
+        hand.has_valid_velocity = true;  // Still valid, just zero velocity
+    }
+    
+    hand.last_update_timestamp = current_timestamp;
+    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "[HAND_VELOCITY] Hand " << hand.id << ": velocity=("
+                  << hand.velocity.x << ", " << hand.velocity.y << ", " << hand.velocity.z
+                  << ") m/s, speed=" << cv::norm(hand.velocity) << " m/s, history_size="
+                  << hand.position_history.size() << std::endl;
+        debug_log.close();
+    });
+}
+
 std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
     std::vector<SimpleBall>& balls,
     const std::vector<SimpleHand>& hands) {
@@ -744,7 +839,11 @@ std::vector<BallEvent> SimpleBallTracker::detectStatesAndEvents(
     
     DEBUG_LOG(debug_log, {
         OPEN_DEBUG_LOG(debug_log);
-        debug_log << "\n=== FRAME " << frame_counter_ << " - detectStatesAndEvents() ===" << std::endl;
+        if (recording_frame_number_ >= 0) {
+            debug_log << "\n=== FRAME " << frame_counter_ << " (Recording Frame " << recording_frame_number_ << ") - detectStatesAndEvents() ===" << std::endl;
+        } else {
+            debug_log << "\n=== FRAME " << frame_counter_ << " - detectStatesAndEvents() ===" << std::endl;
+        }
         debug_log << "Number of balls: " << balls.size() << std::endl;
         debug_log << "Number of hands: " << hands.size() << std::endl;
         debug_log << "NOTE: State transitions are now handled in updateHeldBall() and updateInFlightBall()" << std::endl;
@@ -793,7 +892,11 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     DEBUG_LOG(debug_log, {
         OPEN_DEBUG_LOG(debug_log);
         debug_log << "\n\n========================================" << std::endl;
-        debug_log << "=== FRAME " << frame_counter_ << " ===" << std::endl;
+        if (recording_frame_number_ >= 0) {
+            debug_log << "=== FRAME " << frame_counter_ << " (Recording Frame " << recording_frame_number_ << ") ===" << std::endl;
+        } else {
+            debug_log << "=== FRAME " << frame_counter_ << " ===" << std::endl;
+        }
         debug_log << "========================================" << std::endl;
     });
 
@@ -911,6 +1014,26 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     std::cout << "[FRAME " << frame_counter_ << "] Running pose estimation..." << std::endl;
     std::vector<SimpleHand> hands = runPoseEstimation(color_frame, depth_frame, intrinsics);
     std::cout << "[FRAME " << frame_counter_ << "] Pose estimation complete: " << hands.size() << " hands" << std::endl;
+    
+    // Update hand velocity for all detected hands
+    // CRITICAL FIX: Transfer position_history from last frame's hands to preserve velocity tracking
+    uint64_t current_timestamp = getCurrentTimestamp();
+    for (auto& hand : hands) {
+        if (hand.is_visible && tracking_settings_.hand_velocity_enabled) {
+            // Find matching hand from last frame to transfer position history
+            for (const auto& last_hand : last_known_hands_) {
+                if (last_hand.id == hand.id) {
+                    // Transfer position history and timestamp from last frame
+                    hand.position_history = last_hand.position_history;
+                    hand.last_update_timestamp = last_hand.last_update_timestamp;
+                    hand.velocity = last_hand.velocity;
+                    hand.has_valid_velocity = last_hand.has_valid_velocity;
+                    break;
+                }
+            }
+            updateHandVelocity(hand, current_timestamp);
+        }
+    }
     
     // HAND PERSISTENCE: Fill in missing hands with last known positions
     // This prevents tracking issues when a hand temporarily disappears from pose detection
@@ -2233,8 +2356,21 @@ void SimpleBallTracker::updateInFlightBall(
         // If we found a hand within threshold, catch to it
         // CRITICAL: Check if this is the hand that just threw the ball
         if (closest_hand != nullptr) {
-            // Prevent immediate re-catch by throwing hand
-            if (closest_hand->id == ball.was_just_thrown_by_hand_id) {
+            // CRITICAL: Check if ball was thrown in hand velocity zone
+            // If so, it can ONLY be caught by the OTHER hand
+            if (ball.thrown_in_hand_velocity_zone && closest_hand->id == ball.held_by_hand_id) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  CATCH PREVENTED: Ball was thrown in hand velocity zone by hand "
+                              << ball.held_by_hand_id << ", can only be caught by other hand" << std::endl;
+                    debug_log << "    Attempted catch by same hand " << closest_hand->id << " rejected" << std::endl;
+                    debug_log.close();
+                });
+                // Keep ball in flight - don't clear the flag yet
+                // It will be cleared when caught by the other hand
+            }
+            // Prevent immediate re-catch by throwing hand (legacy check)
+            else if (closest_hand->id == ball.was_just_thrown_by_hand_id) {
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
                     debug_log << "  CATCH PREVENTED: Hand " << closest_hand->id
@@ -2252,11 +2388,17 @@ void SimpleBallTracker::updateInFlightBall(
                     debug_log << "  CATCH DETECTED to CLOSEST hand " << closest_hand->id
                               << ": dist=" << min_dist
                               << "m, threshold=" << tracking_settings_.hand_distance_threshold << "m" << std::endl;
+                    if (ball.thrown_in_hand_velocity_zone) {
+                        debug_log << "    Ball was thrown in velocity zone by hand " << ball.held_by_hand_id
+                                  << ", now caught by other hand " << closest_hand->id << std::endl;
+                    }
                     debug_log.close();
                 });
                 
                 // Clear the throw tracking since we're catching with a different hand
                 ball.was_just_thrown_by_hand_id = -1;
+                // Clear velocity zone flag when caught by other hand
+                ball.thrown_in_hand_velocity_zone = false;
                 initiateCatch(ball, *closest_hand, events);
                 return;
             }
@@ -2385,6 +2527,7 @@ void SimpleBallTracker::initiateCatch(
     
     // CRITICAL: Clear throw tracking when ball is caught
     ball.was_just_thrown_by_hand_id = -1;
+    ball.thrown_in_hand_velocity_zone = false;  // Clear velocity zone flag
     
     // 2. Reset physics parameters
     ball.trajectory.initial_velocity = cv::Point3f(0, 0, 0);
@@ -2679,6 +2822,44 @@ void SimpleBallTracker::drawTrajectory(
         }
     }
     
+    // NEW: Draw hand velocity debug info at bottom of frame
+    if (viz_settings_.show_hand_velocity_zone && tracking_settings_.hand_velocity_enabled) {
+        int text_y = frame.rows - 10;  // Start from bottom
+        int line_height = 20;
+        
+        for (const auto& hand : hands_) {
+            // Calculate hand speed
+            float hand_speed = cv::norm(hand.velocity);
+            bool has_velocity = hand.has_valid_velocity;
+            bool exceeds_threshold = has_velocity && (hand_speed >= tracking_settings_.hand_velocity_threshold);
+            
+            // Format debug text
+            std::string hand_label = (hand.id == 0) ? "LEFT" : "RIGHT";
+            std::string debug_text = cv::format("%s Hand: speed=%.2f m/s, threshold=%.2f m/s, valid=%s, active=%s",
+                                                hand_label.c_str(),
+                                                hand_speed,
+                                                tracking_settings_.hand_velocity_threshold,
+                                                has_velocity ? "YES" : "NO",
+                                                exceeds_threshold ? "YES" : "NO");
+            
+            // Choose color based on whether velocity zone is active
+            cv::Scalar text_color = exceeds_threshold ? cv::Scalar(255, 0, 255) : cv::Scalar(150, 150, 150);
+            
+            // Draw text with black background for readability
+            int baseline = 0;
+            cv::Size text_size = cv::getTextSize(debug_text, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
+            cv::rectangle(frame,
+                         cv::Point(5, text_y - text_size.height - 5),
+                         cv::Point(5 + text_size.width + 10, text_y + 5),
+                         cv::Scalar(0, 0, 0), -1);
+            
+            cv::putText(frame, debug_text, cv::Point(10, text_y),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1);
+            
+            text_y -= line_height;
+        }
+    }
+    
     // 4. Draw confidence indicator
     if (viz_settings_.show_confidence && ball.pixel_pos.x >= 0) {
         std::string conf_text = cv::format("Conf: %.2f",
@@ -2688,6 +2869,47 @@ void SimpleBallTracker::drawTrajectory(
         cv::putText(frame, conf_text, text_pos,
                     cv::FONT_HERSHEY_SIMPLEX, 0.5,
                     viz_settings_.trajectory_color, 1);
+    }
+    
+    // 5. Draw hand velocity detection zones (NEW)
+    if (viz_settings_.show_hand_velocity_zone) {
+        for (const auto& tracked_ball : balls_) {
+            if (tracked_ball.hand_velocity_active && tracked_ball.hand_velocity_radius > 0) {
+                // Project 3D center to 2D
+                cv::Point2f center_2d = project_3d_to_2d(tracked_ball.hand_velocity_center, intrinsics);
+                
+                // Check if on-screen
+                if (center_2d.x >= 0 && center_2d.x < frame.cols &&
+                    center_2d.y >= 0 && center_2d.y < frame.rows) {
+                    
+                    // Calculate pixel radius from meters
+                    float radius_pixels = tracked_ball.hand_velocity_radius * intrinsics.fx / tracked_ball.hand_velocity_center.z;
+                    
+                    // Draw purple circle showing detection zone
+                    cv::circle(frame, center_2d, static_cast<int>(radius_pixels),
+                              viz_settings_.hand_velocity_zone_color, 2);
+                    
+                    // Draw direction arrow from hand to zone center
+                    cv::Point3f arrow_start = tracked_ball.hand_velocity_center - 
+                                             tracked_ball.hand_velocity_direction * tracked_ball.hand_velocity_radius;
+                    cv::Point2f hand_2d = project_3d_to_2d(arrow_start, intrinsics);
+                    
+                    if (hand_2d.x >= 0 && hand_2d.x < frame.cols &&
+                        hand_2d.y >= 0 && hand_2d.y < frame.rows) {
+                        cv::arrowedLine(frame, hand_2d, center_2d,
+                                       viz_settings_.hand_velocity_zone_color, 2);
+                    }
+                    
+                    // Add label with hand speed
+                    float hand_speed = cv::norm(tracked_ball.hand_velocity_direction);
+                    std::string label = cv::format("Hand: %.2fm/s", hand_speed);
+                    cv::Point text_pos(center_2d.x + 10, center_2d.y - static_cast<int>(radius_pixels) - 5);
+                    cv::putText(frame, label, text_pos,
+                               cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                               viz_settings_.hand_velocity_zone_color, 1);
+                }
+            }
+        }
     }
 }
 
@@ -2923,6 +3145,70 @@ void SimpleBallTracker::updateHeldBall(
     // Check for THROW: Look for detection moving away from hand
     // CRITICAL FIX: Use previous ball position to verify actual movement
     // This prevents false throws when ball is just jittering near the hand
+    
+    // NEW: Calculate hand velocity-based adjustments
+    float hand_speed = 0.0f;
+    cv::Point3f hand_velocity_direction(0, 0, 0);
+    bool hand_is_moving_fast = false;
+    
+    // CRITICAL: Always reset visualization flag first
+    ball.hand_velocity_active = false;
+    
+    if (tracking_settings_.hand_velocity_enabled && hand->has_valid_velocity) {
+        hand_speed = cv::norm(hand->velocity);
+        if (hand_speed > tracking_settings_.hand_velocity_threshold) {
+            hand_is_moving_fast = true;
+            hand_velocity_direction = hand->velocity / hand_speed;  // Normalize
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  [HAND_VELOCITY] Hand " << hand->id << " is moving fast: "
+                          << hand_speed << " m/s (threshold: "
+                          << tracking_settings_.hand_velocity_threshold << " m/s)" << std::endl;
+                debug_log << "    Velocity direction: (" << hand_velocity_direction.x << ", "
+                          << hand_velocity_direction.y << ", " << hand_velocity_direction.z << ")" << std::endl;
+                debug_log << "    Current hand position: (" << hand->wrist_pos_3d.x << ", "
+                          << hand->wrist_pos_3d.y << ", " << hand->wrist_pos_3d.z << ")" << std::endl;
+                debug_log << "    Detection zone radius: " << tracking_settings_.hand_velocity_detection_radius << " m" << std::endl;
+                debug_log.close();
+            });
+        }
+    }
+    
+    // CRITICAL: Calculate predicted hand position for velocity-based detection checks
+    // This must match the visualization zone center
+    // Calculate ONCE and use everywhere to ensure consistency
+    float dt = 0.033f;  // Assume 30 FPS for next frame prediction
+    cv::Point3f predicted_hand_pos = hand->wrist_pos_3d + (hand_is_moving_fast ? hand->velocity * dt : cv::Point3f(0,0,0));
+    
+    // Store for visualization AFTER calculating predicted_hand_pos
+    if (hand_is_moving_fast) {
+        ball.hand_velocity_active = true;
+        ball.hand_velocity_center = predicted_hand_pos;  // Use the SAME predicted position
+        ball.hand_velocity_direction = hand_velocity_direction;
+        ball.hand_velocity_radius = tracking_settings_.hand_velocity_detection_radius;
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  [HAND_VELOCITY] Visualization zone set:" << std::endl;
+            debug_log << "    Zone center (predicted): (" << predicted_hand_pos.x << ", "
+                      << predicted_hand_pos.y << ", " << predicted_hand_pos.z << ")" << std::endl;
+            debug_log.close();
+        });
+    }
+    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  [THROW CHECK] Starting detection loop:" << std::endl;
+        debug_log << "    Number of YOLO detections: " << yolo_detections.size() << std::endl;
+        debug_log << "    Hand velocity zone active: " << (hand_is_moving_fast ? "YES" : "NO") << std::endl;
+        if (hand_is_moving_fast) {
+            debug_log << "    Hand speed: " << hand_speed << " m/s (threshold: "
+                      << tracking_settings_.hand_velocity_threshold << " m/s)" << std::endl;
+        }
+        debug_log.close();
+    });
+    
     for (const auto& det : yolo_detections) {
         float dist_from_hand = cv::norm(det.world_pos - hand->wrist_pos_3d);
         float dist_from_ball = cv::norm(det.world_pos - ball.position);
@@ -2931,28 +3217,206 @@ void SimpleBallTracker::updateHeldBall(
             OPEN_DEBUG_LOG(debug_log);
             debug_log << "  [THROW CHECK] Evaluating detection:" << std::endl;
             debug_log << "    det.world_pos: (" << det.world_pos.x << ", " << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
+            debug_log << "    det.class_id: " << det.class_id << " (" << (det.class_id == 0 ? "ball" : "ball_held") << ")" << std::endl;
+            debug_log << "    det.confidence: " << det.confidence << std::endl;
             debug_log << "    hand.wrist_pos_3d: (" << hand->wrist_pos_3d.x << ", " << hand->wrist_pos_3d.y << ", " << hand->wrist_pos_3d.z << ")" << std::endl;
+            debug_log << "    predicted_hand_pos: (" << predicted_hand_pos.x << ", " << predicted_hand_pos.y << ", " << predicted_hand_pos.z << ")" << std::endl;
             debug_log << "    ball.position: (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
             debug_log << "    dist_from_hand: " << dist_from_hand << "m" << std::endl;
             debug_log << "    dist_from_ball: " << dist_from_ball << "m" << std::endl;
             debug_log.close();
         });
         
-        // CRITICAL FIX: Detection must be far from hand AND within max tracker distance from ball
-        // This prevents false throws when a detection (e.g., other hand) is far from current hand
-        // but also far from the ball's current position
-        if (dist_from_hand > tracking_settings_.hand_distance_threshold &&
-            dist_from_ball < tracking_settings_.max_tracker_distance_per_frame &&
-            det.class_id == 0) {  // CRITICAL: Detection must be class 'ball' (in-flight) to trigger throw
+        // NEW: Check if detection is within the hand velocity zone
+        // CRITICAL FIX: Only check if detection is within the zone RADIUS
+        // Direction doesn't matter - if it's inside the zone, accept it
+        bool in_velocity_direction = false;
+        float det_distance_from_predicted = 0.0f;
+        if (hand_is_moving_fast) {
+            cv::Point3f det_direction = det.world_pos - predicted_hand_pos;
+            det_distance_from_predicted = cv::norm(det_direction);
+            
+            // Detection is in velocity zone if within the detection radius
+            // No direction check needed - the zone is a sphere, not a cone
+            if (det_distance_from_predicted < tracking_settings_.hand_velocity_detection_radius) {
+                in_velocity_direction = true;
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "    ✓ Detection is INSIDE hand velocity zone!" << std::endl;
+                    debug_log << "      Distance from predicted hand pos: " << det_distance_from_predicted << "m < radius: "
+                              << tracking_settings_.hand_velocity_detection_radius << "m" << std::endl;
+                    debug_log.close();
+                });
+            } else {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "    ✗ Detection is OUTSIDE hand velocity zone" << std::endl;
+                    debug_log << "      Distance from predicted hand pos: " << det_distance_from_predicted << "m >= radius: "
+                              << tracking_settings_.hand_velocity_detection_radius << "m" << std::endl;
+                    debug_log.close();
+                });
+            }
+        } else {
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    Hand velocity zone: INACTIVE (hand not moving fast enough)" << std::endl;
+                debug_log.close();
+            });
+        }
+        
+        // Apply velocity-based threshold adjustments
+        float effective_confidence_threshold = tracking_settings_.override_ball_confidence_threshold;
+        float effective_color_threshold = tracking_settings_.min_color_match_score;
+        bool class_requirement_active = true;
+        
+        if (in_velocity_direction) {
+            // Lower thresholds for detections in the direction of hand movement
+            effective_confidence_threshold -= tracking_settings_.hand_velocity_confidence_reduction;
+            effective_color_threshold -= tracking_settings_.hand_velocity_confidence_reduction;
+            
+            // Optionally ignore class requirement
+            if (tracking_settings_.hand_velocity_ignore_class) {
+                class_requirement_active = false;
+            }
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    Applying velocity-based threshold reduction:" << std::endl;
+                debug_log << "      Confidence threshold: " << effective_confidence_threshold
+                          << " (reduced from " << tracking_settings_.override_ball_confidence_threshold << ")" << std::endl;
+                debug_log << "      Color threshold: " << effective_color_threshold
+                          << " (reduced from " << tracking_settings_.min_color_match_score << ")" << std::endl;
+                debug_log << "      Class requirement: " << (class_requirement_active ? "ACTIVE" : "IGNORED") << std::endl;
+                debug_log.close();
+            });
+        }
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "    Class check: det.class_id=" << det.class_id
+                      << ", class_requirement_active=" << (class_requirement_active ? "YES" : "NO") << std::endl;
+            debug_log.close();
+        });
+        
+        // CRITICAL FIX: Check class requirement AFTER velocity adjustments
+        // When hand_velocity_ignore_class is true AND we're in velocity direction,
+        // class_requirement_active will be false, so we should accept any class
+        bool meets_class_requirement = !class_requirement_active || (det.class_id == 0);
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            if (meets_class_requirement) {
+                debug_log << "    ✓ Class requirement: PASSED" << std::endl;
+                if (!class_requirement_active) {
+                    debug_log << "      (class requirement disabled by hand velocity zone)" << std::endl;
+                } else {
+                    debug_log << "      (det.class_id=" << det.class_id << " is 'ball')" << std::endl;
+                }
+            } else {
+                debug_log << "    ✗ Class requirement: FAILED" << std::endl;
+                debug_log << "      (det.class_id=" << det.class_id << " is 'ball_held', requires 'ball')" << std::endl;
+            }
+            debug_log.close();
+        });
+        
+        // NEW AGGRESSIVE THROW DETECTION: When hand velocity zone is active
+        // Check if detection is moving AWAY from ball's current position (at wrist)
+        // This allows throw detection even when YOLO detects ball_held class
+        // CRITICAL FIX: Don't check meets_class_requirement here - that's the whole point!
+        // When hand velocity zone is active and ignore_class is enabled, we should
+        // accept ANY class_id (ball or ball_held)
+        bool is_aggressive_throw = false;
+        bool is_velocity_zone_throw = false;  // Track if this is a velocity zone throw
+        if (hand_is_moving_fast && in_velocity_direction) {
+            // Detection is in velocity zone - check if it's moving away from wrist
+            // The ball is currently at the wrist, so any detection in the velocity direction
+            // that's beyond the reduced threshold is considered a throw
+            float dist_from_wrist = cv::norm(det.world_pos - hand->wrist_pos_3d);
+            
+            if (dist_from_wrist > tracking_settings_.hand_velocity_distance_reduction) {
+                is_aggressive_throw = true;
+                is_velocity_zone_throw = true;  // Mark as velocity zone throw
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "    AGGRESSIVE THROW DETECTED in velocity zone!" << std::endl;
+                    debug_log << "      Detection distance from wrist: " << dist_from_wrist << "m" << std::endl;
+                    debug_log << "      Reduced threshold: " << tracking_settings_.hand_velocity_distance_reduction << "m" << std::endl;
+                    debug_log << "      Detection class: " << (det.class_id == 0 ? "ball" : "ball_held") << std::endl;
+                    debug_log << "      MARKING AS VELOCITY ZONE THROW - only catchable by other hand" << std::endl;
+                    debug_log.close();
+                });
+            }
+        }
+        
+        // STANDARD THROW DETECTION: Detection must be far from hand
+        // NEW: When hand velocity zone is active, use reduced hand_distance_threshold
+        float effective_hand_distance_threshold = tracking_settings_.hand_distance_threshold;
+        if (hand_is_moving_fast && in_velocity_direction) {
+            effective_hand_distance_threshold = tracking_settings_.hand_velocity_distance_reduction;
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "    Using REDUCED hand_distance_threshold: " << effective_hand_distance_threshold
+                          << "m (normal: " << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
+                debug_log.close();
+            });
+        }
+        
+        bool is_standard_throw = (dist_from_hand > effective_hand_distance_threshold &&
+                                  dist_from_ball < tracking_settings_.max_tracker_distance_per_frame &&
+                                  meets_class_requirement);
+        
+        // Accept throw if EITHER aggressive or standard detection
+        if (is_aggressive_throw || is_standard_throw) {
             float color_score = matchColor(det, *profile, color_frame);
             
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
-                debug_log << "    color_score: " << color_score << " (threshold: " << tracking_settings_.min_color_match_score << ")" << std::endl;
+                debug_log << "    Throw candidate detected (" << (is_aggressive_throw ? "AGGRESSIVE" : "STANDARD") << ")" << std::endl;
+                debug_log << "    Checking color and confidence..." << std::endl;
+                debug_log << "      color_score: " << color_score << " vs threshold: " << effective_color_threshold << std::endl;
+                debug_log << "      det.confidence: " << det.confidence << " vs threshold: " << effective_confidence_threshold << std::endl;
                 debug_log.close();
             });
             
-            if (color_score > tracking_settings_.min_color_match_score) {
+            // CRITICAL: When aggressive throw is detected, be MORE lenient with color
+            // The ball might have different lighting/angle when held vs in-air
+            float aggressive_color_threshold = effective_color_threshold;
+            if (is_aggressive_throw) {
+                // In aggressive mode, reduce color threshold even further (or skip it)
+                // Use half the normal threshold, or minimum 0.15
+                aggressive_color_threshold = std::max(0.15f, effective_color_threshold * 0.5f);
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "    AGGRESSIVE MODE: Using extra-reduced color threshold: "
+                              << aggressive_color_threshold << " (normal: " << effective_color_threshold << ")" << std::endl;
+                    debug_log.close();
+                });
+            }
+            
+            // Use velocity-adjusted thresholds (or aggressive thresholds if in aggressive mode)
+            bool color_check_passed = (color_score > aggressive_color_threshold);
+            bool confidence_check_passed = (det.confidence >= effective_confidence_threshold);
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                if (color_check_passed) {
+                    debug_log << "      ✓ Color check: PASSED (" << color_score << " > " << aggressive_color_threshold << ")" << std::endl;
+                } else {
+                    debug_log << "      ✗ Color check: FAILED (" << color_score << " <= " << aggressive_color_threshold << ")" << std::endl;
+                }
+                if (confidence_check_passed) {
+                    debug_log << "      ✓ Confidence check: PASSED (" << det.confidence << " >= " << effective_confidence_threshold << ")" << std::endl;
+                } else {
+                    debug_log << "      ✗ Confidence check: FAILED (" << det.confidence << " < " << effective_confidence_threshold << ")" << std::endl;
+                }
+                debug_log.close();
+            });
+            
+            if (color_check_passed && confidence_check_passed) {
                 // CRITICAL FIX: Use dist_from_hand as the distance_moved
                 // The ball is currently at the wrist, so we need to check if the detection
                 // is far enough from the hand to constitute a throw
@@ -2960,7 +3424,8 @@ void SimpleBallTracker::updateHeldBall(
                 
                 // CRITICAL: Ball must have moved at least half the throw threshold distance
                 // This prevents false throws from small jitter or hand movement
-                float min_movement_threshold = tracking_settings_.hand_distance_threshold * 0.5f;
+                // NEW: Use the effective threshold (which may be reduced for velocity zone)
+                float min_movement_threshold = effective_hand_distance_threshold * 0.5f;
                 
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
@@ -2969,47 +3434,57 @@ void SimpleBallTracker::updateHeldBall(
                     debug_log.close();
                 });
                 
-                if (distance_moved >= min_movement_threshold) {
+                bool movement_check_passed = (distance_moved >= min_movement_threshold);
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    if (movement_check_passed) {
+                        debug_log << "      ✓ Movement check: PASSED (" << distance_moved << "m >= " << min_movement_threshold << "m)" << std::endl;
+                    } else {
+                        debug_log << "      ✗ Movement check: FAILED (" << distance_moved << "m < " << min_movement_threshold << "m)" << std::endl;
+                    }
+                    debug_log.close();
+                });
+                
+                if (movement_check_passed) {
                     // THROW DETECTED - initiate throw transition
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  THROW DETECTED: ball " << dist_from_hand
-                                  << "m from hand (threshold: "
-                                  << tracking_settings_.hand_distance_threshold << "m)"
-                                  << ", dist_from_ball: " << dist_from_ball
-                                  << "m (max: " << tracking_settings_.max_tracker_distance_per_frame << "m)"
-                                  << ", distance_moved: " << distance_moved
-                                  << "m (min: " << min_movement_threshold << "m)" << std::endl;
+                        debug_log << "  ✓✓✓ THROW DETECTED ✓✓✓" << std::endl;
+                        debug_log << "    Detection registered as IN_FLIGHT" << std::endl;
+                        debug_log << "    Summary:" << std::endl;
+                        debug_log << "      - In velocity zone: " << (in_velocity_direction ? "YES" : "NO") << std::endl;
+                        debug_log << "      - Velocity zone throw: " << (is_velocity_zone_throw ? "YES" : "NO") << std::endl;
+                        debug_log << "      - Distance from hand: " << dist_from_hand << "m (threshold: " << effective_hand_distance_threshold << "m)" << std::endl;
+                        debug_log << "      - Distance from ball: " << dist_from_ball << "m (max: " << tracking_settings_.max_tracker_distance_per_frame << "m)" << std::endl;
+                        debug_log << "      - Distance moved: " << distance_moved << "m (min: " << min_movement_threshold << "m)" << std::endl;
+                        debug_log << "      - Color score: " << color_score << " (threshold: " << aggressive_color_threshold << ")" << std::endl;
+                        debug_log << "      - Confidence: " << det.confidence << " (threshold: " << effective_confidence_threshold << ")" << std::endl;
+                        debug_log << "      - Class: " << (det.class_id == 0 ? "ball" : "ball_held") << std::endl;
                         debug_log.close();
                     });
+                    
+                    // Set the velocity zone flag before initiating throw
+                    ball.thrown_in_hand_velocity_zone = is_velocity_zone_throw;
+                    
                     initiateThrow(ball, det, hand, events);
                     return;
-                } else {
-                    DEBUG_LOG(debug_log, {
-                        OPEN_DEBUG_LOG(debug_log);
-                        debug_log << "  THROW REJECTED: distance_moved " << distance_moved
-                                  << "m < min_movement " << min_movement_threshold << "m (ball too close to hand)" << std::endl;
-                        debug_log.close();
-                    });
                 }
-            } else {
-                DEBUG_LOG(debug_log, {
-                    OPEN_DEBUG_LOG(debug_log);
-                    debug_log << "  THROW REJECTED: color_score " << color_score
-                              << " < " << tracking_settings_.min_color_match_score << std::endl;
-                    debug_log.close();
-                });
             }
         } else {
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
-                if (dist_from_hand <= tracking_settings_.hand_distance_threshold) {
-                    debug_log << "  THROW REJECTED: dist_from_hand " << dist_from_hand
-                              << "m <= threshold " << tracking_settings_.hand_distance_threshold << "m" << std::endl;
+                debug_log << "    ✗ Not a throw candidate:" << std::endl;
+                if (dist_from_hand <= effective_hand_distance_threshold) {
+                    debug_log << "      - dist_from_hand " << dist_from_hand
+                              << "m <= threshold " << effective_hand_distance_threshold << "m" << std::endl;
                 }
                 if (dist_from_ball >= tracking_settings_.max_tracker_distance_per_frame) {
-                    debug_log << "  THROW REJECTED: dist_from_ball " << dist_from_ball
+                    debug_log << "      - dist_from_ball " << dist_from_ball
                               << "m >= max_tracker_distance " << tracking_settings_.max_tracker_distance_per_frame << "m" << std::endl;
+                }
+                if (!meets_class_requirement) {
+                    debug_log << "      - class requirement not met (det.class_id=" << det.class_id << ")" << std::endl;
                 }
                 debug_log.close();
             });

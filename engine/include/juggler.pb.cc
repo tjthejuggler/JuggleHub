@@ -158,13 +158,16 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORIT
 PROTOBUF_CONSTEXPR Hand::Hand(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.keypoints_)*/{}
+  , /*decltype(_impl_.position_history_)*/{}
   , /*decltype(_impl_.side_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.position_2d_)*/nullptr
   , /*decltype(_impl_.wrist_pos_3d_)*/nullptr
   , /*decltype(_impl_.position_3d_)*/nullptr
+  , /*decltype(_impl_.velocity_3d_)*/nullptr
+  , /*decltype(_impl_.confidence_)*/0
   , /*decltype(_impl_.id_)*/0
   , /*decltype(_impl_.is_visible_)*/false
-  , /*decltype(_impl_.confidence_)*/0
+  , /*decltype(_impl_.has_valid_velocity_)*/false
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct HandDefaultTypeInternal {
   PROTOBUF_CONSTEXPR HandDefaultTypeInternal()
@@ -447,7 +450,6 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.camera_fps_)*/0u
   , /*decltype(_impl_.logical_id_to_calibrate_)*/0
   , /*decltype(_impl_.record_with_yolo_boxes_)*/false
-  , /*decltype(_impl_.record_with_bytetrack_boxes_)*/false
   , /*decltype(_impl_.pose_model_enabled_)*/false
   , /*decltype(_impl_.video_feed_enabled_)*/false
   , /*decltype(_impl_.click_x_)*/0
@@ -479,6 +481,7 @@ PROTOBUF_CONSTEXPR VisualizationStates::VisualizationStates(
   , /*decltype(_impl_.show_unmatched_detections_)*/false
   , /*decltype(_impl_.show_tails_)*/false
   , /*decltype(_impl_.show_trajectory_)*/false
+  , /*decltype(_impl_.show_hand_velocity_zone_)*/false
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct VisualizationStatesDefaultTypeInternal {
   PROTOBUF_CONSTEXPR VisualizationStatesDefaultTypeInternal()
@@ -624,6 +627,9 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.keypoints_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.side_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.position_3d_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.velocity_3d_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.has_valid_velocity_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::Hand, _impl_.position_history_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::IMUData, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -818,7 +824,6 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.logical_id_to_calibrate_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.calibration_pixel_pos_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.record_with_yolo_boxes_),
-  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.record_with_bytetrack_boxes_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.pose_model_enabled_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.visualization_states_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.color_name_),
@@ -847,6 +852,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_unmatched_detections_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_tails_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_trajectory_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_hand_velocity_zone_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorCommand, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -875,24 +881,24 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 63, -1, -1, sizeof(::juggler::v1::ColorTrackedBall)},
   { 76, -1, -1, sizeof(::juggler::v1::KeyPoint)},
   { 85, -1, -1, sizeof(::juggler::v1::Hand)},
-  { 99, -1, -1, sizeof(::juggler::v1::IMUData)},
-  { 114, -1, -1, sizeof(::juggler::v1::ThrowCatchEvent)},
-  { 126, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
-  { 137, -1, -1, sizeof(::juggler::v1::SystemStatus)},
-  { 150, -1, -1, sizeof(::juggler::v1::TrajectoryPrediction)},
-  { 160, -1, -1, sizeof(::juggler::v1::FilteredDetection)},
-  { 169, -1, -1, sizeof(::juggler::v1::TrackerAssociation)},
-  { 180, -1, -1, sizeof(::juggler::v1::NewTracker)},
-  { 190, -1, -1, sizeof(::juggler::v1::TrajectoryPoint)},
-  { 200, -1, -1, sizeof(::juggler::v1::BallState)},
-  { 213, -1, -1, sizeof(::juggler::v1::OcclusionState)},
-  { 223, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
-  { 236, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 265, 273, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 275, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 301, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
-  { 322, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 330, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 102, -1, -1, sizeof(::juggler::v1::IMUData)},
+  { 117, -1, -1, sizeof(::juggler::v1::ThrowCatchEvent)},
+  { 129, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
+  { 140, -1, -1, sizeof(::juggler::v1::SystemStatus)},
+  { 153, -1, -1, sizeof(::juggler::v1::TrajectoryPrediction)},
+  { 163, -1, -1, sizeof(::juggler::v1::FilteredDetection)},
+  { 172, -1, -1, sizeof(::juggler::v1::TrackerAssociation)},
+  { 183, -1, -1, sizeof(::juggler::v1::NewTracker)},
+  { 193, -1, -1, sizeof(::juggler::v1::TrajectoryPoint)},
+  { 203, -1, -1, sizeof(::juggler::v1::BallState)},
+  { 216, -1, -1, sizeof(::juggler::v1::OcclusionState)},
+  { 226, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
+  { 239, -1, -1, sizeof(::juggler::v1::FrameData)},
+  { 268, 276, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 278, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 303, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
+  { 325, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 333, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -953,101 +959,103 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "rames_since_seen\030\007 \001(\005\"h\n\010KeyPoint\022#\n\006po"
   "s_2d\030\001 \001(\0132\023.juggler.v1.Vector2\022#\n\006pos_3"
   "d\030\002 \001(\0132\023.juggler.v1.Vector3\022\022\n\nconfiden"
-  "ce\030\003 \001(\002\"\360\001\n\004Hand\022\n\n\002id\030\001 \001(\005\022(\n\013positio"
+  "ce\030\003 \001(\002\"\345\002\n\004Hand\022\n\n\002id\030\001 \001(\005\022(\n\013positio"
   "n_2d\030\002 \001(\0132\023.juggler.v1.Vector2\022)\n\014wrist"
   "_pos_3d\030\003 \001(\0132\023.juggler.v1.Vector3\022\022\n\nco"
   "nfidence\030\004 \001(\001\022\022\n\nis_visible\030\005 \001(\010\022\'\n\tke"
   "ypoints\030\006 \003(\0132\024.juggler.v1.KeyPoint\022\014\n\004s"
   "ide\030\007 \001(\t\022(\n\013position_3d\030\010 \001(\0132\023.juggler"
-  ".v1.Vector3\"\211\002\n\007IMUData\022\022\n\nwatch_name\030\001 "
-  "\001(\t\022\020\n\010watch_ip\030\002 \001(\t\022)\n\014acceleration\030\003 "
-  "\001(\0132\023.juggler.v1.Vector3\022&\n\tgyroscope\030\004 "
-  "\001(\0132\023.juggler.v1.Vector3\022)\n\014magnetometer"
-  "\030\005 \001(\0132\023.juggler.v1.Vector3\022\027\n\017accel_mag"
-  "nitude\030\006 \001(\001\022\026\n\016gyro_magnitude\030\007 \001(\001\022\024\n\014"
-  "timestamp_us\030\010 \001(\004\022\023\n\013data_age_ms\030\t \001(\001\""
-  "\334\001\n\017ThrowCatchEvent\0223\n\004type\030\001 \001(\0162%.jugg"
-  "ler.v1.ThrowCatchEvent.EventType\022\017\n\007ball"
-  "_id\030\002 \001(\005\022\017\n\007hand_id\030\003 \001(\005\022\024\n\014timestamp_"
-  "us\030\004 \001(\004\022%\n\010position\030\005 \001(\0132\023.juggler.v1."
-  "Vector3\022\022\n\nconfidence\030\006 \001(\002\"!\n\tEventType"
-  "\022\t\n\005THROW\020\000\022\t\n\005CATCH\020\001\"Y\n\020CameraIntrinsi"
-  "cs\022\n\n\002fx\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003ppx\030\003 \001(\001\022"
-  "\013\n\003ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001\"\235\001\n\014Sy"
-  "stemStatus\022\030\n\020camera_connected\030\001 \001(\010\022\026\n\016"
-  "engine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001(\001\022\023\n\013fra"
-  "me_count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\rerror_me"
-  "ssage\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001(\004\"\235\001\n\024Tr"
-  "ajectoryPrediction\022\022\n\nlogical_id\030\001 \001(\005\022*"
-  "\n\rpredicted_pos\030\002 \001(\0132\023.juggler.v1.Vecto"
-  "r3\022-\n\020predicted_pos_2d\030\003 \001(\0132\023.juggler.v"
-  "1.Vector2\022\026\n\016is_in_freefall\030\004 \001(\010\"`\n\021Fil"
-  "teredDetection\022&\n\003box\030\001 \001(\0132\031.juggler.v1"
-  ".BoundingBox2D\022\016\n\006reason\030\002 \001(\t\022\023\n\013depth_"
-  "value\030\003 \001(\002\"\254\001\n\022TrackerAssociation\022\022\n\ntr"
-  "acker_id\030\001 \001(\005\022\027\n\017detection_index\030\002 \001(\005\022"
-  "\023\n\013distance_3d\030\003 \001(\002\022(\n\013tracker_pos\030\004 \001("
-  "\0132\023.juggler.v1.Vector3\022*\n\rdetection_pos\030"
-  "\005 \001(\0132\023.juggler.v1.Vector3\"\220\001\n\nNewTracke"
-  "r\022\022\n\nlogical_id\030\001 \001(\005\022(\n\013initial_pos\030\002 \001"
-  "(\0132\023.juggler.v1.Vector3\022+\n\016initial_pos_2"
-  "d\030\003 \001(\0132\023.juggler.v1.Vector2\022\027\n\017detectio"
-  "n_index\030\004 \001(\005\"t\n\017TrajectoryPoint\022%\n\010posi"
-  "tion\030\001 \001(\0132\023.juggler.v1.Vector3\022\024\n\014times"
-  "tamp_us\030\002 \001(\004\022\020\n\010verified\030\003 \001(\010\022\022\n\nconfi"
-  "dence\030\004 \001(\002\"\237\002\n\tBallState\022\022\n\nlogical_id\030"
-  "\001 \001(\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1.BallSt"
-  "ate.State\022\032\n\022associated_hand_id\030\003 \001(\005\022\022\n"
-  "\nconfidence\030\004 \001(\002\022\027\n\017frames_in_state\030\005 \001"
-  "(\005\0226\n\021trajectory_points\030\006 \003(\0132\033.juggler."
-  "v1.TrajectoryPoint\022\034\n\024verified_point_cou"
-  "nt\030\007 \001(\005\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRAN"
-  "SITIONING\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022"
-  "\022\n\nlogical_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010"
-  "\022\031\n\021occluding_hand_id\030\003 \001(\005\022\030\n\020distance_"
-  "to_hand\030\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nl"
-  "ogical_id\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rs"
-  "earch_center\030\003 \001(\0132\023.juggler.v1.Vector2\022"
-  "\025\n\rsearch_radius\030\004 \001(\002\022(\n\013blob_center\030\005 "
-  "\001(\0132\023.juggler.v1.Vector2\022\021\n\tblob_area\030\006 "
-  "\001(\002\022\r\n\005found\030\007 \001(\010\"\337\007\n\tFrameData\022\024\n\014time"
-  "stamp_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler."
-  "v1.Ball\022\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand"
-  "\022%\n\010imu_data\030\004 \003(\0132\023.juggler.v1.IMUData\022"
-  "0\n\nintrinsics\030\005 \001(\0132\034.juggler.v1.CameraI"
-  "ntrinsics\022(\n\006status\030\006 \001(\0132\030.juggler.v1.S"
-  "ystemStatus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014fram"
-  "e_height\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016"
-  "raw_detections\030\n \003(\0132\031.juggler.v1.Boundi"
-  "ngBox2D\0227\n\024unmatched_detections\030\020 \003(\0132\031."
-  "juggler.v1.BoundingBox2D\022\027\n\017color_image_"
-  "b64\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir"
-  "_projector_active\030\r \001(\010\0229\n\023color_tracked"
-  "_balls\030\016 \003(\0132\034.juggler.v1.ColorTrackedBa"
-  "ll\0227\n\022throw_catch_events\030\017 \003(\0132\033.juggler"
-  ".v1.ThrowCatchEvent\022@\n\026trajectory_predic"
-  "tions\030\021 \003(\0132 .juggler.v1.TrajectoryPredi"
-  "ction\022:\n\023filtered_detections\030\022 \003(\0132\035.jug"
-  "gler.v1.FilteredDetection\022<\n\024tracker_ass"
-  "ociations\030\023 \003(\0132\036.juggler.v1.TrackerAsso"
-  "ciation\022,\n\014new_trackers\030\024 \003(\0132\026.juggler."
-  "v1.NewTracker\022*\n\013ball_states\030\025 \003(\0132\025.jug"
-  "gler.v1.BallState\0224\n\020occlusion_states\030\026 "
-  "\003(\0132\032.juggler.v1.OcclusionState\022;\n\024color"
-  "_search_regions\030\027 \003(\0132\035.juggler.v1.Color"
-  "SearchRegion\"\335\010\n\016CommandRequest\0224\n\004type\030"
-  "\001 \001(\0162&.juggler.v1.CommandRequest.Comman"
-  "dType\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestamp_"
-  "us\030\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.juggle"
-  "r.v1.ColorCommand\022\?\n\013module_args\030\005 \003(\0132*"
-  ".juggler.v1.CommandRequest.ModuleArgsEnt"
-  "ry\022\034\n\024camera_settings_file\030\006 \001(\t\022\024\n\014came"
-  "ra_width\030\007 \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n"
-  "\ncamera_fps\030\t \001(\r\022\037\n\027logical_id_to_calib"
-  "rate\030\n \001(\005\0222\n\025calibration_pixel_pos\030\013 \001("
-  "\0132\023.juggler.v1.Vector2\022\036\n\026record_with_yo"
-  "lo_boxes\030\014 \001(\010\022#\n\033record_with_bytetrack_"
-  "boxes\030\r \001(\010\022\032\n\022pose_model_enabled\030\016 \001(\010\022"
+  ".v1.Vector3\022(\n\013velocity_3d\030\t \001(\0132\023.juggl"
+  "er.v1.Vector3\022\032\n\022has_valid_velocity\030\n \001("
+  "\010\022-\n\020position_history\030\013 \003(\0132\023.juggler.v1"
+  ".Vector3\"\211\002\n\007IMUData\022\022\n\nwatch_name\030\001 \001(\t"
+  "\022\020\n\010watch_ip\030\002 \001(\t\022)\n\014acceleration\030\003 \001(\013"
+  "2\023.juggler.v1.Vector3\022&\n\tgyroscope\030\004 \001(\013"
+  "2\023.juggler.v1.Vector3\022)\n\014magnetometer\030\005 "
+  "\001(\0132\023.juggler.v1.Vector3\022\027\n\017accel_magnit"
+  "ude\030\006 \001(\001\022\026\n\016gyro_magnitude\030\007 \001(\001\022\024\n\014tim"
+  "estamp_us\030\010 \001(\004\022\023\n\013data_age_ms\030\t \001(\001\"\334\001\n"
+  "\017ThrowCatchEvent\0223\n\004type\030\001 \001(\0162%.juggler"
+  ".v1.ThrowCatchEvent.EventType\022\017\n\007ball_id"
+  "\030\002 \001(\005\022\017\n\007hand_id\030\003 \001(\005\022\024\n\014timestamp_us\030"
+  "\004 \001(\004\022%\n\010position\030\005 \001(\0132\023.juggler.v1.Vec"
+  "tor3\022\022\n\nconfidence\030\006 \001(\002\"!\n\tEventType\022\t\n"
+  "\005THROW\020\000\022\t\n\005CATCH\020\001\"Y\n\020CameraIntrinsics\022"
+  "\n\n\002fx\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003ppx\030\003 \001(\001\022\013\n\003"
+  "ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001\"\235\001\n\014Syste"
+  "mStatus\022\030\n\020camera_connected\030\001 \001(\010\022\026\n\016eng"
+  "ine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001(\001\022\023\n\013frame_"
+  "count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\rerror_messa"
+  "ge\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001(\004\"\235\001\n\024Traje"
+  "ctoryPrediction\022\022\n\nlogical_id\030\001 \001(\005\022*\n\rp"
+  "redicted_pos\030\002 \001(\0132\023.juggler.v1.Vector3\022"
+  "-\n\020predicted_pos_2d\030\003 \001(\0132\023.juggler.v1.V"
+  "ector2\022\026\n\016is_in_freefall\030\004 \001(\010\"`\n\021Filter"
+  "edDetection\022&\n\003box\030\001 \001(\0132\031.juggler.v1.Bo"
+  "undingBox2D\022\016\n\006reason\030\002 \001(\t\022\023\n\013depth_val"
+  "ue\030\003 \001(\002\"\254\001\n\022TrackerAssociation\022\022\n\ntrack"
+  "er_id\030\001 \001(\005\022\027\n\017detection_index\030\002 \001(\005\022\023\n\013"
+  "distance_3d\030\003 \001(\002\022(\n\013tracker_pos\030\004 \001(\0132\023"
+  ".juggler.v1.Vector3\022*\n\rdetection_pos\030\005 \001"
+  "(\0132\023.juggler.v1.Vector3\"\220\001\n\nNewTracker\022\022"
+  "\n\nlogical_id\030\001 \001(\005\022(\n\013initial_pos\030\002 \001(\0132"
+  "\023.juggler.v1.Vector3\022+\n\016initial_pos_2d\030\003"
+  " \001(\0132\023.juggler.v1.Vector2\022\027\n\017detection_i"
+  "ndex\030\004 \001(\005\"t\n\017TrajectoryPoint\022%\n\010positio"
+  "n\030\001 \001(\0132\023.juggler.v1.Vector3\022\024\n\014timestam"
+  "p_us\030\002 \001(\004\022\020\n\010verified\030\003 \001(\010\022\022\n\nconfiden"
+  "ce\030\004 \001(\002\"\237\002\n\tBallState\022\022\n\nlogical_id\030\001 \001"
+  "(\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1.BallState"
+  ".State\022\032\n\022associated_hand_id\030\003 \001(\005\022\022\n\nco"
+  "nfidence\030\004 \001(\002\022\027\n\017frames_in_state\030\005 \001(\005\022"
+  "6\n\021trajectory_points\030\006 \003(\0132\033.juggler.v1."
+  "TrajectoryPoint\022\034\n\024verified_point_count\030"
+  "\007 \001(\005\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRANSIT"
+  "IONING\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022\022\n\n"
+  "logical_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010\022\031\n"
+  "\021occluding_hand_id\030\003 \001(\005\022\030\n\020distance_to_"
+  "hand\030\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nlogi"
+  "cal_id\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rsear"
+  "ch_center\030\003 \001(\0132\023.juggler.v1.Vector2\022\025\n\r"
+  "search_radius\030\004 \001(\002\022(\n\013blob_center\030\005 \001(\013"
+  "2\023.juggler.v1.Vector2\022\021\n\tblob_area\030\006 \001(\002"
+  "\022\r\n\005found\030\007 \001(\010\"\337\007\n\tFrameData\022\024\n\014timesta"
+  "mp_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler.v1."
+  "Ball\022\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand\022%\n"
+  "\010imu_data\030\004 \003(\0132\023.juggler.v1.IMUData\0220\n\n"
+  "intrinsics\030\005 \001(\0132\034.juggler.v1.CameraIntr"
+  "insics\022(\n\006status\030\006 \001(\0132\030.juggler.v1.Syst"
+  "emStatus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014frame_h"
+  "eight\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016raw"
+  "_detections\030\n \003(\0132\031.juggler.v1.BoundingB"
+  "ox2D\0227\n\024unmatched_detections\030\020 \003(\0132\031.jug"
+  "gler.v1.BoundingBox2D\022\027\n\017color_image_b64"
+  "\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir_pr"
+  "ojector_active\030\r \001(\010\0229\n\023color_tracked_ba"
+  "lls\030\016 \003(\0132\034.juggler.v1.ColorTrackedBall\022"
+  "7\n\022throw_catch_events\030\017 \003(\0132\033.juggler.v1"
+  ".ThrowCatchEvent\022@\n\026trajectory_predictio"
+  "ns\030\021 \003(\0132 .juggler.v1.TrajectoryPredicti"
+  "on\022:\n\023filtered_detections\030\022 \003(\0132\035.juggle"
+  "r.v1.FilteredDetection\022<\n\024tracker_associ"
+  "ations\030\023 \003(\0132\036.juggler.v1.TrackerAssocia"
+  "tion\022,\n\014new_trackers\030\024 \003(\0132\026.juggler.v1."
+  "NewTracker\022*\n\013ball_states\030\025 \003(\0132\025.juggle"
+  "r.v1.BallState\0224\n\020occlusion_states\030\026 \003(\013"
+  "2\032.juggler.v1.OcclusionState\022;\n\024color_se"
+  "arch_regions\030\027 \003(\0132\035.juggler.v1.ColorSea"
+  "rchRegion\"\270\010\n\016CommandRequest\0224\n\004type\030\001 \001"
+  "(\0162&.juggler.v1.CommandRequest.CommandTy"
+  "pe\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestamp_us\030"
+  "\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.juggler.v"
+  "1.ColorCommand\022\?\n\013module_args\030\005 \003(\0132*.ju"
+  "ggler.v1.CommandRequest.ModuleArgsEntry\022"
+  "\034\n\024camera_settings_file\030\006 \001(\t\022\024\n\014camera_"
+  "width\030\007 \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n\nca"
+  "mera_fps\030\t \001(\r\022\037\n\027logical_id_to_calibrat"
+  "e\030\n \001(\005\0222\n\025calibration_pixel_pos\030\013 \001(\0132\023"
+  ".juggler.v1.Vector2\022\036\n\026record_with_yolo_"
+  "boxes\030\014 \001(\010\022\032\n\022pose_model_enabled\030\016 \001(\010\022"
   "=\n\024visualization_states\030\023 \001(\0132\037.juggler."
   "v1.VisualizationStates\022\022\n\ncolor_name\030\017 \001"
   "(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014"
@@ -1063,7 +1071,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "BRATE_OBJECT\020\013\022\032\n\026SET_POSE_MODEL_ENABLED"
   "\020\014\022\023\n\017CALIBRATE_COLOR\020\r\022\022\n\016ENABLE_FEATUR"
   "E\020\016\022\023\n\017DISABLE_FEATURE\020\017\022\032\n\026SET_VIDEO_FE"
-  "ED_ENABLED\020\020\"\267\003\n\023VisualizationStates\022#\n\033"
+  "ED_ENABLED\020\020\"\330\003\n\023VisualizationStates\022#\n\033"
   "show_trajectory_predictions\030\001 \001(\010\022\033\n\023sho"
   "w_raw_detections\030\002 \001(\010\022 \n\030show_filtered_"
   "detections\030\003 \001(\010\022\031\n\021show_associations\030\004 "
@@ -1074,15 +1082,15 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "\n\022show_color_tracker\030\013 \001(\010\022\032\n\022show_track"
   "ed_boxes\030\014 \001(\010\022!\n\031show_unmatched_detecti"
   "ons\030\r \001(\010\022\022\n\nshow_tails\030\016 \001(\010\022\027\n\017show_tr"
-  "ajectory\030\017 \001(\010\"A\n\014ColorCommand\022\017\n\007ball_i"
-  "d\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Colo"
-  "r\"I\n\017CommandResponse\022\017\n\007success\030\001 \001(\010\022\017\n"
-  "\007message\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006pr"
-  "oto3"
+  "ajectory\030\017 \001(\010\022\037\n\027show_hand_velocity_zon"
+  "e\030\020 \001(\010\"A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t"
+  "\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017Co"
+  "mmandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007messag"
+  "e\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 6084, descriptor_table_protodef_juggler_2eproto,
+    false, false, 6197, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 27,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -3813,6 +3821,7 @@ class Hand::_Internal {
   static const ::juggler::v1::Vector2& position_2d(const Hand* msg);
   static const ::juggler::v1::Vector3& wrist_pos_3d(const Hand* msg);
   static const ::juggler::v1::Vector3& position_3d(const Hand* msg);
+  static const ::juggler::v1::Vector3& velocity_3d(const Hand* msg);
 };
 
 const ::juggler::v1::Vector2&
@@ -3827,6 +3836,10 @@ const ::juggler::v1::Vector3&
 Hand::_Internal::position_3d(const Hand* msg) {
   return *msg->_impl_.position_3d_;
 }
+const ::juggler::v1::Vector3&
+Hand::_Internal::velocity_3d(const Hand* msg) {
+  return *msg->_impl_.velocity_3d_;
+}
 Hand::Hand(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                          bool is_message_owned)
   : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
@@ -3838,13 +3851,16 @@ Hand::Hand(const Hand& from)
   Hand* const _this = this; (void)_this;
   new (&_impl_) Impl_{
       decltype(_impl_.keypoints_){from._impl_.keypoints_}
+    , decltype(_impl_.position_history_){from._impl_.position_history_}
     , decltype(_impl_.side_){}
     , decltype(_impl_.position_2d_){nullptr}
     , decltype(_impl_.wrist_pos_3d_){nullptr}
     , decltype(_impl_.position_3d_){nullptr}
+    , decltype(_impl_.velocity_3d_){nullptr}
+    , decltype(_impl_.confidence_){}
     , decltype(_impl_.id_){}
     , decltype(_impl_.is_visible_){}
-    , decltype(_impl_.confidence_){}
+    , decltype(_impl_.has_valid_velocity_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -3865,9 +3881,12 @@ Hand::Hand(const Hand& from)
   if (from._internal_has_position_3d()) {
     _this->_impl_.position_3d_ = new ::juggler::v1::Vector3(*from._impl_.position_3d_);
   }
-  ::memcpy(&_impl_.id_, &from._impl_.id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.confidence_) -
-    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.confidence_));
+  if (from._internal_has_velocity_3d()) {
+    _this->_impl_.velocity_3d_ = new ::juggler::v1::Vector3(*from._impl_.velocity_3d_);
+  }
+  ::memcpy(&_impl_.confidence_, &from._impl_.confidence_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.has_valid_velocity_) -
+    reinterpret_cast<char*>(&_impl_.confidence_)) + sizeof(_impl_.has_valid_velocity_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.Hand)
 }
 
@@ -3877,13 +3896,16 @@ inline void Hand::SharedCtor(
   (void)is_message_owned;
   new (&_impl_) Impl_{
       decltype(_impl_.keypoints_){arena}
+    , decltype(_impl_.position_history_){arena}
     , decltype(_impl_.side_){}
     , decltype(_impl_.position_2d_){nullptr}
     , decltype(_impl_.wrist_pos_3d_){nullptr}
     , decltype(_impl_.position_3d_){nullptr}
+    , decltype(_impl_.velocity_3d_){nullptr}
+    , decltype(_impl_.confidence_){0}
     , decltype(_impl_.id_){0}
     , decltype(_impl_.is_visible_){false}
-    , decltype(_impl_.confidence_){0}
+    , decltype(_impl_.has_valid_velocity_){false}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.side_.InitDefault();
@@ -3904,10 +3926,12 @@ Hand::~Hand() {
 inline void Hand::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
   _impl_.keypoints_.~RepeatedPtrField();
+  _impl_.position_history_.~RepeatedPtrField();
   _impl_.side_.Destroy();
   if (this != internal_default_instance()) delete _impl_.position_2d_;
   if (this != internal_default_instance()) delete _impl_.wrist_pos_3d_;
   if (this != internal_default_instance()) delete _impl_.position_3d_;
+  if (this != internal_default_instance()) delete _impl_.velocity_3d_;
 }
 
 void Hand::SetCachedSize(int size) const {
@@ -3921,6 +3945,7 @@ void Hand::Clear() {
   (void) cached_has_bits;
 
   _impl_.keypoints_.Clear();
+  _impl_.position_history_.Clear();
   _impl_.side_.ClearToEmpty();
   if (GetArenaForAllocation() == nullptr && _impl_.position_2d_ != nullptr) {
     delete _impl_.position_2d_;
@@ -3934,9 +3959,13 @@ void Hand::Clear() {
     delete _impl_.position_3d_;
   }
   _impl_.position_3d_ = nullptr;
-  ::memset(&_impl_.id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.confidence_) -
-      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.confidence_));
+  if (GetArenaForAllocation() == nullptr && _impl_.velocity_3d_ != nullptr) {
+    delete _impl_.velocity_3d_;
+  }
+  _impl_.velocity_3d_ = nullptr;
+  ::memset(&_impl_.confidence_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.has_valid_velocity_) -
+      reinterpret_cast<char*>(&_impl_.confidence_)) + sizeof(_impl_.has_valid_velocity_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -4014,6 +4043,35 @@ const char* Hand::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 66)) {
           ptr = ctx->ParseMessage(_internal_mutable_position_3d(), ptr);
           CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .juggler.v1.Vector3 velocity_3d = 9;
+      case 9:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 74)) {
+          ptr = ctx->ParseMessage(_internal_mutable_velocity_3d(), ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool has_valid_velocity = 10;
+      case 10:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 80)) {
+          _impl_.has_valid_velocity_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated .juggler.v1.Vector3 position_history = 11;
+      case 11:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 90)) {
+          ptr -= 1;
+          do {
+            ptr += 1;
+            ptr = ctx->ParseMessage(_internal_add_position_history(), ptr);
+            CHK_(ptr);
+            if (!ctx->DataAvailable(ptr)) break;
+          } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<90>(ptr));
         } else
           goto handle_unusual;
         continue;
@@ -4107,6 +4165,27 @@ uint8_t* Hand::_InternalSerialize(
         _Internal::position_3d(this).GetCachedSize(), target, stream);
   }
 
+  // .juggler.v1.Vector3 velocity_3d = 9;
+  if (this->_internal_has_velocity_3d()) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(9, _Internal::velocity_3d(this),
+        _Internal::velocity_3d(this).GetCachedSize(), target, stream);
+  }
+
+  // bool has_valid_velocity = 10;
+  if (this->_internal_has_valid_velocity() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(10, this->_internal_has_valid_velocity(), target);
+  }
+
+  // repeated .juggler.v1.Vector3 position_history = 11;
+  for (unsigned i = 0,
+      n = static_cast<unsigned>(this->_internal_position_history_size()); i < n; i++) {
+    const auto& repfield = this->_internal_position_history(i);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+        InternalWriteMessage(11, repfield, repfield.GetCachedSize(), target, stream);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -4126,6 +4205,13 @@ size_t Hand::ByteSizeLong() const {
   // repeated .juggler.v1.KeyPoint keypoints = 6;
   total_size += 1UL * this->_internal_keypoints_size();
   for (const auto& msg : this->_impl_.keypoints_) {
+    total_size +=
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
+  }
+
+  // repeated .juggler.v1.Vector3 position_history = 11;
+  total_size += 1UL * this->_internal_position_history_size();
+  for (const auto& msg : this->_impl_.position_history_) {
     total_size +=
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(msg);
   }
@@ -4158,6 +4244,22 @@ size_t Hand::ByteSizeLong() const {
         *_impl_.position_3d_);
   }
 
+  // .juggler.v1.Vector3 velocity_3d = 9;
+  if (this->_internal_has_velocity_3d()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *_impl_.velocity_3d_);
+  }
+
+  // double confidence = 4;
+  static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
+  double tmp_confidence = this->_internal_confidence();
+  uint64_t raw_confidence;
+  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
+  if (raw_confidence != 0) {
+    total_size += 1 + 8;
+  }
+
   // int32 id = 1;
   if (this->_internal_id() != 0) {
     total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_id());
@@ -4168,13 +4270,9 @@ size_t Hand::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
-  // double confidence = 4;
-  static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
-  double tmp_confidence = this->_internal_confidence();
-  uint64_t raw_confidence;
-  memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
-  if (raw_confidence != 0) {
-    total_size += 1 + 8;
+  // bool has_valid_velocity = 10;
+  if (this->_internal_has_valid_velocity() != 0) {
+    total_size += 1 + 1;
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -4196,6 +4294,7 @@ void Hand::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_
   (void) cached_has_bits;
 
   _this->_impl_.keypoints_.MergeFrom(from._impl_.keypoints_);
+  _this->_impl_.position_history_.MergeFrom(from._impl_.position_history_);
   if (!from._internal_side().empty()) {
     _this->_internal_set_side(from._internal_side());
   }
@@ -4211,11 +4310,9 @@ void Hand::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_
     _this->_internal_mutable_position_3d()->::juggler::v1::Vector3::MergeFrom(
         from._internal_position_3d());
   }
-  if (from._internal_id() != 0) {
-    _this->_internal_set_id(from._internal_id());
-  }
-  if (from._internal_is_visible() != 0) {
-    _this->_internal_set_is_visible(from._internal_is_visible());
+  if (from._internal_has_velocity_3d()) {
+    _this->_internal_mutable_velocity_3d()->::juggler::v1::Vector3::MergeFrom(
+        from._internal_velocity_3d());
   }
   static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
   double tmp_confidence = from._internal_confidence();
@@ -4223,6 +4320,15 @@ void Hand::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_
   memcpy(&raw_confidence, &tmp_confidence, sizeof(tmp_confidence));
   if (raw_confidence != 0) {
     _this->_internal_set_confidence(from._internal_confidence());
+  }
+  if (from._internal_id() != 0) {
+    _this->_internal_set_id(from._internal_id());
+  }
+  if (from._internal_is_visible() != 0) {
+    _this->_internal_set_is_visible(from._internal_is_visible());
+  }
+  if (from._internal_has_valid_velocity() != 0) {
+    _this->_internal_set_has_valid_velocity(from._internal_has_valid_velocity());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -4244,13 +4350,14 @@ void Hand::InternalSwap(Hand* other) {
   auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   _impl_.keypoints_.InternalSwap(&other->_impl_.keypoints_);
+  _impl_.position_history_.InternalSwap(&other->_impl_.position_history_);
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.side_, lhs_arena,
       &other->_impl_.side_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(Hand, _impl_.confidence_)
-      + sizeof(Hand::_impl_.confidence_)
+      PROTOBUF_FIELD_OFFSET(Hand, _impl_.has_valid_velocity_)
+      + sizeof(Hand::_impl_.has_valid_velocity_)
       - PROTOBUF_FIELD_OFFSET(Hand, _impl_.position_2d_)>(
           reinterpret_cast<char*>(&_impl_.position_2d_),
           reinterpret_cast<char*>(&other->_impl_.position_2d_));
@@ -9392,7 +9499,6 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.camera_fps_){}
     , decltype(_impl_.logical_id_to_calibrate_){}
     , decltype(_impl_.record_with_yolo_boxes_){}
-    , decltype(_impl_.record_with_bytetrack_boxes_){}
     , decltype(_impl_.pose_model_enabled_){}
     , decltype(_impl_.video_feed_enabled_){}
     , decltype(_impl_.click_x_){}
@@ -9468,7 +9574,6 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.camera_fps_){0u}
     , decltype(_impl_.logical_id_to_calibrate_){0}
     , decltype(_impl_.record_with_yolo_boxes_){false}
-    , decltype(_impl_.record_with_bytetrack_boxes_){false}
     , decltype(_impl_.pose_model_enabled_){false}
     , decltype(_impl_.video_feed_enabled_){false}
     , decltype(_impl_.click_x_){0}
@@ -9661,14 +9766,6 @@ const char* CommandRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext
       case 12:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 96)) {
           _impl_.record_with_yolo_boxes_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
-          CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
-      // bool record_with_bytetrack_boxes = 13;
-      case 13:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 104)) {
-          _impl_.record_with_bytetrack_boxes_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -9869,12 +9966,6 @@ uint8_t* CommandRequest::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(12, this->_internal_record_with_yolo_boxes(), target);
   }
 
-  // bool record_with_bytetrack_boxes = 13;
-  if (this->_internal_record_with_bytetrack_boxes() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteBoolToArray(13, this->_internal_record_with_bytetrack_boxes(), target);
-  }
-
   // bool pose_model_enabled = 14;
   if (this->_internal_pose_model_enabled() != 0) {
     target = stream->EnsureSpace(target);
@@ -10036,11 +10127,6 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
-  // bool record_with_bytetrack_boxes = 13;
-  if (this->_internal_record_with_bytetrack_boxes() != 0) {
-    total_size += 1 + 1;
-  }
-
   // bool pose_model_enabled = 14;
   if (this->_internal_pose_model_enabled() != 0) {
     total_size += 1 + 1;
@@ -10128,9 +10214,6 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   }
   if (from._internal_record_with_yolo_boxes() != 0) {
     _this->_internal_set_record_with_yolo_boxes(from._internal_record_with_yolo_boxes());
-  }
-  if (from._internal_record_with_bytetrack_boxes() != 0) {
-    _this->_internal_set_record_with_bytetrack_boxes(from._internal_record_with_bytetrack_boxes());
   }
   if (from._internal_pose_model_enabled() != 0) {
     _this->_internal_set_pose_model_enabled(from._internal_pose_model_enabled());
@@ -10225,12 +10308,13 @@ VisualizationStates::VisualizationStates(const VisualizationStates& from)
     , decltype(_impl_.show_unmatched_detections_){}
     , decltype(_impl_.show_tails_){}
     , decltype(_impl_.show_trajectory_){}
+    , decltype(_impl_.show_hand_velocity_zone_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   ::memcpy(&_impl_.show_trajectory_predictions_, &from._impl_.show_trajectory_predictions_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.show_trajectory_) -
-    reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_)) + sizeof(_impl_.show_trajectory_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.show_hand_velocity_zone_) -
+    reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_)) + sizeof(_impl_.show_hand_velocity_zone_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.VisualizationStates)
 }
 
@@ -10254,6 +10338,7 @@ inline void VisualizationStates::SharedCtor(
     , decltype(_impl_.show_unmatched_detections_){false}
     , decltype(_impl_.show_tails_){false}
     , decltype(_impl_.show_trajectory_){false}
+    , decltype(_impl_.show_hand_velocity_zone_){false}
     , /*decltype(_impl_._cached_size_)*/{}
   };
 }
@@ -10282,8 +10367,8 @@ void VisualizationStates::Clear() {
   (void) cached_has_bits;
 
   ::memset(&_impl_.show_trajectory_predictions_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.show_trajectory_) -
-      reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_)) + sizeof(_impl_.show_trajectory_));
+      reinterpret_cast<char*>(&_impl_.show_hand_velocity_zone_) -
+      reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_)) + sizeof(_impl_.show_hand_velocity_zone_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -10413,6 +10498,14 @@ const char* VisualizationStates::_InternalParse(const char* ptr, ::_pbi::ParseCo
         } else
           goto handle_unusual;
         continue;
+      // bool show_hand_velocity_zone = 16;
+      case 16:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 128)) {
+          _impl_.show_hand_velocity_zone_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
       default:
         goto handle_unusual;
     }  // switch
@@ -10532,6 +10625,12 @@ uint8_t* VisualizationStates::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(15, this->_internal_show_trajectory(), target);
   }
 
+  // bool show_hand_velocity_zone = 16;
+  if (this->_internal_show_hand_velocity_zone() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(16, this->_internal_show_hand_velocity_zone(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -10623,6 +10722,11 @@ size_t VisualizationStates::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // bool show_hand_velocity_zone = 16;
+  if (this->_internal_show_hand_velocity_zone() != 0) {
+    total_size += 2 + 1;
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -10686,6 +10790,9 @@ void VisualizationStates::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, co
   if (from._internal_show_trajectory() != 0) {
     _this->_internal_set_show_trajectory(from._internal_show_trajectory());
   }
+  if (from._internal_show_hand_velocity_zone() != 0) {
+    _this->_internal_set_show_hand_velocity_zone(from._internal_show_hand_velocity_zone());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -10704,8 +10811,8 @@ void VisualizationStates::InternalSwap(VisualizationStates* other) {
   using std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_trajectory_)
-      + sizeof(VisualizationStates::_impl_.show_trajectory_)
+      PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_hand_velocity_zone_)
+      + sizeof(VisualizationStates::_impl_.show_hand_velocity_zone_)
       - PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_trajectory_predictions_)>(
           reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_),
           reinterpret_cast<char*>(&other->_impl_.show_trajectory_predictions_));

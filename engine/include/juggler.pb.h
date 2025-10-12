@@ -2037,13 +2037,16 @@ class Hand final :
 
   enum : int {
     kKeypointsFieldNumber = 6,
+    kPositionHistoryFieldNumber = 11,
     kSideFieldNumber = 7,
     kPosition2DFieldNumber = 2,
     kWristPos3DFieldNumber = 3,
     kPosition3DFieldNumber = 8,
+    kVelocity3DFieldNumber = 9,
+    kConfidenceFieldNumber = 4,
     kIdFieldNumber = 1,
     kIsVisibleFieldNumber = 5,
-    kConfidenceFieldNumber = 4,
+    kHasValidVelocityFieldNumber = 10,
   };
   // repeated .juggler.v1.KeyPoint keypoints = 6;
   int keypoints_size() const;
@@ -2062,6 +2065,24 @@ class Hand final :
   ::juggler::v1::KeyPoint* add_keypoints();
   const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KeyPoint >&
       keypoints() const;
+
+  // repeated .juggler.v1.Vector3 position_history = 11;
+  int position_history_size() const;
+  private:
+  int _internal_position_history_size() const;
+  public:
+  void clear_position_history();
+  ::juggler::v1::Vector3* mutable_position_history(int index);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::Vector3 >*
+      mutable_position_history();
+  private:
+  const ::juggler::v1::Vector3& _internal_position_history(int index) const;
+  ::juggler::v1::Vector3* _internal_add_position_history();
+  public:
+  const ::juggler::v1::Vector3& position_history(int index) const;
+  ::juggler::v1::Vector3* add_position_history();
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::Vector3 >&
+      position_history() const;
 
   // string side = 7;
   void clear_side();
@@ -2131,6 +2152,33 @@ class Hand final :
       ::juggler::v1::Vector3* position_3d);
   ::juggler::v1::Vector3* unsafe_arena_release_position_3d();
 
+  // .juggler.v1.Vector3 velocity_3d = 9;
+  bool has_velocity_3d() const;
+  private:
+  bool _internal_has_velocity_3d() const;
+  public:
+  void clear_velocity_3d();
+  const ::juggler::v1::Vector3& velocity_3d() const;
+  PROTOBUF_NODISCARD ::juggler::v1::Vector3* release_velocity_3d();
+  ::juggler::v1::Vector3* mutable_velocity_3d();
+  void set_allocated_velocity_3d(::juggler::v1::Vector3* velocity_3d);
+  private:
+  const ::juggler::v1::Vector3& _internal_velocity_3d() const;
+  ::juggler::v1::Vector3* _internal_mutable_velocity_3d();
+  public:
+  void unsafe_arena_set_allocated_velocity_3d(
+      ::juggler::v1::Vector3* velocity_3d);
+  ::juggler::v1::Vector3* unsafe_arena_release_velocity_3d();
+
+  // double confidence = 4;
+  void clear_confidence();
+  double confidence() const;
+  void set_confidence(double value);
+  private:
+  double _internal_confidence() const;
+  void _internal_set_confidence(double value);
+  public:
+
   // int32 id = 1;
   void clear_id();
   int32_t id() const;
@@ -2149,13 +2197,13 @@ class Hand final :
   void _internal_set_is_visible(bool value);
   public:
 
-  // double confidence = 4;
-  void clear_confidence();
-  double confidence() const;
-  void set_confidence(double value);
+  // bool has_valid_velocity = 10;
+  void clear_has_valid_velocity();
+  bool has_valid_velocity() const;
+  void set_has_valid_velocity(bool value);
   private:
-  double _internal_confidence() const;
-  void _internal_set_confidence(double value);
+  bool _internal_has_valid_velocity() const;
+  void _internal_set_has_valid_velocity(bool value);
   public:
 
   // @@protoc_insertion_point(class_scope:juggler.v1.Hand)
@@ -2167,13 +2215,16 @@ class Hand final :
   typedef void DestructorSkippable_;
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::KeyPoint > keypoints_;
+    ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::Vector3 > position_history_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr side_;
     ::juggler::v1::Vector2* position_2d_;
     ::juggler::v1::Vector3* wrist_pos_3d_;
     ::juggler::v1::Vector3* position_3d_;
+    ::juggler::v1::Vector3* velocity_3d_;
+    double confidence_;
     int32_t id_;
     bool is_visible_;
-    double confidence_;
+    bool has_valid_velocity_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -5538,7 +5589,6 @@ class CommandRequest final :
     kCameraFpsFieldNumber = 9,
     kLogicalIdToCalibrateFieldNumber = 10,
     kRecordWithYoloBoxesFieldNumber = 12,
-    kRecordWithBytetrackBoxesFieldNumber = 13,
     kPoseModelEnabledFieldNumber = 14,
     kVideoFeedEnabledFieldNumber = 20,
     kClickXFieldNumber = 16,
@@ -5734,15 +5784,6 @@ class CommandRequest final :
   void _internal_set_record_with_yolo_boxes(bool value);
   public:
 
-  // bool record_with_bytetrack_boxes = 13;
-  void clear_record_with_bytetrack_boxes();
-  bool record_with_bytetrack_boxes() const;
-  void set_record_with_bytetrack_boxes(bool value);
-  private:
-  bool _internal_record_with_bytetrack_boxes() const;
-  void _internal_set_record_with_bytetrack_boxes(bool value);
-  public:
-
   // bool pose_model_enabled = 14;
   void clear_pose_model_enabled();
   bool pose_model_enabled() const;
@@ -5806,7 +5847,6 @@ class CommandRequest final :
     uint32_t camera_fps_;
     int32_t logical_id_to_calibrate_;
     bool record_with_yolo_boxes_;
-    bool record_with_bytetrack_boxes_;
     bool pose_model_enabled_;
     bool video_feed_enabled_;
     int32_t click_x_;
@@ -5954,6 +5994,7 @@ class VisualizationStates final :
     kShowUnmatchedDetectionsFieldNumber = 13,
     kShowTailsFieldNumber = 14,
     kShowTrajectoryFieldNumber = 15,
+    kShowHandVelocityZoneFieldNumber = 16,
   };
   // bool show_trajectory_predictions = 1;
   void clear_show_trajectory_predictions();
@@ -6090,6 +6131,15 @@ class VisualizationStates final :
   void _internal_set_show_trajectory(bool value);
   public:
 
+  // bool show_hand_velocity_zone = 16;
+  void clear_show_hand_velocity_zone();
+  bool show_hand_velocity_zone() const;
+  void set_show_hand_velocity_zone(bool value);
+  private:
+  bool _internal_show_hand_velocity_zone() const;
+  void _internal_set_show_hand_velocity_zone(bool value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.VisualizationStates)
  private:
   class _Internal;
@@ -6113,6 +6163,7 @@ class VisualizationStates final :
     bool show_unmatched_detections_;
     bool show_tails_;
     bool show_trajectory_;
+    bool show_hand_velocity_zone_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -8387,6 +8438,156 @@ inline void Hand::set_allocated_position_3d(::juggler::v1::Vector3* position_3d)
   }
   _impl_.position_3d_ = position_3d;
   // @@protoc_insertion_point(field_set_allocated:juggler.v1.Hand.position_3d)
+}
+
+// .juggler.v1.Vector3 velocity_3d = 9;
+inline bool Hand::_internal_has_velocity_3d() const {
+  return this != internal_default_instance() && _impl_.velocity_3d_ != nullptr;
+}
+inline bool Hand::has_velocity_3d() const {
+  return _internal_has_velocity_3d();
+}
+inline void Hand::clear_velocity_3d() {
+  if (GetArenaForAllocation() == nullptr && _impl_.velocity_3d_ != nullptr) {
+    delete _impl_.velocity_3d_;
+  }
+  _impl_.velocity_3d_ = nullptr;
+}
+inline const ::juggler::v1::Vector3& Hand::_internal_velocity_3d() const {
+  const ::juggler::v1::Vector3* p = _impl_.velocity_3d_;
+  return p != nullptr ? *p : reinterpret_cast<const ::juggler::v1::Vector3&>(
+      ::juggler::v1::_Vector3_default_instance_);
+}
+inline const ::juggler::v1::Vector3& Hand::velocity_3d() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.Hand.velocity_3d)
+  return _internal_velocity_3d();
+}
+inline void Hand::unsafe_arena_set_allocated_velocity_3d(
+    ::juggler::v1::Vector3* velocity_3d) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.velocity_3d_);
+  }
+  _impl_.velocity_3d_ = velocity_3d;
+  if (velocity_3d) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:juggler.v1.Hand.velocity_3d)
+}
+inline ::juggler::v1::Vector3* Hand::release_velocity_3d() {
+  
+  ::juggler::v1::Vector3* temp = _impl_.velocity_3d_;
+  _impl_.velocity_3d_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::juggler::v1::Vector3* Hand::unsafe_arena_release_velocity_3d() {
+  // @@protoc_insertion_point(field_release:juggler.v1.Hand.velocity_3d)
+  
+  ::juggler::v1::Vector3* temp = _impl_.velocity_3d_;
+  _impl_.velocity_3d_ = nullptr;
+  return temp;
+}
+inline ::juggler::v1::Vector3* Hand::_internal_mutable_velocity_3d() {
+  
+  if (_impl_.velocity_3d_ == nullptr) {
+    auto* p = CreateMaybeMessage<::juggler::v1::Vector3>(GetArenaForAllocation());
+    _impl_.velocity_3d_ = p;
+  }
+  return _impl_.velocity_3d_;
+}
+inline ::juggler::v1::Vector3* Hand::mutable_velocity_3d() {
+  ::juggler::v1::Vector3* _msg = _internal_mutable_velocity_3d();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.Hand.velocity_3d)
+  return _msg;
+}
+inline void Hand::set_allocated_velocity_3d(::juggler::v1::Vector3* velocity_3d) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.velocity_3d_;
+  }
+  if (velocity_3d) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(velocity_3d);
+    if (message_arena != submessage_arena) {
+      velocity_3d = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, velocity_3d, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.velocity_3d_ = velocity_3d;
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.Hand.velocity_3d)
+}
+
+// bool has_valid_velocity = 10;
+inline void Hand::clear_has_valid_velocity() {
+  _impl_.has_valid_velocity_ = false;
+}
+inline bool Hand::_internal_has_valid_velocity() const {
+  return _impl_.has_valid_velocity_;
+}
+inline bool Hand::has_valid_velocity() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.Hand.has_valid_velocity)
+  return _internal_has_valid_velocity();
+}
+inline void Hand::_internal_set_has_valid_velocity(bool value) {
+  
+  _impl_.has_valid_velocity_ = value;
+}
+inline void Hand::set_has_valid_velocity(bool value) {
+  _internal_set_has_valid_velocity(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.Hand.has_valid_velocity)
+}
+
+// repeated .juggler.v1.Vector3 position_history = 11;
+inline int Hand::_internal_position_history_size() const {
+  return _impl_.position_history_.size();
+}
+inline int Hand::position_history_size() const {
+  return _internal_position_history_size();
+}
+inline void Hand::clear_position_history() {
+  _impl_.position_history_.Clear();
+}
+inline ::juggler::v1::Vector3* Hand::mutable_position_history(int index) {
+  // @@protoc_insertion_point(field_mutable:juggler.v1.Hand.position_history)
+  return _impl_.position_history_.Mutable(index);
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::Vector3 >*
+Hand::mutable_position_history() {
+  // @@protoc_insertion_point(field_mutable_list:juggler.v1.Hand.position_history)
+  return &_impl_.position_history_;
+}
+inline const ::juggler::v1::Vector3& Hand::_internal_position_history(int index) const {
+  return _impl_.position_history_.Get(index);
+}
+inline const ::juggler::v1::Vector3& Hand::position_history(int index) const {
+  // @@protoc_insertion_point(field_get:juggler.v1.Hand.position_history)
+  return _internal_position_history(index);
+}
+inline ::juggler::v1::Vector3* Hand::_internal_add_position_history() {
+  return _impl_.position_history_.Add();
+}
+inline ::juggler::v1::Vector3* Hand::add_position_history() {
+  ::juggler::v1::Vector3* _add = _internal_add_position_history();
+  // @@protoc_insertion_point(field_add:juggler.v1.Hand.position_history)
+  return _add;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::juggler::v1::Vector3 >&
+Hand::position_history() const {
+  // @@protoc_insertion_point(field_list:juggler.v1.Hand.position_history)
+  return _impl_.position_history_;
 }
 
 // -------------------------------------------------------------------
@@ -12316,26 +12517,6 @@ inline void CommandRequest::set_record_with_yolo_boxes(bool value) {
   // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.record_with_yolo_boxes)
 }
 
-// bool record_with_bytetrack_boxes = 13;
-inline void CommandRequest::clear_record_with_bytetrack_boxes() {
-  _impl_.record_with_bytetrack_boxes_ = false;
-}
-inline bool CommandRequest::_internal_record_with_bytetrack_boxes() const {
-  return _impl_.record_with_bytetrack_boxes_;
-}
-inline bool CommandRequest::record_with_bytetrack_boxes() const {
-  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.record_with_bytetrack_boxes)
-  return _internal_record_with_bytetrack_boxes();
-}
-inline void CommandRequest::_internal_set_record_with_bytetrack_boxes(bool value) {
-  
-  _impl_.record_with_bytetrack_boxes_ = value;
-}
-inline void CommandRequest::set_record_with_bytetrack_boxes(bool value) {
-  _internal_set_record_with_bytetrack_boxes(value);
-  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.record_with_bytetrack_boxes)
-}
-
 // bool pose_model_enabled = 14;
 inline void CommandRequest::clear_pose_model_enabled() {
   _impl_.pose_model_enabled_ = false;
@@ -12908,6 +13089,26 @@ inline void VisualizationStates::_internal_set_show_trajectory(bool value) {
 inline void VisualizationStates::set_show_trajectory(bool value) {
   _internal_set_show_trajectory(value);
   // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_trajectory)
+}
+
+// bool show_hand_velocity_zone = 16;
+inline void VisualizationStates::clear_show_hand_velocity_zone() {
+  _impl_.show_hand_velocity_zone_ = false;
+}
+inline bool VisualizationStates::_internal_show_hand_velocity_zone() const {
+  return _impl_.show_hand_velocity_zone_;
+}
+inline bool VisualizationStates::show_hand_velocity_zone() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_hand_velocity_zone)
+  return _internal_show_hand_velocity_zone();
+}
+inline void VisualizationStates::_internal_set_show_hand_velocity_zone(bool value) {
+  
+  _impl_.show_hand_velocity_zone_ = value;
+}
+inline void VisualizationStates::set_show_hand_velocity_zone(bool value) {
+  _internal_set_show_hand_velocity_zone(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_hand_velocity_zone)
 }
 
 // -------------------------------------------------------------------

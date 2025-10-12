@@ -402,6 +402,13 @@ if PYQT_AVAILABLE:
             self.show_hand_threshold_toggle.setToolTip("tracking_settings.hand_distance_threshold - Blue circles around hands showing unified hand distance threshold")
             toggle_buttons.append(self.show_hand_threshold_toggle)
             
+            self.show_hand_velocity_zone_toggle = QPushButton("hand_velocity_zone")
+            self.show_hand_velocity_zone_toggle.setCheckable(True)
+            self.show_hand_velocity_zone_toggle.setChecked(False)
+            self.show_hand_velocity_zone_toggle.clicked.connect(self.toggle_overlays)
+            self.show_hand_velocity_zone_toggle.setToolTip("tracking_settings.hand_velocity - Purple circles showing detection zone when hand is moving fast")
+            toggle_buttons.append(self.show_hand_velocity_zone_toggle)
+            
             self.show_tails_toggle = QPushButton("tracker_history")
             self.show_tails_toggle.setCheckable(True)
             self.show_tails_toggle.setChecked(False)
@@ -1441,6 +1448,106 @@ if PYQT_AVAILABLE:
                                         int(kp_end.pos_2d.x), int(kp_end.pos_2d.y)
                                     )
 
+            # --- Draw Hand Velocity Zone Visualization ---
+            if self.show_hand_velocity_zone_toggle.isChecked():
+                # Get camera intrinsics for 3D-to-2D projection
+                fx = frame_data.intrinsics.fx if frame_data.HasField('intrinsics') else 385.0
+                fy = frame_data.intrinsics.fy if frame_data.HasField('intrinsics') else 385.0
+                ppx = frame_data.intrinsics.ppx if frame_data.HasField('intrinsics') else 320.0
+                ppy = frame_data.intrinsics.ppy if frame_data.HasField('intrinsics') else 240.0
+                
+                # Get hand velocity settings from settings widget
+                hand_velocity_threshold = 1.0  # Default threshold in m/s
+                hand_velocity_radius = 0.15  # Default radius in meters
+                if hasattr(self, 'settings_widget') and self.settings_widget:
+                    if hasattr(self.settings_widget, 'hand_velocity_threshold_slider'):
+                        hand_velocity_threshold = self.settings_widget.hand_velocity_threshold_slider.value() / 100.0
+                    if hasattr(self.settings_widget, 'hand_velocity_detection_radius_slider'):
+                        hand_velocity_radius = self.settings_widget.hand_velocity_detection_radius_slider.value() / 100.0
+                
+                painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                
+                for hand in frame_data.hands:
+                    # Check if hand has valid velocity information
+                    if not hand.has_valid_velocity:
+                        continue
+                    
+                    # Calculate hand velocity magnitude
+                    velocity_magnitude = (hand.velocity_3d.x**2 + hand.velocity_3d.y**2 + hand.velocity_3d.z**2)**0.5
+                    
+                    # Check if a ball is held by this hand
+                    ball_held = False
+                    held_ball_color = None
+                    for color_ball in frame_data.color_tracked_balls:
+                        if color_ball.associated_wrist_id == hand.id:
+                            ball_held = True
+                            held_ball_color = color_ball.color_name
+                            break
+                    
+                    # Only draw if velocity exceeds threshold OR if a ball is held (to show history)
+                    show_velocity_zone = velocity_magnitude >= hand_velocity_threshold
+                    show_history = ball_held and len(hand.position_history) > 0
+                    
+                    if not show_velocity_zone and not show_history:
+                        continue
+                    
+                    # Project hand wrist position to 2D
+                    if hand.wrist_pos_3d.z <= 0:
+                        continue
+                    
+                    center_x = int((hand.wrist_pos_3d.x * fx) / hand.wrist_pos_3d.z + ppx)
+                    center_y = int((hand.wrist_pos_3d.y * fy) / hand.wrist_pos_3d.z + ppy)
+                    
+                    # Check if on-screen
+                    if center_x < 0 or center_x >= pixmap.width() or center_y < 0 or center_y >= pixmap.height():
+                        continue
+                    
+                    # Draw velocity zone if hand is moving fast
+                    if show_velocity_zone:
+                        # Calculate radius in pixels (approximate projection)
+                        radius_pixels = int((hand_velocity_radius * fx) / hand.wrist_pos_3d.z)
+                        
+                        # Draw purple circle showing detection zone
+                        painter.setPen(QPen(QColor(128, 0, 255, 200), 3))  # Purple
+                        painter.setBrush(Qt.BrushStyle.NoBrush)
+                        painter.drawEllipse(center_x - radius_pixels, center_y - radius_pixels,
+                                          radius_pixels * 2, radius_pixels * 2)
+                        
+                        # Draw velocity magnitude text
+                        painter.setPen(QPen(QColor(255, 255, 255)))
+                        velocity_text = f"Hand velocity: {velocity_magnitude:.2f} m/s"
+                        painter.drawText(center_x + radius_pixels + 10, center_y - 20, velocity_text)
+                    
+                    # Draw hand position history if ball is held
+                    if show_history:
+                        # Draw position history trail
+                        painter.setPen(QPen(QColor(255, 255, 0, 150), 2))  # Yellow trail
+                        
+                        prev_point = None
+                        for hist_pos in hand.position_history:
+                            if hist_pos.z <= 0:
+                                continue
+                            
+                            # Project history position to 2D
+                            hist_x = int((hist_pos.x * fx) / hist_pos.z + ppx)
+                            hist_y = int((hist_pos.y * fy) / hist_pos.z + ppy)
+                            
+                            # Draw small circle at history point
+                            painter.setBrush(QBrush(QColor(255, 255, 0, 200)))
+                            painter.drawEllipse(hist_x - 3, hist_y - 3, 6, 6)
+                            
+                            # Draw line connecting to previous point
+                            if prev_point is not None:
+                                painter.drawLine(prev_point[0], prev_point[1], hist_x, hist_y)
+                            
+                            prev_point = (hist_x, hist_y)
+                        
+                        # Draw text showing history
+                        painter.setPen(QPen(QColor(255, 255, 0)))  # Yellow text
+                        history_text = f"Hand locations history when {held_ball_color} ball is held"
+                        text_y = center_y if show_velocity_zone else center_y - 20
+                        painter.drawText(center_x + 10, text_y, history_text)
+
             painter.end()
             self.video_pixmap_item.setPixmap(pixmap)
             
@@ -1498,6 +1605,7 @@ if PYQT_AVAILABLE:
             viz_states.show_unmatched_detections = self.show_unmatched_detections_toggle.isChecked()
             viz_states.show_tails = self.show_tails_toggle.isChecked()
             viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
+            viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
             
             command = juggler_pb2.CommandRequest(
                 type=juggler_pb2.CommandRequest.CommandType.RECORD_START,
@@ -1535,6 +1643,7 @@ if PYQT_AVAILABLE:
                 viz_states.show_unmatched_detections = self.show_unmatched_detections_toggle.isChecked()
                 viz_states.show_tails = self.show_tails_toggle.isChecked()
                 viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
+                viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
                 command.visualization_states.CopyFrom(viz_states)
             
             try:

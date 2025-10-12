@@ -21,6 +21,9 @@ class RecordingLogger {
 public:
     RecordingLogger() : is_active_(false), frame_number_(0) {}
     
+    // Get current frame number (for debug logging)
+    int getFrameNumber() const { return frame_number_; }
+    
     ~RecordingLogger() {
         close();
     }
@@ -165,6 +168,36 @@ public:
                          << hand.wrist_pos_3d.z << ") m\n";
                 log_file_ << "    Visible: " << (hand.is_visible ? "YES" : "NO") << "\n";
                 log_file_ << "    Confidence: " << std::setprecision(3) << hand.confidence << "\n";
+                
+                // Log hand velocity if available
+                if (hand.has_valid_velocity) {
+                    float velocity_magnitude = std::sqrt(
+                        hand.velocity.x * hand.velocity.x +
+                        hand.velocity.y * hand.velocity.y +
+                        hand.velocity.z * hand.velocity.z
+                    );
+                    log_file_ << "    Velocity: (" << std::fixed << std::setprecision(4)
+                             << hand.velocity.x << ", "
+                             << hand.velocity.y << ", "
+                             << hand.velocity.z << ") m/s\n";
+                    log_file_ << "    Velocity magnitude: " << std::setprecision(4) << velocity_magnitude << " m/s\n";
+                } else {
+                    log_file_ << "    Velocity: NOT AVAILABLE (need more frames)\n";
+                }
+                
+                // Log position history if available
+                if (!hand.position_history.empty()) {
+                    log_file_ << "    Position history (" << hand.position_history.size() << " points):\n";
+                    for (size_t i = 0; i < hand.position_history.size(); ++i) {
+                        const auto& hist_pos = hand.position_history[i];
+                        log_file_ << "      [" << i << "] (" << std::fixed << std::setprecision(4)
+                                 << hist_pos.x << ", "
+                                 << hist_pos.y << ", "
+                                 << hist_pos.z << ") m\n";
+                    }
+                } else {
+                    log_file_ << "    Position history: EMPTY\n";
+                }
             }
             log_file_ << "\n";
         }

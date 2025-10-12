@@ -1237,9 +1237,14 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                             // Generate catch event using initiateCatch
                             DEBUG_LOG(debug_log, {
                                 OPEN_DEBUG_LOG(debug_log);
+                                debug_log << "  ★★★ [CATCH LOCATION 1: OVERRIDE PATH] ★★★" << std::endl;
                                 debug_log << "  Override: Ball transitioning IN_FLIGHT→HELD via initiateCatch() (distance-based: hand "
                                           << closest_hand_id << ", dist=" << min_dist << "m < threshold="
                                           << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
+                                debug_log << "  Ball " << ball.id << " caught by hand " << catching_hand->id << std::endl;
+                                debug_log << "  last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                                debug_log << "  frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                                debug_log << "  min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
                                 debug_log.close();
                             });
                             initiateCatch(ball, *catching_hand, events);
@@ -1832,7 +1837,12 @@ void SimpleBallTracker::updateInFlightBall(
             if (nearest_hand) {
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ★★★ [CATCH LOCATION 5: LOCKUP PREVENTION - MAX FRAMES] ★★★" << std::endl;
                     debug_log << "  FORCED CATCH to hand " << nearest_hand->id << " (dist=" << min_dist << "m)" << std::endl;
+                    debug_log << "  Ball " << ball.id << " caught by hand " << nearest_hand->id << std::endl;
+                    debug_log << "  last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                    debug_log << "  frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                    debug_log << "  min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
                     debug_log.close();
                 });
                 initiateCatch(ball, *nearest_hand, events);
@@ -1882,7 +1892,12 @@ void SimpleBallTracker::updateInFlightBall(
             if (nearest_hand && min_dist < tracking_settings_.max_tracker_distance_per_frame * 3.0f) {
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ★★★ [CATCH LOCATION 6: LOCKUP PREVENTION - MAX UNVERIFIED] ★★★" << std::endl;
                     debug_log << "  FORCED CATCH to hand " << nearest_hand->id << " (dist=" << min_dist << "m)" << std::endl;
+                    debug_log << "  Ball " << ball.id << " caught by hand " << nearest_hand->id << std::endl;
+                    debug_log << "  last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                    debug_log << "  frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                    debug_log << "  min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
                     debug_log.close();
                 });
                 initiateCatch(ball, *nearest_hand, events);
@@ -1936,7 +1951,12 @@ void SimpleBallTracker::updateInFlightBall(
             if (nearest_hand) {
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ★★★ [CATCH LOCATION 7: CRITICAL FALLBACK - NO POINTS] ★★★" << std::endl;
                     debug_log << "  FORCED CATCH to hand " << nearest_hand->id << " (dist=" << min_dist << "m)" << std::endl;
+                    debug_log << "  Ball " << ball.id << " caught by hand " << nearest_hand->id << std::endl;
+                    debug_log << "  last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                    debug_log << "  frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                    debug_log << "  min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
                     debug_log.close();
                 });
                 initiateCatch(ball, *nearest_hand, events);
@@ -2253,8 +2273,13 @@ void SimpleBallTracker::updateInFlightBall(
                 
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ★★★ [CATCH LOCATION 2: NEAR-HAND FALLBACK] ★★★" << std::endl;
                     debug_log << "  NEAR-HAND FALLBACK: Ball within 0.15m of hand " << hand.id
                               << " (dist=" << dist << "m) - initiating catch" << std::endl;
+                    debug_log << "  Ball " << ball.id << " caught by hand " << hand.id << std::endl;
+                    debug_log << "  last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                    debug_log << "  frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                    debug_log << "  min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
                     debug_log.close();
                 });
                 
@@ -2293,12 +2318,37 @@ void SimpleBallTracker::updateInFlightBall(
         
         // CRITICAL FIX: Only force catch if within max_tracker_distance threshold
         if (nearest_hand && min_dist < tracking_settings_.max_tracker_distance_per_frame) {
+            // CRITICAL: Check catch cooldown before allowing catch
+            if (ball.last_throwing_hand_id >= 0 &&
+                nearest_hand->id == ball.last_throwing_hand_id &&
+                ball.frames_in_flight_since_throw < tracking_settings_.min_frames_before_catch) {
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ✗ CRITICAL FALLBACK CATCH BLOCKED: Same hand that threw, only "
+                              << ball.frames_in_flight_since_throw << " frames in flight (need "
+                              << tracking_settings_.min_frames_before_catch << "+)" << std::endl;
+                    debug_log.close();
+                });
+                
+                // Don't force catch - keep ball at last known position instead
+                ball.position = reference_pos;
+                ball.pixel_pos = project_3d_to_2d(reference_pos, intrinsics);
+                ball.tracking_reason = "IN_FLIGHT_fallback_blocked_cooldown";
+                return;
+            }
+            
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  ★★★ [CATCH LOCATION 8: CRITICAL FALLBACK - INVALID POSITION] ★★★" << std::endl;
                 debug_log << "  CRITICAL FALLBACK: Invalid position (z=" << ball.position.z
                           << ") - forcing catch to nearest hand " << nearest_hand->id
                           << " (dist=" << min_dist << "m < max="
                           << tracking_settings_.max_tracker_distance_per_frame << "m)" << std::endl;
+                debug_log << "  Ball " << ball.id << " caught by hand " << nearest_hand->id << std::endl;
+                debug_log << "  last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                debug_log << "  frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                debug_log << "  min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
                 debug_log.close();
             });
             initiateCatch(ball, *nearest_hand, events);
@@ -2482,11 +2532,14 @@ void SimpleBallTracker::updateInFlightBall(
             } else {
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ★★★ [CATCH LOCATION 3: MAIN CATCH DETECTION] ★★★" << std::endl;
                     debug_log << "  CATCH DETECTED to CLOSEST hand " << closest_hand->id
                               << ": dist=" << min_dist
                               << "m, threshold=" << tracking_settings_.hand_distance_threshold << "m" << std::endl;
-                    
-                    // No special logging needed - 3-frame rule is global
+                    debug_log << "  Ball " << ball.id << " caught by hand " << closest_hand->id << std::endl;
+                    debug_log << "  last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                    debug_log << "  frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                    debug_log << "  min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
                     debug_log.close();
                 });
                 
@@ -2535,9 +2588,14 @@ void SimpleBallTracker::updateInFlightBall(
                 
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ★★★ [CATCH LOCATION 4: SAFETY CATCH] ★★★" << std::endl;
                     debug_log << "  SAFETY CATCH: Ball within " << dist_to_hand
                               << "m of hand " << hand.id << " (threshold: "
                               << tracking_settings_.hand_distance_threshold << "m) - forcing catch" << std::endl;
+                    debug_log << "  Ball " << ball.id << " caught by hand " << hand.id << std::endl;
+                    debug_log << "  last_throwing_hand_id: " << ball.last_throwing_hand_id << std::endl;
+                    debug_log << "  frames_in_flight_since_throw: " << ball.frames_in_flight_since_throw << std::endl;
+                    debug_log << "  min_frames_before_catch: " << tracking_settings_.min_frames_before_catch << std::endl;
                     debug_log.close();
                 });
                 

@@ -249,6 +249,11 @@ std::vector<Detection> Simple2DBallTracker::runBallDetection(const cv::Mat& colo
 // ============================================================================
 
 std::vector<SimpleHand> Simple2DBallTracker::runPoseEstimation(const cv::Mat& color_frame) {
+    // If pose detection is disabled, return empty vector
+    if (!enable_pose_detection_) {
+        return std::vector<SimpleHand>();
+    }
+    
     std::vector<SimpleHand> hands;
     
     // Preprocess
@@ -380,6 +385,12 @@ bool Simple2DBallTracker::updateSetting(const std::string& key, const std::strin
         enable_ball_detection_ = (value == "true" || value == "1");
         std::cout << "[Simple2DBallTracker] Ball detection "
                   << (enable_ball_detection_ ? "enabled" : "disabled") << std::endl;
+        return true;
+    }
+    else if (key == "enable_pose_detection") {
+        enable_pose_detection_ = (value == "true" || value == "1");
+        std::cout << "[Simple2DBallTracker] Pose detection "
+                  << (enable_pose_detection_ ? "enabled" : "disabled") << std::endl;
         return true;
     }
     

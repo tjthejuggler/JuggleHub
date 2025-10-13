@@ -253,6 +253,7 @@ private:
     float ball_held_confidence_threshold_;      // Confidence threshold for 'ball_held' class
     float nms_threshold_;                       // Non-maximum suppression threshold
     bool enable_ball_detection_;                // Enable/disable YOLO ball detection
+    bool enable_pose_detection_;                // Enable/disable YOLO pose detection
     
     // Constants
     static constexpr int NUM_CLASSES = 2;       // ball, ball_held

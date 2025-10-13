@@ -458,6 +458,7 @@ private:
     float nms_threshold_ = 0.5f;
     bool show_raw_yolo_detections_ = false;        // Toggle for showing raw YOLO detections in visualization
     bool enable_ball_detection_ = true;            // Toggle for enabling/disabling YOLO ball detection
+    bool enable_pose_detection_ = true;            // Toggle for enabling/disabling YOLO pose detection
     const int num_classes_ = 2;  // ball, ball_held
     
     // Parameters

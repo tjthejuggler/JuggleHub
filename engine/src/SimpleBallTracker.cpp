@@ -494,6 +494,10 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             enable_ball_detection_ = (value == "true" || value == "1");
             return true;
         }
+        else if (key == "enable_pose_detection") {
+            enable_pose_detection_ = (value == "true" || value == "1");
+            return true;
+        }
     } catch (const std::exception& e) {
         return false;
     }
@@ -1649,6 +1653,11 @@ std::vector<SimpleHand> SimpleBallTracker::runPoseEstimation(
     const cv::Mat& color_frame,
     const cv::Mat& depth_frame,
     const CameraIntrinsics& intrinsics) {
+    
+    // If pose detection is disabled, return empty vector
+    if (!enable_pose_detection_) {
+        return std::vector<SimpleHand>();
+    }
     
     std::vector<SimpleHand> hands;
     

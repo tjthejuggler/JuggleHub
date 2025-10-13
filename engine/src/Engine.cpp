@@ -616,8 +616,19 @@ void Engine::processCommands() {
                     response.set_message("Manual object calibration not supported in SimpleBallTracker. Use color calibration instead.");
                     break;
                 case juggler::v1::CommandRequest::SET_POSE_MODEL_ENABLED:
-                    // Note: Pose model is always enabled in SimpleBallTracker
-                    response.set_message("Pose model is always enabled in SimpleBallTracker");
+                    if (tracker_) {
+                        bool enabled = command.pose_model_enabled();
+                        bool success = tracker_->updateSetting("enable_pose_detection", enabled ? "1" : "0");
+                        if (success) {
+                            response.set_message(std::string("Pose detection ") + (enabled ? "enabled" : "disabled"));
+                        } else {
+                            response.set_success(false);
+                            response.set_message("Failed to update pose detection setting");
+                        }
+                    } else {
+                        response.set_success(false);
+                        response.set_message("Tracker not initialized");
+                    }
                     break;
                 case juggler::v1::CommandRequest::CALIBRATE_COLOR:
                     if (tracker_) {

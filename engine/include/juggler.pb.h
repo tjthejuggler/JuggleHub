@@ -261,12 +261,13 @@ enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_DISABLE_FEATURE = 15,
   CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED = 16,
   CommandRequest_CommandType_SET_TRACKER_TYPE = 17,
+  CommandRequest_CommandType_SET_DEPTH_SENSOR_ENABLED = 18,
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool CommandRequest_CommandType_IsValid(int value);
 constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MIN = CommandRequest_CommandType_UNKNOWN;
-constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_SET_TRACKER_TYPE;
+constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_SET_DEPTH_SENSOR_ENABLED;
 constexpr int CommandRequest_CommandType_CommandType_ARRAYSIZE = CommandRequest_CommandType_CommandType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor();
@@ -5549,6 +5550,8 @@ class CommandRequest final :
     CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED;
   static constexpr CommandType SET_TRACKER_TYPE =
     CommandRequest_CommandType_SET_TRACKER_TYPE;
+  static constexpr CommandType SET_DEPTH_SENSOR_ENABLED =
+    CommandRequest_CommandType_SET_DEPTH_SENSOR_ENABLED;
   static inline bool CommandType_IsValid(int value) {
     return CommandRequest_CommandType_IsValid(value);
   }
@@ -5592,11 +5595,12 @@ class CommandRequest final :
     kCameraHeightFieldNumber = 8,
     kCameraFpsFieldNumber = 9,
     kLogicalIdToCalibrateFieldNumber = 10,
+    kClickXFieldNumber = 16,
+    kClickYFieldNumber = 17,
     kRecordWithYoloBoxesFieldNumber = 12,
     kPoseModelEnabledFieldNumber = 14,
     kVideoFeedEnabledFieldNumber = 20,
-    kClickXFieldNumber = 16,
-    kClickYFieldNumber = 17,
+    kDepthSensorEnabledFieldNumber = 22,
   };
   // map<string, string> module_args = 5;
   int module_args_size() const;
@@ -5793,6 +5797,24 @@ class CommandRequest final :
   void _internal_set_logical_id_to_calibrate(int32_t value);
   public:
 
+  // int32 click_x = 16;
+  void clear_click_x();
+  int32_t click_x() const;
+  void set_click_x(int32_t value);
+  private:
+  int32_t _internal_click_x() const;
+  void _internal_set_click_x(int32_t value);
+  public:
+
+  // int32 click_y = 17;
+  void clear_click_y();
+  int32_t click_y() const;
+  void set_click_y(int32_t value);
+  private:
+  int32_t _internal_click_y() const;
+  void _internal_set_click_y(int32_t value);
+  public:
+
   // bool record_with_yolo_boxes = 12;
   void clear_record_with_yolo_boxes();
   bool record_with_yolo_boxes() const;
@@ -5820,22 +5842,13 @@ class CommandRequest final :
   void _internal_set_video_feed_enabled(bool value);
   public:
 
-  // int32 click_x = 16;
-  void clear_click_x();
-  int32_t click_x() const;
-  void set_click_x(int32_t value);
+  // bool depth_sensor_enabled = 22;
+  void clear_depth_sensor_enabled();
+  bool depth_sensor_enabled() const;
+  void set_depth_sensor_enabled(bool value);
   private:
-  int32_t _internal_click_x() const;
-  void _internal_set_click_x(int32_t value);
-  public:
-
-  // int32 click_y = 17;
-  void clear_click_y();
-  int32_t click_y() const;
-  void set_click_y(int32_t value);
-  private:
-  int32_t _internal_click_y() const;
-  void _internal_set_click_y(int32_t value);
+  bool _internal_depth_sensor_enabled() const;
+  void _internal_set_depth_sensor_enabled(bool value);
   public:
 
   // @@protoc_insertion_point(class_scope:juggler.v1.CommandRequest)
@@ -5865,11 +5878,12 @@ class CommandRequest final :
     uint32_t camera_height_;
     uint32_t camera_fps_;
     int32_t logical_id_to_calibrate_;
+    int32_t click_x_;
+    int32_t click_y_;
     bool record_with_yolo_boxes_;
     bool pose_model_enabled_;
     bool video_feed_enabled_;
-    int32_t click_x_;
-    int32_t click_y_;
+    bool depth_sensor_enabled_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -12854,6 +12868,26 @@ inline void CommandRequest::set_allocated_tracker_type(std::string* tracker_type
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.tracker_type)
+}
+
+// bool depth_sensor_enabled = 22;
+inline void CommandRequest::clear_depth_sensor_enabled() {
+  _impl_.depth_sensor_enabled_ = false;
+}
+inline bool CommandRequest::_internal_depth_sensor_enabled() const {
+  return _impl_.depth_sensor_enabled_;
+}
+inline bool CommandRequest::depth_sensor_enabled() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.depth_sensor_enabled)
+  return _internal_depth_sensor_enabled();
+}
+inline void CommandRequest::_internal_set_depth_sensor_enabled(bool value) {
+  
+  _impl_.depth_sensor_enabled_ = value;
+}
+inline void CommandRequest::set_depth_sensor_enabled(bool value) {
+  _internal_set_depth_sensor_enabled(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.depth_sensor_enabled)
 }
 
 // -------------------------------------------------------------------

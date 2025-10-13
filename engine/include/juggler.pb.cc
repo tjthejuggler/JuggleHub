@@ -450,11 +450,12 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.camera_height_)*/0u
   , /*decltype(_impl_.camera_fps_)*/0u
   , /*decltype(_impl_.logical_id_to_calibrate_)*/0
+  , /*decltype(_impl_.click_x_)*/0
+  , /*decltype(_impl_.click_y_)*/0
   , /*decltype(_impl_.record_with_yolo_boxes_)*/false
   , /*decltype(_impl_.pose_model_enabled_)*/false
   , /*decltype(_impl_.video_feed_enabled_)*/false
-  , /*decltype(_impl_.click_x_)*/0
-  , /*decltype(_impl_.click_y_)*/0
+  , /*decltype(_impl_.depth_sensor_enabled_)*/false
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct CommandRequestDefaultTypeInternal {
   PROTOBUF_CONSTEXPR CommandRequestDefaultTypeInternal()
@@ -833,6 +834,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.feature_name_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.video_feed_enabled_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.tracker_type_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.depth_sensor_enabled_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -898,9 +900,9 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 239, -1, -1, sizeof(::juggler::v1::FrameData)},
   { 268, 276, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
   { 278, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 304, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
-  { 326, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 334, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 305, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
+  { 327, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 335, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -1046,7 +1048,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "r.v1.BallState\0224\n\020occlusion_states\030\026 \003(\013"
   "2\032.juggler.v1.OcclusionState\022;\n\024color_se"
   "arch_regions\030\027 \003(\0132\035.juggler.v1.ColorSea"
-  "rchRegion\"\344\010\n\016CommandRequest\0224\n\004type\030\001 \001"
+  "rchRegion\"\240\t\n\016CommandRequest\0224\n\004type\030\001 \001"
   "(\0162&.juggler.v1.CommandRequest.CommandTy"
   "pe\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestamp_us\030"
   "\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.juggler.v"
@@ -1062,39 +1064,40 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "v1.VisualizationStates\022\022\n\ncolor_name\030\017 \001"
   "(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014"
   "feature_name\030\022 \001(\t\022\032\n\022video_feed_enabled"
-  "\030\024 \001(\010\022\024\n\014tracker_type\030\025 \001(\t\0321\n\017ModuleAr"
-  "gsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\""
-  "\236\003\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MOD"
-  "ULE\020\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_C"
-  "OMMAND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD"
-  "_START\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n"
-  "\026RECORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WIT"
-  "H_CAMERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014"
-  "CAMERA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026"
-  "SET_POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_CO"
-  "LOR\020\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_FEA"
-  "TURE\020\017\022\032\n\026SET_VIDEO_FEED_ENABLED\020\020\022\024\n\020SE"
-  "T_TRACKER_TYPE\020\021\"\330\003\n\023VisualizationStates"
-  "\022#\n\033show_trajectory_predictions\030\001 \001(\010\022\033\n"
-  "\023show_raw_detections\030\002 \001(\010\022 \n\030show_filte"
-  "red_detections\030\003 \001(\010\022\031\n\021show_association"
-  "s\030\004 \001(\010\022\031\n\021show_new_trackers\030\005 \001(\010\022\032\n\022sh"
-  "ow_hand_tracking\030\006 \001(\010\022\030\n\020show_ball_stat"
-  "es\030\007 \001(\010\022\026\n\016show_occlusion\030\010 \001(\010\022\025\n\rshow"
-  "_skeleton\030\t \001(\010\022\031\n\021show_color_search\030\n \001"
-  "(\010\022\032\n\022show_color_tracker\030\013 \001(\010\022\032\n\022show_t"
-  "racked_boxes\030\014 \001(\010\022!\n\031show_unmatched_det"
-  "ections\030\r \001(\010\022\022\n\nshow_tails\030\016 \001(\010\022\027\n\017sho"
-  "w_trajectory\030\017 \001(\010\022\037\n\027show_hand_velocity"
-  "_zone\030\020 \001(\010\"A\n\014ColorCommand\022\017\n\007ball_id\030\001"
-  " \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1.Color\"I"
-  "\n\017CommandResponse\022\017\n\007success\030\001 \001(\010\022\017\n\007me"
-  "ssage\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004b\006proto"
-  "3"
+  "\030\024 \001(\010\022\024\n\014tracker_type\030\025 \001(\t\022\034\n\024depth_se"
+  "nsor_enabled\030\026 \001(\010\0321\n\017ModuleArgsEntry\022\013\n"
+  "\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\274\003\n\013Comman"
+  "dType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rU"
+  "NLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMMAND\020\003\022\024"
+  "\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_START\020\005\022\033"
+  "\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026RECORD_CO"
+  "NTINUOUS_STOP\020\007\022 \n\034RESTART_WITH_CAMERA_S"
+  "ETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CAMERA_STA"
+  "RT\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026SET_POSE_M"
+  "ODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COLOR\020\r\022\022\n\016E"
+  "NABLE_FEATURE\020\016\022\023\n\017DISABLE_FEATURE\020\017\022\032\n\026"
+  "SET_VIDEO_FEED_ENABLED\020\020\022\024\n\020SET_TRACKER_"
+  "TYPE\020\021\022\034\n\030SET_DEPTH_SENSOR_ENABLED\020\022\"\330\003\n"
+  "\023VisualizationStates\022#\n\033show_trajectory_"
+  "predictions\030\001 \001(\010\022\033\n\023show_raw_detections"
+  "\030\002 \001(\010\022 \n\030show_filtered_detections\030\003 \001(\010"
+  "\022\031\n\021show_associations\030\004 \001(\010\022\031\n\021show_new_"
+  "trackers\030\005 \001(\010\022\032\n\022show_hand_tracking\030\006 \001"
+  "(\010\022\030\n\020show_ball_states\030\007 \001(\010\022\026\n\016show_occ"
+  "lusion\030\010 \001(\010\022\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021s"
+  "how_color_search\030\n \001(\010\022\032\n\022show_color_tra"
+  "cker\030\013 \001(\010\022\032\n\022show_tracked_boxes\030\014 \001(\010\022!"
+  "\n\031show_unmatched_detections\030\r \001(\010\022\022\n\nsho"
+  "w_tails\030\016 \001(\010\022\027\n\017show_trajectory\030\017 \001(\010\022\037"
+  "\n\027show_hand_velocity_zone\030\020 \001(\010\"A\n\014Color"
+  "Command\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132"
+  "\021.juggler.v1.Color\"I\n\017CommandResponse\022\017\n"
+  "\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014times"
+  "tamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 6241, descriptor_table_protodef_juggler_2eproto,
+    false, false, 6301, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 27,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -1200,6 +1203,7 @@ bool CommandRequest_CommandType_IsValid(int value) {
     case 15:
     case 16:
     case 17:
+    case 18:
       return true;
     default:
       return false;
@@ -1225,6 +1229,7 @@ constexpr CommandRequest_CommandType CommandRequest::ENABLE_FEATURE;
 constexpr CommandRequest_CommandType CommandRequest::DISABLE_FEATURE;
 constexpr CommandRequest_CommandType CommandRequest::SET_VIDEO_FEED_ENABLED;
 constexpr CommandRequest_CommandType CommandRequest::SET_TRACKER_TYPE;
+constexpr CommandRequest_CommandType CommandRequest::SET_DEPTH_SENSOR_ENABLED;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MIN;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MAX;
 constexpr int CommandRequest::CommandType_ARRAYSIZE;
@@ -9505,11 +9510,12 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.camera_height_){}
     , decltype(_impl_.camera_fps_){}
     , decltype(_impl_.logical_id_to_calibrate_){}
+    , decltype(_impl_.click_x_){}
+    , decltype(_impl_.click_y_){}
     , decltype(_impl_.record_with_yolo_boxes_){}
     , decltype(_impl_.pose_model_enabled_){}
     , decltype(_impl_.video_feed_enabled_){}
-    , decltype(_impl_.click_x_){}
-    , decltype(_impl_.click_y_){}
+    , decltype(_impl_.depth_sensor_enabled_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -9564,8 +9570,8 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     _this->_impl_.visualization_states_ = new ::juggler::v1::VisualizationStates(*from._impl_.visualization_states_);
   }
   ::memcpy(&_impl_.timestamp_us_, &from._impl_.timestamp_us_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.click_y_) -
-    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.click_y_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.depth_sensor_enabled_) -
+    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.depth_sensor_enabled_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.CommandRequest)
 }
 
@@ -9589,11 +9595,12 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.camera_height_){0u}
     , decltype(_impl_.camera_fps_){0u}
     , decltype(_impl_.logical_id_to_calibrate_){0}
+    , decltype(_impl_.click_x_){0}
+    , decltype(_impl_.click_y_){0}
     , decltype(_impl_.record_with_yolo_boxes_){false}
     , decltype(_impl_.pose_model_enabled_){false}
     , decltype(_impl_.video_feed_enabled_){false}
-    , decltype(_impl_.click_x_){0}
-    , decltype(_impl_.click_y_){0}
+    , decltype(_impl_.depth_sensor_enabled_){false}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.module_name_.InitDefault();
@@ -9675,8 +9682,8 @@ void CommandRequest::Clear() {
   }
   _impl_.visualization_states_ = nullptr;
   ::memset(&_impl_.timestamp_us_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.click_y_) -
-      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.click_y_));
+      reinterpret_cast<char*>(&_impl_.depth_sensor_enabled_) -
+      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.depth_sensor_enabled_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -9859,6 +9866,14 @@ const char* CommandRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.CommandRequest.tracker_type"));
+        } else
+          goto handle_unusual;
+        continue;
+      // bool depth_sensor_enabled = 22;
+      case 22:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 176)) {
+          _impl_.depth_sensor_enabled_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -10059,6 +10074,12 @@ uint8_t* CommandRequest::_InternalSerialize(
         21, this->_internal_tracker_type(), target);
   }
 
+  // bool depth_sensor_enabled = 22;
+  if (this->_internal_depth_sensor_enabled() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(22, this->_internal_depth_sensor_enabled(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -10171,6 +10192,20 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_logical_id_to_calibrate());
   }
 
+  // int32 click_x = 16;
+  if (this->_internal_click_x() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_click_x());
+  }
+
+  // int32 click_y = 17;
+  if (this->_internal_click_y() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_click_y());
+  }
+
   // bool record_with_yolo_boxes = 12;
   if (this->_internal_record_with_yolo_boxes() != 0) {
     total_size += 1 + 1;
@@ -10186,18 +10221,9 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += 2 + 1;
   }
 
-  // int32 click_x = 16;
-  if (this->_internal_click_x() != 0) {
-    total_size += 2 +
-      ::_pbi::WireFormatLite::Int32Size(
-        this->_internal_click_x());
-  }
-
-  // int32 click_y = 17;
-  if (this->_internal_click_y() != 0) {
-    total_size += 2 +
-      ::_pbi::WireFormatLite::Int32Size(
-        this->_internal_click_y());
+  // bool depth_sensor_enabled = 22;
+  if (this->_internal_depth_sensor_enabled() != 0) {
+    total_size += 2 + 1;
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -10264,6 +10290,12 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (from._internal_logical_id_to_calibrate() != 0) {
     _this->_internal_set_logical_id_to_calibrate(from._internal_logical_id_to_calibrate());
   }
+  if (from._internal_click_x() != 0) {
+    _this->_internal_set_click_x(from._internal_click_x());
+  }
+  if (from._internal_click_y() != 0) {
+    _this->_internal_set_click_y(from._internal_click_y());
+  }
   if (from._internal_record_with_yolo_boxes() != 0) {
     _this->_internal_set_record_with_yolo_boxes(from._internal_record_with_yolo_boxes());
   }
@@ -10273,11 +10305,8 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (from._internal_video_feed_enabled() != 0) {
     _this->_internal_set_video_feed_enabled(from._internal_video_feed_enabled());
   }
-  if (from._internal_click_x() != 0) {
-    _this->_internal_set_click_x(from._internal_click_x());
-  }
-  if (from._internal_click_y() != 0) {
-    _this->_internal_set_click_y(from._internal_click_y());
+  if (from._internal_depth_sensor_enabled() != 0) {
+    _this->_internal_set_depth_sensor_enabled(from._internal_depth_sensor_enabled());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -10320,8 +10349,8 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
       &other->_impl_.tracker_type_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.click_y_)
-      + sizeof(CommandRequest::_impl_.click_y_)
+      PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.depth_sensor_enabled_)
+      + sizeof(CommandRequest::_impl_.depth_sensor_enabled_)
       - PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.color_command_)>(
           reinterpret_cast<char*>(&_impl_.color_command_),
           reinterpret_cast<char*>(&other->_impl_.color_command_));

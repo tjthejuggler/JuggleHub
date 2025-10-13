@@ -99,9 +99,9 @@ void Engine::run() {
     startCamera();
     writeDebugLog("Engine::run() - Camera started");
 
-    // Initialize settings module with current tracker
+    // Initialize settings module with current tracker and use_dnn_tracker flag
     writeDebugLog("Engine::run() - Initializing settings module...");
-    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_);  // Still uses simple_tracker_ for settings
+    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_, &use_dnn_tracker_);
     settings_module_->setup();
     writeDebugLog("Engine::run() - Settings module initialized");
 
@@ -655,6 +655,13 @@ void Engine::processCommands() {
                         response.set_success(false);
                         response.set_message(std::string("Failed to switch tracker: ") + e.what());
                     }
+                    break;
+                case juggler::v1::CommandRequest::SET_DEPTH_SENSOR_ENABLED:
+                    // Note: Depth sensor control would require camera restart with different stream configuration
+                    // For now, acknowledge the command but explain it requires camera restart
+                    response.set_message(std::string("Depth sensor ") +
+                                       (command.depth_sensor_enabled() ? "enable" : "disable") +
+                                       " requested. Note: This requires camera restart to take effect.");
                     break;
                 default:
                     response.set_success(false);

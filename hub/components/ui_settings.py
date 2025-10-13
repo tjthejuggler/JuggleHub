@@ -58,15 +58,17 @@ if PYQT_AVAILABLE:
             main_layout.setContentsMargins(0, 0, 0, 0)
             
             # Initialize resolution-FPS mapping first
+            # Based on Intel RealSense D455 specifications
+            # 90FPS is only supported at lower resolutions
             self.resolution_fps_map = {
                 "1280 x 800": [60, 30, 15, 6],
                 "1280 x 720": [60, 30, 15, 6],
                 "960 x 540": [60, 30, 15, 6],
-                "848 x 480": [60, 30, 15, 6],
+                "848 x 480": [90, 60, 30, 15, 6],  # 90FPS supported
                 "640 x 480": [60, 30, 15, 6],
-                "640 x 360": [60, 30, 15, 6],
-                "424 x 240": [60, 30, 15, 6],
-                "320 x 240": [60, 30, 15, 6]
+                "640 x 360": [90, 60, 30, 15, 6],  # 90FPS supported
+                "424 x 240": [90, 60, 30, 15, 6],  # 90FPS supported
+                "320 x 240": [90, 60, 30, 15, 6]   # 90FPS supported
             }
             
             # Create scroll area
@@ -229,8 +231,20 @@ if PYQT_AVAILABLE:
             self.ir_status_label = QLabel("🔆 IR Projector: Unknown")
             camera_layout.addWidget(self.ir_status_label, 5, 0, 1, 2)
             
+            # Depth Sensor Toggle
+            self.depth_sensor_toggle = QPushButton("Enable Depth Sensor")
+            self.depth_sensor_toggle.setCheckable(True)
+            self.depth_sensor_toggle.setChecked(True)
+            self.depth_sensor_toggle.clicked.connect(self.toggle_depth_sensor)
+            self.depth_sensor_toggle.setToolTip(
+                "Enable or disable the RealSense depth sensor.\n"
+                "When disabled, only RGB camera is used (saves power and processing).\n"
+                "Note: Depth-based tracking requires this to be enabled."
+            )
+            camera_layout.addWidget(self.depth_sensor_toggle, 6, 0, 1, 2)
+            
             # Tracking System Selection
-            camera_layout.addWidget(QLabel("Tracking System:"), 6, 0)
+            camera_layout.addWidget(QLabel("Tracking System:"), 7, 0)
             self.tracking_system_combo = QComboBox()
             self.tracking_system_combo.addItem("Depth-Based 3D (Current)", "depth_based")
             self.tracking_system_combo.addItem("Simple 2D (New)", "simple_2d")
@@ -240,7 +254,7 @@ if PYQT_AVAILABLE:
                 "• Depth-Based 3D: Uses RealSense depth data for 3D tracking (current system)\n"
                 "• Simple 2D: 2D-only tracking without depth (new system - to be implemented)"
             )
-            camera_layout.addWidget(self.tracking_system_combo, 6, 1)
+            camera_layout.addWidget(self.tracking_system_combo, 7, 1)
             
             return section
 
@@ -252,6 +266,40 @@ if PYQT_AVAILABLE:
     
             # Class-specific confidence thresholds
             row = 0
+            
+            # Enable/Disable YOLO Ball Model toggle
+            self.use_dnn_tracker_toggle = QPushButton("Enable YOLO Ball Detection")
+            self.use_dnn_tracker_toggle.setCheckable(True)
+            self.use_dnn_tracker_toggle.setChecked(True)  # Enabled by default
+            self.use_dnn_tracker_toggle.clicked.connect(self.toggle_dnn_tracker)
+            self.use_dnn_tracker_toggle.setToolTip(
+                "Enable or disable YOLO ball detection model.\n"
+                "When disabled, no ball detection occurs (useful for performance testing).\n"
+                "Disabling this should give you full camera FPS with no processing overhead."
+            )
+            self.use_dnn_tracker_toggle.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 8px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+                QPushButton:pressed {
+                    background-color: #2e7d32;
+                }
+                QPushButton:checked {
+                    background-color: #4CAF50;
+                }
+                QPushButton:!checked {
+                    background-color: #f44336;
+                }
+            """)
+            dnn_layout.addWidget(self.use_dnn_tracker_toggle, row, 0, 1, 3)
+            row += 1
             
             # Info label
             info_label = QLabel("ℹ️ Set confidence thresholds per class type")
@@ -1541,6 +1589,24 @@ if PYQT_AVAILABLE:
                 import traceback
                 traceback.print_exc()
 
+        def toggle_dnn_tracker(self):
+            """Toggle the YOLO ball detection model on/off."""
+            is_enabled = self.use_dnn_tracker_toggle.isChecked()
+            
+            # Update button text based on state
+            if is_enabled:
+                self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
+            else:
+                self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
+            
+            # Send setting to engine via UDP
+            self.udp_client.send_setting('use_dnn_tracker', 1 if is_enabled else 0)
+            print(f"✅ YOLO ball detection {'enabled' if is_enabled else 'disabled'}")
+            
+            # Auto-save settings
+            if not self._loading_settings:
+                self.save_settings()
+        
         def toggle_pose_model(self):
             is_enabled = self.pose_model_toggle.isChecked()
             command = juggler_pb2.CommandRequest(
@@ -1656,6 +1722,29 @@ if PYQT_AVAILABLE:
         def on_resolution_changed(self):
             """Handle resolution change to update FPS options."""
             self.populate_fps_options()
+        
+        def toggle_depth_sensor(self):
+            """Toggle the depth sensor on/off."""
+            is_enabled = self.depth_sensor_toggle.isChecked()
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.SET_DEPTH_SENSOR_ENABLED
+            command.depth_sensor_enabled = is_enabled
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Depth sensor {'enabled' if is_enabled else 'disabled'}")
+                    # Auto-save settings after depth sensor toggle
+                    if not self._loading_settings:
+                        self.save_settings()
+                else:
+                    print(f"❌ Failed to toggle depth sensor: {response.message}")
+                    QMessageBox.warning(self, "Depth Sensor Toggle Failed",
+                                      f"Failed to toggle depth sensor:\n{response.message}")
+            except Exception as e:
+                print(f"❌ Error toggling depth sensor: {e}")
+                QMessageBox.critical(self, "Error",
+                                   f"Error toggling depth sensor:\n{str(e)}")
         
         def on_tracking_system_changed(self):
             """Handle tracking system selection change"""
@@ -1783,7 +1872,9 @@ if PYQT_AVAILABLE:
                 'camera_settings_profile': self.camera_settings_combo.currentData(),
                 'resolution': self.resolution_combo.currentText(),
                 'fps': self.fps_combo.currentData(),
+                'depth_sensor_enabled': self.depth_sensor_toggle.isChecked() if hasattr(self, 'depth_sensor_toggle') else True,
                 'tracking_system': self.tracking_system_combo.currentData(),
+                'use_dnn_tracker': self.use_dnn_tracker_toggle.isChecked() if hasattr(self, 'use_dnn_tracker_toggle') else True,
                 'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0,
                 'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0,
                 'nms_threshold': self.nms_slider.value() / 100.0,
@@ -1933,11 +2024,24 @@ if PYQT_AVAILABLE:
                 if index >= 0:
                     self.fps_combo.setCurrentIndex(index)
             
+            # Depth sensor
+            if 'depth_sensor_enabled' in settings and hasattr(self, 'depth_sensor_toggle'):
+                self.depth_sensor_toggle.setChecked(settings['depth_sensor_enabled'])
+            
             # Tracking system
             if 'tracking_system' in settings:
                 index = self.tracking_system_combo.findData(settings['tracking_system'])
                 if index >= 0:
                     self.tracking_system_combo.setCurrentIndex(index)
+            
+            # DNN Tracker enable/disable
+            if 'use_dnn_tracker' in settings and hasattr(self, 'use_dnn_tracker_toggle'):
+                self.use_dnn_tracker_toggle.setChecked(settings['use_dnn_tracker'])
+                # Update button text based on loaded state
+                if settings['use_dnn_tracker']:
+                    self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
+                else:
+                    self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
             
             # DNN Tracker settings
             if 'ball_confidence_threshold' in settings:
@@ -2249,6 +2353,10 @@ if PYQT_AVAILABLE:
             This is called after loading settings to ensure the engine receives
             all configuration values, not just the UI slider positions.
             """
+            # DNN Tracker enable/disable
+            if 'use_dnn_tracker' in settings:
+                self.udp_client.send_setting('use_dnn_tracker', 1 if settings['use_dnn_tracker'] else 0)
+            
             # YOLO Tracker settings
             if 'ball_confidence_threshold' in settings:
                 self.udp_client.send_setting('ball_confidence_threshold', settings['ball_confidence_threshold'])

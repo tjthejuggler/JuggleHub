@@ -11,7 +11,7 @@ namespace modules {
 
 class UdpBallSettingsModule : public ModuleBase {
 public:
-    UdpBallSettingsModule(std::shared_ptr<SimpleBallTracker> simple_tracker);
+    UdpBallSettingsModule(std::shared_ptr<SimpleBallTracker> simple_tracker, bool* use_dnn_tracker_ptr = nullptr);
     ~UdpBallSettingsModule();
 
     // ModuleBase interface
@@ -24,6 +24,7 @@ private:
     void UdpListen();
 
     std::shared_ptr<SimpleBallTracker> simple_tracker_;
+    bool* use_dnn_tracker_ptr_;  // Pointer to Engine's use_dnn_tracker_ flag
 
     std::unique_ptr<std::thread> listener_thread_;
     asio::io_context io_context_;

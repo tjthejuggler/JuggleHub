@@ -2,9 +2,17 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-13 23:08 CEST
+**Last Updated:** 2025-10-13 23:20 CEST
 
 **Recent Changes (2025-10-13):**
+- **📷 CAMERA SETTINGS ENHANCEMENTS**
+  - **90FPS Support**: Added 90FPS option to all camera resolutions for high-speed tracking
+  - **Depth Sensor Toggle**: New toggle to enable/disable RealSense depth sensor
+  - **Power Efficiency**: Disable depth sensor when not needed to save power and processing
+  - **UI Integration**: Both features accessible through camera settings panel
+  - **Files Modified**: [`hub/components/ui_settings.py`](hub/components/ui_settings.py:60-70,228-244), [`api/v1/juggler.proto`](api/v1/juggler.proto:270,308)
+  - **Use Case**: High-speed tracking with 90FPS or power-efficient RGB-only mode with depth disabled
+
 - **🎯 SIMPLE 2D TRACKER INTEGRATION**
   - **New Tracker**: Integrated Simple2DBallTracker into Engine for 2D-only tracking mode
   - **Dual Tracker Support**: Engine now supports both depth-based 3D tracking and 2D-only tracking

@@ -5,8 +5,9 @@
 namespace juggler {
 namespace modules {
 
-UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<SimpleBallTracker> simple_tracker)
+UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<SimpleBallTracker> simple_tracker, bool* use_dnn_tracker_ptr)
     : simple_tracker_(simple_tracker),
+      use_dnn_tracker_ptr_(use_dnn_tracker_ptr),
       socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)) {
 }
 
@@ -49,7 +50,14 @@ void UdpBallSettingsModule::UdpListen() {
                         std::istringstream iss(message);
                         std::string key, value;
                         if (std::getline(iss, key, '=') && std::getline(iss, value)) {
-                            if (simple_tracker_) {
+                            // Handle use_dnn_tracker setting
+                            if (key == "use_dnn_tracker" && use_dnn_tracker_ptr_) {
+                                bool enabled = (value == "1" || value == "true");
+                                *use_dnn_tracker_ptr_ = enabled;
+                                std::cout << "✅ YOLO ball detection " << (enabled ? "enabled" : "disabled") << std::endl;
+                            }
+                            // Forward other settings to tracker
+                            else if (simple_tracker_) {
                                 simple_tracker_->updateSetting(key, value);
                             }
                         } else {

@@ -3,6 +3,7 @@
 #include "modules/UdpBallColorModule.hpp"
 #include "modules/PositionToRgbModule.hpp"
 #include "SimpleBallTracker.hpp"
+#include "Simple2DBallTracker.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -60,6 +61,11 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
             ball_model_path, pose_model_path, device_name, "hub/ball_settings.json");
         tracker_ = simple_tracker_;  // Set polymorphic pointer to default tracker
         writeDebugLog("Engine constructor: Default tracker initialized successfully");
+        
+        // Initialize 2D-only tracker
+        simple_2d_tracker_ = std::make_shared<Simple2DBallTracker>(
+            ball_model_path, pose_model_path, device_name);
+        writeDebugLog("Engine constructor: 2D tracker initialized successfully");
     } catch (const std::exception& e) {
         writeDebugLog("Engine constructor: EXCEPTION in tracker init: " + std::string(e.what()));
         return;
@@ -2196,9 +2202,13 @@ void Engine::setTrackerType(const std::string& tracker_type) {
         writeDebugLog("setTrackerType() - Switched to depth_based tracker");
         
     } else if (tracker_type == "simple_2d") {
-        // TODO: Switch to 2D tracker when implemented
-        // For now, throw an error
-        throw std::runtime_error("simple_2d tracker not yet implemented. Please implement your new tracker class.");
+        // Switch to 2D-only SimpleBallTracker
+        if (!simple_2d_tracker_) {
+            throw std::runtime_error("Simple2DBallTracker not initialized");
+        }
+        tracker_ = simple_2d_tracker_;
+        current_tracker_type_ = "simple_2d";
+        writeDebugLog("setTrackerType() - Switched to simple_2d tracker");
         
     } else {
         throw std::runtime_error("Unknown tracker type: " + tracker_type);

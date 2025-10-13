@@ -2,7 +2,16 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-12 20:52 CEST
+**Last Updated:** 2025-10-13 23:08 CEST
+
+**Recent Changes (2025-10-13):**
+- **🎯 SIMPLE 2D TRACKER INTEGRATION**
+  - **New Tracker**: Integrated Simple2DBallTracker into Engine for 2D-only tracking mode
+  - **Dual Tracker Support**: Engine now supports both depth-based 3D tracking and 2D-only tracking
+  - **Seamless Switching**: Users can switch between trackers via UI dropdown without restart
+  - **Polymorphic Design**: Both trackers implement IBallTracker interface for unified handling
+  - **Files Modified**: [`engine/include/Engine.hpp`](engine/include/Engine.hpp:8,97), [`engine/src/Engine.cpp`](engine/src/Engine.cpp:6,65-67,2198-2206)
+  - **Use Case**: Enables testing raw YOLO detections without depth/trajectory processing
 
 **Recent Changes (2025-10-12):**
 - **📊 RECORDING VISUALIZATION - FRAMES IN FLIGHT DISPLAY**

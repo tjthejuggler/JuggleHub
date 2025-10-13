@@ -6,6 +6,7 @@
 #include "../src/modules/UdpBallSettingsModule.hpp"
 #include "IBallTracker.hpp" // Include the tracker interface
 #include "SimpleBallTracker.hpp" // Include the simplified ball tracker
+#include "Simple2DBallTracker.hpp" // Include the 2D-only ball tracker
 #include "RecordingLogger.hpp" // Include recording logger
 #include "json.hpp" // Include nlohmann/json
 #include <memory>
@@ -94,6 +95,7 @@ private:
     
     // Legacy compatibility
     std::shared_ptr<SimpleBallTracker> simple_tracker_;  // Keep for backward compatibility during transition
+    std::shared_ptr<Simple2DBallTracker> simple_2d_tracker_;  // 2D-only tracker (no depth)
     bool use_dnn_tracker_; // Flag to switch between old/new tracker (kept for compatibility)
     bool verbose_;
 

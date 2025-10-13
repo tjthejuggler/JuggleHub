@@ -101,7 +101,7 @@ void Engine::run() {
 
     // Initialize settings module with current tracker and use_dnn_tracker flag
     writeDebugLog("Engine::run() - Initializing settings module...");
-    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(simple_tracker_, &use_dnn_tracker_);
+    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(tracker_, &use_dnn_tracker_);
     settings_module_->setup();
     writeDebugLog("Engine::run() - Settings module initialized");
 
@@ -186,8 +186,9 @@ void Engine::run() {
         std::vector<BallEvent> ball_events;
         std::vector<SimpleHand> tracked_hands;
         
-        if (use_dnn_tracker_) {
-            if (!tracker_) return; // Safety check
+        // ALWAYS run tracker for pose detection
+        // Ball detection is controlled internally by tracker's enable_ball_detection_ flag
+        if (tracker_) {
             
             // Set recording frame number if recording is active
             if (recording_logger_.isActive()) {
@@ -326,10 +327,10 @@ void Engine::run() {
             }
  
         }
-
+        
         // Populate trajectory-based predictions for visualization
         // Uses physics-based trajectory prediction with gravity
-        if (use_dnn_tracker_ && tracker_) {
+        if (tracker_) {
             for (const auto& ball : tracked_balls) {
                 // Only create prediction if we have enough trajectory data
                 if (ball.trajectory.verified_point_count < 3) {
@@ -2219,6 +2220,12 @@ void Engine::setTrackerType(const std::string& tracker_type) {
         
     } else {
         throw std::runtime_error("Unknown tracker type: " + tracker_type);
+    }
+    
+    // Update the settings module to use the new tracker
+    if (settings_module_) {
+        settings_module_->setTracker(tracker_);
+        writeDebugLog("setTrackerType() - Updated settings module tracker pointer");
     }
     
     INFO_LOG("Tracker switched to: ", tracker_type);

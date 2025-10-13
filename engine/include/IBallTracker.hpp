@@ -95,4 +95,12 @@ public:
      */
     virtual void evaluateOverrideCriteria(std::vector<Detection>& detections,
                                          const cv::Mat& color_image) = 0;
+    
+    /**
+     * @brief Update a tracking setting
+     * @param key Setting name
+     * @param value Setting value as string
+     * @return True if setting was recognized and updated, false otherwise
+     */
+    virtual bool updateSetting(const std::string& key, const std::string& value) = 0;
 };

@@ -490,6 +490,10 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.min_frames_before_catch = std::max(0, std::min(10, val));
             return true;
         }
+        else if (key == "enable_ball_detection") {
+            enable_ball_detection_ = (value == "true" || value == "1");
+            return true;
+        }
     } catch (const std::exception& e) {
         return false;
     }
@@ -1541,6 +1545,11 @@ std::vector<Detection> SimpleBallTracker::runBallDetection(
     
     // Store color frame for calibration
     last_color_frame_ = color_frame.clone();
+    
+    // If ball detection is disabled, return empty vector
+    if (!enable_ball_detection_) {
+        return std::vector<Detection>();
+    }
     
     // Preprocess
     float scale_x, scale_y;

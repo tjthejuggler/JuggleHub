@@ -5,8 +5,8 @@
 namespace juggler {
 namespace modules {
 
-UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<SimpleBallTracker> simple_tracker, bool* use_dnn_tracker_ptr)
-    : simple_tracker_(simple_tracker),
+UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<IBallTracker> tracker, bool* use_dnn_tracker_ptr)
+    : tracker_(tracker),
       use_dnn_tracker_ptr_(use_dnn_tracker_ptr),
       socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)) {
 }
@@ -37,6 +37,11 @@ void UdpBallSettingsModule::processCommand(const juggler::v1::CommandRequest&) {
     // Nothing to do here
 }
 
+void UdpBallSettingsModule::setTracker(std::shared_ptr<IBallTracker> tracker) {
+    tracker_ = tracker;
+    std::cout << "UdpBallSettingsModule: Tracker pointer updated" << std::endl;
+}
+
 void UdpBallSettingsModule::UdpListen() {
     while (!stop_listening_) {
         try {
@@ -50,15 +55,21 @@ void UdpBallSettingsModule::UdpListen() {
                         std::istringstream iss(message);
                         std::string key, value;
                         if (std::getline(iss, key, '=') && std::getline(iss, value)) {
-                            // Handle use_dnn_tracker setting
-                            if (key == "use_dnn_tracker" && use_dnn_tracker_ptr_) {
+                            // Handle enable_ball_detection - forward to tracker to control ball inference
+                            if (key == "enable_ball_detection" && tracker_) {
+                                tracker_->updateSetting(key, value);
                                 bool enabled = (value == "1" || value == "true");
-                                *use_dnn_tracker_ptr_ = enabled;
                                 std::cout << "✅ YOLO ball detection " << (enabled ? "enabled" : "disabled") << std::endl;
                             }
+                            // Handle legacy use_dnn_tracker setting (kept for backward compatibility)
+                            else if (key == "use_dnn_tracker" && use_dnn_tracker_ptr_) {
+                                bool enabled = (value == "1" || value == "true");
+                                *use_dnn_tracker_ptr_ = enabled;
+                                std::cout << "✅ YOLO tracker " << (enabled ? "enabled" : "disabled") << std::endl;
+                            }
                             // Forward other settings to tracker
-                            else if (simple_tracker_) {
-                                simple_tracker_->updateSetting(key, value);
+                            else if (tracker_) {
+                                tracker_->updateSetting(key, value);
                             }
                         } else {
                             std::cerr << "Warning: Malformed settings message received." << std::endl;

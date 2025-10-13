@@ -272,6 +272,9 @@ if PYQT_AVAILABLE:
             self.use_dnn_tracker_toggle.setCheckable(True)
             self.use_dnn_tracker_toggle.setChecked(True)  # Enabled by default
             self.use_dnn_tracker_toggle.clicked.connect(self.toggle_dnn_tracker)
+            
+            # Send initial state to engine
+            self.udp_client.send_setting('enable_ball_detection', 1)
             self.use_dnn_tracker_toggle.setToolTip(
                 "Enable or disable YOLO ball detection model.\n"
                 "When disabled, no ball detection occurs (useful for performance testing).\n"
@@ -1590,7 +1593,7 @@ if PYQT_AVAILABLE:
                 traceback.print_exc()
 
         def toggle_dnn_tracker(self):
-            """Toggle the YOLO ball detection model on/off."""
+            """Toggle the YOLO ball detection model on/off (pose detection remains active)."""
             is_enabled = self.use_dnn_tracker_toggle.isChecked()
             
             # Update button text based on state
@@ -1599,9 +1602,9 @@ if PYQT_AVAILABLE:
             else:
                 self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
             
-            # Send setting to engine via UDP
-            self.udp_client.send_setting('use_dnn_tracker', 1 if is_enabled else 0)
-            print(f"✅ YOLO ball detection {'enabled' if is_enabled else 'disabled'}")
+            # Send setting to tracker via UDP (only affects ball detection, not pose)
+            self.udp_client.send_setting('enable_ball_detection', 1 if is_enabled else 0)
+            print(f"✅ YOLO ball detection {'enabled' if is_enabled else 'disabled'} (pose detection remains active)")
             
             # Auto-save settings
             if not self._loading_settings:
@@ -1874,7 +1877,7 @@ if PYQT_AVAILABLE:
                 'fps': self.fps_combo.currentData(),
                 'depth_sensor_enabled': self.depth_sensor_toggle.isChecked() if hasattr(self, 'depth_sensor_toggle') else True,
                 'tracking_system': self.tracking_system_combo.currentData(),
-                'use_dnn_tracker': self.use_dnn_tracker_toggle.isChecked() if hasattr(self, 'use_dnn_tracker_toggle') else True,
+                'enable_ball_detection': self.use_dnn_tracker_toggle.isChecked() if hasattr(self, 'use_dnn_tracker_toggle') else True,
                 'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0,
                 'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0,
                 'nms_threshold': self.nms_slider.value() / 100.0,
@@ -2034,14 +2037,27 @@ if PYQT_AVAILABLE:
                 if index >= 0:
                     self.tracking_system_combo.setCurrentIndex(index)
             
-            # DNN Tracker enable/disable
-            if 'use_dnn_tracker' in settings and hasattr(self, 'use_dnn_tracker_toggle'):
-                self.use_dnn_tracker_toggle.setChecked(settings['use_dnn_tracker'])
+            # Ball detection enable/disable (check both old and new setting names for backward compatibility)
+            if 'enable_ball_detection' in settings and hasattr(self, 'use_dnn_tracker_toggle'):
+                is_enabled = settings['enable_ball_detection']
+                self.use_dnn_tracker_toggle.setChecked(is_enabled)
                 # Update button text based on loaded state
-                if settings['use_dnn_tracker']:
+                if is_enabled:
                     self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
                 else:
                     self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
+                # Send to engine
+                self.udp_client.send_setting('enable_ball_detection', 1 if is_enabled else 0)
+            elif 'use_dnn_tracker' in settings and hasattr(self, 'use_dnn_tracker_toggle'):
+                # Backward compatibility with old setting name
+                is_enabled = settings['use_dnn_tracker']
+                self.use_dnn_tracker_toggle.setChecked(is_enabled)
+                if is_enabled:
+                    self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
+                else:
+                    self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
+                # Send to engine
+                self.udp_client.send_setting('enable_ball_detection', 1 if is_enabled else 0)
             
             # DNN Tracker settings
             if 'ball_confidence_threshold' in settings:
@@ -2353,9 +2369,12 @@ if PYQT_AVAILABLE:
             This is called after loading settings to ensure the engine receives
             all configuration values, not just the UI slider positions.
             """
-            # DNN Tracker enable/disable
-            if 'use_dnn_tracker' in settings:
-                self.udp_client.send_setting('use_dnn_tracker', 1 if settings['use_dnn_tracker'] else 0)
+            # DNN Tracker enable/disable (support both old and new setting names)
+            if 'enable_ball_detection' in settings:
+                self.udp_client.send_setting('enable_ball_detection', 1 if settings['enable_ball_detection'] else 0)
+            elif 'use_dnn_tracker' in settings:
+                # Backward compatibility with old setting name
+                self.udp_client.send_setting('enable_ball_detection', 1 if settings['use_dnn_tracker'] else 0)
             
             # YOLO Tracker settings
             if 'ball_confidence_threshold' in settings:

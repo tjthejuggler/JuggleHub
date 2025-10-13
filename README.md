@@ -6,12 +6,14 @@ A high-performance monorepo combining C++ real-time ball tracking with Python-ba
 
 **Recent Changes (2025-10-13):**
 - **📷 CAMERA SETTINGS ENHANCEMENTS**
-  - **90FPS Support**: Added 90FPS option to all camera resolutions for high-speed tracking
+  - **90FPS Support**: Added 90FPS option for compatible resolutions (848x480, 640x360, 424x240, 320x240)
   - **Depth Sensor Toggle**: New toggle to enable/disable RealSense depth sensor
+  - **YOLO Ball Detection Toggle**: New toggle to enable/disable YOLO ball detection independently from pose detection
+  - **Performance Testing**: Ball detection toggle allows isolating performance bottlenecks
   - **Power Efficiency**: Disable depth sensor when not needed to save power and processing
-  - **UI Integration**: Both features accessible through camera settings panel
-  - **Files Modified**: [`hub/components/ui_settings.py`](hub/components/ui_settings.py:60-70,228-244), [`api/v1/juggler.proto`](api/v1/juggler.proto:270,308)
-  - **Use Case**: High-speed tracking with 90FPS or power-efficient RGB-only mode with depth disabled
+  - **UI Integration**: All features accessible through camera settings panel
+  - **Files Modified**: [`hub/components/ui_settings.py`](hub/components/ui_settings.py:270-301,1592-1608,1876-1877,2037-2049), [`engine/include/SimpleBallTracker.hpp`](engine/include/SimpleBallTracker.hpp:460), [`engine/src/SimpleBallTracker.cpp`](engine/src/SimpleBallTracker.cpp:493-496,1537-1547), [`api/v1/juggler.proto`](api/v1/juggler.proto:270,308)
+  - **Use Case**: High-speed tracking with 90FPS, power-efficient RGB-only mode with depth disabled, or performance testing with ball detection disabled
 
 - **🎯 SIMPLE 2D TRACKER INTEGRATION**
   - **New Tracker**: Integrated Simple2DBallTracker into Engine for 2D-only tracking mode

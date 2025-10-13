@@ -457,6 +457,7 @@ private:
     float ball_held_confidence_threshold_ = 0.25f; // Confidence threshold for 'ball_held' class (class_id=1)
     float nms_threshold_ = 0.5f;
     bool show_raw_yolo_detections_ = false;        // Toggle for showing raw YOLO detections in visualization
+    bool enable_ball_detection_ = true;            // Toggle for enabling/disabling YOLO ball detection
     const int num_classes_ = 2;  // ball, ball_held
     
     // Parameters

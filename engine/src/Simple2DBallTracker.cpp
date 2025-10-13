@@ -16,7 +16,8 @@ Simple2DBallTracker::Simple2DBallTracker(const std::string& ball_model_path,
       input_height_(640),
       ball_confidence_threshold_(0.25f),
       ball_held_confidence_threshold_(0.25f),
-      nms_threshold_(0.45f) {
+      nms_threshold_(0.45f),
+      enable_ball_detection_(true) {
     
     std::cout << "[Simple2DBallTracker] Initializing 2D-only ball tracker..." << std::endl;
     
@@ -149,6 +150,11 @@ cv::Mat Simple2DBallTracker::preprocess(const cv::Mat& frame, float& scale_x, fl
 // ============================================================================
 
 std::vector<Detection> Simple2DBallTracker::runBallDetection(const cv::Mat& color_frame) {
+    // If ball detection is disabled, return empty vector
+    if (!enable_ball_detection_) {
+        return std::vector<Detection>();
+    }
+    
     // Preprocess
     float scale_x, scale_y;
     cv::Mat preprocessed = preprocess(color_frame, scale_x, scale_y);
@@ -363,4 +369,21 @@ int Simple2DBallTracker::findClosestBallId(const Detection& detection, float max
     }
     
     return closest_id;
+}
+
+// ============================================================================
+// SETTINGS UPDATE METHOD
+// ============================================================================
+
+bool Simple2DBallTracker::updateSetting(const std::string& key, const std::string& value) {
+    if (key == "enable_ball_detection") {
+        enable_ball_detection_ = (value == "true" || value == "1");
+        std::cout << "[Simple2DBallTracker] Ball detection "
+                  << (enable_ball_detection_ ? "enabled" : "disabled") << std::endl;
+        return true;
+    }
+    
+    // Add other settings here as needed
+    
+    return false;
 }

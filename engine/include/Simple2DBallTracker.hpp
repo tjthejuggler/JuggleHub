@@ -159,6 +159,14 @@ public:
                                   const cv::Mat& color_image) override {
         // No-op: no override logic in 2D tracker
     }
+    
+    /**
+     * @brief Update a tracking setting
+     * @param key Setting name
+     * @param value Setting value
+     * @return True if setting was recognized and updated
+     */
+    bool updateSetting(const std::string& key, const std::string& value);
 
 private:
     // ========================================================================
@@ -244,6 +252,7 @@ private:
     float ball_confidence_threshold_;           // Confidence threshold for 'ball' class
     float ball_held_confidence_threshold_;      // Confidence threshold for 'ball_held' class
     float nms_threshold_;                       // Non-maximum suppression threshold
+    bool enable_ball_detection_;                // Enable/disable YOLO ball detection
     
     // Constants
     static constexpr int NUM_CLASSES = 2;       // ball, ball_held

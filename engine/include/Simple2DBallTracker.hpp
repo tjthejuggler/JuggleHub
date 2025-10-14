@@ -184,17 +184,23 @@ private:
     
     /**
      * @brief Run YOLO ball detection
-     * @param color_frame Input color frame
+     * @param preprocessed Preprocessed image (already resized and normalized)
+     * @param scale_x X scaling factor for coordinate conversion
+     * @param scale_y Y scaling factor for coordinate conversion
      * @return Vector of ball detections
      */
-    std::vector<Detection> runBallDetection(const cv::Mat& color_frame);
+    std::vector<Detection> runBallDetection(const cv::Mat& preprocessed,
+                                            float scale_x, float scale_y);
     
     /**
      * @brief Run YOLO pose estimation for hands
-     * @param color_frame Input color frame
+     * @param preprocessed Preprocessed image (already resized and normalized)
+     * @param scale_x X scaling factor for coordinate conversion
+     * @param scale_y Y scaling factor for coordinate conversion
      * @return Vector of detected hands
      */
-    std::vector<SimpleHand> runPoseEstimation(const cv::Mat& color_frame);
+    std::vector<SimpleHand> runPoseEstimation(const cv::Mat& preprocessed,
+                                               float scale_x, float scale_y);
     
     // ========================================================================
     // Simple Tracking Methods
@@ -235,6 +241,7 @@ private:
     
     int next_ball_id_;                          // Counter for assigning ball IDs
     int recording_frame_number_;                // Current recording frame (-1 if not recording)
+    CameraIntrinsics camera_intrinsics_;        // Camera intrinsics for 2D->3D conversion
     
     // ========================================================================
     // Settings

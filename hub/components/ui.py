@@ -515,46 +515,27 @@ if PYQT_AVAILABLE:
             
             main_layout.addLayout(content_layout)
             
-            # Bottom panel - Log
-            log_group = QGroupBox("📝 Activity Log")
-            log_layout = QVBoxLayout(log_group)
-            
-            # Add control buttons for the log
-            log_controls_layout = QHBoxLayout()
-            
-            self.log_paused = True  # Start paused by default
-            self.pause_log_button = QPushButton("▶ Resume Log")
-            self.pause_log_button.setCheckable(True)
-            self.pause_log_button.setChecked(True)  # Start checked (paused)
-            self.pause_log_button.clicked.connect(self.toggle_log_pause)
-            self.pause_log_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #555;
-                    color: white;
-                    border: 1px solid #777;
-                    padding: 5px;
-                    border-radius: 3px;
-                }
-                QPushButton:checked {
-                    background-color: #f44336;
-                    border-color: #d32f2f;
+            # Bottom right corner - Visual Indicator Square
+            self.indicator_widget = QWidget()
+            self.indicator_widget.setFixedSize(80, 80)
+            self.indicator_widget.setStyleSheet("""
+                QWidget {
+                    background-color: #1e1e1e;
+                    border: 2px solid #555555;
+                    border-radius: 5px;
                 }
             """)
-            log_controls_layout.addWidget(self.pause_log_button)
             
-            self.clear_log_button = QPushButton("🗑 Clear Log")
-            self.clear_log_button.clicked.connect(self.clear_log)
-            log_controls_layout.addWidget(self.clear_log_button)
+            # Position indicator in bottom right corner
+            indicator_layout = QHBoxLayout()
+            indicator_layout.addStretch()
+            indicator_layout.addWidget(self.indicator_widget)
+            main_layout.addLayout(indicator_layout)
             
-            log_controls_layout.addStretch()
-            log_layout.addLayout(log_controls_layout)
-            
-            self.log_text = QTextEdit()
-            self.log_text.setMaximumHeight(150)
-            self.log_text.setReadOnly(True)
-            log_layout.addWidget(self.log_text)
-            
-            main_layout.addWidget(log_group)
+            # Timer for indicator flash animation
+            self.indicator_timer = QTimer()
+            self.indicator_timer.timeout.connect(self._reset_indicator)
+            self.indicator_flash_duration = 300  # milliseconds
             
             self.apply_dark_theme()
             self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -620,7 +601,7 @@ if PYQT_AVAILABLE:
                 index = self.color_profile_combo.findText(current_selection)
                 if index >= 0:
                     self.color_profile_combo.setCurrentIndex(index)
-                self.log_message("✅ Color profiles updated")
+                print("✅ Color profiles updated")
                 # Refresh the video feed to show updated colors
                 if self.last_frame_data:
                     self.update_video_feed(self.last_frame_data)
@@ -679,15 +660,15 @@ if PYQT_AVAILABLE:
             
             try:
                 self.hub_instance.app_manager.launch_app(app_id)
-                self.log_message(f"✅ Launched app: {app_id}")
+                print(f"✅ Launched app: {app_id}")
                 self.update_recent_apps_menu()
             except Exception as e:
                 QMessageBox.critical(self, "Launch Error", f"Failed to launch app '{app_id}':\n{str(e)}")
-                self.log_message(f"❌ Failed to launch app '{app_id}': {e}")
+                print(f"❌ Failed to launch app '{app_id}': {e}")
         
         def on_app_launched(self, app_id: str):
             """Handle app launched signal from App Manager dialog."""
-            self.log_message(f"✅ App launched: {app_id}")
+            print(f"✅ App launched: {app_id}")
             self.update_recent_apps_menu()
         
         def save_settings_dialog(self):
@@ -706,7 +687,7 @@ if PYQT_AVAILABLE:
             if filepath:
                 if self.settings_widget.save_settings(filepath):
                     QMessageBox.information(self, "Success", f"Settings saved to:\n{filepath}")
-                    self.log_message(f"✅ Settings saved to {filepath}")
+                    print(f"✅ Settings saved to {filepath}")
                 else:
                     QMessageBox.critical(self, "Error", "Failed to save settings. Check console for details.")
         
@@ -726,7 +707,7 @@ if PYQT_AVAILABLE:
             if filepath:
                 if self.settings_widget.load_settings(filepath):
                     QMessageBox.information(self, "Success", f"Settings loaded from:\n{filepath}")
-                    self.log_message(f"✅ Settings loaded from {filepath}")
+                    print(f"✅ Settings loaded from {filepath}")
                 else:
                     QMessageBox.critical(self, "Error", "Failed to load settings. Check console for details.")
         
@@ -794,31 +775,36 @@ if PYQT_AVAILABLE:
                 self.frame_timestamps.pop(0)
             
             
-            # Check for throw/catch events and play sounds if enabled
+            # Check for throw/catch events and play sounds/flash indicator if enabled
             if hasattr(frame_data, 'throw_catch_events'):
                 for event in frame_data.throw_catch_events:
+                    # Find the color name for this ball
+                    color_ball = next((cb for cb in frame_data.color_tracked_balls if cb.logical_id == event.ball_id), None)
+                    
                     if event.type == juggler_pb2.ThrowCatchEvent.CATCH:
                         # Play color name if enabled, otherwise play beep sound
                         if self.settings_widget.tc_name_on_catch_toggle.isChecked():
-                            # Find the color name for this ball
-                            color_ball = next((cb for cb in frame_data.color_tracked_balls if cb.logical_id == event.ball_id), None)
                             if color_ball and color_ball.color_name:
                                 self.settings_widget.play_color_name(color_ball.color_name)
-                                self.log_message(f"🔊 CATCH name '{color_ball.color_name}' played for Ball {event.ball_id}")
+                                # Flash indicator with ball color
+                                self._flash_indicator(color_ball.color_name)
                         elif self.settings_widget.tc_sound_on_catch_toggle.isChecked():
                             self.settings_widget.play_system_sound(frequency=800, duration=100)
-                            self.log_message(f"🔊 CATCH sound played for Ball {event.ball_id} by Hand {event.hand_id}")
+                            # Flash indicator with ball color
+                            if color_ball and color_ball.color_name:
+                                self._flash_indicator(color_ball.color_name)
                     elif event.type == juggler_pb2.ThrowCatchEvent.THROW:
                         # Play color name if enabled, otherwise play beep sound
                         if self.settings_widget.tc_name_on_throw_toggle.isChecked():
-                            # Find the color name for this ball
-                            color_ball = next((cb for cb in frame_data.color_tracked_balls if cb.logical_id == event.ball_id), None)
                             if color_ball and color_ball.color_name:
                                 self.settings_widget.play_color_name(color_ball.color_name)
-                                self.log_message(f"🔊 THROW name '{color_ball.color_name}' played for Ball {event.ball_id}")
+                                # Flash indicator with ball color
+                                self._flash_indicator(color_ball.color_name)
                         elif self.settings_widget.tc_sound_on_throw_toggle.isChecked():
                             self.settings_widget.play_system_sound(frequency=1200, duration=100)
-                            self.log_message(f"🔊 THROW sound played for Ball {event.ball_id} by Hand {event.hand_id}")
+                            # Flash indicator with ball color
+                            if color_ball and color_ball.color_name:
+                                self._flash_indicator(color_ball.color_name)
             
             ball_count = len(frame_data.balls)
             self.ball_count_label.setText(f"Balls detected: {ball_count}")
@@ -938,7 +924,7 @@ if PYQT_AVAILABLE:
                 self.camera_status.setText(f"📷 Camera: {'Connected' if status.camera_connected else 'Disconnected'}")
                 self.engine_status.setText(f"🔧 Engine: {'Running' if status.engine_running else 'Stopped'}")
                 self.mode_status.setText(f"🎯 Mode: {status.mode}")
-                if status.error_message: self.log_message(f"❌ Error: {status.error_message}")
+                if status.error_message: print(f"❌ Error: {status.error_message}")
             
             self.hand_status.setText(f"👋 Hands: {len(frame_data.hands)}")
             self.imu_status.setText(f"📱 IMU: {len(frame_data.imu_data)} sensors")
@@ -968,30 +954,34 @@ if PYQT_AVAILABLE:
                 time_since_last = (time.time() * 1000000 - self.last_frame_data.timestamp_us) / 1000000
                 if time_since_last > 2.0: self.status_label.setText("⚠️ No data received recently")
         
-        def toggle_log_pause(self):
-            """Toggle the activity log pause state."""
-            self.log_paused = self.pause_log_button.isChecked()
-            if self.log_paused:
-                self.pause_log_button.setText("▶ Resume Log")
-            else:
-                self.pause_log_button.setText("⏸ Pause Log")
+        def _reset_indicator(self):
+            """Reset the indicator to default state after flash."""
+            self.indicator_timer.stop()
+            self.indicator_widget.setStyleSheet("""
+                QWidget {
+                    background-color: #1e1e1e;
+                    border: 2px solid #555555;
+                    border-radius: 5px;
+                }
+            """)
         
-        def clear_log(self):
-            """Clear all messages from the activity log."""
-            self.log_text.clear()
-        
-        def log_message(self, message: str):
-            # Don't add messages if log is paused
-            if self.log_paused:
-                return
+        def _flash_indicator(self, color_name: str):
+            """Flash the indicator with the ball's color."""
+            # Get color from profile manager
+            color_name_map = self.color_profile_manager.get_color_map()
+            qcolor = color_name_map.get(color_name.lower(), QColor(255, 255, 255))
             
-            timestamp = time.strftime("%H:%M:%S")
-            self.log_text.append(f"[{timestamp}] {message}")
-            if self.log_text.document().blockCount() > 100:
-                cursor = self.log_text.textCursor()
-                cursor.movePosition(cursor.MoveOperation.Start)
-                cursor.select(cursor.SelectionType.BlockUnderCursor)
-                cursor.removeSelectedText()
+            # Set indicator to the ball's color
+            self.indicator_widget.setStyleSheet(f"""
+                QWidget {{
+                    background-color: {qcolor.name()};
+                    border: 3px solid #ffffff;
+                    border-radius: 5px;
+                }}
+            """)
+            
+            # Start timer to reset after flash duration
+            self.indicator_timer.start(self.indicator_flash_duration)
         
         # Calibration mode is now always on - no toggle needed
 
@@ -1010,11 +1000,11 @@ if PYQT_AVAILABLE:
             try:
                 response = self.zmq_client.send_command(command)
                 if response.success:
-                    self.log_message(f"✅ Video feed encoding {'disabled' if is_hidden else 'enabled'}: {response.message}")
+                    print(f"✅ Video feed encoding {'disabled' if is_hidden else 'enabled'}: {response.message}")
                 else:
-                    self.log_message(f"❌ Failed to toggle video feed: {response.message}")
+                    print(f"❌ Failed to toggle video feed: {response.message}")
             except Exception as e:
-                self.log_message(f"❌ Error toggling video feed: {e}")
+                print(f"❌ Error toggling video feed: {e}")
             
             # Update the display
             if self.last_frame_data:
@@ -1590,7 +1580,7 @@ if PYQT_AVAILABLE:
             return QColor(total_r // pixel_count, total_g // pixel_count, total_b // pixel_count)
 
         def record_clip(self):
-            self.log_message("Sending record command to engine...")
+            print("Sending record command to engine...")
             
             # Create visualization states from current toggle states
             viz_states = juggler_pb2.VisualizationStates()
@@ -1615,13 +1605,13 @@ if PYQT_AVAILABLE:
             
             try:
                 response = self.zmq_client.send_command(command)
-                self.log_message(f"✅ Record command acknowledged: {response.message}" if response.success else f"❌ Record command failed: {response.message}")
+                print(f"✅ Record command acknowledged: {response.message}" if response.success else f"❌ Record command failed: {response.message}")
             except Exception as e:
-                self.log_message(f"❌ Error sending record command: {e}")
+                print(f"❌ Error sending record command: {e}")
 
         def toggle_continuous_recording(self):
             is_starting = not self.is_continuous_recording
-            self.log_message(f"{'Starting' if is_starting else 'Stopping'} continuous recording...")
+            print(f"{'Starting' if is_starting else 'Stopping'} continuous recording...")
             command_type = juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_START if is_starting else juggler_pb2.CommandRequest.CommandType.RECORD_CONTINUOUS_STOP
             
             command = juggler_pb2.CommandRequest(
@@ -1654,15 +1644,15 @@ if PYQT_AVAILABLE:
                     self.continuous_record_button.setChecked(is_starting)
                     self.recording_status.setText(f"● {'Recording' if is_starting else 'Not Recording'}")
                     self.recording_status.setStyleSheet(f"color: {'#f44336' if is_starting else '#666666'}; font-weight: bold;")
-                    self.log_message(f"✅ Continuous recording {'started' if is_starting else 'stopped'}: {response.message}")
+                    print(f"✅ Continuous recording {'started' if is_starting else 'stopped'}: {response.message}")
                 else:
-                    self.log_message(f"❌ Failed to {'start' if is_starting else 'stop'} continuous recording: {response.message}")
+                    print(f"❌ Failed to {'start' if is_starting else 'stop'} continuous recording: {response.message}")
             except Exception as e:
-                self.log_message(f"❌ Error {'starting' if is_starting else 'stopping'} continuous recording: {e}")
+                print(f"❌ Error {'starting' if is_starting else 'stopping'} continuous recording: {e}")
         
         def keyPressEvent(self, event):
             if event.key() == Qt.Key.Key_R:
-                self.log_message("🎹 'R' key pressed - triggering recording")
+                print("🎹 'R' key pressed - triggering recording")
                 self.record_clip()
             else:
                 super().keyPressEvent(event)
@@ -1709,10 +1699,10 @@ if PYQT_AVAILABLE:
             if self.set_color_profile_button.isChecked():
                 selected_color = self.color_profile_combo.currentText()
                 self.color_profile_status_label.setText(f"Click on a {selected_color} ball in the video feed...")
-                self.log_message(f"Waiting for user to click on a {selected_color} ball to set color profile.")
+                print(f"Waiting for user to click on a {selected_color} ball to set color profile.")
             else:
                 self.color_profile_status_label.setText("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
-                self.log_message("Color profile calibration cancelled.")
+                print("Color profile calibration cancelled.")
 
         def video_view_clicked(self, event):
             print(f"🖱️ video_view_clicked() called! Button checked: {self.set_color_profile_button.isChecked()}")
@@ -1734,7 +1724,7 @@ if PYQT_AVAILABLE:
                     
                     color_name = self.color_profile_combo.currentText()
                     print(f"🎨 Selected color: '{color_name}'")
-                    self.log_message(f"Clicked at pixel ({img_pos.x():.1f}, {img_pos.y():.1f}) to set '{color_name}' color profile")
+                    print(f"Clicked at pixel ({img_pos.x():.1f}, {img_pos.y():.1f}) to set '{color_name}' color profile")
                     
                     # Get the current frame image
                     frame_image = self.get_latest_frame()
@@ -1761,7 +1751,7 @@ if PYQT_AVAILABLE:
                             avg_hsv = np.mean(hsv_roi, axis=(0, 1))
                             
                             print(f"📊 Sampled HSV: H={avg_hsv[0]:.1f}, S={avg_hsv[1]:.1f}, V={avg_hsv[2]:.1f}")
-                            self.log_message(f"Sampled HSV color: H={avg_hsv[0]:.1f}, S={avg_hsv[1]:.1f}, V={avg_hsv[2]:.1f}")
+                            print(f"Sampled HSV color: H={avg_hsv[0]:.1f}, S={avg_hsv[1]:.1f}, V={avg_hsv[2]:.1f}")
                             
                             print(f"📦 Creating ZMQ command...")
                             # Send calibration command to engine via ZMQ
@@ -1776,49 +1766,49 @@ if PYQT_AVAILABLE:
                             print(f"📦 Click coordinates set to ({x}, {y})")
                             
                             print(f"📤 About to send ZMQ command...")
-                            self.log_message(f"📤 Sending CALIBRATE_COLOR command for '{color_name}' at ({x}, {y})")
+                            print(f"📤 Sending CALIBRATE_COLOR command for '{color_name}' at ({x}, {y})")
                             response = self.zmq_client.send_command(command)
                             print(f"📥 Response received: success={response.success}, message='{response.message}'")
-                            self.log_message(f"📥 Response from engine: success={response.success}, message='{response.message}'")
+                            print(f"📥 Response from engine: success={response.success}, message='{response.message}'")
                             
                             if response.success:
                                 print(f"✅ Response was successful, proceeding with reload...")
-                                self.log_message(f"✅ Color profile '{color_name}' updated successfully from YOLO detection box")
+                                print(f"✅ Color profile '{color_name}' updated successfully from YOLO detection box")
                                 self.color_profile_status_label.setText(f"✅ '{color_name}' profile set! Click 'Set Color Profile' again to calibrate another color.")
                                 
                                 # Reload ball profiles to update the hue sliders in Ball Profiles section
                                 # CRITICAL FIX: Add small delay to allow engine to finish writing the file
                                 # The engine saves the file after calibration, but we need to wait for it to complete
                                 if hasattr(self, 'settings_widget') and self.settings_widget:
-                                    self.log_message(f"🔄 Scheduling reload_ball_profiles() for '{color_name}' after 100ms delay")
+                                    print(f"🔄 Scheduling reload_ball_profiles() for '{color_name}' after 100ms delay")
                                     try:
                                         # Use QTimer to delay reload by 100ms to avoid race condition
                                         QTimer.singleShot(100, lambda: self._reload_ball_profiles_with_logging(color_name))
                                     except Exception as e:
-                                        self.log_message(f"❌ Error scheduling reload: {e}")
+                                        print(f"❌ Error scheduling reload: {e}")
                                         import traceback
-                                        self.log_message(f"Stack trace: {traceback.format_exc()}")
+                                        print(f"Stack trace: {traceback.format_exc()}")
                             else:
                                 # Check if the error is about no YOLO box found
                                 if "No YOLO detection box found" in response.message:
-                                    self.log_message(f"❌ No ball detected at click location. Please click directly on a detected ball.")
+                                    print(f"❌ No ball detected at click location. Please click directly on a detected ball.")
                                     self.color_profile_status_label.setText(f"❌ No ball detected! Click on a ball with a YOLO detection box.")
                                     QMessageBox.warning(self, "No Ball Detected",
                                                        "No YOLO detection box found at the click location.\n\n"
                                                        "Please click directly on a detected ball (one with a red box around it).\n\n"
                                                        "Tip: Enable 'YOLO Detections' visualization to see where balls are detected.")
                                 else:
-                                    self.log_message(f"❌ Failed to update color profile: {response.message}")
+                                    print(f"❌ Failed to update color profile: {response.message}")
                                     self.color_profile_status_label.setText(f"❌ Failed to set '{color_name}' profile: {response.message}")
                         except Exception as e:
                             print(f"❌ EXCEPTION during calibration: {e}")
                             import traceback
                             print(f"Stack trace: {traceback.format_exc()}")
-                            self.log_message(f"❌ Error during calibration: {e}")
+                            print(f"❌ Error during calibration: {e}")
                             self.color_profile_status_label.setText(f"❌ Error: {e}")
                     else:
                         print(f"❌ ERROR: frame_image is None!")
-                        self.log_message(f"❌ Error: No frame image available for color sampling")
+                        print(f"❌ Error: No frame image available for color sampling")
                         self.color_profile_status_label.setText("❌ No frame available")
                     
                     # Uncheck the button after calibration
@@ -1830,27 +1820,27 @@ if PYQT_AVAILABLE:
         def _reload_ball_profiles_with_logging(self, color_name: str):
             """Helper method to reload ball profiles after calibration with proper error handling"""
             try:
-                self.log_message(f"🔄 _reload_ball_profiles_with_logging() called for '{color_name}'")
+                print(f"🔄 _reload_ball_profiles_with_logging() called for '{color_name}'")
                 
                 if not hasattr(self, 'settings_widget'):
-                    self.log_message(f"❌ ERROR: self.settings_widget does not exist!")
+                    print(f"❌ ERROR: self.settings_widget does not exist!")
                     return
                 
                 if not self.settings_widget:
-                    self.log_message(f"❌ ERROR: self.settings_widget is None!")
+                    print(f"❌ ERROR: self.settings_widget is None!")
                     return
                 
                 if not hasattr(self.settings_widget, 'reload_ball_profiles'):
-                    self.log_message(f"❌ ERROR: settings_widget does not have reload_ball_profiles method!")
+                    print(f"❌ ERROR: settings_widget does not have reload_ball_profiles method!")
                     return
                 
-                self.log_message(f"✅ Calling settings_widget.reload_ball_profiles()...")
+                print(f"✅ Calling settings_widget.reload_ball_profiles()...")
                 self.settings_widget.reload_ball_profiles()
-                self.log_message(f"🎨 Ball profile hue sliders updated for '{color_name}'")
+                print(f"🎨 Ball profile hue sliders updated for '{color_name}'")
             except Exception as e:
-                self.log_message(f"⚠️ Warning: Could not reload ball profiles: {e}")
+                print(f"⚠️ Warning: Could not reload ball profiles: {e}")
                 import traceback
-                self.log_message(f"Stack trace: {traceback.format_exc()}")
+                print(f"Stack trace: {traceback.format_exc()}")
 
 class JuggleHubUI:
     def __init__(self, config: dict, zmq_client: Optional['ZMQClient'] = None, hub_instance=None):

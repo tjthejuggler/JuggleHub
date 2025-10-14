@@ -275,6 +275,29 @@ JuggleHub/
 - **Intel OpenVINO 2025.2.0+** (for DNN-based tracking)
 - **Eigen3** (for mathematical operations)
 
+### OpenVINO Performance Benchmarking
+
+JuggleHub includes comprehensive benchmarking tools to measure and optimize OpenVINO inference performance. See [`scripts/test_openvino_models_refactored.py`](scripts/test_openvino_models_refactored.py:1) for advanced performance testing.
+
+**Quick Benchmark:**
+```bash
+# Run optimized performance benchmark
+source /opt/intel/openvino_2025.2.0/setupvars.sh && python3 scripts/test_openvino_models_refactored.py
+```
+
+The refactored benchmark demonstrates three optimization approaches:
+1. **Original (Baseline)**: CPU preprocessing + synchronous inference
+2. **Preprocessing API**: GPU-accelerated preprocessing + synchronous inference
+3. **Fully Optimized**: Async inference + GPU preprocessing + throughput hints
+
+**Expected Performance Gains:**
+- Preprocessing API: 5-15% FPS boost
+- Async API: 30-100%+ FPS boost
+- Throughput Hint: 5-10% FPS boost
+- **Combined: 50-150%+ total improvement**
+
+For detailed benchmarking documentation, see the script's inline documentation.
+
 ### Installation
 
 1. **Clone the repository:**

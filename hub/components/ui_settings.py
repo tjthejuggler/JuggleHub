@@ -502,6 +502,25 @@ if PYQT_AVAILABLE:
             )
             row += 1
             
+            # Ignore Class Toggle
+            self.tc_ignore_class_toggle = QPushButton("Ignore Class (Treat ball/ball_held Same)")
+            self.tc_ignore_class_toggle.setCheckable(True)
+            self.tc_ignore_class_toggle.setChecked(False)
+            self.tc_ignore_class_toggle.clicked.connect(
+                lambda: self.update_setting('ignore_class',
+                                           1 if self.tc_ignore_class_toggle.isChecked() else 0))
+            self.tc_ignore_class_toggle.setToolTip(
+                "When enabled, the tracking system ignores ML class distinctions.\n"
+                "Both 'ball' and 'ball_held' classes are treated identically.\n"
+                "This means:\n"
+                "• No class-based filtering in detection matching\n"
+                "• No class-based threshold differences\n"
+                "• State determined purely by distance to hands\n"
+                "Use this if YOLO class predictions are unreliable."
+            )
+            layout.addWidget(self.tc_ignore_class_toggle, row, 0, 1, 3)
+            row += 1
+            
             # Separator
             layout.addWidget(QLabel("Tracker Distance Limits:"), row, 0, 1, 3)
             row += 1
@@ -1890,6 +1909,7 @@ if PYQT_AVAILABLE:
                 'hand_distance_threshold': self.tc_hand_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_hand_distance_threshold_slider') else 0.25,  # cm to m
                 'min_throw_distance': self.tc_min_throw_distance_slider.value() / 100.0 if hasattr(self, 'tc_min_throw_distance_slider') else 0.20,  # cm to m
                 'min_frames_before_catch': self.tc_min_frames_before_catch_slider.value() if hasattr(self, 'tc_min_frames_before_catch_slider') else 3,
+                'ignore_class': self.tc_ignore_class_toggle.isChecked() if hasattr(self, 'tc_ignore_class_toggle') else False,
                 'max_tracker_distance_per_frame': self.tc_max_tracker_distance_slider.value() / 100.0,  # cm to m
                 'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked(),
                 'tc_sound_on_throw': self.tc_sound_on_throw_toggle.isChecked(),
@@ -2115,6 +2135,9 @@ if PYQT_AVAILABLE:
             
             if 'tc_name_on_throw' in settings:
                 self.tc_name_on_throw_toggle.setChecked(settings['tc_name_on_throw'])
+            
+            if 'ignore_class' in settings and hasattr(self, 'tc_ignore_class_toggle'):
+                self.tc_ignore_class_toggle.setChecked(settings['ignore_class'])
             
             # Restore collapsed states
             if 'collapsed_camera' in settings:
@@ -2426,6 +2449,9 @@ if PYQT_AVAILABLE:
             
             if 'tc_name_on_throw' in settings:
                 self.udp_client.send_setting('tc_name_on_throw', 1 if settings['tc_name_on_throw'] else 0)
+            
+            if 'ignore_class' in settings:
+                self.udp_client.send_setting('ignore_class', 1 if settings['ignore_class'] else 0)
             
             # Euclidean Matching Temporal Consistency
             if 'temporal_consistency_bonus' in settings:

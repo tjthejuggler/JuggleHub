@@ -17,20 +17,28 @@ Simple2DBallTracker::Simple2DBallTracker(const std::string& ball_model_path,
       ball_confidence_threshold_(0.25f),
       ball_held_confidence_threshold_(0.25f),
       nms_threshold_(0.45f),
-      enable_ball_detection_(true) {
+      enable_ball_detection_(true),
+      use_async_inference_(true) {
     
-    std::cout << "[Simple2DBallTracker] Initializing 2D-only ball tracker..." << std::endl;
+    std::cout << "[Simple2DBallTracker] Initializing 2D-only ball tracker with async inference..." << std::endl;
     
-    // Load OpenVINO models
-    ball_model_ = core_.compile_model(ball_model_path, device_name);
+    // OPTIMIZATION: Compile models with THROUGHPUT performance hint
+    // This configures OpenVINO to maximize FPS by optimizing device settings
+    ov::AnyMap config;
+    config["PERFORMANCE_HINT"] = "THROUGHPUT";
+    
+    // Load OpenVINO models with performance hints
+    ball_model_ = core_.compile_model(ball_model_path, device_name, config);
     ball_infer_ = ball_model_.create_infer_request();
     
-    pose_model_ = core_.compile_model(pose_model_path, device_name);
+    pose_model_ = core_.compile_model(pose_model_path, device_name, config);
     pose_infer_ = pose_model_.create_infer_request();
     
     std::cout << "[Simple2DBallTracker] Models loaded successfully" << std::endl;
     std::cout << "[Simple2DBallTracker] Device: " << device_name << std::endl;
     std::cout << "[Simple2DBallTracker] Input size: " << input_width_ << "x" << input_height_ << std::endl;
+    std::cout << "[Simple2DBallTracker] Async inference: " << (use_async_inference_ ? "ENABLED" : "DISABLED") << std::endl;
+    std::cout << "[Simple2DBallTracker] Performance hint: THROUGHPUT" << std::endl;
 }
 
 // ============================================================================
@@ -55,13 +63,57 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> Simple2DBallTracker::
     float scale_x, scale_y;
     cv::Mat preprocessed = preprocess(color_frame, scale_x, scale_y);
     
-    // Run YOLO ball detection (2D only) - pass preprocessed image
-    std::vector<Detection> ball_detections = runBallDetection(preprocessed, scale_x, scale_y);
-    std::cout << "[Simple2DBallTracker] Ball detections: " << ball_detections.size() << std::endl;
+    // ASYNC OPTIMIZATION: Start both inferences simultaneously to overlap GPU execution
+    std::vector<Detection> ball_detections;
+    std::vector<SimpleHand> hands;
     
-    // Run YOLO pose estimation for hands (2D only) - reuse preprocessed image
-    std::vector<SimpleHand> hands = runPoseEstimation(preprocessed, scale_x, scale_y);
-    std::cout << "[Simple2DBallTracker] Hands detected: " << hands.size() << std::endl;
+    if (use_async_inference_) {
+        // OPTIMIZED PATH: Asynchronous inference with overlapping execution
+        // This allows the GPU to pipeline both model executions
+        
+        // 1. Start ball detection inference (non-blocking)
+        if (enable_ball_detection_) {
+            ov::Tensor ball_input_tensor(ball_model_.input().get_element_type(),
+                                         ball_model_.input().get_shape(),
+                                         preprocessed.data);
+            ball_infer_.set_input_tensor(ball_input_tensor);
+            ball_infer_.start_async();
+        }
+        
+        // 2. Start pose estimation inference (non-blocking)
+        if (enable_pose_detection_) {
+            ov::Tensor pose_input_tensor(pose_model_.input().get_element_type(),
+                                         pose_model_.input().get_shape(),
+                                         preprocessed.data);
+            pose_infer_.set_input_tensor(pose_input_tensor);
+            pose_infer_.start_async();
+        }
+        
+        // 3. Wait for ball detection to complete
+        if (enable_ball_detection_) {
+            ball_infer_.wait();
+            
+            // 4. Process ball detection results while pose may still be running
+            ball_detections = runBallDetection(preprocessed, scale_x, scale_y);
+            std::cout << "[Simple2DBallTracker] Ball detections: " << ball_detections.size() << std::endl;
+        }
+        
+        // 5. Wait for pose estimation to complete
+        if (enable_pose_detection_) {
+            pose_infer_.wait();
+            
+            // 6. Process pose estimation results
+            hands = runPoseEstimation(preprocessed, scale_x, scale_y);
+            std::cout << "[Simple2DBallTracker] Hands detected: " << hands.size() << std::endl;
+        }
+    } else {
+        // FALLBACK PATH: Synchronous inference (original behavior)
+        ball_detections = runBallDetection(preprocessed, scale_x, scale_y);
+        std::cout << "[Simple2DBallTracker] Ball detections: " << ball_detections.size() << std::endl;
+        
+        hands = runPoseEstimation(preprocessed, scale_x, scale_y);
+        std::cout << "[Simple2DBallTracker] Hands detected: " << hands.size() << std::endl;
+    }
     
     // Store for getters
     hands_ = hands;
@@ -181,12 +233,17 @@ std::vector<Detection> Simple2DBallTracker::runBallDetection(const cv::Mat& prep
         return std::vector<Detection>();
     }
     
-    // Run inference
-    ov::Tensor input_tensor(ball_model_.input().get_element_type(),
-                           ball_model_.input().get_shape(),
-                           preprocessed.data);
-    ball_infer_.set_input_tensor(input_tensor);
-    ball_infer_.infer();
+    // NOTE: When using async inference, the inference is already started in update()
+    // This function only processes the results after wait() is called
+    // For sync mode, we still run inference here
+    if (!use_async_inference_) {
+        ov::Tensor input_tensor(ball_model_.input().get_element_type(),
+                               ball_model_.input().get_shape(),
+                               preprocessed.data);
+        ball_infer_.set_input_tensor(input_tensor);
+        ball_infer_.infer();
+    }
+    
     const ov::Tensor& output_tensor = ball_infer_.get_output_tensor();
     
     // Parse YOLO output
@@ -216,7 +273,8 @@ std::vector<Detection> Simple2DBallTracker::runBallDetection(const cv::Mat& prep
         
         // Apply class-specific confidence thresholds
         // class_id=0 is 'ball', class_id=1 is 'ball_held'
-        float threshold = (class_id == 0) ? ball_confidence_threshold_ : ball_held_confidence_threshold_;
+        // IGNORE_CLASS: When enabled, use ball threshold for all classes
+        float threshold = (tracking_settings_.ignore_class || class_id == 0) ? ball_confidence_threshold_ : ball_held_confidence_threshold_;
         
         if (confidence > threshold) {
             // Extract bounding box (center_x, center_y, width, height)
@@ -279,12 +337,17 @@ std::vector<SimpleHand> Simple2DBallTracker::runPoseEstimation(const cv::Mat& pr
     
     std::vector<SimpleHand> hands;
     
-    // Run inference
-    ov::Tensor input_tensor(pose_model_.input().get_element_type(),
-                           pose_model_.input().get_shape(),
-                           preprocessed.data);
-    pose_infer_.set_input_tensor(input_tensor);
-    pose_infer_.infer();
+    // NOTE: When using async inference, the inference is already started in update()
+    // This function only processes the results after wait() is called
+    // For sync mode, we still run inference here
+    if (!use_async_inference_) {
+        ov::Tensor input_tensor(pose_model_.input().get_element_type(),
+                               pose_model_.input().get_shape(),
+                               preprocessed.data);
+        pose_infer_.set_input_tensor(input_tensor);
+        pose_infer_.infer();
+    }
+    
     const ov::Tensor& output_tensor = pose_infer_.get_output_tensor();
     
     // Parse YOLO-Pose output
@@ -414,10 +477,22 @@ bool Simple2DBallTracker::updateSetting(const std::string& key, const std::strin
                   << (enable_ball_detection_ ? "enabled" : "disabled") << std::endl;
         return true;
     }
+    else if (key == "ignore_class") {
+        tracking_settings_.ignore_class = (value == "true" || value == "1");
+        std::cout << "[Simple2DBallTracker] Ignore class "
+                  << (tracking_settings_.ignore_class ? "enabled" : "disabled") << std::endl;
+        return true;
+    }
     else if (key == "enable_pose_detection") {
         enable_pose_detection_ = (value == "true" || value == "1");
         std::cout << "[Simple2DBallTracker] Pose detection "
                   << (enable_pose_detection_ ? "enabled" : "disabled") << std::endl;
+        return true;
+    }
+    else if (key == "use_async_inference") {
+        use_async_inference_ = (value == "true" || value == "1");
+        std::cout << "[Simple2DBallTracker] Async inference "
+                  << (use_async_inference_ ? "enabled" : "disabled") << std::endl;
         return true;
     }
     

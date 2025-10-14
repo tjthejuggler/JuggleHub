@@ -223,9 +223,12 @@ private:
     
     ov::Core core_;                  // OpenVINO core
     ov::CompiledModel ball_model_;   // Compiled ball detection model
-    ov::InferRequest ball_infer_;    // Ball detection inference request
+    ov::InferRequest ball_infer_;    // Ball detection inference request (async)
     ov::CompiledModel pose_model_;   // Compiled pose estimation model
-    ov::InferRequest pose_infer_;    // Pose estimation inference request
+    ov::InferRequest pose_infer_;    // Pose estimation inference request (async)
+    
+    // Async inference support
+    bool use_async_inference_;       // Enable asynchronous inference for performance
     
     // ========================================================================
     // State Vectors

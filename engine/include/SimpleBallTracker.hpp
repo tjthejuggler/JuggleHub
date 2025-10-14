@@ -184,6 +184,9 @@ struct TrackingSettings {
     int min_frames_for_transition = 2;        // Debouncing for state changes
     int min_frames_before_catch = 3;          // Minimum frames in flight before same hand can catch (0-10)
     
+    // Class filtering
+    bool ignore_class = false;                // If true, ignore ML class distinctions (treat ball/ball_held same)
+    
     // Hand velocity tracking settings (for throw prediction)
     bool hand_velocity_enabled = true;                    // Enable hand velocity-based throw prediction
     float hand_velocity_threshold = 1.0f;                 // Minimum hand velocity to trigger enhanced detection (m/s)
@@ -358,10 +361,16 @@ public:
 private:
     // YOLO detection
     cv::Mat preprocess(const cv::Mat& frame, float& scale_x, float& scale_y);
-    std::vector<Detection> runBallDetection(const cv::Mat& color_frame, 
+    std::vector<Detection> runBallDetection(const cv::Mat& preprocessed,
+                                           float scale_x,
+                                           float scale_y,
+                                           const cv::Mat& color_frame,
                                            const cv::Mat& depth_frame,
                                            const CameraIntrinsics& intrinsics);
-    std::vector<SimpleHand> runPoseEstimation(const cv::Mat& color_frame,
+    std::vector<SimpleHand> runPoseEstimation(const cv::Mat& preprocessed,
+                                             float scale_x,
+                                             float scale_y,
+                                             const cv::Mat& color_frame,
                                              const cv::Mat& depth_frame,
                                              const CameraIntrinsics& intrinsics);
     

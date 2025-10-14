@@ -490,6 +490,10 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.min_frames_before_catch = std::max(0, std::min(10, val));
             return true;
         }
+        else if (key == "ignore_class") {
+            tracking_settings_.ignore_class = (value == "true" || value == "1");
+            return true;
+        }
         else if (key == "enable_ball_detection") {
             enable_ball_detection_ = (value == "true" || value == "1");
             return true;
@@ -642,18 +646,20 @@ void SimpleBallTracker::evaluateOverrideCriteria(std::vector<Detection>& detecti
             
             // NEW: Use class-specific thresholds based on detection class_id
             // class_id=0 is 'ball', class_id=1 is 'ball_held'
-            float confidence_threshold = (det.class_id == 0) ?
+            // IGNORE_CLASS: When enabled, use ball thresholds for all classes
+            float confidence_threshold = (tracking_settings_.ignore_class || det.class_id == 0) ?
                 tracking_settings_.override_ball_confidence_threshold :
                 tracking_settings_.override_ball_held_confidence_threshold;
             
-            float color_threshold = (det.class_id == 0) ?
+            float color_threshold = (tracking_settings_.ignore_class || det.class_id == 0) ?
                 tracking_settings_.override_ball_color_threshold :
                 tracking_settings_.override_ball_held_color_threshold;
             
             // Check override criteria using class-specific thresholds
             eval.meets_confidence_threshold = (det.confidence >= confidence_threshold);
             eval.meets_color_threshold = (eval.color_score >= color_threshold);
-            eval.meets_class_requirement = !tracking_settings_.override_require_ball_class || (det.class_id == 0);
+            // IGNORE_CLASS: When enabled, ignore class requirement
+            eval.meets_class_requirement = tracking_settings_.ignore_class || !tracking_settings_.override_require_ball_class || (det.class_id == 0);
             
             // Determine if this would override
             eval.would_override = eval.meets_confidence_threshold &&
@@ -935,9 +941,14 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     cv::cvtColor(color_frame, cached_hsv_frame_, cv::COLOR_BGR2HSV);
     cached_color_frame_ = color_frame;  // Store reference for cache validation
 
+    // PERFORMANCE OPTIMIZATION: Preprocess once and reuse for both models
+    // Both models use the same input size (640x640) and preprocessing steps
+    float preprocess_scale_x, preprocess_scale_y;
+    cv::Mat preprocessed_frame = preprocess(color_frame, preprocess_scale_x, preprocess_scale_y);
+    
     // Run YOLO detection
     std::cout << "[FRAME " << frame_counter_ << "] Running YOLO detection..." << std::endl;
-    std::vector<Detection> yolo_detections = runBallDetection(color_frame, depth_frame, intrinsics);
+    std::vector<Detection> yolo_detections = runBallDetection(preprocessed_frame, preprocess_scale_x, preprocess_scale_y, color_frame, depth_frame, intrinsics);
     std::cout << "[FRAME " << frame_counter_ << "] YOLO detection complete: " << yolo_detections.size() << " detections" << std::endl;
     
     // PERFORMANCE FIX: Only evaluate override criteria for recording/debugging
@@ -971,17 +982,19 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             float color_score = matchColor(det, *profile, color_frame);
             
             // Check override criteria using class-specific thresholds
-            float confidence_threshold = (det.class_id == 0) ?
+            // IGNORE_CLASS: When enabled, use ball thresholds for all classes
+            float confidence_threshold = (tracking_settings_.ignore_class || det.class_id == 0) ?
                 tracking_settings_.override_ball_confidence_threshold :
                 tracking_settings_.override_ball_held_confidence_threshold;
             
-            float color_threshold = (det.class_id == 0) ?
+            float color_threshold = (tracking_settings_.ignore_class || det.class_id == 0) ?
                 tracking_settings_.override_ball_color_threshold :
                 tracking_settings_.override_ball_held_color_threshold;
             
             bool meets_confidence = (det.confidence >= confidence_threshold);
             bool meets_color = (color_score >= color_threshold);
-            bool meets_class = !tracking_settings_.override_require_ball_class || (det.class_id == 0);
+            // IGNORE_CLASS: When enabled, ignore class requirement
+            bool meets_class = tracking_settings_.ignore_class || !tracking_settings_.override_require_ball_class || (det.class_id == 0);
             
             bool would_override = meets_confidence && meets_color && meets_class;
             
@@ -1024,9 +1037,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         }
     });
 
-    // Run pose estimation
+    // Run pose estimation (reusing preprocessed frame)
     std::cout << "[FRAME " << frame_counter_ << "] Running pose estimation..." << std::endl;
-    std::vector<SimpleHand> hands = runPoseEstimation(color_frame, depth_frame, intrinsics);
+    std::vector<SimpleHand> hands = runPoseEstimation(preprocessed_frame, preprocess_scale_x, preprocess_scale_y, color_frame, depth_frame, intrinsics);
     std::cout << "[FRAME " << frame_counter_ << "] Pose estimation complete: " << hands.size() << " hands" << std::endl;
     
     // Update hand velocity for all detected hands
@@ -1563,6 +1576,9 @@ cv::Mat SimpleBallTracker::preprocess(const cv::Mat& frame, float& scale_x, floa
 }
 
 std::vector<Detection> SimpleBallTracker::runBallDetection(
+    const cv::Mat& preprocessed,
+    float scale_x,
+    float scale_y,
     const cv::Mat& color_frame,
     const cv::Mat& depth_frame,
     const CameraIntrinsics& intrinsics) {
@@ -1574,10 +1590,6 @@ std::vector<Detection> SimpleBallTracker::runBallDetection(
     if (!enable_ball_detection_) {
         return std::vector<Detection>();
     }
-    
-    // Preprocess
-    float scale_x, scale_y;
-    cv::Mat preprocessed = preprocess(color_frame, scale_x, scale_y);
     
     // Run inference
     ov::Tensor input_tensor(ball_model_.input().get_element_type(),
@@ -1609,7 +1621,8 @@ std::vector<Detection> SimpleBallTracker::runBallDetection(
         int class_id = class_id_point.x;
         
         // Apply class-specific confidence thresholds
-        float threshold = (class_id == 0) ? ball_confidence_threshold_ : ball_held_confidence_threshold_;
+        // IGNORE_CLASS: When enabled, use ball threshold for all classes
+        float threshold = (tracking_settings_.ignore_class || class_id == 0) ? ball_confidence_threshold_ : ball_held_confidence_threshold_;
         
         if (confidence > threshold) {
             float cx = output_buffer.at<float>(i, 0);
@@ -1670,6 +1683,9 @@ std::vector<Detection> SimpleBallTracker::runBallDetection(
 }
 
 std::vector<SimpleHand> SimpleBallTracker::runPoseEstimation(
+    const cv::Mat& preprocessed,
+    float scale_x,
+    float scale_y,
     const cv::Mat& color_frame,
     const cv::Mat& depth_frame,
     const CameraIntrinsics& intrinsics) {
@@ -1680,10 +1696,6 @@ std::vector<SimpleHand> SimpleBallTracker::runPoseEstimation(
     }
     
     std::vector<SimpleHand> hands;
-    
-    // Preprocess
-    float scale_x, scale_y;
-    cv::Mat preprocessed = preprocess(color_frame, scale_x, scale_y);
     
     // Run inference
     ov::Tensor input_tensor(pose_model_.input().get_element_type(),
@@ -3503,14 +3515,16 @@ void SimpleBallTracker::updateHeldBall(
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);
             debug_log << "    Class check: det.class_id=" << det.class_id
-                      << ", class_requirement_active=" << (class_requirement_active ? "YES" : "NO") << std::endl;
+                      << ", class_requirement_active=" << (class_requirement_active ? "YES" : "NO")
+                      << ", ignore_class=" << (tracking_settings_.ignore_class ? "YES" : "NO") << std::endl;
             debug_log.close();
         });
         
         // CRITICAL FIX: Check class requirement AFTER velocity adjustments
         // When hand_velocity_ignore_class is true AND we're in velocity direction,
         // class_requirement_active will be false, so we should accept any class
-        bool meets_class_requirement = !class_requirement_active || (det.class_id == 0);
+        // IGNORE_CLASS: When enabled globally, always ignore class requirement
+        bool meets_class_requirement = tracking_settings_.ignore_class || !class_requirement_active || (det.class_id == 0);
         
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);

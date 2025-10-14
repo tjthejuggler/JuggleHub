@@ -1576,11 +1576,19 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     ball.is_held = true;
                     ball.held_by_hand_id = closest_hand_id;
                     
+                    // CRITICAL FIX: Store override position as potential throw location
+                    // This allows next frame to use it as reference if override fails
+                    ball.has_potential_throw_location = true;
+                    ball.potential_throw_location = ball.position;  // Current override position
+                    ball.potential_throw_frame_age = 0;
+                    
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
                         debug_log << "  Override: Ball set to HELD (distance-based: hand "
                                   << closest_hand_id << ", dist=" << min_dist << "m < threshold="
                                   << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
+                        debug_log << "  [POTENTIAL_THROW] Stored override position as potential throw location" << std::endl;
+                        debug_log << "    Location: (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
                         debug_log.close();
                     });
                 }
@@ -3914,6 +3922,22 @@ void SimpleBallTracker::updateHeldBall(
         });
     }
     
+    // CRITICAL FIX: Age out potential throw location if it's too old (>2 frames)
+    // This prevents stale locations from affecting throw detection
+    if (ball.has_potential_throw_location) {
+        ball.potential_throw_frame_age++;
+        if (ball.potential_throw_frame_age > 2) {
+            ball.has_potential_throw_location = false;
+            ball.potential_throw_frame_age = 0;
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  [POTENTIAL_THROW] Aged out potential throw location (>2 frames old)" << std::endl;
+                debug_log.close();
+            });
+        }
+    }
+    
     DEBUG_LOG(debug_log, {
         OPEN_DEBUG_LOG(debug_log);
         debug_log << "  [THROW CHECK] Starting detection loop:" << std::endl;
@@ -3923,12 +3947,34 @@ void SimpleBallTracker::updateHeldBall(
             debug_log << "    Hand speed: " << hand_speed << " m/s (threshold: "
                       << tracking_settings_.hand_velocity_threshold << " m/s)" << std::endl;
         }
+        if (ball.has_potential_throw_location) {
+            debug_log << "    Potential throw location active: YES" << std::endl;
+            debug_log << "      Location: (" << ball.potential_throw_location.x << ", "
+                      << ball.potential_throw_location.y << ", " << ball.potential_throw_location.z << ")" << std::endl;
+            debug_log << "      Age: " << ball.potential_throw_frame_age << " frames" << std::endl;
+        } else {
+            debug_log << "    Potential throw location active: NO" << std::endl;
+        }
         debug_log.close();
     });
     
     for (const auto& det : yolo_detections) {
         float dist_from_hand = cv::norm(det.world_pos - hand->wrist_pos_3d);
-        float dist_from_ball = cv::norm(det.world_pos - ball.position);
+        
+        // CRITICAL FIX: Use potential_throw_location for distance check if available
+        // This solves the catch-22 problem where ball is at wrist but detection is far away
+        float dist_from_ball;
+        cv::Point3f reference_position;
+        
+        if (ball.has_potential_throw_location) {
+            // Use the potential throw location as reference instead of current ball position
+            dist_from_ball = cv::norm(det.world_pos - ball.potential_throw_location);
+            reference_position = ball.potential_throw_location;
+        } else {
+            // Use current ball position (at wrist)
+            dist_from_ball = cv::norm(det.world_pos - ball.position);
+            reference_position = ball.position;
+        }
         
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);
@@ -3939,8 +3985,15 @@ void SimpleBallTracker::updateHeldBall(
             debug_log << "    hand.wrist_pos_3d: (" << hand->wrist_pos_3d.x << ", " << hand->wrist_pos_3d.y << ", " << hand->wrist_pos_3d.z << ")" << std::endl;
             debug_log << "    predicted_hand_pos: (" << predicted_hand_pos.x << ", " << predicted_hand_pos.y << ", " << predicted_hand_pos.z << ")" << std::endl;
             debug_log << "    ball.position: (" << ball.position.x << ", " << ball.position.y << ", " << ball.position.z << ")" << std::endl;
+            if (ball.has_potential_throw_location) {
+                debug_log << "    reference_position (potential_throw): (" << reference_position.x << ", "
+                          << reference_position.y << ", " << reference_position.z << ")" << std::endl;
+            } else {
+                debug_log << "    reference_position (ball.position): (" << reference_position.x << ", "
+                          << reference_position.y << ", " << reference_position.z << ")" << std::endl;
+            }
             debug_log << "    dist_from_hand: " << dist_from_hand << "m" << std::endl;
-            debug_log << "    dist_from_ball: " << dist_from_ball << "m" << std::endl;
+            debug_log << "    dist_from_ball: " << dist_from_ball << "m (from reference_position)" << std::endl;
             debug_log.close();
         });
         
@@ -4023,6 +4076,32 @@ void SimpleBallTracker::updateHeldBall(
         // class_requirement_active will be false, so we should accept any class
         // IGNORE_CLASS: When enabled globally, always ignore class requirement
         bool meets_class_requirement = tracking_settings_.ignore_class || !class_requirement_active || (det.class_id == 0);
+        
+        // NEW: Check if this detection is within catch area and matches color
+        // If so, remember it as a potential throw location for next frame
+        bool is_in_catch_area = (dist_from_hand <= tracking_settings_.hand_distance_threshold);
+        
+        if (is_in_catch_area && !ball.has_potential_throw_location) {
+            // Check color match to see if this is actually the ball
+            float color_score = matchColor(det, *profile, color_frame);
+            
+            if (color_score >= tracking_settings_.min_color_confidence_override) {
+                // This detection is in catch area and matches the ball color
+                // Remember it as a potential throw location
+                ball.has_potential_throw_location = true;
+                ball.potential_throw_location = det.world_pos;
+                ball.potential_throw_frame_age = 0;
+                
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "    [POTENTIAL_THROW] Detected ball in catch area - remembering location" << std::endl;
+                    debug_log << "      Location: (" << det.world_pos.x << ", " << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
+                    debug_log << "      Distance from hand: " << dist_from_hand << "m (threshold: " << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
+                    debug_log << "      Color score: " << color_score << " (threshold: " << tracking_settings_.min_color_confidence_override << ")" << std::endl;
+                    debug_log.close();
+                });
+            }
+        }
         
         DEBUG_LOG(debug_log, {
             OPEN_DEBUG_LOG(debug_log);

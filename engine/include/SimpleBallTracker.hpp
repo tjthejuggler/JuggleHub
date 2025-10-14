@@ -133,6 +133,11 @@ struct SimpleBall {
     std::vector<DetectionCandidate> throw_candidates;  // Last 5 frames of detection candidates
     int consecutive_valid_detections;                   // Counter for consecutive valid detections
     
+    // Potential throw location tracking (NEW: Fix catch-22 problem)
+    bool has_potential_throw_location;                  // True if we detected a potential throw location
+    cv::Point3f potential_throw_location;               // Location where ball was detected near hand
+    int potential_throw_frame_age;                      // Frames since potential throw was detected
+    
     // Trajectory (NEW: replaces Kalman and ColorBasedPredictor in Phase 3)
     BallTrajectory trajectory;       // Only valid when IN_FLIGHT
     cv::Point3f last_held_position;  // Position when last held (for velocity estimation)
@@ -166,6 +171,9 @@ struct SimpleBall {
                    last_throwing_hand_id(-1),
                    frames_in_flight_since_throw(0),
                    consecutive_valid_detections(0),
+                   has_potential_throw_location(false),
+                   potential_throw_location(0, 0, 0),
+                   potential_throw_frame_age(0),
                    has_yolo_detection(false),
                    frames_without_verified_detection(0),
                    unverified_trajectory_points(0),

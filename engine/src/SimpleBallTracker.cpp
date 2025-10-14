@@ -8,7 +8,7 @@
 #include <set>
 
 // FIX #5: These constants are now configurable via TrackingSettings
-// - min_color_confidence_override (default: 0.35f)
+// - min_color_confidence_override (default: 0.50f)
 // - min_ball_separation (default: 0.15f)
 // - min_hand_change_distance (default: 0.25f)
 
@@ -1117,7 +1117,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     debug_log << "    Color score: " << color_score << std::endl;
                     debug_log << "    Distance score: " << distance_score << std::endl;
                     debug_log << "    Combined score: " << combined_score
-                              << " (color*0.6 + dist*0.4)" << std::endl;
+                              << " (color*0.75 + dist*0.25)" << std::endl;
                     debug_log << "    Confidence: " << det.confidence << std::endl;
                     debug_log << "    Class: " << (det.class_id == 0 ? "ball" : "ball_held") << std::endl;
                 });
@@ -1373,9 +1373,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             if (closest_hand_id >= 0 && min_dist < tracking_settings_.hand_distance_threshold) {
                 // Ball is near a hand - check if catch is allowed
                 
-                // CRITICAL: Check if ball changed hands (hand swap without flight)
-                // This happens when override detects ball near a different hand than before
-                bool hand_changed = (ball.held_by_hand_id >= 0 && closest_hand_id != ball.held_by_hand_id);
+                // CRITICAL: Only check hand changes for HELD balls
+                // IN_FLIGHT balls should only check for catches, not hand changes
+                bool hand_changed = (ball.state == HELD && ball.held_by_hand_id >= 0 &&
+                                    closest_hand_id != ball.held_by_hand_id);
                 
                 if (hand_changed) {
                     // FIX #4: Validate that ball has actually moved significantly

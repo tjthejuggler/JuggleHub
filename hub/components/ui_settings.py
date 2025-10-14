@@ -502,6 +502,25 @@ if PYQT_AVAILABLE:
             )
             row += 1
             
+            # Throw YOLO Confidence Threshold (for HELD→IN_FLIGHT transition)
+            self.throw_yolo_confidence_threshold_slider, self.throw_yolo_confidence_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Throw Detection Confidence",
+                tooltip_text="Minimum YOLO confidence for throw detection (HELD→IN_FLIGHT transition).\n"
+                             "Range: 0.0-1.0. Default: 0.50 (50%).\n"
+                             "This is separate from trajectory tracking confidence.\n"
+                             "Lower = more sensitive throw detection (catches throws earlier)\n"
+                             "Higher = stricter requirements (may miss some throws)\n"
+                             "⚠️ Should be LOWER than trajectory tracking confidence (70%)!",
+                range_min=0,
+                range_max=100,
+                initial_value=50,
+                update_func=lambda v: self.update_setting('throw_yolo_confidence_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
             # Ignore Class Toggle
             self.tc_ignore_class_toggle = QPushButton("Ignore Class (Treat ball/ball_held Same)")
             self.tc_ignore_class_toggle.setCheckable(True)
@@ -1078,6 +1097,23 @@ if PYQT_AVAILABLE:
                 range_max=100,
                 initial_value=50,
                 update_func=lambda v: self.update_setting('traj_color_match_threshold', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # YOLO Confidence Threshold for Normal Tracking
+            self.traj_yolo_confidence_threshold_slider, self.traj_yolo_confidence_threshold_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="YOLO Confidence Threshold",
+                tooltip_text="Minimum YOLO confidence for normal throw detection (non-override).\n"
+                             "Range: 0.0-1.0. Default: 0.70 (70%).\n"
+                             "This is separate from override thresholds and used for regular tracking.\n"
+                             "Lower = more sensitive throw detection, Higher = stricter requirements.",
+                range_min=0,
+                range_max=100,
+                initial_value=70,
+                update_func=lambda v: self.update_setting('traj_yolo_confidence_threshold', v / 100.0),
                 is_float=True
             )
             row += 1
@@ -1963,6 +1999,8 @@ if PYQT_AVAILABLE:
                 'traj_search_radius': self._safe_get_slider_value(self.traj_search_radius_slider, 15) / 100.0 if hasattr(self, 'traj_search_radius_slider') else 0.15,
                 'traj_min_points_for_prediction': self._safe_get_slider_value(self.traj_min_points_for_prediction_slider, 3) if hasattr(self, 'traj_min_points_for_prediction_slider') else 3,
                 'traj_color_match_threshold': self._safe_get_slider_value(self.traj_color_match_threshold_slider, 50) / 100.0 if hasattr(self, 'traj_color_match_threshold_slider') else 0.50,
+                'traj_yolo_confidence_threshold': self._safe_get_slider_value(self.traj_yolo_confidence_threshold_slider, 70) / 100.0 if hasattr(self, 'traj_yolo_confidence_threshold_slider') else 0.70,
+                'throw_yolo_confidence_threshold': self._safe_get_slider_value(self.throw_yolo_confidence_threshold_slider, 50) / 100.0 if hasattr(self, 'throw_yolo_confidence_threshold_slider') else 0.50,
                 'traj_velocity_estimation_time': self._safe_get_slider_value(self.traj_velocity_estimation_time_slider, 10) / 100.0 if hasattr(self, 'traj_velocity_estimation_time_slider') else 0.10,
                 'traj_max_search_distance': self._safe_get_slider_value(self.traj_max_search_distance_slider, 50) / 100.0 if hasattr(self, 'traj_max_search_distance_slider') else 0.50,
                 
@@ -2235,6 +2273,12 @@ if PYQT_AVAILABLE:
             
             if 'traj_color_match_threshold' in settings and hasattr(self, 'traj_color_match_threshold_slider'):
                 self.traj_color_match_threshold_slider.setValue(int(settings['traj_color_match_threshold'] * 100))
+            
+            if 'traj_yolo_confidence_threshold' in settings and hasattr(self, 'traj_yolo_confidence_threshold_slider'):
+                self.traj_yolo_confidence_threshold_slider.setValue(int(settings['traj_yolo_confidence_threshold'] * 100))
+            
+            if 'throw_yolo_confidence_threshold' in settings and hasattr(self, 'throw_yolo_confidence_threshold_slider'):
+                self.throw_yolo_confidence_threshold_slider.setValue(int(settings['throw_yolo_confidence_threshold'] * 100))
             
             if 'traj_velocity_estimation_time' in settings and hasattr(self, 'traj_velocity_estimation_time_slider'):
                 self.traj_velocity_estimation_time_slider.setValue(int(settings['traj_velocity_estimation_time'] * 100))  # s to cs
@@ -2528,6 +2572,12 @@ if PYQT_AVAILABLE:
             
             if 'traj_color_match_threshold' in settings:
                 self.udp_client.send_setting('traj_color_match_threshold', settings['traj_color_match_threshold'])
+            
+            if 'traj_yolo_confidence_threshold' in settings:
+                self.udp_client.send_setting('traj_yolo_confidence_threshold', settings['traj_yolo_confidence_threshold'])
+            
+            if 'throw_yolo_confidence_threshold' in settings:
+                self.udp_client.send_setting('throw_yolo_confidence_threshold', settings['throw_yolo_confidence_threshold'])
             
             if 'traj_velocity_estimation_time' in settings:
                 self.udp_client.send_setting('traj_velocity_estimation_time', settings['traj_velocity_estimation_time'])

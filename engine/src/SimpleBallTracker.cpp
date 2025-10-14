@@ -451,6 +451,14 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             tracking_settings_.traj_color_match_threshold = std::stof(value);
             return true;
         }
+        else if (key == "traj_yolo_confidence_threshold") {
+            tracking_settings_.traj_yolo_confidence_threshold = std::stof(value);
+            return true;
+        }
+        else if (key == "throw_yolo_confidence_threshold") {
+            tracking_settings_.throw_yolo_confidence_threshold = std::stof(value);
+            return true;
+        }
         else if (key == "traj_velocity_estimation_time") {
             tracking_settings_.traj_velocity_estimation_time = std::stof(value);
             return true;
@@ -1121,6 +1129,23 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // Track which detections are used
     std::set<int> used_detections;
     
+    // CRITICAL: Increment flight frame counter for ALL in-flight balls BEFORE any processing
+    // This MUST happen before override logic to ensure cooldown works correctly
+    // The counter needs to be incremented BEFORE we check it in the override path
+    for (auto& ball : balls_) {
+        if (ball.state == IN_FLIGHT && ball.last_throwing_hand_id >= 0) {
+            ball.frames_in_flight_since_throw++;
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "[COOLDOWN] Ball " << ball.id << " in flight: frames_since_throw="
+                          << ball.frames_in_flight_since_throw << ", last_throwing_hand="
+                          << ball.last_throwing_hand_id << std::endl;
+                debug_log.close();
+            });
+        }
+    }
+    
     // CRITICAL: Reset detection flags at start of frame
     // This prevents balls from keeping stale "has_yolo_detection" flags
     // NOTE: was_just_thrown_by_hand_id is NOT reset here - it's reset when:
@@ -1142,23 +1167,7 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         }
         debug_log.close();
     });
-    
-    // CRITICAL: Increment flight frame counter for ALL in-flight balls BEFORE any processing
-    // This ensures the cooldown counter works for all code paths (override, normal, etc.)
-    for (auto& ball : balls_) {
-        if (ball.state == IN_FLIGHT && ball.last_throwing_hand_id >= 0) {
-            ball.frames_in_flight_since_throw++;
             
-            DEBUG_LOG(debug_log, {
-                OPEN_DEBUG_LOG(debug_log);
-                debug_log << "[COOLDOWN] Ball " << ball.id << " in flight: frames_since_throw="
-                          << ball.frames_in_flight_since_throw << ", last_throwing_hand="
-                          << ball.last_throwing_hand_id << std::endl;
-                debug_log.close();
-            });
-        }
-    }
-    
     // CRITICAL: Process each ball based on its state
     // BUT skip balls that have been overridden - they're already positioned correctly
     for (auto& ball : balls_) {
@@ -1193,6 +1202,73 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             // If distance >= hand_distance_threshold: IN_FLIGHT state
             if (closest_hand_id >= 0 && min_dist < tracking_settings_.hand_distance_threshold) {
                 // Ball is near a hand - check if catch is allowed
+                
+                // CRITICAL: Check if ball changed hands (hand swap without flight)
+                // This happens when override detects ball near a different hand than before
+                bool hand_changed = (ball.held_by_hand_id >= 0 && closest_hand_id != ball.held_by_hand_id);
+                
+                if (hand_changed) {
+                    // Ball changed hands without going through IN_FLIGHT state
+                    // This is a direct hand-to-hand transfer - generate THROW and CATCH events
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  [OVERRIDE HAND CHANGE] Ball changed from hand " << ball.held_by_hand_id
+                                  << " to hand " << closest_hand_id << " (dist=" << min_dist << "m)" << std::endl;
+                        debug_log.close();
+                    });
+                    
+                    // Find both hands
+                    const SimpleHand* old_hand = nullptr;
+                    const SimpleHand* new_hand = nullptr;
+                    for (const auto& h : hands_) {
+                        if (h.id == ball.held_by_hand_id) old_hand = &h;
+                        if (h.id == closest_hand_id) new_hand = &h;
+                    }
+                    
+                    // Generate THROW from old hand
+                    if (old_hand) {
+                        Detection throw_detection;
+                        throw_detection.world_pos = ball.position;
+                        throw_detection.box = ball.bbox;
+                        throw_detection.confidence = ball.yolo_confidence;
+                        throw_detection.class_id = ball.yolo_class_id;
+                        
+                        // Set throwing hand ID and reset counter
+                        ball.last_throwing_hand_id = ball.held_by_hand_id;
+                        ball.frames_in_flight_since_throw = 0;
+                        
+                        // Temporarily transition to IN_FLIGHT for throw event
+                        ball.state = IN_FLIGHT;
+                        initiateThrow(ball, throw_detection, old_hand, events);
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  THROW EVENT GENERATED via override hand change (hand "
+                                      << ball.held_by_hand_id << ")" << std::endl;
+                            debug_log.close();
+                        });
+                    }
+                    
+                    // Generate CATCH to new hand (immediately after throw)
+                    if (new_hand) {
+                        initiateCatch(ball, *new_hand, events);
+                        
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  CATCH EVENT GENERATED via override hand change (hand "
+                                      << closest_hand_id << ")" << std::endl;
+                            debug_log.close();
+                        });
+                    } else {
+                        // Fallback: just update hand ID
+                        ball.state = HELD;
+                        ball.is_held = true;
+                        ball.held_by_hand_id = closest_hand_id;
+                    }
+                    
+                    continue;  // Skip to next ball
+                }
                 
                 // CRITICAL: Check if this is the hand that threw the ball
                 // Apply the SAME cooldown logic as normal catch detection
@@ -1347,6 +1423,11 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                     throw_detection.confidence = ball.yolo_confidence;
                     throw_detection.class_id = ball.yolo_class_id;
                     
+                    // CRITICAL FIX: Set the throwing hand ID and reset frame counter BEFORE initiateThrow
+                    // This ensures the GLOBAL 3-frame rule is enforced for override-path throws
+                    ball.last_throwing_hand_id = ball.held_by_hand_id;
+                    ball.frames_in_flight_since_throw = 0;
+                    
                     // Generate throw event using initiateThrow
                     initiateThrow(ball, throw_detection, throwing_hand, events);
                     
@@ -1354,6 +1435,10 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                         OPEN_DEBUG_LOG(debug_log);
                         debug_log << "  THROW EVENT GENERATED via override logic (HELD→IN_FLIGHT transition)" << std::endl;
                         debug_log << "  Hand ID: " << ball.held_by_hand_id << std::endl;
+                        debug_log << "  Setting last_throwing_hand_id = " << ball.held_by_hand_id << std::endl;
+                        debug_log << "  Resetting frames_in_flight_since_throw = 0" << std::endl;
+                        debug_log << "  GLOBAL RULE: Hand " << ball.held_by_hand_id << " cannot catch for "
+                                  << tracking_settings_.min_frames_before_catch << " frames" << std::endl;
                         debug_log.close();
                     });
                 }
@@ -2227,6 +2312,8 @@ void SimpleBallTracker::updateInFlightBall(
         
         // If still not verified, use predicted position
         if (!verified) {
+            // CRITICAL FIX: Always set position to predicted_next when no detection found
+            // This ensures the tracker follows the trajectory prediction
             ball.position = predicted_next;
             ball.pixel_pos = project_3d_to_2d(predicted_next, intrinsics);
             
@@ -2246,6 +2333,8 @@ void SimpleBallTracker::updateInFlightBall(
             DEBUG_LOG(debug_log, {
                 OPEN_DEBUG_LOG(debug_log);
                 debug_log << "  Using predicted position (no detection found)" << std::endl;
+                debug_log << "  Ball position set to: (" << ball.position.x << ", "
+                          << ball.position.y << ", " << ball.position.z << ")" << std::endl;
                 debug_log.close();
             });
         }
@@ -2381,9 +2470,8 @@ void SimpleBallTracker::updateInFlightBall(
                     debug_log.close();
                 });
                 
-                // Don't force catch - keep ball at last known position instead
-                ball.position = reference_pos;
-                ball.pixel_pos = project_3d_to_2d(reference_pos, intrinsics);
+                // Don't force catch - position was already set to predicted_next earlier
+                // Just update the tracking reason and return
                 ball.tracking_reason = "IN_FLIGHT_fallback_blocked_cooldown";
                 return;
             }
@@ -2412,9 +2500,9 @@ void SimpleBallTracker::updateInFlightBall(
                 debug_log << "  Keeping ball at last known position instead" << std::endl;
                 debug_log.close();
             });
-            // Keep ball at last known position - don't force invalid catch
-            ball.position = reference_pos;
-            ball.pixel_pos = project_3d_to_2d(reference_pos, intrinsics);
+            // CRITICAL FIX: Don't overwrite ball.position here!
+            // The position was already set to predicted_next earlier (line 2239)
+            // Just update the tracking reason and return
             ball.tracking_reason = "IN_FLIGHT_fallback_rejected_too_far";
             return;
         }
@@ -2899,6 +2987,11 @@ const Detection* SimpleBallTracker::searchAlongPredictionLine(
     
     // Search through all YOLO detections
     for (const auto& det : yolo_detections) {
+        // CRITICAL: Check YOLO confidence first (use trajectory-specific threshold)
+        if (det.confidence < tracking_settings_.traj_yolo_confidence_threshold) {
+            continue;  // Skip low-confidence detections
+        }
+        
         // Calculate 3D distance to predicted position
         float distance = cv::norm(det.world_pos - predicted_pos);
         
@@ -3186,6 +3279,190 @@ void SimpleBallTracker::drawHandThresholds(
                        viz_settings_.catch_distance_color, 1);
         }
     }
+}
+
+// ============================================================================
+// SEQUENTIAL THROW DETECTION (NEW: Multi-frame validation)
+// ============================================================================
+
+bool SimpleBallTracker::validateThrowSequence(
+    const std::vector<DetectionCandidate>& candidates,
+    const SimpleHand* hand) {
+    
+    if (candidates.size() < static_cast<size_t>(tracking_settings_.throw_min_sequential_detections)) {
+        return false;
+    }
+    
+    // Get last 2-3 detections for validation
+    int n = candidates.size();
+    const auto& first = candidates[n-2];   // Previous frame
+    const auto& second = candidates[n-1];  // Current frame
+    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "\n[validateThrowSequence] Validating detection sequence:" << std::endl;
+        debug_log << "  Candidate history size: " << candidates.size() << std::endl;
+        debug_log << "  First detection (frame " << first.frame_number << "):" << std::endl;
+        debug_log << "    position: (" << first.position.x << ", " << first.position.y << ", " << first.position.z << ")" << std::endl;
+        debug_log << "    distance_from_hand: " << first.distance_from_hand << "m" << std::endl;
+        debug_log << "    color_score: " << first.color_score << std::endl;
+        debug_log << "  Second detection (frame " << second.frame_number << "):" << std::endl;
+        debug_log << "    position: (" << second.position.x << ", " << second.position.y << ", " << second.position.z << ")" << std::endl;
+        debug_log << "    distance_from_hand: " << second.distance_from_hand << "m" << std::endl;
+        debug_log << "    color_score: " << second.color_score << std::endl;
+        debug_log.close();
+    });
+    
+    // RULE 1: Progressive distance increase
+    // Each detection must be further from hand than previous
+    bool moving_away = (second.distance_from_hand > first.distance_from_hand);
+    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  RULE 1 - Progressive distance:" << std::endl;
+        debug_log << "    Moving away: " << (moving_away ? "YES" : "NO") << std::endl;
+        debug_log << "    Distance change: " << (second.distance_from_hand - first.distance_from_hand) << "m" << std::endl;
+        debug_log.close();
+    });
+    
+    if (!moving_away) {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  ✗ VALIDATION FAILED: Not moving away from hand" << std::endl;
+            debug_log.close();
+        });
+        return false;
+    }
+    
+    // RULE 2: Minimum movement threshold
+    // Must move at least throw_min_movement_per_frame between frames to avoid jitter
+    float movement = second.distance_from_hand - first.distance_from_hand;
+    bool sufficient_movement = (movement >= tracking_settings_.throw_min_movement_per_frame);
+    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  RULE 2 - Minimum movement:" << std::endl;
+        debug_log << "    Movement: " << movement << "m" << std::endl;
+        debug_log << "    Threshold: " << tracking_settings_.throw_min_movement_per_frame << "m" << std::endl;
+        debug_log << "    Sufficient: " << (sufficient_movement ? "YES" : "NO") << std::endl;
+        debug_log.close();
+    });
+    
+    if (!sufficient_movement) {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  ✗ VALIDATION FAILED: Insufficient movement (" << movement << "m < "
+                      << tracking_settings_.throw_min_movement_per_frame << "m)" << std::endl;
+            debug_log.close();
+        });
+        return false;
+    }
+    
+    // RULE 3: Reasonable velocity
+    // Movement should be consistent with throw physics (not teleporting)
+    float time_delta = (second.timestamp - first.timestamp) / 1000000.0f;  // Convert to seconds
+    if (time_delta < 0.001f) time_delta = 0.033f;  // Fallback to 30fps if timestamps are bad
+    
+    float velocity = cv::norm(second.position - first.position) / time_delta;
+    bool reasonable_velocity = (velocity >= tracking_settings_.throw_min_velocity &&
+                               velocity <= tracking_settings_.throw_max_velocity);
+    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  RULE 3 - Reasonable velocity:" << std::endl;
+        debug_log << "    Time delta: " << time_delta << "s" << std::endl;
+        debug_log << "    Velocity: " << velocity << " m/s" << std::endl;
+        debug_log << "    Min threshold: " << tracking_settings_.throw_min_velocity << " m/s" << std::endl;
+        debug_log << "    Max threshold: " << tracking_settings_.throw_max_velocity << " m/s" << std::endl;
+        debug_log << "    Reasonable: " << (reasonable_velocity ? "YES" : "NO") << std::endl;
+        debug_log.close();
+    });
+    
+    if (!reasonable_velocity) {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  ✗ VALIDATION FAILED: Unreasonable velocity (" << velocity << " m/s)" << std::endl;
+            debug_log.close();
+        });
+        return false;
+    }
+    
+    // RULE 4: Consistent direction (if we have 3+ detections)
+    // Movement should be in roughly same direction (not random jumps)
+    if (candidates.size() >= 3) {
+        const auto& third = candidates[n-3];
+        cv::Point3f dir1 = first.position - third.position;
+        cv::Point3f dir2 = second.position - first.position;
+        
+        // Normalize and check dot product
+        float len1 = cv::norm(dir1);
+        float len2 = cv::norm(dir2);
+        
+        if (len1 > 0.01f && len2 > 0.01f) {
+            float dot = dir1.dot(dir2) / (len1 * len2);
+            bool consistent_direction = (dot >= tracking_settings_.throw_direction_consistency);
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "  RULE 4 - Consistent direction:" << std::endl;
+                debug_log << "    Direction 1 (third→first): (" << dir1.x << ", " << dir1.y << ", " << dir1.z << ")" << std::endl;
+                debug_log << "    Direction 2 (first→second): (" << dir2.x << ", " << dir2.y << ", " << dir2.z << ")" << std::endl;
+                debug_log << "    Dot product: " << dot << std::endl;
+                debug_log << "    Threshold: " << tracking_settings_.throw_direction_consistency << std::endl;
+                debug_log << "    Consistent: " << (consistent_direction ? "YES" : "NO") << std::endl;
+                debug_log.close();
+            });
+            
+            if (!consistent_direction) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  ✗ VALIDATION FAILED: Inconsistent direction (dot=" << dot << " < "
+                              << tracking_settings_.throw_direction_consistency << ")" << std::endl;
+                    debug_log.close();
+                });
+                return false;
+            }
+        }
+    }
+    
+    // RULE 5: At least one detection must be outside catch zone
+    // This ensures ball has actually left the hand
+    bool outside_catch_zone = (second.distance_from_hand > tracking_settings_.hand_distance_threshold);
+    
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  RULE 5 - Outside catch zone:" << std::endl;
+        debug_log << "    Second detection distance: " << second.distance_from_hand << "m" << std::endl;
+        debug_log << "    Catch zone threshold: " << tracking_settings_.hand_distance_threshold << "m" << std::endl;
+        debug_log << "    Outside zone: " << (outside_catch_zone ? "YES" : "NO") << std::endl;
+        debug_log.close();
+    });
+    
+    if (!outside_catch_zone) {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "  ✗ VALIDATION FAILED: Still inside catch zone (" << second.distance_from_hand
+                      << "m <= " << tracking_settings_.hand_distance_threshold << "m)" << std::endl;
+            debug_log.close();
+        });
+        return false;
+    }
+    
+    // All rules passed!
+    DEBUG_LOG(debug_log, {
+        OPEN_DEBUG_LOG(debug_log);
+        debug_log << "  ✓✓✓ VALIDATION PASSED: All rules satisfied!" << std::endl;
+        debug_log << "    - Progressive distance: YES" << std::endl;
+        debug_log << "    - Sufficient movement: YES (" << movement << "m)" << std::endl;
+        debug_log << "    - Reasonable velocity: YES (" << velocity << " m/s)" << std::endl;
+        if (candidates.size() >= 3) {
+            debug_log << "    - Consistent direction: YES" << std::endl;
+        }
+        debug_log << "    - Outside catch zone: YES" << std::endl;
+        debug_log.close();
+    });
+    
+    return true;
 }
 
 
@@ -3486,8 +3763,9 @@ void SimpleBallTracker::updateHeldBall(
         }
         
         // Apply velocity-based threshold adjustments
-        float effective_confidence_threshold = tracking_settings_.override_ball_confidence_threshold;
-        float effective_color_threshold = tracking_settings_.min_color_match_score;
+        // NEW: Use throw-specific threshold for HELD→IN_FLIGHT transition (lower than trajectory tracking)
+        float effective_confidence_threshold = tracking_settings_.throw_yolo_confidence_threshold;
+        float effective_color_threshold = tracking_settings_.traj_color_match_threshold;
         bool class_requirement_active = true;
         
         if (in_velocity_direction) {

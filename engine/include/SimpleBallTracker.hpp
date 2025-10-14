@@ -96,6 +96,19 @@ struct SimpleHand {
                    last_update_timestamp(0) {}
 };
 
+// Detection candidate for throw validation
+struct DetectionCandidate {
+    cv::Point3f position;
+    float distance_from_hand;
+    float color_score;
+    float confidence;
+    uint64_t timestamp;
+    int frame_number;
+    
+    DetectionCandidate() : distance_from_hand(0.0f), color_score(0.0f),
+                          confidence(0.0f), timestamp(0), frame_number(0) {}
+};
+
 // Simple ball state
 struct SimpleBall {
     int id;                          // 0, 1, 2 (based on color order)
@@ -115,6 +128,10 @@ struct SimpleBall {
     int was_just_thrown_by_hand_id;  // -1 if not just thrown, 0=left, 1=right (lasts 1 frame)
     int last_throwing_hand_id;  // Hand ID that last threw this ball (-1 if never thrown)
     int frames_in_flight_since_throw;  // Counter for frames in flight since last throw
+    
+    // Sequential throw detection (NEW: track detection history for robust throw detection)
+    std::vector<DetectionCandidate> throw_candidates;  // Last 5 frames of detection candidates
+    int consecutive_valid_detections;                   // Counter for consecutive valid detections
     
     // Trajectory (NEW: replaces Kalman and ColorBasedPredictor in Phase 3)
     BallTrajectory trajectory;       // Only valid when IN_FLIGHT
@@ -148,6 +165,7 @@ struct SimpleBall {
                    was_just_thrown_by_hand_id(-1),
                    last_throwing_hand_id(-1),
                    frames_in_flight_since_throw(0),
+                   consecutive_valid_detections(0),
                    has_yolo_detection(false),
                    frames_without_verified_detection(0),
                    unverified_trajectory_points(0),
@@ -184,6 +202,15 @@ struct TrackingSettings {
     int min_frames_for_transition = 2;        // Debouncing for state changes
     int min_frames_before_catch = 3;          // Minimum frames in flight before same hand can catch (0-10)
     
+    // Sequential throw detection settings (NEW: robust multi-frame validation)
+    int throw_min_sequential_detections = 2;      // Require 2-3 consecutive frames with valid detections
+    float throw_min_movement_per_frame = 0.05f;   // 5cm minimum movement between frames
+    float throw_min_velocity = 0.5f;              // 0.5 m/s minimum throw velocity
+    float throw_max_velocity = 10.0f;             // 10 m/s maximum throw velocity
+    float throw_direction_consistency = 0.5f;     // Dot product threshold for direction consistency (60° max angle)
+    float throw_max_detection_distance = 0.5f;    // Max distance from hand to consider detection valid
+    int throw_candidate_history_size = 5;         // Number of frames to keep in detection history
+    
     // Class filtering
     bool ignore_class = false;                // If true, ignore ML class distinctions (treat ball/ball_held same)
     
@@ -204,6 +231,8 @@ struct TrackingSettings {
     float traj_search_radius = 0.15f;                  // Search radius along trajectory (m)
     float traj_min_points_for_prediction = 3;          // Points needed before using full physics
     float traj_color_match_threshold = 0.50f;          // Color match threshold for verification
+    float traj_yolo_confidence_threshold = 0.70f;      // YOLO confidence for IN_FLIGHT trajectory tracking
+    float throw_yolo_confidence_threshold = 0.50f;     // YOLO confidence for throw detection (HELD→IN_FLIGHT)
     float traj_velocity_estimation_time = 0.1f;        // Time window for velocity estimation (s)
     float traj_max_search_distance = 0.50f;            // Maximum search distance from prediction (m)
     
@@ -393,6 +422,10 @@ private:
                       const SimpleHand* hand, std::vector<BallEvent>& events);
     void initiateCatch(SimpleBall& ball, const SimpleHand& hand, std::vector<BallEvent>& events);
     void addVerifiedPoint(SimpleBall& ball, const cv::Point3f& position, uint64_t timestamp);
+    
+    // Sequential throw detection helper (NEW: validates multi-frame detection sequence)
+    bool validateThrowSequence(const std::vector<DetectionCandidate>& candidates,
+                              const SimpleHand* hand);
     
     // Trajectory prediction helper methods
     cv::Point3f predictWithTwoPoints(SimpleBall& ball);

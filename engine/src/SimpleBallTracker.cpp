@@ -7,6 +7,11 @@
 #include <chrono>
 #include <set>
 
+// FIX #5: These constants are now configurable via TrackingSettings
+// - min_color_confidence_override (default: 0.35f)
+// - min_ball_separation (default: 0.15f)
+// - min_hand_change_distance (default: 0.25f)
+
 // Helper macro for conditional debug logging
 // Only creates stream object when logging is enabled
 #define OPEN_DEBUG_LOG(var_name) \
@@ -51,6 +56,38 @@ static float get_filtered_depth(const cv::Mat& depth_frame, const cv::Point2f& p
     size_t mid = depth_samples.size() / 2;
     std::nth_element(depth_samples.begin(), depth_samples.begin() + mid, depth_samples.end());
     return depth_samples[mid];
+}
+
+// Validation function to check ball separation with same-hand exception
+static bool validateBallSeparation(const std::vector<SimpleBall>& balls, float min_ball_separation) {
+    // Check each pair of balls
+    for (size_t i = 0; i < balls.size(); i++) {
+        for (size_t j = i + 1; j < balls.size(); j++) {
+            // EXCEPTION: If both balls are HELD by the SAME hand, allow same position
+            if (balls[i].state == HELD &&
+                balls[j].state == HELD &&
+                balls[i].held_by_hand_id == balls[j].held_by_hand_id) {
+                // Same hand holding both - this is valid, skip check
+                continue;
+            }
+            
+            // Otherwise, enforce minimum separation
+            float dist = cv::norm(balls[i].position - balls[j].position);
+            if (dist < min_ball_separation) {
+                std::ofstream debug_log;
+                if (g_enable_debug_log) {
+                    debug_log.open("engine_debug.log", std::ios::app);
+                    debug_log << "[BALL_SEPARATION_ERROR] Ball separation violation: balls " << i << " and " << j
+                              << " are " << dist << "m apart (min: " << min_ball_separation << "m)"
+                              << " - Ball " << i << " state=" << (int)balls[i].state
+                              << ", Ball " << j << " state=" << (int)balls[j].state << std::endl;
+                    debug_log.close();
+                }
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 SimpleBallTracker::SimpleBallTracker(const std::string& ball_model_path,
@@ -362,6 +399,19 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
         }
         else if (key == "max_depth_jump_strict") {
             tracking_settings_.max_depth_jump_strict = std::stof(value);
+            return true;
+        }
+        // FIX #5: New tracking thresholds
+        else if (key == "min_color_confidence_override") {
+            tracking_settings_.min_color_confidence_override = std::stof(value);
+            return true;
+        }
+        else if (key == "min_ball_separation") {
+            tracking_settings_.min_ball_separation = std::stof(value);
+            return true;
+        }
+        else if (key == "min_hand_change_distance") {
+            tracking_settings_.min_hand_change_distance = std::stof(value);
             return true;
         }
         // Trajectory visualization settings
@@ -971,6 +1021,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // Track which balls have been overridden so we skip normal update logic for them
     std::set<int> overridden_balls;
     
+    // FIX #1: Track which detections have been assigned to prevent duplicates
+    std::set<int> used_detections;
+    
     for (auto& ball : balls_) {
         // Find the color profile for this ball
         const ColorProfile* profile = nullptr;
@@ -983,11 +1036,50 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         
         if (!profile) continue;
         
+        // FIX #1: Find the BEST UNUSED detection for this ball
+        // Use combined scoring: color_score * 0.6 + distance_score * 0.4
+        const Detection* best_detection = nullptr;
+        float best_combined_score = 0.0f;
+        int best_detection_index = -1;
+        
+        // Calculate expected position for distance scoring
+        cv::Point3f expected_pos = ball.position;
+        
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "[OVERRIDE] Evaluating detections for Ball " << ball.id
+                      << " (" << ball.color_name << ")" << std::endl;
+            debug_log << "  Expected position: (" << expected_pos.x << ", "
+                      << expected_pos.y << ", " << expected_pos.z << ")" << std::endl;
+        });
+        
         // Check all detections for override match
-        // PERFORMANCE FIX: Evaluate override criteria ONLY for this specific ball color
-        for (auto& det : yolo_detections) {
+        for (size_t det_idx = 0; det_idx < yolo_detections.size(); ++det_idx) {
+            const auto& det = yolo_detections[det_idx];
+            
+            // Skip if this detection is already used
+            if (used_detections.find(det_idx) != used_detections.end()) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  Detection " << det_idx << ": SKIPPED (already assigned)" << std::endl;
+                });
+                continue;
+            }
+            
             // Calculate color score for THIS ball's color only
             float color_score = matchColor(det, *profile, color_frame);
+            
+            // FIX #2: Reject detection if color confidence is too weak
+            if (color_score < tracking_settings_.min_color_confidence_override) {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  Detection " << det_idx << ": REJECTED for ball " << ball.id << std::endl;
+                    debug_log << "    Reason: color_score " << color_score
+                              << " < threshold " << tracking_settings_.min_color_confidence_override << std::endl;
+                    debug_log.close();
+                });
+                continue;  // Skip this detection
+            }
             
             // Check override criteria using class-specific thresholds
             // IGNORE_CLASS: When enabled, use ball thresholds for all classes
@@ -1007,30 +1099,110 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
             bool would_override = meets_confidence && meets_color && meets_class;
             
             if (would_override) {
-                // OVERRIDE DETECTED - force ball to this detection
-                ball.position = det.world_pos;
-                ball.pixel_pos = cv::Point2f(det.box.x + det.box.width / 2.0f,
-                                             det.box.y + det.box.height / 2.0f);
-                ball.bbox = det.box;
-                ball.has_yolo_detection = true;
-                ball.yolo_confidence = det.confidence;
-                ball.yolo_class_id = det.class_id;
-                ball.color_match_score = color_score;
-                ball.tracking_reason = "OVERRIDE_forced";
+                // Calculate distance from expected position
+                float distance = cv::norm(det.world_pos - expected_pos);
                 
-                // Mark this ball as overridden so we skip normal update logic
-                overridden_balls.insert(ball.id);
+                // Normalize distance score (closer is better, max distance = 1.0m)
+                float distance_score = std::max(0.0f, 1.0f - (distance / 1.0f));
+                
+                // FIX #1: Combined score = color_score * 0.6 + distance_score * 0.4
+                float combined_score = color_score * 0.6f + distance_score * 0.4f;
                 
                 DEBUG_LOG(debug_log, {
                     OPEN_DEBUG_LOG(debug_log);
-                    debug_log << "[OVERRIDE] Ball " << ball.id << " (" << ball.color_name
-                              << ") forced to detection: conf=" << det.confidence
-                              << ", color=" << color_score << std::endl;
-                    debug_log.close();
+                    debug_log << "  Detection " << det_idx << ": CANDIDATE" << std::endl;
+                    debug_log << "    Position: (" << det.world_pos.x << ", "
+                              << det.world_pos.y << ", " << det.world_pos.z << ")" << std::endl;
+                    debug_log << "    Distance: " << distance << "m" << std::endl;
+                    debug_log << "    Color score: " << color_score << std::endl;
+                    debug_log << "    Distance score: " << distance_score << std::endl;
+                    debug_log << "    Combined score: " << combined_score
+                              << " (color*0.6 + dist*0.4)" << std::endl;
+                    debug_log << "    Confidence: " << det.confidence << std::endl;
+                    debug_log << "    Class: " << (det.class_id == 0 ? "ball" : "ball_held") << std::endl;
                 });
                 
-                break;  // Found override for this ball, stop checking detections
+                // Track best detection
+                if (combined_score > best_combined_score) {
+                    best_combined_score = combined_score;
+                    best_detection = &det;
+                    best_detection_index = det_idx;
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "    *** NEW BEST for Ball " << ball.id << " ***" << std::endl;
+                    });
+                }
+            } else {
+                DEBUG_LOG(debug_log, {
+                    OPEN_DEBUG_LOG(debug_log);
+                    debug_log << "  Detection " << det_idx << ": REJECTED" << std::endl;
+                    if (!meets_confidence) {
+                        debug_log << "    Confidence too low: " << det.confidence
+                                  << " < " << confidence_threshold << std::endl;
+                    }
+                    if (!meets_color) {
+                        debug_log << "    Color score too low: " << color_score
+                                  << " < " << color_threshold << std::endl;
+                    }
+                    if (!meets_class) {
+                        debug_log << "    Class requirement not met (class_id="
+                                  << det.class_id << ")" << std::endl;
+                    }
+                });
             }
+        }
+        
+        // FIX #2: Check if no valid detection was found due to weak color matching
+        if (best_detection == nullptr) {
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "[OVERRIDE] Ball " << ball.id << " (" << ball.color_name
+                          << ") override disabled: no detections meet color threshold "
+                          << tracking_settings_.min_color_confidence_override << std::endl;
+                debug_log.close();
+            });
+            // Don't set override - allow normal tracking logic to proceed
+            // The ball will be updated through normal updateHeldBall or updateInFlightBall
+        }
+        
+        // FIX #1: Assign best detection if found
+        if (best_detection != nullptr) {
+            // OVERRIDE DETECTED - force ball to this detection
+            ball.position = best_detection->world_pos;
+            ball.pixel_pos = cv::Point2f(best_detection->box.x + best_detection->box.width / 2.0f,
+                                         best_detection->box.y + best_detection->box.height / 2.0f);
+            ball.bbox = best_detection->box;
+            ball.has_yolo_detection = true;
+            ball.yolo_confidence = best_detection->confidence;
+            ball.yolo_class_id = best_detection->class_id;
+            ball.color_match_score = matchColor(*best_detection, *profile, color_frame);
+            ball.tracking_reason = "OVERRIDE_forced";
+            
+            // Mark this ball as overridden so we skip normal update logic
+            overridden_balls.insert(ball.id);
+            
+            // FIX #1: Mark this detection as used
+            used_detections.insert(best_detection_index);
+            
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "[OVERRIDE] ✓✓✓ Ball " << ball.id << " (" << ball.color_name
+                          << ") assigned to detection " << best_detection_index << std::endl;
+                debug_log << "  Combined score: " << best_combined_score << std::endl;
+                debug_log << "  Position: (" << best_detection->world_pos.x << ", "
+                          << best_detection->world_pos.y << ", " << best_detection->world_pos.z << ")" << std::endl;
+                debug_log << "  Confidence: " << best_detection->confidence << std::endl;
+                debug_log << "  Color score: " << ball.color_match_score << std::endl;
+                debug_log.close();
+            });
+        } else {
+            DEBUG_LOG(debug_log, {
+                OPEN_DEBUG_LOG(debug_log);
+                debug_log << "[OVERRIDE] ✗ No valid unused detection found for Ball "
+                          << ball.id << " (" << ball.color_name << ")" << std::endl;
+                debug_log.close();
+            });
         }
     }
 
@@ -1126,8 +1298,6 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     // hsv_frame is now passed as color_frame, and matchColor/searchForColorBlob
     // will convert only the regions they need
     
-    // Track which detections are used
-    std::set<int> used_detections;
     
     // CRITICAL: Increment flight frame counter for ALL in-flight balls BEFORE any processing
     // This MUST happen before override logic to ensure cooldown works correctly
@@ -1208,15 +1378,45 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
                 bool hand_changed = (ball.held_by_hand_id >= 0 && closest_hand_id != ball.held_by_hand_id);
                 
                 if (hand_changed) {
-                    // Ball changed hands without going through IN_FLIGHT state
-                    // This is a direct hand-to-hand transfer - generate THROW and CATCH events
+                    // FIX #4: Validate that ball has actually moved significantly
+                    // Calculate distance from last held position to prevent false hand changes from noise
+                    float movement = std::sqrt(
+                        std::pow(ball.position.x - ball.last_held_position.x, 2) +
+                        std::pow(ball.position.y - ball.last_held_position.y, 2) +
+                        std::pow(ball.position.z - ball.last_held_position.z, 2)
+                    );
                     
                     DEBUG_LOG(debug_log, {
                         OPEN_DEBUG_LOG(debug_log);
                         debug_log << "  [OVERRIDE HAND CHANGE] Ball changed from hand " << ball.held_by_hand_id
                                   << " to hand " << closest_hand_id << " (dist=" << min_dist << "m)" << std::endl;
+                        debug_log << "    Movement since last held: " << movement << "m (threshold: "
+                                  << tracking_settings_.min_hand_change_distance << "m)" << std::endl;
                         debug_log.close();
                     });
+                    
+                    // Reject hand change if ball hasn't moved enough
+                    if (movement < tracking_settings_.min_hand_change_distance) {
+                        DEBUG_LOG(debug_log, {
+                            OPEN_DEBUG_LOG(debug_log);
+                            debug_log << "  ✗ Hand change rejected: ball moved only " << movement
+                                      << "m (need " << tracking_settings_.min_hand_change_distance << "m+)" << std::endl;
+                            debug_log << "    Keeping ball with hand " << ball.held_by_hand_id << std::endl;
+                            debug_log.close();
+                        });
+                        
+                        // Keep ball with current hand, don't generate events
+                        continue;
+                    }
+                    
+                    DEBUG_LOG(debug_log, {
+                        OPEN_DEBUG_LOG(debug_log);
+                        debug_log << "  ✓ Hand change validated: ball moved " << movement << "m" << std::endl;
+                        debug_log.close();
+                    });
+                    
+                    // Ball changed hands without going through IN_FLIGHT state
+                    // This is a direct hand-to-hand transfer - generate THROW and CATCH events
                     
                     // Find both hands
                     const SimpleHand* old_hand = nullptr;
@@ -1482,6 +1682,18 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         }
         
         std::cout << "[FRAME " << frame_counter_ << "] Ball " << ball.id << " update complete" << std::endl;
+    }
+    
+    // VALIDATION: Check ball separation (with same-hand exception)
+    if (!validateBallSeparation(balls_, tracking_settings_.min_ball_separation)) {
+        DEBUG_LOG(debug_log, {
+            OPEN_DEBUG_LOG(debug_log);
+            debug_log << "\n[VALIDATION_WARNING] Ball separation validation failed!" << std::endl;
+            debug_log << "  This indicates a tracking bug - balls should not be at identical positions" << std::endl;
+            debug_log << "  (unless both held by same hand)" << std::endl;
+            debug_log.close();
+        });
+        // Don't crash - just log the error for debugging
     }
     
     // DEBUG: Log ball positions after update
@@ -2849,6 +3061,9 @@ void SimpleBallTracker::initiateCatch(
     // 4. Update position to wrist
     ball.position = hand.wrist_pos_3d;
     
+    // FIX #4: Update last_held_position when ball becomes HELD
+    ball.last_held_position = hand.wrist_pos_3d;
+    
     // 5. Generate CATCH event
     uint64_t timestamp = getCurrentTimestamp();
     events.push_back({
@@ -3617,6 +3832,10 @@ void SimpleBallTracker::updateHeldBall(
     // This ensures stable, predictable tracking for held balls
     ball.position = hand->wrist_pos_3d;
     ball.pixel_pos = project_3d_to_2d(hand->wrist_pos_3d, intrinsics);
+    
+    // FIX #4: Update last_held_position every frame while ball is HELD
+    // This ensures we have the most recent position for movement validation
+    ball.last_held_position = hand->wrist_pos_3d;
     
     // Set bbox for visualization
     float bbox_size = 30.0f;

@@ -285,6 +285,11 @@ struct TrackingSettings {
     float min_euclidean_color_score = 0.30f;
     float max_depth_jump_strict = 0.20f;
     
+    // Ball separation and hand change detection (NEW: Fix #5)
+    float min_color_confidence_override = 0.35f;  // Minimum color match confidence required for override (0.0-1.0)
+    float min_ball_separation = 0.15f;            // Minimum separation between balls in meters (except same hand)
+    float min_hand_change_distance = 0.25f;       // Minimum movement distance for hand change detection (meters)
+    
     TrackingSettings() = default;
 };
 // Trajectory visualization settings

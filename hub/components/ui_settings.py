@@ -801,6 +801,63 @@ if PYQT_AVAILABLE:
             )
             row += 1
             
+            # Separator for ball separation and hand change settings
+            layout.addWidget(QLabel("Ball Separation & Hand Change:"), row, 0, 1, 3)
+            row += 1
+            
+            # Min Color Confidence Override
+            self.ct_min_color_confidence_override_slider, self.ct_min_color_confidence_override_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Color Confidence Override",
+                tooltip_text="Minimum color match confidence required for override (0.0-1.0).\n"
+                             "Range: 0.0-1.0. Default: 0.35.\n"
+                             "Higher values require stronger color match to override tracker.\n"
+                             "Lower values allow weaker color matches to override.",
+                range_min=0,
+                range_max=100,
+                initial_value=35,
+                update_func=lambda v: self.update_setting('min_color_confidence_override', v / 100.0),
+                is_float=True
+            )
+            row += 1
+            
+            # Min Ball Separation
+            self.ct_min_ball_separation_slider, self.ct_min_ball_separation_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Ball Separation (cm)",
+                tooltip_text="Minimum separation between balls in meters (except same hand).\n"
+                             "Range: 5-50cm. Default: 15cm.\n"
+                             "Prevents balls from being placed too close together.\n"
+                             "Lower values allow balls to be closer (may cause confusion).\n"
+                             "Higher values enforce more separation (more conservative).",
+                range_min=5,
+                range_max=50,
+                initial_value=15,
+                update_func=lambda v: self.update_setting('min_ball_separation', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
+            # Min Hand Change Distance
+            self.ct_min_hand_change_distance_slider, self.ct_min_hand_change_distance_label = self._create_slider_widget(
+                parent_layout=layout,
+                row=row,
+                label_text="Min Hand Change Distance (cm)",
+                tooltip_text="Minimum movement distance for hand change detection (meters).\n"
+                             "Range: 10-50cm. Default: 25cm.\n"
+                             "Distance a ball must move to be considered as changing hands.\n"
+                             "Lower values detect hand changes more easily.\n"
+                             "Higher values require more movement to confirm hand change.",
+                range_min=10,
+                range_max=50,
+                initial_value=25,
+                update_func=lambda v: self.update_setting('min_hand_change_distance', v / 100.0),
+                is_float=False
+            )
+            row += 1
+            
             return section
         
         def create_override_detection_section(self):
@@ -1975,6 +2032,11 @@ if PYQT_AVAILABLE:
                 'min_euclidean_color_score': self._safe_get_slider_value(self.ct_min_euclidean_color_score_slider, 30) / 100.0 if hasattr(self, 'ct_min_euclidean_color_score_slider') else 0.30,
                 'max_depth_jump_strict': self._safe_get_slider_value(self.ct_max_depth_jump_strict_slider, 20) / 100.0 if hasattr(self, 'ct_max_depth_jump_strict_slider') else 0.20,
                 
+                # Ball Separation & Hand Change settings
+                'min_color_confidence_override': self._safe_get_slider_value(self.ct_min_color_confidence_override_slider, 35) / 100.0 if hasattr(self, 'ct_min_color_confidence_override_slider') else 0.35,
+                'min_ball_separation': self._safe_get_slider_value(self.ct_min_ball_separation_slider, 15) / 100.0 if hasattr(self, 'ct_min_ball_separation_slider') else 0.15,
+                'min_hand_change_distance': self._safe_get_slider_value(self.ct_min_hand_change_distance_slider, 25) / 100.0 if hasattr(self, 'ct_min_hand_change_distance_slider') else 0.25,
+                
                 # Override Detection settings (NEW: class-specific thresholds)
                 'override_ball_confidence_threshold': self._safe_get_slider_value(self.od_ball_confidence_slider, 70) / 100.0 if hasattr(self, 'od_ball_confidence_slider') else 0.70,
                 'override_ball_color_threshold': self._safe_get_slider_value(self.od_ball_color_slider, 80) / 100.0 if hasattr(self, 'od_ball_color_slider') else 0.80,
@@ -2218,6 +2280,16 @@ if PYQT_AVAILABLE:
             
             if 'max_depth_jump_strict' in settings and hasattr(self, 'ct_max_depth_jump_strict_slider'):
                 self.ct_max_depth_jump_strict_slider.setValue(int(settings['max_depth_jump_strict'] * 100))
+            
+            # Ball Separation & Hand Change settings
+            if 'min_color_confidence_override' in settings and hasattr(self, 'ct_min_color_confidence_override_slider'):
+                self.ct_min_color_confidence_override_slider.setValue(int(settings['min_color_confidence_override'] * 100))
+            
+            if 'min_ball_separation' in settings and hasattr(self, 'ct_min_ball_separation_slider'):
+                self.ct_min_ball_separation_slider.setValue(int(settings['min_ball_separation'] * 100))
+            
+            if 'min_hand_change_distance' in settings and hasattr(self, 'ct_min_hand_change_distance_slider'):
+                self.ct_min_hand_change_distance_slider.setValue(int(settings['min_hand_change_distance'] * 100))
             
             # Override Detection settings (NEW: class-specific thresholds)
             if 'override_ball_confidence_threshold' in settings and hasattr(self, 'od_ball_confidence_slider'):
@@ -2517,6 +2589,16 @@ if PYQT_AVAILABLE:
             
             if 'max_depth_jump_strict' in settings:
                 self.udp_client.send_setting('max_depth_jump_strict', settings['max_depth_jump_strict'])
+            
+            # Ball Separation & Hand Change settings
+            if 'min_color_confidence_override' in settings:
+                self.udp_client.send_setting('min_color_confidence_override', settings['min_color_confidence_override'])
+            
+            if 'min_ball_separation' in settings:
+                self.udp_client.send_setting('min_ball_separation', settings['min_ball_separation'])
+            
+            if 'min_hand_change_distance' in settings:
+                self.udp_client.send_setting('min_hand_change_distance', settings['min_hand_change_distance'])
             
             # Override Detection settings (NEW: class-specific thresholds)
             if 'override_ball_confidence_threshold' in settings:

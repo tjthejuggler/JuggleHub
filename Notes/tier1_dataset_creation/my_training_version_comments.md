@@ -18,3 +18,5 @@ V9.1 - uses bigger bounding boxes from V6.6 and has more targeted failures as we
 V9.1.1 - none of the V9 augmented data
 V9.2 - same as V9.1 but has less augmented data('all' has been removed)
 V9.3 - same as V9.1 except all 'ball' classes are 2 pixels smaller on all sides and all 'ball_held' are 1 pixels larger on all sides
+V10 - it has all of the V8 directories and V9.1_targeted_lowish_light_60fps_default_realsense but everything is converted to 640x360 from the top and bottom 60 pixels removed
+V10_1_V8_640x360 - same as V10, just without V9.1_targeted_lowish_light_60fps_default_realsense

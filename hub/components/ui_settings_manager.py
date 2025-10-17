@@ -21,6 +21,7 @@ class SettingsManager:
         """
         self.config_dir = config_dir
         self.settings_3d_file = os.path.join(config_dir, "calibration_settings_3d.json")
+        self.settings_new3d_file = os.path.join(config_dir, "calibration_settings_new3d.json")
         self.settings_2d_file = os.path.join(config_dir, "calibration_settings_2d.json")
         self.legacy_settings_file = os.path.join(config_dir, "calibration_settings.json")
         
@@ -32,13 +33,15 @@ class SettingsManager:
         Get the settings file path for a specific tracker type.
         
         Args:
-            tracker_type: Either "depth_based" (3D) or "simple_2d" (2D)
+            tracker_type: Either "depth_based" (3D), "new_3d" (New 3D Kalman), or "simple_2d" (2D)
             
         Returns:
             Path to the settings file
         """
         if tracker_type == "simple_2d":
             return self.settings_2d_file
+        elif tracker_type == "new_3d":
+            return self.settings_new3d_file
         else:
             return self.settings_3d_file
     
@@ -47,7 +50,7 @@ class SettingsManager:
         Load settings for a specific tracker type.
         
         Args:
-            tracker_type: Either "depth_based" (3D) or "simple_2d" (2D)
+            tracker_type: Either "depth_based" (3D), "new_3d" (New 3D Kalman), or "simple_2d" (2D)
             
         Returns:
             Settings dictionary or None if file doesn't exist
@@ -80,7 +83,7 @@ class SettingsManager:
         Save settings for a specific tracker type.
         
         Args:
-            tracker_type: Either "depth_based" (3D) or "simple_2d" (2D)
+            tracker_type: Either "depth_based" (3D), "new_3d" (New 3D Kalman), or "simple_2d" (2D)
             settings: Settings dictionary to save
             
         Returns:
@@ -197,7 +200,7 @@ class SettingsManager:
         Get default settings for a specific tracker type.
         
         Args:
-            tracker_type: Either "depth_based" (3D) or "simple_2d" (2D)
+            tracker_type: Either "depth_based" (3D), "new_3d" (New 3D Kalman), or "simple_2d" (2D)
             
         Returns:
             Dictionary with default settings
@@ -275,6 +278,35 @@ class SettingsManager:
                 'collapsed_trajectory': False,
                 'collapsed_hand_velocity': False,
                 'collapsed_ball_profiles': False,
+            })
+        
+        # Add New 3D Kalman-specific defaults
+        elif tracker_type == "new_3d":
+            defaults.update({
+                # Kalman Filter settings
+                'kalman_process_noise_pos': 0.01,
+                'kalman_process_noise_vel': 0.1,
+                'kalman_measurement_noise': 0.05,
+                'kalman_max_prediction_time': 1.0,
+                'kalman_velocity_smoothing': 0.3,
+                
+                # Association settings
+                'assoc_max_distance': 0.30,
+                'assoc_iou_threshold': 0.3,
+                'assoc_color_weight': 0.4,
+                'assoc_spatial_weight': 0.6,
+                'assoc_max_missed_frames': 5,
+                
+                # State management settings
+                'state_min_hits_to_confirm': 3,
+                'state_max_age': 10,
+                'state_confidence_decay': 0.95,
+                'state_min_confidence': 0.3,
+                
+                # UI collapsed states
+                'collapsed_new3d_kalman': False,
+                'collapsed_new3d_association': False,
+                'collapsed_new3d_state': False,
             })
         
         return defaults

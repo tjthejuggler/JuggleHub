@@ -129,6 +129,7 @@ class CommonSettingsSections:
         camera_layout.addWidget(QLabel("Tracking System:"), 7, 0)
         self.parent.tracking_system_combo = QComboBox()
         self.parent.tracking_system_combo.addItem("Depth-Based 3D (Current)", "depth_based")
+        self.parent.tracking_system_combo.addItem("New 3D Kalman ⭐", "new_3d")
         self.parent.tracking_system_combo.addItem("Simple 2D (New)", "simple_2d")
         self.parent.tracking_system_combo.currentIndexChanged.connect(self.parent.on_tracking_system_changed)
         self.parent.tracking_system_combo.setToolTip(

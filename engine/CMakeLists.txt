@@ -54,6 +54,7 @@ add_executable(juggle_engine
     src/Engine.cpp
     src/SimpleBallTracker.cpp
     src/Simple2DBallTracker.cpp
+    src/New3DTracker.cpp
     src/GpuHsvConverter.cpp
     src/GpuTrajectoryPredictor.cpp
     src/modules/UdpBallColorModule.cpp

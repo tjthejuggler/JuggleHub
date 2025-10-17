@@ -4,6 +4,7 @@
 #include "modules/PositionToRgbModule.hpp"
 #include "SimpleBallTracker.hpp"
 #include "Simple2DBallTracker.hpp"
+#include "New3DTracker.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -66,6 +67,11 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
         simple_2d_tracker_ = std::make_shared<Simple2DBallTracker>(
             ball_model_path, pose_model_path, device_name);
         writeDebugLog("Engine constructor: 2D tracker initialized successfully");
+        
+        // Initialize New3D tracker
+        new_3d_tracker_ = std::make_shared<New3DTracker>(
+            ball_model_path, pose_model_path, device_name, "hub/calibration_settings_new3d.json");
+        writeDebugLog("Engine constructor: New3D tracker initialized successfully");
     } catch (const std::exception& e) {
         writeDebugLog("Engine constructor: EXCEPTION in tracker init: " + std::string(e.what()));
         return;
@@ -2228,6 +2234,15 @@ void Engine::setTrackerType(const std::string& tracker_type) {
         tracker_ = simple_2d_tracker_;
         current_tracker_type_ = "simple_2d";
         writeDebugLog("setTrackerType() - Switched to simple_2d tracker");
+        
+    } else if (tracker_type == "new_3d") {
+        // Switch to New3DTracker
+        if (!new_3d_tracker_) {
+            throw std::runtime_error("New3DTracker not initialized");
+        }
+        tracker_ = new_3d_tracker_;
+        current_tracker_type_ = "new_3d";
+        writeDebugLog("setTrackerType() - Switched to new_3d tracker");
         
     } else {
         throw std::runtime_error("Unknown tracker type: " + tracker_type);

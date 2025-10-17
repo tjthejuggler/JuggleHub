@@ -34,6 +34,7 @@ if PYQT_AVAILABLE:
     from .ui_settings_common import CommonSettingsSections
     from .ui_settings_3d import Tracker3DSettingsSections
     from .ui_settings_2d import Tracker2DSettingsSections
+    from .ui_settings_new3d import New3DSettingsSections
 
 
 if PYQT_AVAILABLE:
@@ -71,6 +72,7 @@ if PYQT_AVAILABLE:
             # Create section handlers
             self.common_sections = CommonSettingsSections(self, udp_client, zmq_client)
             self.tracker_3d_sections = Tracker3DSettingsSections(self, udp_client, zmq_client)
+            self.tracker_new3d_sections = New3DSettingsSections(self, udp_client, zmq_client)
             self.tracker_2d_sections = Tracker2DSettingsSections(self, udp_client, zmq_client)
             
             # Initialize UI
@@ -108,6 +110,7 @@ if PYQT_AVAILABLE:
             # Lists to track section widgets for visibility management
             self.common_section_widgets = []
             self.tracker_3d_section_widgets = []
+            self.tracker_new3d_section_widgets = []
             self.tracker_2d_section_widgets = []
             
             # Add common sections (always visible)
@@ -152,6 +155,35 @@ if PYQT_AVAILABLE:
             container_layout.addWidget(self.ball_profiles_section)
             self.tracker_3d_section_widgets.append(self.ball_profiles_section)
             
+            # Add New 3D Kalman tracker sections
+            self.new3d_physics_section = self.tracker_new3d_sections.create_physics_section()
+            container_layout.addWidget(self.new3d_physics_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_physics_section)
+            
+            self.new3d_tracking_logic_section = self.tracker_new3d_sections.create_tracking_logic_section()
+            container_layout.addWidget(self.new3d_tracking_logic_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_tracking_logic_section)
+            
+            self.new3d_association_section = self.tracker_new3d_sections.create_association_section()
+            container_layout.addWidget(self.new3d_association_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_association_section)
+            
+            self.new3d_hand_velocity_section = self.tracker_new3d_sections.create_hand_velocity_section()
+            container_layout.addWidget(self.new3d_hand_velocity_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_hand_velocity_section)
+            
+            self.new3d_visualization_section = self.tracker_new3d_sections.create_visualization_section()
+            container_layout.addWidget(self.new3d_visualization_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_visualization_section)
+            
+            self.new3d_audio_indicators_section = self.tracker_new3d_sections.create_audio_indicators_section()
+            container_layout.addWidget(self.new3d_audio_indicators_section)
+            
+            # Add Color Calibration section
+            self.new3d_color_calibration_section = self.tracker_new3d_sections.create_color_calibration_section()
+            container_layout.addWidget(self.new3d_color_calibration_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_audio_indicators_section)
+            
             # Add 2D tracker sections (currently none, but ready for future)
             # When 2D sections are added, append them to self.tracker_2d_section_widgets
             
@@ -170,6 +202,8 @@ if PYQT_AVAILABLE:
             """Hide all tracker-specific sections"""
             for section in self.tracker_3d_section_widgets:
                 section.setVisible(False)
+            for section in self.tracker_new3d_section_widgets:
+                section.setVisible(False)
             for section in self.tracker_2d_section_widgets:
                 section.setVisible(False)
 
@@ -177,6 +211,9 @@ if PYQT_AVAILABLE:
             """Show sections for specified tracker"""
             if tracker_type == "depth_based":
                 for section in self.tracker_3d_section_widgets:
+                    section.setVisible(True)
+            elif tracker_type == "new_3d":
+                for section in self.tracker_new3d_section_widgets:
                     section.setVisible(True)
             elif tracker_type == "simple_2d":
                 for section in self.tracker_2d_section_widgets:
@@ -256,6 +293,10 @@ if PYQT_AVAILABLE:
             if self.current_tracker == "depth_based":
                 settings.update(self._get_3d_tracker_settings())
             
+            # Add New 3D Kalman-specific settings if current tracker is new_3d
+            elif self.current_tracker == "new_3d":
+                settings.update(self._get_new3d_tracker_settings())
+            
             # Add 2D-specific settings if current tracker is 2D
             elif self.current_tracker == "simple_2d":
                 settings.update(self._get_2d_tracker_settings())
@@ -313,6 +354,36 @@ if PYQT_AVAILABLE:
                 'hand_velocity_detection_radius': self.hand_velocity_detection_radius_slider.value() / 100.0 if hasattr(self, 'hand_velocity_detection_radius_slider') else 0.15,
                 'hand_velocity_distance_reduction': self.hand_velocity_distance_reduction_slider.value() / 100.0 if hasattr(self, 'hand_velocity_distance_reduction_slider') else 0.10,
                 'hand_velocity_ignore_class': self.hand_velocity_ignore_class_toggle.isChecked() if hasattr(self, 'hand_velocity_ignore_class_toggle') else False,
+            }
+
+        def _get_new3d_tracker_settings(self) -> dict:
+            """Get New 3D Kalman tracker-specific settings"""
+            return {
+                # Kalman Filter settings
+                'kalman_process_noise_pos': self.kalman_process_noise_pos_slider.value() / 100.0 if hasattr(self, 'kalman_process_noise_pos_slider') else 0.01,
+                'kalman_process_noise_vel': self.kalman_process_noise_vel_slider.value() / 100.0 if hasattr(self, 'kalman_process_noise_vel_slider') else 0.1,
+                'kalman_measurement_noise': self.kalman_measurement_noise_slider.value() / 100.0 if hasattr(self, 'kalman_measurement_noise_slider') else 0.05,
+                'kalman_max_prediction_time': self.kalman_max_prediction_time_slider.value() / 10.0 if hasattr(self, 'kalman_max_prediction_time_slider') else 1.0,
+                'kalman_velocity_smoothing': self.kalman_velocity_smoothing_slider.value() / 100.0 if hasattr(self, 'kalman_velocity_smoothing_slider') else 0.3,
+                
+                # Association settings
+                'assoc_max_distance': self.assoc_max_distance_slider.value() / 100.0 if hasattr(self, 'assoc_max_distance_slider') else 0.30,
+                'assoc_iou_threshold': self.assoc_iou_threshold_slider.value() / 100.0 if hasattr(self, 'assoc_iou_threshold_slider') else 0.3,
+                'assoc_color_weight': self.assoc_color_weight_slider.value() / 100.0 if hasattr(self, 'assoc_color_weight_slider') else 0.4,
+                'assoc_spatial_weight': self.assoc_spatial_weight_slider.value() / 100.0 if hasattr(self, 'assoc_spatial_weight_slider') else 0.6,
+                'assoc_max_missed_frames': self.assoc_max_missed_frames_slider.value() if hasattr(self, 'assoc_max_missed_frames_slider') else 5,
+                
+                # State management settings
+                'state_min_hits_to_confirm': self.state_min_hits_to_confirm_slider.value() if hasattr(self, 'state_min_hits_to_confirm_slider') else 3,
+                'state_max_age': self.state_max_age_slider.value() if hasattr(self, 'state_max_age_slider') else 10,
+                'state_confidence_decay': self.state_confidence_decay_slider.value() / 100.0 if hasattr(self, 'state_confidence_decay_slider') else 0.95,
+                'state_min_confidence': self.state_min_confidence_slider.value() / 100.0 if hasattr(self, 'state_min_confidence_slider') else 0.3,
+                
+                # Audio indicators
+                'tc_sound_on_catch': self.new3d_sound_on_catch_toggle.isChecked() if hasattr(self, 'new3d_sound_on_catch_toggle') else False,
+                'tc_sound_on_throw': self.new3d_sound_on_throw_toggle.isChecked() if hasattr(self, 'new3d_sound_on_throw_toggle') else False,
+                'tc_name_on_catch': self.new3d_name_on_catch_toggle.isChecked() if hasattr(self, 'new3d_name_on_catch_toggle') else False,
+                'tc_name_on_throw': self.new3d_name_on_throw_toggle.isChecked() if hasattr(self, 'new3d_name_on_throw_toggle') else False,
             }
 
         def _get_2d_tracker_settings(self) -> dict:
@@ -389,6 +460,10 @@ if PYQT_AVAILABLE:
             # Apply 3D-specific settings
             if self.current_tracker == "depth_based":
                 self._apply_3d_tracker_settings(settings)
+            
+            # Apply New 3D Kalman-specific settings
+            elif self.current_tracker == "new_3d":
+                self._apply_new3d_tracker_settings(settings)
             
             # Apply 2D-specific settings
             elif self.current_tracker == "simple_2d":
@@ -502,6 +577,52 @@ if PYQT_AVAILABLE:
                 self.hand_velocity_distance_reduction_slider.setValue(int(settings['hand_velocity_distance_reduction'] * 100))
             if 'hand_velocity_ignore_class' in settings and hasattr(self, 'hand_velocity_ignore_class_toggle'):
                 self.hand_velocity_ignore_class_toggle.setChecked(settings['hand_velocity_ignore_class'])
+
+        def _apply_new3d_tracker_settings(self, settings: dict):
+            """Apply New 3D Kalman tracker-specific settings"""
+            # Kalman Filter settings
+            if 'kalman_process_noise_pos' in settings and hasattr(self, 'kalman_process_noise_pos_slider'):
+                self.kalman_process_noise_pos_slider.setValue(int(settings['kalman_process_noise_pos'] * 100))
+            if 'kalman_process_noise_vel' in settings and hasattr(self, 'kalman_process_noise_vel_slider'):
+                self.kalman_process_noise_vel_slider.setValue(int(settings['kalman_process_noise_vel'] * 100))
+            if 'kalman_measurement_noise' in settings and hasattr(self, 'kalman_measurement_noise_slider'):
+                self.kalman_measurement_noise_slider.setValue(int(settings['kalman_measurement_noise'] * 100))
+            if 'kalman_max_prediction_time' in settings and hasattr(self, 'kalman_max_prediction_time_slider'):
+                self.kalman_max_prediction_time_slider.setValue(int(settings['kalman_max_prediction_time'] * 10))
+            if 'kalman_velocity_smoothing' in settings and hasattr(self, 'kalman_velocity_smoothing_slider'):
+                self.kalman_velocity_smoothing_slider.setValue(int(settings['kalman_velocity_smoothing'] * 100))
+            
+            # Association settings
+            if 'assoc_max_distance' in settings and hasattr(self, 'assoc_max_distance_slider'):
+                self.assoc_max_distance_slider.setValue(int(settings['assoc_max_distance'] * 100))
+            if 'assoc_iou_threshold' in settings and hasattr(self, 'assoc_iou_threshold_slider'):
+                self.assoc_iou_threshold_slider.setValue(int(settings['assoc_iou_threshold'] * 100))
+            if 'assoc_color_weight' in settings and hasattr(self, 'assoc_color_weight_slider'):
+                self.assoc_color_weight_slider.setValue(int(settings['assoc_color_weight'] * 100))
+            if 'assoc_spatial_weight' in settings and hasattr(self, 'assoc_spatial_weight_slider'):
+                self.assoc_spatial_weight_slider.setValue(int(settings['assoc_spatial_weight'] * 100))
+            if 'assoc_max_missed_frames' in settings and hasattr(self, 'assoc_max_missed_frames_slider'):
+                self.assoc_max_missed_frames_slider.setValue(settings['assoc_max_missed_frames'])
+            
+            # State management settings
+            if 'state_min_hits_to_confirm' in settings and hasattr(self, 'state_min_hits_to_confirm_slider'):
+                self.state_min_hits_to_confirm_slider.setValue(settings['state_min_hits_to_confirm'])
+            if 'state_max_age' in settings and hasattr(self, 'state_max_age_slider'):
+                self.state_max_age_slider.setValue(settings['state_max_age'])
+            if 'state_confidence_decay' in settings and hasattr(self, 'state_confidence_decay_slider'):
+                self.state_confidence_decay_slider.setValue(int(settings['state_confidence_decay'] * 100))
+            if 'state_min_confidence' in settings and hasattr(self, 'state_min_confidence_slider'):
+                self.state_min_confidence_slider.setValue(int(settings['state_min_confidence'] * 100))
+            
+            # Audio indicators
+            if 'tc_sound_on_catch' in settings and hasattr(self, 'new3d_sound_on_catch_toggle'):
+                self.new3d_sound_on_catch_toggle.setChecked(settings['tc_sound_on_catch'])
+            if 'tc_sound_on_throw' in settings and hasattr(self, 'new3d_sound_on_throw_toggle'):
+                self.new3d_sound_on_throw_toggle.setChecked(settings['tc_sound_on_throw'])
+            if 'tc_name_on_catch' in settings and hasattr(self, 'new3d_name_on_catch_toggle'):
+                self.new3d_name_on_catch_toggle.setChecked(settings['tc_name_on_catch'])
+            if 'tc_name_on_throw' in settings and hasattr(self, 'new3d_name_on_throw_toggle'):
+                self.new3d_name_on_throw_toggle.setChecked(settings['tc_name_on_throw'])
 
         def _apply_2d_tracker_settings(self, settings: dict):
             """Apply 2D tracker-specific settings"""
@@ -1057,6 +1178,52 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('show_hand_distance_threshold', 1 if settings['show_hand_distance_threshold'] else 0)
             if 'show_hand_velocity_zone' in settings:
                 self.udp_client.send_setting('show_hand_velocity_zone', 1 if settings['show_hand_velocity_zone'] else 0)
+        def _send_new3d_tracker_settings(self, settings: dict):
+            """Send New 3D Kalman tracker-specific settings to engine"""
+            # Kalman Filter settings
+            if 'kalman_process_noise_pos' in settings:
+                self.udp_client.send_setting('kalman_process_noise_pos', settings['kalman_process_noise_pos'])
+            if 'kalman_process_noise_vel' in settings:
+                self.udp_client.send_setting('kalman_process_noise_vel', settings['kalman_process_noise_vel'])
+            if 'kalman_measurement_noise' in settings:
+                self.udp_client.send_setting('kalman_measurement_noise', settings['kalman_measurement_noise'])
+            if 'kalman_max_prediction_time' in settings:
+                self.udp_client.send_setting('kalman_max_prediction_time', settings['kalman_max_prediction_time'])
+            if 'kalman_velocity_smoothing' in settings:
+                self.udp_client.send_setting('kalman_velocity_smoothing', settings['kalman_velocity_smoothing'])
+            
+            # Association settings
+            if 'assoc_max_distance' in settings:
+                self.udp_client.send_setting('assoc_max_distance', settings['assoc_max_distance'])
+            if 'assoc_iou_threshold' in settings:
+                self.udp_client.send_setting('assoc_iou_threshold', settings['assoc_iou_threshold'])
+            if 'assoc_color_weight' in settings:
+                self.udp_client.send_setting('assoc_color_weight', settings['assoc_color_weight'])
+            if 'assoc_spatial_weight' in settings:
+                self.udp_client.send_setting('assoc_spatial_weight', settings['assoc_spatial_weight'])
+            if 'assoc_max_missed_frames' in settings:
+                self.udp_client.send_setting('assoc_max_missed_frames', settings['assoc_max_missed_frames'])
+            
+            # State management settings
+            if 'state_min_hits_to_confirm' in settings:
+                self.udp_client.send_setting('state_min_hits_to_confirm', settings['state_min_hits_to_confirm'])
+            if 'state_max_age' in settings:
+                self.udp_client.send_setting('state_max_age', settings['state_max_age'])
+            if 'state_confidence_decay' in settings:
+                self.udp_client.send_setting('state_confidence_decay', settings['state_confidence_decay'])
+            if 'state_min_confidence' in settings:
+                self.udp_client.send_setting('state_min_confidence', settings['state_min_confidence'])
+            
+            # Audio indicators
+            if 'tc_sound_on_catch' in settings:
+                self.udp_client.send_setting('tc_sound_on_catch', 1 if settings['tc_sound_on_catch'] else 0)
+            if 'tc_sound_on_throw' in settings:
+                self.udp_client.send_setting('tc_sound_on_throw', 1 if settings['tc_sound_on_throw'] else 0)
+            if 'tc_name_on_catch' in settings:
+                self.udp_client.send_setting('tc_name_on_catch', 1 if settings['tc_name_on_catch'] else 0)
+            if 'tc_name_on_throw' in settings:
+                self.udp_client.send_setting('tc_name_on_throw', 1 if settings['tc_name_on_throw'] else 0)
+        
         
         def _send_2d_tracker_settings(self, settings: dict):
             """Send 2D tracker-specific settings to engine"""

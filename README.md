@@ -2,7 +2,38 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-13 23:20 CEST
+**Last Updated:** 2025-10-17 12:11 CEST
+
+**Recent Changes (2025-10-17):**
+- **🎯 NEW 3D KALMAN TRACKER - PHASE 12 COMPLETE ✅**
+  - **Compilation Success**: Project compiles successfully with all 12 phases implemented
+  - **Build Verification**: Clean build with exit code 0, only minor warnings (no errors)
+  - **Complete Implementation**: All core functionality implemented and ready for testing
+  - **Implementation Summary**: Comprehensive documentation created in [`NEW_3D_TRACKER_IMPLEMENTATION_COMPLETE.md`](NEW_3D_TRACKER_IMPLEMENTATION_COMPLETE.md:1)
+  - **Total Code**: ~2,300 lines of C++ + ~240 lines of Python
+  - **Status**: Ready for runtime testing with real camera data
+  - **Next Steps**: Parameter tuning, live testing, and performance validation
+
+- **🎯 NEW 3D KALMAN TRACKER - PHASE 9 COMPLETE**
+  - **Engine Integration**: New3DTracker now fully integrated into Engine.cpp
+  - **Tracker Instantiation**: Engine constructor creates New3DTracker instance alongside existing trackers
+  - **Runtime Switching**: setTrackerType() method supports "new_3d" tracker selection
+  - **Settings File**: Uses dedicated calibration_settings_new3d.json for configuration
+  - **Polymorphic Design**: New3DTracker implements IBallTracker interface for seamless integration
+  - **Files Modified**: [`engine/include/Engine.hpp`](engine/include/Engine.hpp:10,99), [`engine/src/Engine.cpp`](engine/src/Engine.cpp:7,72-74,2232-2238)
+  - **Status**: All 9 phases of New 3D Tracker implementation complete
+  - **Use Case**: Switch to "new_3d" tracker via UI for advanced Kalman filter-based tracking
+
+- **🎯 NEW 3D KALMAN TRACKER UI INTEGRATION**
+  - **New Tracker Option**: Added "New 3D Kalman ⭐" to tracking system dropdown
+  - **Modular Settings**: Integrated New3DSettingsSections with three configuration panels
+  - **Kalman Filter Settings**: Process noise, measurement noise, prediction time, velocity smoothing
+  - **Association Settings**: Distance thresholds, IOU, color/spatial weights, missed frames handling
+  - **State Management**: Hit confirmation, max age, confidence decay, minimum confidence
+  - **Persistent Settings**: Separate settings file (calibration_settings_new3d.json) for new_3d tracker
+  - **Seamless Switching**: Switch between depth_based, new_3d, and simple_2d trackers via UI
+  - **Files Modified**: [`hub/components/ui_settings_common.py`](hub/components/ui_settings_common.py:131), [`hub/components/ui_settings.py`](hub/components/ui_settings.py:37,74,111,154-167,172-174,177-184,260-262,320-343,395-397,507-543,551-556,952-954,1149-1185), [`hub/components/ui_settings_manager.py`](hub/components/ui_settings_manager.py:24,32-44,47-53,80-88,197-203,279-307)
+  - **Use Case**: Advanced Kalman filter-based tracking with configurable association and state management
 
 **Recent Changes (2025-10-13):**
 - **📷 CAMERA SETTINGS ENHANCEMENTS**

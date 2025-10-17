@@ -7,6 +7,7 @@
 #include "IBallTracker.hpp" // Include the tracker interface
 #include "SimpleBallTracker.hpp" // Include the simplified ball tracker
 #include "Simple2DBallTracker.hpp" // Include the 2D-only ball tracker
+#include "New3DTracker.hpp" // Include the new 3D tracker
 #include "RecordingLogger.hpp" // Include recording logger
 #include "json.hpp" // Include nlohmann/json
 #include <memory>
@@ -91,11 +92,12 @@ private:
     
     // Tracker system (polymorphic - can be any IBallTracker implementation)
     std::shared_ptr<IBallTracker> tracker_;
-    std::string current_tracker_type_;  // "depth_based" or "simple_2d"
+    std::string current_tracker_type_;  // "depth_based", "simple_2d", or "new_3d"
     
     // Legacy compatibility
     std::shared_ptr<SimpleBallTracker> simple_tracker_;  // Keep for backward compatibility during transition
     std::shared_ptr<Simple2DBallTracker> simple_2d_tracker_;  // 2D-only tracker (no depth)
+    std::shared_ptr<New3DTracker> new_3d_tracker_;  // New 3D tracker with stereo vision
     bool use_dnn_tracker_; // Flag to switch between old/new tracker (kept for compatibility)
     bool verbose_;
 

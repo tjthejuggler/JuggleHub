@@ -1,0 +1,561 @@
+"""
+New 3D Tracker Settings Sections for JuggleHub UI.
+Contains settings sections that are ONLY visible when new_3d tracker is selected.
+"""
+
+from PyQt6.QtWidgets import (QLabel, QPushButton, QGridLayout, QCheckBox, QVBoxLayout, QGroupBox)
+from PyQt6.QtCore import Qt
+from .ui_widgets import CollapsibleGroupBox
+
+
+class New3DSettingsSections:
+    """New 3D tracker-specific settings sections."""
+    
+    def __init__(self, parent_widget, udp_client, zmq_client):
+        """
+        Initialize New 3D tracker settings sections.
+        
+        Args:
+            parent_widget: Parent CalibrationSettingsWidget instance
+            udp_client: UDP client for sending settings to engine
+            zmq_client: ZMQ client for sending commands to engine
+        """
+        self.parent = parent_widget
+        self.udp_client = udp_client
+        self.zmq_client = zmq_client
+    
+    def create_physics_section(self):
+        """Create the Physics & Kalman Filter settings section"""
+        section = CollapsibleGroupBox("⚛️ Physics & Kalman Filter", collapsed=False)
+        layout = QGridLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        row = 0
+        
+        # Info label
+        info_label = QLabel("ℹ️ Configure physics parameters for Kalman filter prediction")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label, row, 0, 1, 3)
+        row += 1
+        
+        # Held Radius
+        self.parent.new3d_held_radius_slider, self.parent.new3d_held_radius_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Held Radius (cm)",
+            tooltip_text="Radius around wrist where ball is considered 'held'.\n"
+                         "Range: 5-30cm. Default: 12cm.\n"
+                         "Smaller = stricter held detection, Larger = more forgiving.",
+            range_min=5,
+            range_max=30,
+            initial_value=12,
+            update_func=lambda v: self.parent.update_setting('held_radius_m', v / 100.0),
+            is_float=False
+        )
+        row += 1
+        
+        # Throw Velocity Threshold
+        self.parent.new3d_throw_velocity_slider, self.parent.new3d_throw_velocity_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Throw Velocity Threshold (m/s)",
+            tooltip_text="Minimum relative velocity between ball and hand to trigger throw.\n"
+                         "Range: 0.1-3.0 m/s. Default: 0.5 m/s.\n"
+                         "Lower = more sensitive, Higher = requires faster throws.",
+            range_min=10,
+            range_max=300,
+            initial_value=50,
+            update_func=lambda v: self.parent.update_setting('throw_velocity_threshold_mps', v / 100.0),
+            is_float=True
+        )
+        row += 1
+        
+        # Gravity
+        self.parent.new3d_gravity_slider, self.parent.new3d_gravity_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Gravity (m/s²)",
+            tooltip_text="Gravitational acceleration for trajectory prediction.\n"
+                         "Range: 5.0-15.0 m/s². Default: 9.81 m/s² (Earth gravity).\n"
+                         "Adjust if calibration seems off.",
+            range_min=50,
+            range_max=150,
+            initial_value=98,
+            update_func=lambda v: self.parent.update_setting('gravity_y', -v / 10.0),
+            is_float=True
+        )
+        row += 1
+        
+        return section
+    
+    def create_tracking_logic_section(self):
+        """Create the Tracking Logic settings section"""
+        section = CollapsibleGroupBox("🎯 Tracking Logic", collapsed=False)
+        layout = QGridLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        row = 0
+        
+        # Info label
+        info_label = QLabel("ℹ️ Configure tracking behavior and confirmation thresholds")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label, row, 0, 1, 3)
+        row += 1
+        
+        # Max Frames Unseen
+        self.parent.new3d_max_frames_unseen_slider, self.parent.new3d_max_frames_unseen_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Max Frames Unseen",
+            tooltip_text="Maximum frames without detection before deleting track.\n"
+                         "Range: 10-60 frames. Default: 30 frames (~1 second at 30fps).\n"
+                         "Higher = more persistent tracking, Lower = faster cleanup.",
+            range_min=10,
+            range_max=60,
+            initial_value=30,
+            update_func=lambda v: self.parent.update_setting('max_frames_unseen', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Min Frames for New Track
+        self.parent.new3d_min_frames_new_track_slider, self.parent.new3d_min_frames_new_track_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Frames for New Track",
+            tooltip_text="Minimum consecutive frames to confirm a new track.\n"
+                         "Range: 1-10 frames. Default: 3 frames.\n"
+                         "Higher = fewer false positives, Lower = faster detection.",
+            range_min=1,
+            range_max=10,
+            initial_value=3,
+            update_func=lambda v: self.parent.update_setting('min_frames_for_new_track', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Min Frames for Color Lock
+        self.parent.new3d_min_frames_color_lock_slider, self.parent.new3d_min_frames_color_lock_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Frames for Color Lock",
+            tooltip_text="Minimum frames before locking ball color identity.\n"
+                         "Range: 1-20 frames. Default: 5 frames.\n"
+                         "Higher = more stable color ID, Lower = faster color assignment.",
+            range_min=1,
+            range_max=20,
+            initial_value=5,
+            update_func=lambda v: self.parent.update_setting('min_frames_for_color_lock', v),
+            is_float=False
+        )
+        row += 1
+        
+        return section
+    
+    def create_association_section(self):
+        """Create the Detection Association settings section"""
+        section = CollapsibleGroupBox("🔗 Detection Association", collapsed=False)
+        layout = QGridLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        row = 0
+        
+        # Info label
+        info_label = QLabel("ℹ️ Configure how detections are matched to tracked balls")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label, row, 0, 1, 3)
+        row += 1
+        
+        # Association Max Distance
+        self.parent.new3d_association_max_distance_slider, self.parent.new3d_association_max_distance_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Max Association Distance (m)",
+            tooltip_text="Maximum distance for matching detections to tracks.\n"
+                         "Range: 0.1-2.0 m. Default: 0.5 m.\n"
+                         "Smaller = stricter matching, Larger = more flexible.",
+            range_min=10,
+            range_max=200,
+            initial_value=50,
+            update_func=lambda v: self.parent.update_setting('association_max_distance_m', v / 100.0),
+            is_float=True
+        )
+        row += 1
+        
+        return section
+    
+    def create_hand_velocity_section(self):
+        """Create the Hand Velocity Tracking settings section"""
+        section = CollapsibleGroupBox("✋ Hand Velocity Tracking", collapsed=False)
+        layout = QGridLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        row = 0
+        
+        # Info label
+        info_label = QLabel("ℹ️ Configure hand velocity-based throw detection enhancement")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label, row, 0, 1, 3)
+        row += 1
+        
+        # Hand Velocity Enabled Toggle
+        label = QLabel("Enable Hand Velocity")
+        label.setToolTip("Enable velocity-based throw detection.\n"
+                        "When enabled, fast hand movements enhance throw detection.")
+        layout.addWidget(label, row, 0)
+        
+        self.parent.new3d_hand_velocity_enabled_toggle = QCheckBox()
+        self.parent.new3d_hand_velocity_enabled_toggle.setChecked(True)
+        self.parent.new3d_hand_velocity_enabled_toggle.stateChanged.connect(
+            lambda state: self.parent.update_setting('hand_velocity_enabled', 1 if state == Qt.CheckState.Checked.value else 0)
+        )
+        layout.addWidget(self.parent.new3d_hand_velocity_enabled_toggle, row, 1, 1, 2)
+        row += 1
+        
+        # Hand Velocity Threshold
+        self.parent.new3d_hand_velocity_threshold_slider, self.parent.new3d_hand_velocity_threshold_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Hand Velocity Threshold (m/s)",
+            tooltip_text="Minimum hand speed to trigger enhanced throw detection.\n"
+                         "Range: 0.1-5.0 m/s. Default: 1.0 m/s.\n"
+                         "Lower = more sensitive to hand movement.",
+            range_min=10,
+            range_max=500,
+            initial_value=100,
+            update_func=lambda v: self.parent.update_setting('hand_velocity_threshold', v / 100.0),
+            is_float=True
+        )
+        row += 1
+        
+        return section
+    
+    def create_visualization_section(self):
+        """Create the Visualization settings section"""
+        section = CollapsibleGroupBox("👁️ Visualization", collapsed=False)
+        layout = QGridLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        row = 0
+        
+        # Info label
+        info_label = QLabel("ℹ️ Configure visual debugging overlays")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label, row, 0, 1, 3)
+        row += 1
+        
+        # Show Kalman Prediction
+        label = QLabel("Show Kalman Prediction")
+        label.setToolTip("Display predicted ball positions from Kalman filter.\n"
+                        "Shows where the tracker expects the ball to be.")
+        layout.addWidget(label, row, 0)
+        
+        self.parent.new3d_show_kalman_prediction_toggle = QCheckBox()
+        self.parent.new3d_show_kalman_prediction_toggle.setChecked(True)
+        self.parent.new3d_show_kalman_prediction_toggle.stateChanged.connect(
+            lambda state: self.parent.update_setting('show_kalman_prediction', 1 if state == Qt.CheckState.Checked.value else 0)
+        )
+        layout.addWidget(self.parent.new3d_show_kalman_prediction_toggle, row, 1, 1, 2)
+        row += 1
+        
+        # Show Held Radius
+        label = QLabel("Show Held Radius")
+        label.setToolTip("Display the held detection radius around wrists.\n"
+                        "Shows the zone where balls are considered held.")
+        layout.addWidget(label, row, 0)
+        
+        self.parent.new3d_show_held_radius_toggle = QCheckBox()
+        self.parent.new3d_show_held_radius_toggle.setChecked(True)
+        self.parent.new3d_show_held_radius_toggle.stateChanged.connect(
+            lambda state: self.parent.update_setting('show_held_radius', 1 if state == Qt.CheckState.Checked.value else 0)
+        )
+        layout.addWidget(self.parent.new3d_show_held_radius_toggle, row, 1, 1, 2)
+        row += 1
+        
+        # Show Association Lines
+        label = QLabel("Show Association Lines")
+        label.setToolTip("Display lines connecting detections to tracked balls.\n"
+                        "Useful for debugging detection-to-track matching.")
+        layout.addWidget(label, row, 0)
+        
+        self.parent.new3d_show_association_lines_toggle = QCheckBox()
+        self.parent.new3d_show_association_lines_toggle.setChecked(True)
+        self.parent.new3d_show_association_lines_toggle.stateChanged.connect(
+            lambda state: self.parent.update_setting('show_association_lines', 1 if state == Qt.CheckState.Checked.value else 0)
+        )
+        layout.addWidget(self.parent.new3d_show_association_lines_toggle, row, 1, 1, 2)
+        row += 1
+        
+        return section
+    
+    def create_audio_indicators_section(self):
+        """Create the Audio Indicators settings section"""
+        section = CollapsibleGroupBox("🔊 Audio Indicators", collapsed=False)
+        layout = QGridLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        row = 0
+        
+        # Info label
+        info_label = QLabel("ℹ️ Configure audio feedback for throw and catch events")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label, row, 0, 1, 3)
+        row += 1
+        
+        # Separator
+        layout.addWidget(QLabel("Sound Effects:"), row, 0, 1, 3)
+        row += 1
+        
+        # Sound on catches toggle with test button
+        self.parent.new3d_sound_on_catch_toggle = QPushButton("Sound on Catches")
+        self.parent.new3d_sound_on_catch_toggle.setCheckable(True)
+        self.parent.new3d_sound_on_catch_toggle.setChecked(False)
+        self.parent.new3d_sound_on_catch_toggle.clicked.connect(
+            lambda: self.parent.update_setting('tc_sound_on_catch', 1 if self.parent.new3d_sound_on_catch_toggle.isChecked() else 0)
+        )
+        layout.addWidget(self.parent.new3d_sound_on_catch_toggle, row, 0, 1, 2)
+        
+        # Test catch sound button
+        self.parent.new3d_test_catch_sound_button = QPushButton("🔊 Test")
+        self.parent.new3d_test_catch_sound_button.setMaximumWidth(80)
+        self.parent.new3d_test_catch_sound_button.clicked.connect(self.parent.test_catch_sound)
+        self.parent.new3d_test_catch_sound_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 5px;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:pressed { background-color: #2e7d32; }
+        """)
+        layout.addWidget(self.parent.new3d_test_catch_sound_button, row, 2)
+        row += 1
+        
+        # Sound on throws toggle with test button
+        self.parent.new3d_sound_on_throw_toggle = QPushButton("Sound on Throws")
+        self.parent.new3d_sound_on_throw_toggle.setCheckable(True)
+        self.parent.new3d_sound_on_throw_toggle.setChecked(False)
+        self.parent.new3d_sound_on_throw_toggle.clicked.connect(
+            lambda: self.parent.update_setting('tc_sound_on_throw', 1 if self.parent.new3d_sound_on_throw_toggle.isChecked() else 0)
+        )
+        layout.addWidget(self.parent.new3d_sound_on_throw_toggle, row, 0, 1, 2)
+        
+        # Test throw sound button
+        self.parent.new3d_test_throw_sound_button = QPushButton("🔊 Test")
+        self.parent.new3d_test_throw_sound_button.setMaximumWidth(80)
+        self.parent.new3d_test_throw_sound_button.clicked.connect(self.parent.test_throw_sound)
+        self.parent.new3d_test_throw_sound_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 5px;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:pressed { background-color: #2e7d32; }
+        """)
+        layout.addWidget(self.parent.new3d_test_throw_sound_button, row, 2)
+        row += 1
+        
+        # Name on catches toggle with test button
+        self.parent.new3d_name_on_catch_toggle = QPushButton("Name on Catches")
+        self.parent.new3d_name_on_catch_toggle.setCheckable(True)
+        self.parent.new3d_name_on_catch_toggle.setChecked(False)
+        self.parent.new3d_name_on_catch_toggle.clicked.connect(
+            lambda: self.parent.update_setting('tc_name_on_catch', 1 if self.parent.new3d_name_on_catch_toggle.isChecked() else 0)
+        )
+        layout.addWidget(self.parent.new3d_name_on_catch_toggle, row, 0, 1, 2)
+        
+        # Test catch name button
+        self.parent.new3d_test_catch_name_button = QPushButton("🔊 Test")
+        self.parent.new3d_test_catch_name_button.setMaximumWidth(80)
+        self.parent.new3d_test_catch_name_button.clicked.connect(self.parent.test_catch_name)
+        self.parent.new3d_test_catch_name_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 5px;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:pressed { background-color: #2e7d32; }
+        """)
+        layout.addWidget(self.parent.new3d_test_catch_name_button, row, 2)
+        row += 1
+        
+        # Name on throws toggle with test button
+        self.parent.new3d_name_on_throw_toggle = QPushButton("Name on Throws")
+        self.parent.new3d_name_on_throw_toggle.setCheckable(True)
+        self.parent.new3d_name_on_throw_toggle.setChecked(False)
+        self.parent.new3d_name_on_throw_toggle.clicked.connect(
+            lambda: self.parent.update_setting('tc_name_on_throw', 1 if self.parent.new3d_name_on_throw_toggle.isChecked() else 0)
+        )
+        layout.addWidget(self.parent.new3d_name_on_throw_toggle, row, 0, 1, 2)
+        
+        # Test throw name button
+        self.parent.new3d_test_throw_name_button = QPushButton("🔊 Test")
+        self.parent.new3d_test_throw_name_button.setMaximumWidth(80)
+        self.parent.new3d_test_throw_name_button.clicked.connect(self.parent.test_throw_name)
+        self.parent.new3d_test_throw_name_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 5px;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:pressed { background-color: #2e7d32; }
+        """)
+        layout.addWidget(self.parent.new3d_test_throw_name_button, row, 2)
+        row += 1
+        
+        return section
+    
+    def create_color_calibration_section(self):
+        """Create the Color Calibration section for New 3D Tracker"""
+        section = CollapsibleGroupBox("🎨 Color Calibration", collapsed=False)
+        layout = QVBoxLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        # Load color profiles from calibration_settings_new3d.json
+        import json
+        import os
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+        settings_path = os.path.normpath(settings_path)
+        
+        try:
+            with open(settings_path, 'r') as f:
+                settings_data = json.load(f)
+                color_profiles = settings_data.get('color_profiles', [])
+            print(f"✅ Loaded color profiles from {settings_path}")
+            print(f"   Profiles loaded: {[p['name'] for p in color_profiles]}")
+        except Exception as e:
+            print(f"❌ Error loading calibration_settings_new3d.json: {e}")
+            color_profiles = []
+        
+        # Store references for later use
+        if not hasattr(self.parent, 'new3d_ball_checkboxes'):
+            self.parent.new3d_ball_checkboxes = {}
+        if not hasattr(self.parent, 'new3d_ball_calibration_labels'):
+            self.parent.new3d_ball_calibration_labels = {}
+        
+        # Create a widget for each color profile
+        for profile in color_profiles:
+            ball_name = profile['name']
+            ball_group = QGroupBox(ball_name.capitalize())
+            ball_layout = QGridLayout(ball_group)
+            
+            # Checkbox for enabling/disabling this ball
+            checkbox = QPushButton(f"Track {ball_name.capitalize()}")
+            checkbox.setCheckable(True)
+            is_enabled = profile.get('enabled', True)
+            checkbox.setChecked(is_enabled)
+            checkbox.clicked.connect(lambda checked, name=ball_name: self.parent.toggle_ball_tracking(name, checked))
+            self.parent.new3d_ball_checkboxes[ball_name] = checkbox
+            ball_layout.addWidget(checkbox, 0, 0, 1, 3)
+            
+            # Get current calibration values
+            avg_hue = profile.get('avg_hue', -1.0)
+            avg_sat = profile.get('avg_saturation', -1.0)
+            
+            # Display calibrated values (read-only)
+            row = 1
+            
+            # Average Hue display
+            ball_layout.addWidget(QLabel("Average Hue:"), row, 0)
+            if avg_hue >= 0:
+                hue_value_label = QLabel(f"{avg_hue:.1f}°")
+                hue_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            else:
+                hue_value_label = QLabel("Not calibrated")
+                hue_value_label.setStyleSheet("color: #f44336;")
+            ball_layout.addWidget(hue_value_label, row, 1, 1, 2)
+            row += 1
+            
+            # Average Saturation display
+            ball_layout.addWidget(QLabel("Average Saturation:"), row, 0)
+            if avg_sat >= 0:
+                sat_value_label = QLabel(f"{avg_sat:.1f}")
+                sat_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            else:
+                sat_value_label = QLabel("Not calibrated")
+                sat_value_label.setStyleSheet("color: #f44336;")
+            ball_layout.addWidget(sat_value_label, row, 1, 1, 2)
+            row += 1
+            
+            # Store label references for updates
+            self.parent.new3d_ball_calibration_labels[ball_name] = {
+                'hue': hue_value_label,
+                'saturation': sat_value_label
+            }
+            
+            # HSV Ranges display (min/max)
+            min_hsv = profile.get('min_hsv', [0, 0, 0])
+            max_hsv = profile.get('max_hsv', [180, 255, 255])
+            
+            # Min HSV display
+            ball_layout.addWidget(QLabel("Min HSV:"), row, 0)
+            min_hsv_label = QLabel(f"H:{min_hsv[0]:.0f} S:{min_hsv[1]:.0f} V:{min_hsv[2]:.0f}")
+            min_hsv_label.setStyleSheet("color: #2196F3; font-size: 9px;")
+            ball_layout.addWidget(min_hsv_label, row, 1, 1, 2)
+            row += 1
+            
+            # Max HSV display
+            ball_layout.addWidget(QLabel("Max HSV:"), row, 0)
+            max_hsv_label = QLabel(f"H:{max_hsv[0]:.0f} S:{max_hsv[1]:.0f} V:{max_hsv[2]:.0f}")
+            max_hsv_label.setStyleSheet("color: #2196F3; font-size: 9px;")
+            ball_layout.addWidget(max_hsv_label, row, 1, 1, 2)
+            row += 1
+            
+            # Calibrate button
+            calibrate_button = QPushButton("🎯 Calibrate Color")
+            calibrate_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    padding: 8px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #1976D2; }
+                QPushButton:pressed { background-color: #0D47A1; }
+            """)
+            calibrate_button.clicked.connect(lambda checked, name=ball_name: self.parent.start_color_calibration(name))
+            ball_layout.addWidget(calibrate_button, row, 0, 1, 3)
+            row += 1
+            
+            # Info label
+            info_label = QLabel("ℹ️ Click on a ball in the video feed to calibrate")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+            info_label.setWordWrap(True)
+            ball_layout.addWidget(info_label, row, 0, 1, 3)
+            
+            layout.addWidget(ball_group)
+        
+        # Auto-calibrate button
+        auto_cal_button = QPushButton("🎯 Auto-Calibrate from Current Colors")
+        auto_cal_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                padding: 10px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+        """)
+        auto_cal_button.clicked.connect(self.parent.auto_calibrate_hues)
+        layout.addWidget(auto_cal_button)
+        
+        return section

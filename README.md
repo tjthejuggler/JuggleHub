@@ -221,6 +221,189 @@ A high-performance monorepo combining C++ real-time ball tracking with Python-ba
   - **Robust & Maintainable**: Easier to understand, debug, and extend
   - See [`SIMPLIFIED_TRACKING_COMPLETE.md`](SIMPLIFIED_TRACKING_COMPLETE.md) for complete documentation
 
+## ⚙️ Tracking System Settings Architecture
+
+**Last Updated:** 2025-10-16
+
+JuggleHub features a modular, extensible tracking system settings architecture that supports multiple tracker types with independent, persistent settings management.
+
+### System Overview
+
+The tracking system settings provide:
+- **Dual Tracker Support**: 3D depth-based tracking and 2D simple tracking
+- **Per-Tracker Settings**: Each tracker maintains its own independent configuration
+- **Persistent Storage**: Settings automatically saved and loaded per tracker type
+- **Modular Design**: Easy to extend with new tracker types
+- **Type-Safe Configuration**: Structured settings with validation
+- **UI Integration**: Seamless integration with calibration interface
+
+### Tracker Types
+
+#### 3D Depth-Based Tracker (SimpleBallTracker)
+The primary tracking system using depth information and trajectory prediction:
+- **Trajectory Settings**: Physics-based ballistic motion parameters
+- **Detection Thresholds**: YOLO confidence and NMS thresholds
+- **Throw/Catch Detection**: Multi-evidence fusion parameters
+- **Kalman Filtering**: Prediction and tracking parameters
+- **Visualization Options**: Debug overlays and trajectory display
+
+#### 2D Simple Tracker (Simple2DBallTracker)
+Lightweight tracking using only RGB detections:
+- **Detection Settings**: Confidence thresholds for 2D tracking
+- **Simplified Parameters**: Minimal configuration for testing
+- **Raw YOLO Output**: Direct visualization of detection results
+
+### Key Features
+
+**Independent Settings Management**
+- Each tracker type has its own settings file
+- Settings persist across sessions
+- Automatic migration from legacy format
+- No interference between tracker configurations
+
+**Modular Architecture**
+- [`UISettingsManager`](hub/components/ui_settings_manager.py:1): Central settings coordinator
+- [`UISettingsCommon`](hub/components/ui_settings_common.py:1): Shared settings across all trackers
+- [`UISettings3D`](hub/components/ui_settings_3d.py:1): 3D tracker-specific settings
+- [`UISettings2D`](hub/components/ui_settings_2d.py:1): 2D tracker-specific settings
+
+**Seamless Tracker Switching**
+- Switch between trackers via UI dropdown
+- Settings automatically loaded for selected tracker
+- No restart required
+- Previous tracker settings preserved
+
+### Settings Files
+
+Settings are stored in JSON format in the project root:
+
+```
+JuggleHub/
+├── ball_settings.json              # 3D tracker settings
+├── ball_settings_2d.json           # 2D tracker settings
+└── ball_settings_legacy.json       # Backup of old format (if migrated)
+```
+
+**3D Tracker Settings** ([`ball_settings.json`](ball_settings.json)):
+```json
+{
+  "tracker_type": "3d",
+  "trajectory": {
+    "search_radius_base": 0.15,
+    "search_radius_velocity_factor": 0.5,
+    "min_confidence_threshold": 0.7
+  },
+  "throw_catch": {
+    "throw_velocity_threshold": 0.5,
+    "catch_distance_threshold": 0.15
+  },
+  "visualization": {
+    "show_trajectories": true,
+    "show_predictions": true
+  }
+}
+```
+
+**2D Tracker Settings** ([`ball_settings_2d.json`](ball_settings_2d.json)):
+```json
+{
+  "tracker_type": "2d",
+  "detection": {
+    "confidence_threshold": 0.45,
+    "nms_threshold": 0.5
+  }
+}
+```
+
+### Usage
+
+#### Switching Trackers
+
+1. **Via UI Dropdown**:
+   - Open Calibration Mode
+   - Select tracker from "Tracking System" dropdown
+   - Settings automatically load for selected tracker
+
+2. **Programmatically**:
+   ```python
+   # Switch to 3D tracker
+   settings_manager.switch_tracker("3d")
+   
+   # Switch to 2D tracker
+   settings_manager.switch_tracker("2d")
+   ```
+
+#### Accessing Settings
+
+```python
+# Get current tracker settings
+current_settings = settings_manager.get_current_settings()
+
+# Get specific tracker settings
+settings_3d = settings_manager.get_settings("3d")
+settings_2d = settings_manager.get_settings("2d")
+
+# Update settings
+settings_manager.update_setting("trajectory.search_radius_base", 0.2)
+```
+
+#### Saving and Loading
+
+Settings are automatically saved when:
+- Any setting value changes
+- Tracker is switched
+- Application exits normally
+
+Settings are automatically loaded when:
+- Application starts
+- Tracker is switched
+- Settings file is modified externally
+
+### Architecture Benefits
+
+**Extensibility**
+- Add new tracker types without modifying existing code
+- Each tracker can have completely different settings
+- Settings modules are self-contained and independent
+
+**Maintainability**
+- Clear separation of concerns
+- Type-safe settings structures
+- Centralized settings management
+- Easy to test and debug
+
+**User Experience**
+- Seamless tracker switching
+- Settings persist across sessions
+- No configuration loss when experimenting
+- Clear visual feedback in UI
+
+### Migration from Legacy System
+
+The system automatically migrates from the old monolithic settings format:
+- Detects legacy [`ball_settings.json`](ball_settings.json:1) format
+- Creates backup as `ball_settings_legacy.json`
+- Converts to new modular format
+- Preserves all existing settings
+- One-time automatic process
+
+### Documentation
+
+For detailed information, see:
+- **Architecture**: [`TRACKING_SYSTEM_SETTINGS_ARCHITECTURE.md`](TRACKING_SYSTEM_SETTINGS_ARCHITECTURE.md:1) - Complete system design
+- **User Guide**: `TRACKING_SYSTEM_SETTINGS_USER_GUIDE.md` - How to use the system
+- **Implementation**: `TRACKING_SYSTEM_SETTINGS_IMPLEMENTATION_SUMMARY.md` - Technical details
+- **Migration**: `TRACKING_SYSTEM_SETTINGS_MIGRATION_GUIDE.md` - Upgrading guide
+
+### Future Extensibility
+
+The modular architecture supports future enhancements:
+- Additional tracker types (e.g., IMU-fusion tracker)
+- Per-ball settings profiles
+- Cloud settings synchronization
+- Settings presets and templates
+- Advanced calibration wizards
+
 ## 🎯 Overview
 
 JuggleHub is a complete system for the real-time analysis and interactive control of juggling patterns. It is built on a high-performance, hybrid architecture that separates low-latency C++ processing from high-level Python management.

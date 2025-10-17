@@ -92,6 +92,9 @@ class JuggleHub:
             return True
             
         except Exception as e:
+            print(f"❌ Error during initialization: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _data_processing_loop(self):

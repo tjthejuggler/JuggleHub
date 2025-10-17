@@ -1,5 +1,6 @@
 """
 Calibration settings widget for JuggleHub UI.
+Refactored to use modular section components with dynamic visibility.
 """
 
 import os
@@ -20,17 +21,19 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                                 QSlider, QPushButton, QComboBox, QGridLayout,
-                                 QScrollArea, QGroupBox, QTextEdit, QMessageBox)
-    from PyQt6.QtCore import Qt, QTimer
-    from PyQt6.QtGui import QFont
+    from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QSlider, QPushButton, 
+                                 QComboBox, QGridLayout, QScrollArea, QMessageBox)
+    from PyQt6.QtCore import Qt
     PYQT_AVAILABLE = True
 except ImportError:
     PYQT_AVAILABLE = False
 
 if PYQT_AVAILABLE:
     from .ui_widgets import CollapsibleGroupBox
+    from .ui_settings_manager import SettingsManager
+    from .ui_settings_common import CommonSettingsSections
+    from .ui_settings_3d import Tracker3DSettingsSections
+    from .ui_settings_2d import Tracker2DSettingsSections
 
 
 if PYQT_AVAILABLE:
@@ -40,36 +43,49 @@ if PYQT_AVAILABLE:
             self.udp_client = udp_client
             self.zmq_client = zmq_client
             self.hub_instance = hub_instance
-            self.main_window = main_window  # Store reference to main window for accessing visualization toggles
-            self.settings_file = os.path.join("hub", "config", "calibration_settings.json")
+            self.main_window = main_window
             self.calibration_saves_dir = os.path.join("hub", "calibration_saves")
-            self._loading_settings = True  # Flag to prevent auto-save during initialization and load
+            self._loading_settings = True
+            
+            # Initialize settings manager
+            self.settings_manager = SettingsManager()
+            
+            # Initialize current tracker type
+            self.current_tracker = "depth_based"  # Default to 3D tracker
+            
             # Ensure calibration_saves directory exists
             os.makedirs(self.calibration_saves_dir, exist_ok=True)
-            self.init_ui()
-            # Load settings after UI is initialized
-            self.load_settings()
-            # Now allow auto-save
-            self._loading_settings = False
-
-        def init_ui(self):
-            # Main layout for the widget
-            main_layout = QVBoxLayout(self)
-            main_layout.setContentsMargins(0, 0, 0, 0)
             
-            # Initialize resolution-FPS mapping first
-            # Based on Intel RealSense D455 specifications
-            # 90FPS is only supported at lower resolutions
+            # Initialize resolution-FPS mapping
             self.resolution_fps_map = {
                 "1280 x 800": [60, 30, 15, 6],
                 "1280 x 720": [60, 30, 15, 6],
                 "960 x 540": [60, 30, 15, 6],
-                "848 x 480": [90, 60, 30, 15, 6],  # 90FPS supported
+                "848 x 480": [90, 60, 30, 15, 6],
                 "640 x 480": [60, 30, 15, 6],
-                "640 x 360": [90, 60, 30, 15, 6],  # 90FPS supported
-                "424 x 240": [90, 60, 30, 15, 6],  # 90FPS supported
-                "320 x 240": [90, 60, 30, 15, 6]   # 90FPS supported
+                "640 x 360": [90, 60, 30, 15, 6],
+                "424 x 240": [90, 60, 30, 15, 6],
+                "320 x 240": [90, 60, 30, 15, 6]
             }
+            
+            # Create section handlers
+            self.common_sections = CommonSettingsSections(self, udp_client, zmq_client)
+            self.tracker_3d_sections = Tracker3DSettingsSections(self, udp_client, zmq_client)
+            self.tracker_2d_sections = Tracker2DSettingsSections(self, udp_client, zmq_client)
+            
+            # Initialize UI
+            self.init_ui()
+            
+            # Load settings after UI is initialized
+            self.load_settings()
+            
+            # Allow auto-save
+            self._loading_settings = False
+
+        def init_ui(self):
+            """Initialize the UI with modular sections"""
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(0, 0, 0, 0)
             
             # Create scroll area
             scroll_area = QScrollArea()
@@ -77,2060 +93,249 @@ if PYQT_AVAILABLE:
             scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             scroll_area.setStyleSheet("""
-                QScrollArea {
-                    border: none;
-                    background-color: #2b2b2b;
-                }
-                QScrollBar:vertical {
-                    border: none;
-                    background: #1e1e1e;
-                    width: 12px;
-                    margin: 0px;
-                }
-                QScrollBar::handle:vertical {
-                    background: #555555;
-                    min-height: 20px;
-                    border-radius: 6px;
-                }
-                QScrollBar::handle:vertical:hover {
-                    background: #666666;
-                }
+                QScrollArea { border: none; background-color: #2b2b2b; }
+                QScrollBar:vertical { border: none; background: #1e1e1e; width: 12px; margin: 0px; }
+                QScrollBar::handle:vertical { background: #555555; min-height: 20px; border-radius: 6px; }
+                QScrollBar::handle:vertical:hover { background: #666666; }
             """)
             
-            # Container widget for all collapsible sections
+            # Container widget for all sections
             container_widget = QWidget()
             container_layout = QVBoxLayout(container_widget)
             container_layout.setSpacing(10)
             container_layout.setContentsMargins(5, 5, 5, 5)
             
-            # Add all collapsible sections
-            self.camera_section = self.create_camera_section()
+            # Lists to track section widgets for visibility management
+            self.common_section_widgets = []
+            self.tracker_3d_section_widgets = []
+            self.tracker_2d_section_widgets = []
+            
+            # Add common sections (always visible)
+            self.camera_section = self.common_sections.create_camera_section()
             container_layout.addWidget(self.camera_section)
+            self.common_section_widgets.append(self.camera_section)
             
-            self.yolo_section = self.create_yolo_section()
+            self.yolo_section = self.common_sections.create_yolo_section()
             container_layout.addWidget(self.yolo_section)
+            self.common_section_widgets.append(self.yolo_section)
             
-            self.pose_section = self.create_pose_section()
+            self.pose_section = self.common_sections.create_pose_section()
             container_layout.addWidget(self.pose_section)
+            self.common_section_widgets.append(self.pose_section)
             
-            self.throw_catch_section = self.create_throw_catch_section()
+            # Add 3D tracker sections
+            self.throw_catch_section = self.tracker_3d_sections.create_ball_state_section()
             container_layout.addWidget(self.throw_catch_section)
+            self.tracker_3d_section_widgets.append(self.throw_catch_section)
             
-            self.color_tracker_weights_section = self.create_color_tracker_weights_section()
+            self.color_tracker_weights_section = self.tracker_3d_sections.create_color_tracker_section()
             container_layout.addWidget(self.color_tracker_weights_section)
+            self.tracker_3d_section_widgets.append(self.color_tracker_weights_section)
             
-            self.override_detection_section = self.create_override_detection_section()
+            self.override_detection_section = self.tracker_3d_sections.create_override_detection_section()
             container_layout.addWidget(self.override_detection_section)
+            self.tracker_3d_section_widgets.append(self.override_detection_section)
             
-            self.held_color_blob_section = self.create_held_color_blob_section()
+            self.held_color_blob_section = self.tracker_3d_sections.create_held_color_blob_section()
             container_layout.addWidget(self.held_color_blob_section)
+            self.tracker_3d_section_widgets.append(self.held_color_blob_section)
             
-            self.trajectory_section = self.create_trajectory_section()
+            self.trajectory_section = self.tracker_3d_sections.create_trajectory_section()
             container_layout.addWidget(self.trajectory_section)
+            self.tracker_3d_section_widgets.append(self.trajectory_section)
             
-            self.hand_velocity_section = self.create_hand_velocity_section()
+            self.hand_velocity_section = self.tracker_3d_sections.create_hand_velocity_section()
             container_layout.addWidget(self.hand_velocity_section)
+            self.tracker_3d_section_widgets.append(self.hand_velocity_section)
             
-            self.ball_profiles_section = self.create_ball_profiles_section()
+            self.ball_profiles_section = self.tracker_3d_sections.create_ball_profiles_section()
             container_layout.addWidget(self.ball_profiles_section)
+            self.tracker_3d_section_widgets.append(self.ball_profiles_section)
+            
+            # Add 2D tracker sections (currently none, but ready for future)
+            # When 2D sections are added, append them to self.tracker_2d_section_widgets
+            
+            # Initially show sections based on current tracker
+            self.hide_all_tracker_sections()
+            self.show_tracker_sections(self.current_tracker)
             
             # Add stretch to push sections to top
             container_layout.addStretch()
             
             # Set container as scroll area widget
             scroll_area.setWidget(container_widget)
-            
-            # Add scroll area to main layout
             main_layout.addWidget(scroll_area)
 
-        def create_camera_section(self):
-            """Create the Camera Settings section"""
-            section = CollapsibleGroupBox("📷 Camera Settings", collapsed=False)
-            camera_layout = QGridLayout()
-            section.get_content_layout().addLayout(camera_layout)
-            
-            # Camera settings dropdown
-            camera_layout.addWidget(QLabel("Settings Profile:"), 0, 0)
-            self.camera_settings_combo = QComboBox()
-            self.populate_camera_settings()
-            camera_layout.addWidget(self.camera_settings_combo, 0, 1)
-            
-            # Resolution dropdown
-            camera_layout.addWidget(QLabel("Resolution:"), 1, 0)
-            self.resolution_combo = QComboBox()
-            self.populate_resolution_options()
-            self.resolution_combo.currentTextChanged.connect(self.on_resolution_changed)
-            camera_layout.addWidget(self.resolution_combo, 1, 1)
-            
-            # FPS dropdown
-            camera_layout.addWidget(QLabel("Frame Rate (FPS):"), 2, 0)
-            self.fps_combo = QComboBox()
-            self.populate_fps_options()
-            camera_layout.addWidget(self.fps_combo, 2, 1)
-            
-            # Camera control buttons
-            camera_control_layout = QHBoxLayout()
-            
-            # Stop camera button
-            self.stop_camera_button = QPushButton("Stop Camera")
-            self.stop_camera_button.clicked.connect(self.stop_camera_feed)
-            self.stop_camera_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #f44336;
-                    color: white;
-                    border: none;
-                    padding: 8px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #da190b;
-                }
-                QPushButton:pressed {
-                    background-color: #b71c1c;
-                }
-                QPushButton:disabled {
-                    background-color: #666666;
-                }
-            """)
-            camera_control_layout.addWidget(self.stop_camera_button)
-            
-            # Start camera button
-            self.start_camera_button = QPushButton("Start Camera")
-            self.start_camera_button.clicked.connect(self.start_camera_feed)
-            self.start_camera_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    border: none;
-                    padding: 8px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #45a049;
-                }
-                QPushButton:pressed {
-                    background-color: #2e7d32;
-                }
-                QPushButton:disabled {
-                    background-color: #666666;
-                }
-            """)
-            self.start_camera_button.setEnabled(True)
-            camera_control_layout.addWidget(self.start_camera_button)
-            
-            camera_layout.addLayout(camera_control_layout, 3, 0, 1, 2)
-            
-            # Camera status indicator
-            self.camera_status_label = QLabel("● Camera Stopped")
-            self.camera_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
-            camera_layout.addWidget(self.camera_status_label, 4, 0, 1, 2)
+        def hide_all_tracker_sections(self):
+            """Hide all tracker-specific sections"""
+            for section in self.tracker_3d_section_widgets:
+                section.setVisible(False)
+            for section in self.tracker_2d_section_widgets:
+                section.setVisible(False)
 
-            # IR Projector status
-            self.ir_status_label = QLabel("🔆 IR Projector: Unknown")
-            camera_layout.addWidget(self.ir_status_label, 5, 0, 1, 2)
-            
-            # Depth Sensor Toggle
-            self.depth_sensor_toggle = QPushButton("Enable Depth Sensor")
-            self.depth_sensor_toggle.setCheckable(True)
-            self.depth_sensor_toggle.setChecked(True)
-            self.depth_sensor_toggle.clicked.connect(self.toggle_depth_sensor)
-            self.depth_sensor_toggle.setToolTip(
-                "Enable or disable the RealSense depth sensor.\n"
-                "When disabled, only RGB camera is used (saves power and processing).\n"
-                "Note: Depth-based tracking requires this to be enabled."
-            )
-            camera_layout.addWidget(self.depth_sensor_toggle, 6, 0, 1, 2)
-            
-            # Tracking System Selection
-            camera_layout.addWidget(QLabel("Tracking System:"), 7, 0)
-            self.tracking_system_combo = QComboBox()
-            self.tracking_system_combo.addItem("Depth-Based 3D (Current)", "depth_based")
-            self.tracking_system_combo.addItem("Simple 2D (New)", "simple_2d")
-            self.tracking_system_combo.currentIndexChanged.connect(self.on_tracking_system_changed)
-            self.tracking_system_combo.setToolTip(
-                "Select which tracking system to use:\n"
-                "• Depth-Based 3D: Uses RealSense depth data for 3D tracking (current system)\n"
-                "• Simple 2D: 2D-only tracking without depth (new system - to be implemented)"
-            )
-            camera_layout.addWidget(self.tracking_system_combo, 7, 1)
-            
-            return section
+        def show_tracker_sections(self, tracker_type: str):
+            """Show sections for specified tracker"""
+            if tracker_type == "depth_based":
+                for section in self.tracker_3d_section_widgets:
+                    section.setVisible(True)
+            elif tracker_type == "simple_2d":
+                for section in self.tracker_2d_section_widgets:
+                    section.setVisible(True)
 
-        def create_yolo_section(self):
-            """Create the YOLO Tracker Settings section"""
-            section = CollapsibleGroupBox("🎯 YOLO Tracker Settings", collapsed=False)
-            dnn_layout = QGridLayout()
-            section.get_content_layout().addLayout(dnn_layout)
-    
-            # Class-specific confidence thresholds
-            row = 0
+        def on_tracking_system_changed(self, index=None):
+            """Handle tracking system selection change
             
-            # Enable/Disable YOLO Ball Model toggle
-            self.use_dnn_tracker_toggle = QPushButton("Enable YOLO Ball Detection")
-            self.use_dnn_tracker_toggle.setCheckable(True)
-            self.use_dnn_tracker_toggle.setChecked(True)  # Enabled by default
-            self.use_dnn_tracker_toggle.clicked.connect(self.toggle_dnn_tracker)
+            Args:
+                index: The new index (from currentIndexChanged signal), optional
+            """
+            new_tracker = self.tracking_system_combo.currentData()
             
-            # Send initial state to engine
-            self.udp_client.send_setting('enable_ball_detection', 1)
-            self.use_dnn_tracker_toggle.setToolTip(
-                "Enable or disable YOLO ball detection model.\n"
-                "When disabled, no ball detection occurs (useful for performance testing).\n"
-                "Disabling this should give you full camera FPS with no processing overhead."
-            )
-            self.use_dnn_tracker_toggle.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 8px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #45a049;
-                }
-                QPushButton:pressed {
-                    background-color: #2e7d32;
-                }
-                QPushButton:checked {
-                    background-color: #4CAF50;
-                }
-                QPushButton:!checked {
-                    background-color: #f44336;
-                }
-            """)
-            dnn_layout.addWidget(self.use_dnn_tracker_toggle, row, 0, 1, 3)
-            row += 1
+            if new_tracker == self.current_tracker:
+                return  # No change
             
-            # Info label
-            info_label = QLabel("ℹ️ Set confidence thresholds per class type")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            dnn_layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
+            print(f"🔄 Switching from {self.current_tracker} to {new_tracker}")
             
-            # Ball (in-air) confidence threshold
-            self.ball_confidence_slider, self.ball_confidence_value_label = self._create_slider_widget(
-                parent_layout=dnn_layout,
-                row=row,
-                label_text="'Ball' Confidence",
-                tooltip_text="Minimum confidence for 'ball' (in-air) detections.\n"
-                             "Range: 0.00 to 1.00. Default: 0.25.\n"
-                             "Lower values detect more balls but increase false positives.",
-                range_min=0,
-                range_max=100,
-                initial_value=25,
-                update_func=lambda v: self.update_setting('ball_confidence_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Ball_held confidence threshold
-            self.ball_held_confidence_slider, self.ball_held_confidence_value_label = self._create_slider_widget(
-                parent_layout=dnn_layout,
-                row=row,
-                label_text="'Ball Held' Confidence",
-                tooltip_text="Minimum confidence for 'ball_held' detections.\n"
-                             "Range: 0.00 to 1.00. Default: 0.25.\n"
-                             "Lower values detect more held balls but increase false positives.",
-                range_min=0,
-                range_max=100,
-                initial_value=25,
-                update_func=lambda v: self.update_setting('ball_held_confidence_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-    
-            # NMS threshold (applies to all classes)
-            self.nms_slider, self.nms_value_label = self._create_slider_widget(
-                parent_layout=dnn_layout,
-                row=row,
-                label_text="NMS Threshold",
-                tooltip_text="Non-Maximum Suppression threshold for merging overlapping boxes.\n"
-                             "Range: 0.00 to 1.00. Default: 0.50.\n"
-                             "Higher values allow more overlap.",
-                range_min=0,
-                range_max=100,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('nms_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Visualization toggle for raw detections
-            self.show_raw_yolo_toggle = QPushButton("Show Raw YOLO Detections")
-            self.show_raw_yolo_toggle.setCheckable(True)
-            self.show_raw_yolo_toggle.setChecked(False)
-            self.show_raw_yolo_toggle.clicked.connect(lambda: self.update_setting('show_raw_yolo_detections', 1 if self.show_raw_yolo_toggle.isChecked() else 0))
-            dnn_layout.addWidget(self.show_raw_yolo_toggle, row, 0, 1, 3)
-            row += 1
-            
-            # Info about visualization
-            viz_info_label = QLabel("ℹ️ Raw detections shown as darker red squares (larger)")
-            viz_info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
-            viz_info_label.setWordWrap(True)
-            dnn_layout.addWidget(viz_info_label, row, 0, 1, 3)
-            
-            return section
-
-        def create_pose_section(self):
-            """Create the Pose Model Settings section"""
-            section = CollapsibleGroupBox("🧍 Pose Model Settings", collapsed=False)
-            pose_layout = QGridLayout()
-            section.get_content_layout().addLayout(pose_layout)
-
-            self.pose_model_toggle = QPushButton("Enable Pose Model")
-            self.pose_model_toggle.setCheckable(True)
-            self.pose_model_toggle.setChecked(True)
-            self.pose_model_toggle.clicked.connect(self.toggle_pose_model)
-            pose_layout.addWidget(self.pose_model_toggle, 0, 0, 1, 2)
-
-            return section
-
-        def create_throw_catch_section(self):
-            """Create the Throw/Catch Detection settings section"""
-            section = CollapsibleGroupBox("🎯 Ball State Detection", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Info label
-            info_label = QLabel("ℹ️ Configure how ball state (held/in-air) is determined")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
-            
-            # Separator
-            layout.addWidget(QLabel("Distance Thresholds:"), row, 0, 1, 3)
-            row += 1
-            
-            # Undetected near hand threshold (for occluded balls)
-            self.tc_undetected_near_hand_slider, self.tc_undetected_near_hand_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Undetected Near Hand (cm)",
-                tooltip_text="Distance from hand where undetected ball is considered held (occluded).\n"
-                             "Range: 10-40cm. Default: 20cm.\n"
-                             "Larger threshold accounts for balls hidden by hands.",
-                range_min=10,
-                range_max=40,
-                initial_value=20,
-                update_func=lambda v: self.update_setting('undetected_near_hand_threshold', v / 100.0),  # Convert cm to m
-                is_float=False  # Display as integer cm
-            )
-            row += 1
-            
-            # Separator
-            layout.addWidget(QLabel("State Change:"), row, 0, 1, 3)
-            row += 1
-            
-            # State change debouncing
-            self.tc_min_frames_slider, self.tc_min_frames_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="State Change Frames",
-                tooltip_text="Number of consecutive frames required to confirm state change (held/in-air).\n"
-                             "Range: 1-50 frames. Default: 3.\n"
-                             "Higher values = more stable detection, slower response.",
-                range_min=1,
-                range_max=50,
-                initial_value=3,
-                update_func=lambda v: self.update_setting('min_frames_for_state_change', v),
-                is_float=False
-            )
-            row += 1
-
-            # Unified Hand Distance Threshold (for trajectory-based tracking)
-            self.tc_hand_distance_threshold_slider, self.tc_hand_distance_threshold_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="hand_distance_threshold (cm)",
-                tooltip_text="Unified distance threshold for hand proximity detection.\n"
-                             "Range: 5-50 cm. Default: 25 cm.\n"
-                             "Used for both throw detection (ball leaving hand) and catch detection (ball reaching hand).\n"
-                             "Lower = more sensitive (detects events earlier/closer)\n"
-                             "Higher = less sensitive (requires ball to be farther/closer)\n"
-                             "⚠️ This is the unified threshold you see in debug logs!",
-                range_min=5,
-                range_max=50,
-                initial_value=25,
-                update_func=lambda v: self.update_setting('hand_distance_threshold', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Min Frames Before Catch
-            self.tc_min_frames_before_catch_slider, self.tc_min_frames_before_catch_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Catch Cooldown Frames",
-                tooltip_text="Minimum frames a ball must be in flight after a throw before the same hand can catch it again.\n"
-                             "Range: 0-10 frames. Default: 3.\n"
-                             "Prevents immediate re-catch of the same ball by the throwing hand.\n"
-                             "0 = no cooldown (allows instant re-catch)\n"
-                             "Higher values = longer cooldown period\n"
-                             "⚠️ Set this based on your juggling speed and throw height!",
-                range_min=0,
-                range_max=10,
-                initial_value=3,
-                update_func=lambda v: self.update_setting('min_frames_before_catch', v),
-                is_float=False
-            )
-            row += 1
-
-            # Min Throw Distance (LEGACY - kept for backward compatibility)
-            self.tc_min_throw_distance_slider, self.tc_min_throw_distance_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Throw Distance (cm) [LEGACY]",
-                tooltip_text="LEGACY SETTING - Use 'Throw Distance Threshold' above instead.\n"
-                             "Minimum distance ball must move from wrist to count as a throw/catch.\n"
-                             "Range: 5-50 cm. Default: 20 cm.\n"
-                             "Prevents false throw/catch events when ball is just being held.\n"
-                             "Lower = more sensitive (may trigger false events)\n"
-                             "Higher = less sensitive (may miss real throws)\n"
-                             "⚠️ Set this based on your juggling style and hand movements!",
-                range_min=5,
-                range_max=50,
-                initial_value=20,
-                update_func=lambda v: self.update_setting('min_throw_distance', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Throw YOLO Confidence Threshold (for HELD→IN_FLIGHT transition)
-            self.throw_yolo_confidence_threshold_slider, self.throw_yolo_confidence_threshold_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Throw Detection Confidence",
-                tooltip_text="Minimum YOLO confidence for throw detection (HELD→IN_FLIGHT transition).\n"
-                             "Range: 0.0-1.0. Default: 0.50 (50%).\n"
-                             "This is separate from trajectory tracking confidence.\n"
-                             "Lower = more sensitive throw detection (catches throws earlier)\n"
-                             "Higher = stricter requirements (may miss some throws)\n"
-                             "⚠️ Should be LOWER than trajectory tracking confidence (70%)!",
-                range_min=0,
-                range_max=100,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('throw_yolo_confidence_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Ignore Class Toggle
-            self.tc_ignore_class_toggle = QPushButton("Ignore Class (Treat ball/ball_held Same)")
-            self.tc_ignore_class_toggle.setCheckable(True)
-            self.tc_ignore_class_toggle.setChecked(False)
-            self.tc_ignore_class_toggle.clicked.connect(
-                lambda: self.update_setting('ignore_class',
-                                           1 if self.tc_ignore_class_toggle.isChecked() else 0))
-            self.tc_ignore_class_toggle.setToolTip(
-                "When enabled, the tracking system ignores ML class distinctions.\n"
-                "Both 'ball' and 'ball_held' classes are treated identically.\n"
-                "This means:\n"
-                "• No class-based filtering in detection matching\n"
-                "• No class-based threshold differences\n"
-                "• State determined purely by distance to hands\n"
-                "Use this if YOLO class predictions are unreliable."
-            )
-            layout.addWidget(self.tc_ignore_class_toggle, row, 0, 1, 3)
-            row += 1
-            
-            # Separator
-            layout.addWidget(QLabel("Tracker Distance Limits:"), row, 0, 1, 3)
-            row += 1
-            
-            # Max tracker distance per frame
-            self.tc_max_tracker_distance_slider, self.tc_max_tracker_distance_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Max Tracker Distance (cm)",
-                tooltip_text="Maximum distance a ball tracker can move between frames.\n"
-                             "Range: 10-200cm. Default: 50cm.\n"
-                             "Prevents trackers from flickering to far away balls.\n"
-                             "Lower = stricter tracking, Higher = allows faster movement.",
-                range_min=10,
-                range_max=200,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('max_tracker_distance_per_frame', v / 100.0),  # Convert cm to m
-                is_float=False  # Display as integer cm
-            )
-            row += 1
-            
-            # Separator
-            layout.addWidget(QLabel("Sound Effects:"), row, 0, 1, 3)
-            row += 1
-            
-            # Sound on catches toggle with test button
-            self.tc_sound_on_catch_toggle = QPushButton("Sound on Catches")
-            self.tc_sound_on_catch_toggle.setCheckable(True)
-            self.tc_sound_on_catch_toggle.setChecked(False)
-            self.tc_sound_on_catch_toggle.clicked.connect(lambda: self.update_setting('tc_sound_on_catch', 1 if self.tc_sound_on_catch_toggle.isChecked() else 0))
-            layout.addWidget(self.tc_sound_on_catch_toggle, row, 0, 1, 2)
-            
-            # Test catch sound button
-            self.tc_test_catch_sound_button = QPushButton("🔊 Test")
-            self.tc_test_catch_sound_button.setMaximumWidth(80)
-            self.tc_test_catch_sound_button.clicked.connect(self.test_catch_sound)
-            self.tc_test_catch_sound_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 5px;
-                    border-radius: 3px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #45a049; }
-                QPushButton:pressed { background-color: #2e7d32; }
-            """)
-            layout.addWidget(self.tc_test_catch_sound_button, row, 2)
-            row += 1
-            
-            # Sound on throws toggle with test button
-            self.tc_sound_on_throw_toggle = QPushButton("Sound on Throws")
-            self.tc_sound_on_throw_toggle.setCheckable(True)
-            self.tc_sound_on_throw_toggle.setChecked(False)
-            self.tc_sound_on_throw_toggle.clicked.connect(lambda: self.update_setting('tc_sound_on_throw', 1 if self.tc_sound_on_throw_toggle.isChecked() else 0))
-            layout.addWidget(self.tc_sound_on_throw_toggle, row, 0, 1, 2)
-            
-            # Test throw sound button
-            self.tc_test_throw_sound_button = QPushButton("🔊 Test")
-            self.tc_test_throw_sound_button.setMaximumWidth(80)
-            self.tc_test_throw_sound_button.clicked.connect(self.test_throw_sound)
-            self.tc_test_throw_sound_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 5px;
-                    border-radius: 3px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #45a049; }
-                QPushButton:pressed { background-color: #2e7d32; }
-            """)
-            layout.addWidget(self.tc_test_throw_sound_button, row, 2)
-            row += 1
-            
-            # Name on catches toggle with test button
-            self.tc_name_on_catch_toggle = QPushButton("Name on Catches")
-            self.tc_name_on_catch_toggle.setCheckable(True)
-            self.tc_name_on_catch_toggle.setChecked(False)
-            self.tc_name_on_catch_toggle.clicked.connect(lambda: self.update_setting('tc_name_on_catch', 1 if self.tc_name_on_catch_toggle.isChecked() else 0))
-            layout.addWidget(self.tc_name_on_catch_toggle, row, 0, 1, 2)
-            
-            # Test catch name button
-            self.tc_test_catch_name_button = QPushButton("🔊 Test")
-            self.tc_test_catch_name_button.setMaximumWidth(80)
-            self.tc_test_catch_name_button.clicked.connect(self.test_catch_name)
-            self.tc_test_catch_name_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 5px;
-                    border-radius: 3px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #45a049; }
-                QPushButton:pressed { background-color: #2e7d32; }
-            """)
-            layout.addWidget(self.tc_test_catch_name_button, row, 2)
-            row += 1
-            
-            # Name on throws toggle with test button
-            self.tc_name_on_throw_toggle = QPushButton("Name on Throws")
-            self.tc_name_on_throw_toggle.setCheckable(True)
-            self.tc_name_on_throw_toggle.setChecked(False)
-            self.tc_name_on_throw_toggle.clicked.connect(lambda: self.update_setting('tc_name_on_throw', 1 if self.tc_name_on_throw_toggle.isChecked() else 0))
-            layout.addWidget(self.tc_name_on_throw_toggle, row, 0, 1, 2)
-            
-            # Test throw name button
-            self.tc_test_throw_name_button = QPushButton("🔊 Test")
-            self.tc_test_throw_name_button.setMaximumWidth(80)
-            self.tc_test_throw_name_button.clicked.connect(self.test_throw_name)
-            self.tc_test_throw_name_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 5px;
-                    border-radius: 3px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #45a049; }
-                QPushButton:pressed { background-color: #2e7d32; }
-            """)
-            layout.addWidget(self.tc_test_throw_name_button, row, 2)
-            
-            return section
-        
-        def create_color_tracker_weights_section(self):
-            """Create the Color Tracker Weights section"""
-            section = CollapsibleGroupBox("🎯 Color Tracker Weights", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Info label
-            info_label = QLabel("ℹ️ Control how the color tracker chooses which YOLO detection to assign to each ball")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
-            
-            # Separator for euclidean matching settings
-            layout.addWidget(QLabel("Temporal Consistency (prevents ball identity swaps):"), row, 0, 1, 3)
-            row += 1
-            
-            # Temporal Consistency Bonus
-            self.ct_temporal_consistency_bonus_slider, self.ct_temporal_consistency_bonus_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Temporal Consistency Bonus",
-                tooltip_text="Bonus to reduce effective distance for detections near previous position.\n"
-                             "Range: 0.0-1.0. Default: 0.25.\n"
-                             "Higher values create stronger 'stickiness' to prevent identity swaps.\n"
-                             "⚠️ Increase to 0.40-0.50 to fix the yellow ball tracking issue!",
-                range_min=0,
-                range_max=100,
-                initial_value=25,
-                update_func=lambda v: self.update_setting('temporal_consistency_bonus', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Spatial Threshold
-            self.ct_spatial_threshold_slider, self.ct_spatial_threshold_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Spatial Threshold (cm)",
-                tooltip_text="Maximum distance to apply temporal consistency bonus.\n"
-                             "Range: 10-100cm. Default: 40cm.\n"
-                             "Larger values apply the bonus over greater distances.\n"
-                             "⚠️ Increase to 60-70cm to fix the yellow ball tracking issue!",
-                range_min=10,
-                range_max=100,
-                initial_value=40,
-                update_func=lambda v: self.update_setting('spatial_threshold', v / 100.0),  # Convert cm to m
-                is_float=False
-            )
-            row += 1
-            
-            # Color Sample Radius
-            self.ct_color_sample_radius_slider, self.ct_color_sample_radius_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Color Sample Radius (pixels)",
-                tooltip_text="Radius for color sampling from detection center in the euclidean color matching system.\n"
-                             "Range: 1-5 pixels. Default: 1 (3x3 sample).\n"
-                             "Radius of 1 = 3x3 pixel sample (9 pixels total)\n"
-                             "Radius of 2 = 5x5 pixel sample (25 pixels total)\n"
-                             "Radius of 3 = 7x7 pixel sample (49 pixels total)\n"
-                             "Lower values = faster processing and more precise color detection from exact center.\n"
-                             "Higher values = more robust to noise but slower and may include surrounding colors.\n"
-                             "⚠️ Increasing this will reduce FPS! Only increase if color detection is unreliable.",
-                range_min=1,
-                range_max=5,
-                initial_value=1,
-                update_func=lambda v: self.update_setting('color_sample_radius', v),
-                is_float=False
-            )
-            row += 1
-            
-            # Separator for identity swap prevention settings
-            layout.addWidget(QLabel("Identity Swap Prevention:"), row, 0, 1, 3)
-            row += 1
-            
-            # Max Euclidean Distance
-            self.ct_max_euclidean_distance_slider, self.ct_max_euclidean_distance_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Max Euclidean Distance",
-                tooltip_text="Maximum euclidean color distance to accept a match.\n"
-                             "Range: 0.00-0.50. Default: 0.15.\n"
-                             "Rejects matches with poor color similarity.\n"
-                             "Lower = stricter color matching (prevents identity swaps).\n"
-                             "Set to 0 to disable this check.\n"
-                             "⚠️ Increase to 0.15-0.20 to prevent trackers from swapping identities!",
-                range_min=0,
-                range_max=50,
-                initial_value=15,
-                update_func=lambda v: self.update_setting('max_euclidean_distance', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Min Euclidean Color Score
-            self.ct_min_euclidean_color_score_slider, self.ct_min_euclidean_color_score_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Euclidean Color Score",
-                tooltip_text="Minimum color match score to accept a euclidean match.\n"
-                             "Range: 0.00-1.00. Default: 0.30.\n"
-                             "Requires at least 30% color similarity.\n"
-                             "Higher = stricter color matching (prevents identity swaps).\n"
-                             "Set to 0 to disable this check.\n"
-                             "⚠️ Increase to 0.30-0.40 to prevent trackers from swapping identities!",
-                range_min=0,
-                range_max=100,
-                initial_value=30,
-                update_func=lambda v: self.update_setting('min_euclidean_color_score', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Max Depth Jump Strict
-            self.ct_max_depth_jump_strict_slider, self.ct_max_depth_jump_strict_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Max Depth Jump Strict (cm)",
-                tooltip_text="Stricter maximum depth change per frame for Kalman updates.\n"
-                             "Range: 0-50cm. Default: 20cm.\n"
-                             "Rejects detections with suspicious depth jumps.\n"
-                             "Prevents sensor errors from corrupting Kalman filter.\n"
-                             "Set to 0 to use default 30cm threshold.\n"
-                             "⚠️ Set to 20cm for stricter depth validation!",
-                range_min=0,
-                range_max=50,
-                initial_value=20,
-                update_func=lambda v: self.update_setting('max_depth_jump_strict', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Separator for ball separation and hand change settings
-            layout.addWidget(QLabel("Ball Separation & Hand Change:"), row, 0, 1, 3)
-            row += 1
-            
-            # Min Color Confidence Override
-            self.ct_min_color_confidence_override_slider, self.ct_min_color_confidence_override_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Color Confidence Override",
-                tooltip_text="Minimum color match confidence required for override (0.0-1.0).\n"
-                             "Range: 0.0-1.0. Default: 0.35.\n"
-                             "Higher values require stronger color match to override tracker.\n"
-                             "Lower values allow weaker color matches to override.",
-                range_min=0,
-                range_max=100,
-                initial_value=35,
-                update_func=lambda v: self.update_setting('min_color_confidence_override', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Min Ball Separation
-            self.ct_min_ball_separation_slider, self.ct_min_ball_separation_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Ball Separation (cm)",
-                tooltip_text="Minimum separation between balls in meters (except same hand).\n"
-                             "Range: 5-50cm. Default: 15cm.\n"
-                             "Prevents balls from being placed too close together.\n"
-                             "Lower values allow balls to be closer (may cause confusion).\n"
-                             "Higher values enforce more separation (more conservative).",
-                range_min=5,
-                range_max=50,
-                initial_value=15,
-                update_func=lambda v: self.update_setting('min_ball_separation', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Min Hand Change Distance
-            self.ct_min_hand_change_distance_slider, self.ct_min_hand_change_distance_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Hand Change Distance (cm)",
-                tooltip_text="Minimum movement distance for hand change detection (meters).\n"
-                             "Range: 10-50cm. Default: 25cm.\n"
-                             "Distance a ball must move to be considered as changing hands.\n"
-                             "Lower values detect hand changes more easily.\n"
-                             "Higher values require more movement to confirm hand change.",
-                range_min=10,
-                range_max=50,
-                initial_value=25,
-                update_func=lambda v: self.update_setting('min_hand_change_distance', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            return section
-        
-        def create_override_detection_section(self):
-            """Create the Override Detection Settings section"""
-            section = CollapsibleGroupBox("⚡ Override Detection", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Info label
-            info_label = QLabel("ℹ️ Force tracker placement when high-confidence detections exist\n"
-                               "Separate thresholds for 'ball' (in-air) and 'ball_held' detections")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
-            
-            # Separator for 'ball' (in-air) class
-            separator_label = QLabel("'Ball' (In-Air) Override Thresholds:")
-            separator_label.setStyleSheet("font-weight: bold; color: #4CAF50;")
-            layout.addWidget(separator_label, row, 0, 1, 3)
-            row += 1
-            
-            # Ball confidence threshold
-            self.od_ball_confidence_slider, self.od_ball_confidence_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="'Ball' Min Confidence",
-                tooltip_text="Minimum YOLO confidence for 'ball' (in-air) detections to override tracker.\n"
-                             "Range: 0.00-1.00. Default: 0.70.\n"
-                             "Lower values = more aggressive override for in-air balls.\n"
-                             "Use lower threshold if in-air balls are not being tracked reliably.",
-                range_min=0,
-                range_max=100,
-                initial_value=70,
-                update_func=lambda v: self.update_setting('override_ball_confidence_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Ball color threshold
-            self.od_ball_color_slider, self.od_ball_color_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="'Ball' Min Color Score",
-                tooltip_text="Minimum color match score for 'ball' (in-air) detections to override tracker.\n"
-                             "Range: 0.00-1.00. Default: 0.80.\n"
-                             "Lower values = more lenient color matching for in-air balls.\n"
-                             "Combine with confidence for robust in-air detection.",
-                range_min=0,
-                range_max=100,
-                initial_value=80,
-                update_func=lambda v: self.update_setting('override_ball_color_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Separator for 'ball_held' class
-            separator_label2 = QLabel("'Ball Held' Override Thresholds:")
-            separator_label2.setStyleSheet("font-weight: bold; color: #FF9800;")
-            layout.addWidget(separator_label2, row, 0, 1, 3)
-            row += 1
-            
-            # Ball_held confidence threshold
-            self.od_ball_held_confidence_slider, self.od_ball_held_confidence_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="'Ball Held' Min Confidence",
-                tooltip_text="Minimum YOLO confidence for 'ball_held' detections to override tracker.\n"
-                             "Range: 0.00-1.00. Default: 0.70.\n"
-                             "Higher values = stricter override for held balls (reduces false positives).\n"
-                             "Use higher threshold to avoid tracking hands/clothing as held balls.",
-                range_min=0,
-                range_max=100,
-                initial_value=70,
-                update_func=lambda v: self.update_setting('override_ball_held_confidence_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Ball_held color threshold
-            self.od_ball_held_color_slider, self.od_ball_held_color_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="'Ball Held' Min Color Score",
-                tooltip_text="Minimum color match score for 'ball_held' detections to override tracker.\n"
-                             "Range: 0.00-1.00. Default: 0.80.\n"
-                             "Higher values = stricter color matching for held balls.\n"
-                             "Prevents tracking wrong objects when ball is in hand.",
-                range_min=0,
-                range_max=100,
-                initial_value=80,
-                update_func=lambda v: self.update_setting('override_ball_held_color_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Info about how it works
-            how_it_works_label = QLabel("💡 How it works: The system uses class-specific thresholds to override trackers. "
-                                        "'Ball' (in-air) and 'Ball Held' detections can have different confidence and color "
-                                        "requirements, allowing you to tune each independently for optimal tracking.")
-            how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
-            how_it_works_label.setWordWrap(True)
-            layout.addWidget(how_it_works_label, row, 0, 1, 3)
-            
-            return section
-        
-        def create_held_color_blob_section(self):
-            """Create the Held Color Blob Detection section"""
-            section = CollapsibleGroupBox("🤲 Held Ball Color Detection", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Info label
-            info_label = QLabel("ℹ️ Control how the system searches for color blobs when a ball is marked as held\n"
-                               "These settings prevent trackers from jumping to wrong objects (like pants)")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
-            
-            # Search radius
-            self.hcb_search_radius_slider, self.hcb_search_radius_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Search Radius (pixels)",
-                tooltip_text="Radius in pixels to search for color blob around hand when ball is held.\n"
-                             "Range: 40-200 pixels. Default: 120 pixels.\n"
-                             "Larger values search wider area but may find wrong objects.\n"
-                             "Smaller values are more precise but may miss the ball.\n"
-                             "⚠️ Reduce to 80-100px if tracker jumps to wrong objects!",
-                range_min=40,
-                range_max=200,
-                initial_value=120,
-                update_func=lambda v: self.update_setting('held_color_search_radius', v),
-                is_float=False
-            )
-            row += 1
-            
-            # Minimum color score
-            self.hcb_min_color_score_slider, self.hcb_min_color_score_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Color Match Score",
-                tooltip_text="Minimum color match score to accept a color blob when ball is held.\n"
-                             "Range: 0.00-1.00. Default: 0.30.\n"
-                             "Higher values = stricter color matching (fewer false positives).\n"
-                             "Lower values = more lenient (may track wrong objects).\n"
-                             "⚠️ Increase to 0.40-0.50 if tracker jumps to pants/clothing!",
-                range_min=0,
-                range_max=100,
-                initial_value=30,
-                update_func=lambda v: self.update_setting('held_color_min_score', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Maximum distance from hand
-            self.hcb_max_distance_slider, self.hcb_max_distance_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Max Distance from Hand (cm)",
-                tooltip_text="Maximum distance from hand to accept a color blob when ball is held.\n"
-                             "Range: 10-50cm. Default: 25cm.\n"
-                             "Prevents tracking distant objects that match the color.\n"
-                             "Lower values = stricter proximity requirement.\n"
-                             "⚠️ Reduce to 15-20cm if tracker jumps to distant objects!",
-                range_min=10,
-                range_max=50,
-                initial_value=25,
-                update_func=lambda v: self.update_setting('held_color_max_distance', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Info about how it works
-            how_it_works_label = QLabel("💡 How it works: When a ball is marked as held, the system searches for "
-                                        "a color blob near the hand. These settings ensure it only accepts blobs "
-                                        "that match the ball's color well AND are close to the hand, preventing "
-                                        "false matches with clothing or other objects.")
-            how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
-            how_it_works_label.setWordWrap(True)
-            layout.addWidget(how_it_works_label, row, 0, 1, 3)
-            
-            return section
-        
-        def create_trajectory_section(self):
-            """Create the Trajectory Settings section"""
-            section = CollapsibleGroupBox("🎯 Trajectory Settings", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Info label
-            info_label = QLabel("ℹ️ Configure trajectory prediction physics and search parameters")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
-            
-            # Gravity
-            self.traj_gravity_slider, self.traj_gravity_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Gravity (m/s²)",
-                tooltip_text="Gravitational acceleration for trajectory prediction.\n"
-                             "Range: 5.0-15.0 m/s². Default: 9.81 m/s².\n"
-                             "Earth gravity is 9.81 m/s². Adjust if needed for calibration.",
-                range_min=50,
-                range_max=150,
-                initial_value=98,
-                update_func=lambda v: self.update_setting('traj_gravity', v / 10.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Time Step
-            self.traj_time_step_slider, self.traj_time_step_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Time Step (ms)",
-                tooltip_text="Time between trajectory prediction points.\n"
-                             "Range: 0.01-0.10 s. Default: 0.033 s (30 FPS).\n"
-                             "Smaller = more points, smoother curve, slower computation.",
-                range_min=10,
-                range_max=100,
-                initial_value=33,
-                update_func=lambda v: self.update_setting('traj_time_step', v / 1000.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Max Duration
-            self.traj_max_time_slider, self.traj_max_time_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Max Duration (s)",
-                tooltip_text="Maximum trajectory prediction duration.\n"
-                             "Range: 1.0-5.0 s. Default: 3.0 s.\n"
-                             "Longer = more predicted points, but may be less accurate.",
-                range_min=10,
-                range_max=50,
-                initial_value=30,
-                update_func=lambda v: self.update_setting('traj_max_time', v / 10.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Search Radius
-            self.traj_search_radius_slider, self.traj_search_radius_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Search Radius (cm)",
-                tooltip_text="Search radius along trajectory for ball detection.\n"
-                             "Range: 0.05-0.50 m. Default: 0.15 m (15 cm).\n"
-                             "Larger = more forgiving but may match wrong objects.",
-                range_min=5,
-                range_max=50,
-                initial_value=15,
-                update_func=lambda v: self.update_setting('traj_search_radius', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Min Points for Prediction
-            self.traj_min_points_for_prediction_slider, self.traj_min_points_for_prediction_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Min Points for Prediction",
-                tooltip_text="Minimum trajectory points before full physics prediction.\n"
-                             "Range: 2-5 points. Default: 3.\n"
-                             "2 points = linear, 3+ = parabolic arc with gravity.",
-                range_min=2,
-                range_max=5,
-                initial_value=3,
-                update_func=lambda v: self.update_setting('traj_min_points_for_prediction', v),
-                is_float=False
-            )
-            row += 1
-            
-            # Color Match Threshold
-            self.traj_color_match_threshold_slider, self.traj_color_match_threshold_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Color Match Threshold",
-                tooltip_text="Minimum color match score for trajectory verification.\n"
-                             "Range: 0.0-1.0. Default: 0.50 (50%).\n"
-                             "Higher = stricter color matching, fewer false positives.",
-                range_min=0,
-                range_max=100,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('traj_color_match_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # YOLO Confidence Threshold for Normal Tracking
-            self.traj_yolo_confidence_threshold_slider, self.traj_yolo_confidence_threshold_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="YOLO Confidence Threshold",
-                tooltip_text="Minimum YOLO confidence for normal throw detection (non-override).\n"
-                             "Range: 0.0-1.0. Default: 0.70 (70%).\n"
-                             "This is separate from override thresholds and used for regular tracking.\n"
-                             "Lower = more sensitive throw detection, Higher = stricter requirements.",
-                range_min=0,
-                range_max=100,
-                initial_value=70,
-                update_func=lambda v: self.update_setting('traj_yolo_confidence_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Velocity Estimation Time
-            self.traj_velocity_estimation_time_slider, self.traj_velocity_estimation_time_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Velocity Estimation Time (ms)",
-                tooltip_text="Time window for initial velocity estimation.\n"
-                             "Range: 0.05-0.30 s. Default: 0.10 s.\n"
-                             "Shorter = more responsive, Longer = more stable.",
-                range_min=5,
-                range_max=30,
-                initial_value=10,
-                update_func=lambda v: self.update_setting('traj_velocity_estimation_time', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Max Search Distance
-            self.traj_max_search_distance_slider, self.traj_max_search_distance_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Max Search Distance (cm)",
-                tooltip_text="Maximum distance to search along trajectory.\n"
-                             "Range: 0.20-1.00 m. Default: 0.50 m (50 cm).\n"
-                             "Limits how far ahead we look for the ball.",
-                range_min=20,
-                range_max=100,
-                initial_value=50,
-                update_func=lambda v: self.update_setting('traj_max_search_distance', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Separator for visualization toggles
-            layout.addWidget(QLabel("Threshold Visualization:"), row, 0, 1, 3)
-            row += 1
-            
-            # Show unified hand_distance_threshold toggle
-            self.show_hand_distance_threshold_toggle = QPushButton("show_hand_distance_threshold")
-            self.show_hand_distance_threshold_toggle.setCheckable(True)
-            self.show_hand_distance_threshold_toggle.setChecked(True)
-            self.show_hand_distance_threshold_toggle.clicked.connect(
-                lambda: self.update_setting('show_hand_distance_threshold',
-                                           1 if self.show_hand_distance_threshold_toggle.isChecked() else 0))
-            layout.addWidget(self.show_hand_distance_threshold_toggle, row, 0, 1, 3)
-            row += 1
-            
-            # Show hand velocity zone toggle
-            self.show_hand_velocity_zone_toggle = QPushButton("show_hand_velocity_zone")
-            self.show_hand_velocity_zone_toggle.setCheckable(True)
-            self.show_hand_velocity_zone_toggle.setChecked(False)
-            self.show_hand_velocity_zone_toggle.clicked.connect(
-                lambda: self.update_setting('show_hand_velocity_zone',
-                                           1 if self.show_hand_velocity_zone_toggle.isChecked() else 0))
-            layout.addWidget(self.show_hand_velocity_zone_toggle, row, 0, 1, 3)
-            row += 1
-            
-            # Info about visualization
-            viz_info_label = QLabel("ℹ️ Blue circle = unified hand distance threshold (around hands)")
-            viz_info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
-            viz_info_label.setWordWrap(True)
-            layout.addWidget(viz_info_label, row, 0, 1, 3)
-            
-            return section
-        
-        def create_hand_velocity_section(self):
-            """Create the Hand Velocity Tracking section"""
-            section = CollapsibleGroupBox("🤚 Hand Velocity Tracking", collapsed=False)
-            layout = QGridLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            row = 0
-            
-            # Info label
-            info_label = QLabel("ℹ️ Use hand movement to predict throws and lower detection thresholds")
-            info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
-            info_label.setWordWrap(True)
-            layout.addWidget(info_label, row, 0, 1, 3)
-            row += 1
-            
-            # Enable toggle
-            self.hand_velocity_enabled_toggle = QPushButton("Enable Hand Velocity Tracking")
-            self.hand_velocity_enabled_toggle.setCheckable(True)
-            self.hand_velocity_enabled_toggle.setChecked(True)
-            self.hand_velocity_enabled_toggle.clicked.connect(
-                lambda: self.update_setting('hand_velocity_enabled',
-                                           1 if self.hand_velocity_enabled_toggle.isChecked() else 0))
-            layout.addWidget(self.hand_velocity_enabled_toggle, row, 0, 1, 3)
-            row += 1
-            
-            # Velocity Threshold
-            self.hand_velocity_threshold_slider, self.hand_velocity_threshold_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Velocity Threshold (m/s)",
-                tooltip_text="Minimum hand speed to trigger enhanced throw detection.\n"
-                             "Range: 0.1-5.0 m/s. Default: 1.0 m/s.\n"
-                             "Lower = more sensitive (triggers with slower hand movement)\n"
-                             "Higher = less sensitive (requires faster hand movement)",
-                range_min=10,
-                range_max=500,
-                initial_value=100,
-                update_func=lambda v: self.update_setting('hand_velocity_threshold', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Confidence Reduction
-            self.hand_velocity_confidence_reduction_slider, self.hand_velocity_confidence_reduction_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Confidence Reduction",
-                tooltip_text="Amount to reduce confidence threshold when hand is moving fast.\n"
-                             "Range: 0.0-0.9. Default: 0.3 (30% reduction).\n"
-                             "Higher = more aggressive detection (much lower thresholds)\n"
-                             "Lower = more conservative detection\n"
-                             "⚠️ Values above 0.7 may cause false positives!",
-                range_min=0,
-                range_max=90,
-                initial_value=30,
-                update_func=lambda v: self.update_setting('hand_velocity_confidence_reduction', v / 100.0),
-                is_float=True
-            )
-            row += 1
-            
-            # Detection Radius
-            self.hand_velocity_detection_radius_slider, self.hand_velocity_detection_radius_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Detection Radius (cm)",
-                tooltip_text="Radius of detection zone in direction of hand movement.\n"
-                             "Range: 5-100 cm. Default: 15 cm.\n"
-                             "Defines the area where reduced thresholds apply.\n"
-                             "Larger = wider detection zone, smaller = more precise\n"
-                             "⚠️ Very large values may affect unrelated detections!",
-                range_min=5,
-                range_max=100,
-                initial_value=15,
-                update_func=lambda v: self.update_setting('hand_velocity_detection_radius', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Distance Reduction
-            self.hand_velocity_distance_reduction_slider, self.hand_velocity_distance_reduction_label = self._create_slider_widget(
-                parent_layout=layout,
-                row=row,
-                label_text="Distance Reduction (cm)",
-                tooltip_text="Reduced hand_distance_threshold when hand velocity zone is active.\n"
-                             "Range: 0-30 cm. Default: 10 cm.\n"
-                             "This is the effective hand_distance_threshold used for throw detection\n"
-                             "when the ball is within the velocity zone (moving hand direction).\n"
-                             "0 = no distance requirement (immediate throw detection)\n"
-                             "Lower = allows throws to be detected closer to the hand\n"
-                             "Higher = requires ball to be farther from hand even in velocity zone\n"
-                             "⚠️ Should be lower than normal hand_distance_threshold (25cm)!",
-                range_min=0,
-                range_max=30,
-                initial_value=10,
-                update_func=lambda v: self.update_setting('hand_velocity_distance_reduction', v / 100.0),
-                is_float=False
-            )
-            row += 1
-            
-            # Ignore Class Toggle
-            self.hand_velocity_ignore_class_toggle = QPushButton("Ignore Class Requirement")
-            self.hand_velocity_ignore_class_toggle.setCheckable(True)
-            self.hand_velocity_ignore_class_toggle.setChecked(False)
-            self.hand_velocity_ignore_class_toggle.clicked.connect(
-                lambda: self.update_setting('hand_velocity_ignore_class',
-                                           1 if self.hand_velocity_ignore_class_toggle.isChecked() else 0))
-            self.hand_velocity_ignore_class_toggle.setToolTip(
-                "When enabled, detections in the velocity direction don't need to be 'ball' class.\n"
-                "This allows 'ball_held' detections to trigger throws when hand is moving fast.\n"
-                "Use this if throws are being missed due to class misclassification.")
-            layout.addWidget(self.hand_velocity_ignore_class_toggle, row, 0, 1, 3)
-            row += 1
-            
-            # Info about how it works
-            how_it_works_label = QLabel("💡 How it works: The system tracks the last 3 hand positions to calculate velocity. "
-                                        "When a hand holding a ball moves faster than the threshold, detection requirements "
-                                        "are lowered for balls appearing in the direction of movement. This helps catch throws "
-                                        "earlier, even with lower confidence detections.")
-            how_it_works_label.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
-            how_it_works_label.setWordWrap(True)
-            layout.addWidget(how_it_works_label, row, 0, 1, 3)
-            
-            return section
-
-        def _calculate_hsv_range_from_rgb(self, rgb):
-            """Calculate appropriate HSV range from RGB color values."""
-            import cv2
-            import numpy as np
-            
-            # Convert RGB to HSV
-            rgb_array = np.uint8([[rgb]])  # Shape: (1, 1, 3)
-            hsv_array = cv2.cvtColor(rgb_array, cv2.COLOR_RGB2HSV)
-            h, s, v = hsv_array[0][0]
-            
-            # Define hue tolerance based on color characteristics
-            # Colors near red (hue ~0 or ~180) need special handling due to wrap-around
-            hue_tolerance = 15  # degrees
-            
-            # Calculate min/max hue with wrap-around handling
-            min_hue = float(max(0, h - hue_tolerance))
-            max_hue = float(min(180, h + hue_tolerance))
-            
-            # For colors near red (hue < 15 or hue > 165), we need to handle wrap-around
-            if h < 15:
-                # Red wraps around: use range like [165, 180] + [0, 15]
-                min_hue = float(max(0, 180 - (15 - h)))
-                max_hue = float(h + hue_tolerance)
-            elif h > 165:
-                # Red wraps around: use range like [165, 180] + [0, 15]
-                min_hue = float(h - hue_tolerance)
-                max_hue = float(min(15, h + hue_tolerance - 180))
-            
-            # Saturation and value ranges (more forgiving)
-            min_s = float(max(30, s - 80))
-            max_s = 255.0
-            min_v = float(max(30, v - 80))
-            max_v = 255.0
-            
-            return [min_hue, min_s, min_v], [max_hue, max_s, max_v]
-        
-        def create_ball_profiles_section(self):
-            """Create the Ball Profiles section for tracking configuration"""
-            section = CollapsibleGroupBox("🎨 Ball Profiles", collapsed=False)
-            layout = QVBoxLayout()
-            section.get_content_layout().addLayout(layout)
-            
-            # Load ball profiles from ball_settings.json
-            import json
-            import os
-            # Path should be hub/ball_settings.json (one directory up from components/)
-            ball_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ball_settings.json")
-            ball_settings_path = os.path.normpath(ball_settings_path)
-            
-            try:
-                with open(ball_settings_path, 'r') as f:
-                    self.ball_profiles = json.load(f)
-                print(f"✅ Loaded ball profiles from {ball_settings_path}")
-                print(f"   Profiles loaded: {list(self.ball_profiles.keys())}")
-            except Exception as e:
-                print(f"❌ Error loading ball_settings.json: {e}")
-                self.ball_profiles = {}
-            
-            # Also get profiles from ColorProfileManager to ensure we have all colors
-            from .color_profile_manager import ColorProfileManager
-            color_manager = ColorProfileManager()
-            
-            # Merge profiles - calculate proper HSV ranges for new colors OR fix existing ones with default 0-180 range
-            profiles_updated = False
-            for profile in color_manager.profiles:
-                ball_name = profile['name']
-                
-                # Check if profile needs updating (new or has default 0-180 hue range)
-                needs_update = False
-                if ball_name not in self.ball_profiles:
-                    needs_update = True
-                    print(f"⚠️ Adding missing profile '{ball_name}'")
-                else:
-                    # Check if it has the default 0-180 hue range (needs fixing)
-                    existing_min_hue = self.ball_profiles[ball_name]['min_hsv'][0]
-                    existing_max_hue = self.ball_profiles[ball_name]['max_hsv'][0]
-                    if existing_min_hue == 0.0 and existing_max_hue == 180.0:
-                        needs_update = True
-                        print(f"⚠️ Fixing profile '{ball_name}' with default 0-180 range")
-                    else:
-                        print(f"✓ Profile '{ball_name}' already has custom hue range: {existing_min_hue:.1f}-{existing_max_hue:.1f}")
-                
-                if needs_update:
-                    # Calculate HSV range from RGB color
-                    rgb = profile.get('rgb', [255, 255, 255])
-                    min_hsv, max_hsv = self._calculate_hsv_range_from_rgb(rgb)
-                    
-                    print(f"   RGB: {rgb} -> Hue range: {min_hsv[0]:.1f}-{max_hsv[0]:.1f}")
-                    
-                    # Preserve enabled state if profile already exists
-                    enabled = self.ball_profiles[ball_name].get('enabled', True) if ball_name in self.ball_profiles else profile.get('enabled', True)
-                    
-                    self.ball_profiles[ball_name] = {
-                        'enabled': enabled,
-                        'min_hsv': min_hsv,
-                        'max_hsv': max_hsv
-                    }
-                    profiles_updated = True
-            
-            # Save updated ball_settings.json if we updated any profiles
-            if profiles_updated:
-                try:
-                    with open(ball_settings_path, 'w') as f:
-                        json.dump(self.ball_profiles, f, indent=4)
-                    print(f"✅ Ball settings saved with updated HSV ranges")
-                except Exception as e:
-                    print(f"❌ Error saving ball_settings.json: {e}")
-            else:
-                print(f"ℹ️ No profile updates needed")
-            
-            # Store checkbox and slider references
-            self.ball_checkboxes = {}
-            self.ball_hue_sliders = {}
-            
-            # Create a widget for each ball profile
-            for ball_name in sorted(self.ball_profiles.keys()):
-                ball_group = QGroupBox(ball_name.capitalize())
-                ball_layout = QGridLayout(ball_group)
-                
-                # Checkbox for enabling/disabling this ball
-                checkbox = QPushButton(f"Track {ball_name.capitalize()}")
-                checkbox.setCheckable(True)
-                # Read enabled state from ball_settings.json
-                is_enabled = self.ball_profiles[ball_name].get('enabled', True)
-                checkbox.setChecked(is_enabled)
-                checkbox.clicked.connect(lambda checked, name=ball_name: self.toggle_ball_tracking(name, checked))
-                self.ball_checkboxes[ball_name] = checkbox
-                ball_layout.addWidget(checkbox, 0, 0, 1, 3)
-                
-                # Get current calibration values
-                hsv_data = self.ball_profiles[ball_name]
-                avg_hue = hsv_data.get('avg_hue', -1.0)
-                avg_sat = hsv_data.get('avg_saturation', -1.0)
-                
-                # Display calibrated values (read-only)
-                row = 1
-                
-                # Average Hue display
-                ball_layout.addWidget(QLabel("Average Hue:"), row, 0)
-                if avg_hue >= 0:
-                    hue_value_label = QLabel(f"{avg_hue:.1f}°")
-                    hue_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-                else:
-                    hue_value_label = QLabel("Not calibrated")
-                    hue_value_label.setStyleSheet("color: #f44336;")
-                ball_layout.addWidget(hue_value_label, row, 1, 1, 2)
-                row += 1
-                
-                # Average Saturation display
-                ball_layout.addWidget(QLabel("Average Saturation:"), row, 0)
-                if avg_sat >= 0:
-                    sat_value_label = QLabel(f"{avg_sat:.1f}")
-                    sat_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-                else:
-                    sat_value_label = QLabel("Not calibrated")
-                    sat_value_label.setStyleSheet("color: #f44336;")
-                ball_layout.addWidget(sat_value_label, row, 1, 1, 2)
-                row += 1
-                
-                # Store label references for updates
-                if not hasattr(self, 'ball_calibration_labels'):
-                    self.ball_calibration_labels = {}
-                self.ball_calibration_labels[ball_name] = {
-                    'hue': hue_value_label,
-                    'saturation': sat_value_label
-                }
-                
-                # Calibrate button
-                calibrate_button = QPushButton("🎯 Calibrate Color")
-                calibrate_button.setStyleSheet("""
-                    QPushButton {
-                        background-color: #2196F3;
-                        color: white;
-                        padding: 8px;
-                        border-radius: 4px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover { background-color: #1976D2; }
-                    QPushButton:pressed { background-color: #0D47A1; }
-                """)
-                calibrate_button.clicked.connect(lambda checked, name=ball_name: self.start_color_calibration(name))
-                ball_layout.addWidget(calibrate_button, row, 0, 1, 3)
-                row += 1
-                
-                # Info label
-                info_label = QLabel("ℹ️ Click on a ball in the video feed to calibrate")
-                info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
-                info_label.setWordWrap(True)
-                ball_layout.addWidget(info_label, row, 0, 1, 3)
-                
-                layout.addWidget(ball_group)
-            
-            # Auto-calibrate button
-            auto_cal_button = QPushButton("🎯 Auto-Calibrate from Current Colors")
-            auto_cal_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #FF9800;
-                    color: white;
-                    padding: 10px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #F57C00; }
-            """)
-            auto_cal_button.clicked.connect(self.auto_calibrate_hues)
-            layout.addWidget(auto_cal_button)
-            
-            return section
-
-        def toggle_ball_tracking(self, ball_name: str, enabled: bool):
-            """Toggle tracking for a specific ball color"""
-            print(f"🔄 {'Enabling' if enabled else 'Disabling'} tracking for {ball_name}")
-            
-            # Update the ball_profiles dict
-            if ball_name in self.ball_profiles:
-                self.ball_profiles[ball_name]['enabled'] = enabled
-                # Save to ball_settings.json
-                self.save_ball_settings()
-                print(f"💾 Updated ball_profiles and saved to file: {ball_name} enabled={enabled}")
-            else:
-                print(f"⚠️ WARNING: {ball_name} not found in ball_profiles!")
-            
-            # Send command to engine via UDP
-            self.udp_client.send_setting(f"track_{ball_name}", 1 if enabled else 0)
-            print(f"📤 Sent UDP command: track_{ball_name}={1 if enabled else 0}")
-            
-            # Auto-save settings
+            # Save current tracker settings before switching
             if not self._loading_settings:
-                self.save_settings()
-
-        def start_color_calibration(self, ball_name: str):
-            """Start color calibration for a specific ball"""
-            print(f"🎯 Starting color calibration for {ball_name}")
-            print(f"   Please click on a {ball_name} ball in the video feed")
+                current_settings = self.get_current_settings()
+                self.settings_manager.save_settings(self.current_tracker, current_settings)
             
-            # TODO: This would typically trigger a mode in the UI where the next click
-            # on the video feed is captured and sent to the engine for calibration
-            # For now, just show a message
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(
-                self,
-                "Color Calibration",
-                f"Color calibration for {ball_name} ball:\n\n"
-                f"1. Make sure a {ball_name} ball is visible in the video feed\n"
-                f"2. Click directly on the ball in the video window\n"
-                f"3. The system will sample the center pixels and calibrate\n\n"
-                f"Note: This feature requires the video overlay to be active."
-            )
-
-        def save_ball_settings(self):
-            """Save ball profiles to ball_settings.json"""
-            import json
-            import os
-            # Path should be hub/ball_settings.json (one directory up from components/)
-            ball_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ball_settings.json")
-            ball_settings_path = os.path.normpath(ball_settings_path)
+            # Update current tracker
+            self.current_tracker = new_tracker
             
-            try:
-                with open(ball_settings_path, 'w') as f:
-                    json.dump(self.ball_profiles, f, indent=4)
-                print(f"✅ Ball settings saved to {ball_settings_path}")
-            except Exception as e:
-                print(f"❌ Error saving ball settings: {e}")
-
-        def auto_calibrate_hues(self):
-            """Auto-calibrate hue ranges from current color calibration"""
-            # This will trigger the existing color calibration system to update hue ranges
-            # for all enabled balls
-            print("🎯 Auto-calibrating hue ranges from current ball colors...")
+            # Hide all tracker sections
+            self.hide_all_tracker_sections()
             
-            # Send command to engine to recalculate hue ranges from current samples
-            command = juggler_pb2.CommandRequest()
-            command.type = juggler_pb2.CommandRequest.CommandType.ENABLE_FEATURE
-            command.feature_name = "recalculate_hue_ranges"
+            # Show new tracker sections
+            self.show_tracker_sections(new_tracker)
             
-            try:
-                response = self.zmq_client.send_command(command)
-                if response.success:
-                    print("✅ Hue ranges auto-calibrated successfully")
-                    # Reload ball settings to update UI
-                    self.reload_ball_profiles()
-                else:
-                    print(f"❌ Auto-calibration failed: {response.message}")
-            except Exception as e:
-                print(f"❌ Error during auto-calibration: {e}")
-
-        def reload_ball_profiles(self):
-            """Reload ball profiles from ball_settings.json and update sliders"""
-            import json
-            import os
-            from PyQt6.QtWidgets import QApplication
-            # Path should be hub/ball_settings.json (one directory up from components/)
-            ball_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ball_settings.json")
-            ball_settings_path = os.path.normpath(ball_settings_path)
+            # Load and apply new tracker settings
+            new_settings = self.settings_manager.load_settings(new_tracker)
+            if new_settings:
+                self._loading_settings = True
+                self.apply_settings(new_settings)
+                self._loading_settings = False
             
-            print(f"🔄 reload_ball_profiles() called - reading from {ball_settings_path}")
-            
-            # CRITICAL: Ensure the Ball Profiles section is expanded so sliders are visible
-            if hasattr(self, 'ball_profiles_section') and self.ball_profiles_section.is_collapsed:
-                print(f"⚠️ Ball Profiles section is collapsed - expanding it now")
-                self.ball_profiles_section.toggle_collapsed()
-                QApplication.processEvents()
-            
-            try:
-                with open(ball_settings_path, 'r') as f:
-                    self.ball_profiles = json.load(f)
-                
-                print(f"📖 Loaded ball profiles: {list(self.ball_profiles.keys())}")
-                
-                # Update calibration value displays
-                if hasattr(self, 'ball_calibration_labels'):
-                    for ball_name, labels in self.ball_calibration_labels.items():
-                        if ball_name in self.ball_profiles:
-                            hsv_data = self.ball_profiles[ball_name]
-                            avg_hue = hsv_data.get('avg_hue', -1.0)
-                            avg_sat = hsv_data.get('avg_saturation', -1.0)
-                            
-                            print(f"🎨 Updating {ball_name}: avg_hue={avg_hue}, avg_sat={avg_sat}")
-                            
-                            # Update hue label
-                            if avg_hue >= 0:
-                                labels['hue'].setText(f"{avg_hue:.1f}°")
-                                labels['hue'].setStyleSheet("color: #4CAF50; font-weight: bold;")
-                            else:
-                                labels['hue'].setText("Not calibrated")
-                                labels['hue'].setStyleSheet("color: #f44336;")
-                            
-                            # Update saturation label
-                            if avg_sat >= 0:
-                                labels['saturation'].setText(f"{avg_sat:.1f}")
-                                labels['saturation'].setStyleSheet("color: #4CAF50; font-weight: bold;")
-                            else:
-                                labels['saturation'].setText("Not calibrated")
-                                labels['saturation'].setStyleSheet("color: #f44336;")
-                
-                print("✅ Ball profiles reloaded and sent to engine")
-            except Exception as e:
-                print(f"❌ Error reloading ball profiles: {e}")
-                import traceback
-                traceback.print_exc()
-
-        def toggle_dnn_tracker(self):
-            """Toggle the YOLO ball detection model on/off (pose detection remains active)."""
-            is_enabled = self.use_dnn_tracker_toggle.isChecked()
-            
-            # Update button text based on state
-            if is_enabled:
-                self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
-            else:
-                self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
-            
-            # Send setting to tracker via UDP (only affects ball detection, not pose)
-            self.udp_client.send_setting('enable_ball_detection', 1 if is_enabled else 0)
-            print(f"✅ YOLO ball detection {'enabled' if is_enabled else 'disabled'} (pose detection remains active)")
-            
-            # Auto-save settings
-            if not self._loading_settings:
-                self.save_settings()
-        
-        def toggle_pose_model(self):
-            is_enabled = self.pose_model_toggle.isChecked()
-            command = juggler_pb2.CommandRequest(
-                type=juggler_pb2.CommandRequest.CommandType.SET_POSE_MODEL_ENABLED,
-                pose_model_enabled=is_enabled
-            )
-            try:
-                response = self.zmq_client.send_command(command)
-                if response.success:
-                    print(f"✅ Pose model {'enabled' if is_enabled else 'disabled'}")
-                    # Auto-save settings after pose model toggle
-                    self.save_settings()
-                else:
-                    print(f"❌ Failed to toggle pose model: {response.message}")
-            except Exception as e:
-                print(f"❌ Error toggling pose model: {e}")
-
-        def _create_slider_widget(self, parent_layout, row, label_text, tooltip_text,
-                                  range_min, range_max, initial_value,
-                                  update_func, is_float=False):
-            """Helper function to create a labeled slider with a value display."""
-            label = QLabel(label_text)
-            label.setToolTip(tooltip_text)
-            parent_layout.addWidget(label, row, 0)
-            
-            slider = QSlider(Qt.Orientation.Horizontal)
-            slider.setRange(range_min, range_max)
-            slider.setValue(initial_value)
-            parent_layout.addWidget(slider, row, 1)
-
-            value_label = QLabel()
-            value_label.setMinimumWidth(40) # Ensure consistent width
-            parent_layout.addWidget(value_label, row, 2)
-            
-            def on_value_changed(value):
-                if is_float:
-                    display_value = f"{value / 100.0:.2f}"
-                    update_func(value)
-                else:
-                    display_value = str(value)
-                    update_func(value)
-                value_label.setText(display_value)
-
-            slider.valueChanged.connect(on_value_changed)
-            
-            # Set initial value display
-            on_value_changed(initial_value)
-            
-            return slider, value_label
-
-        def update_ir_status(self, is_active: bool):
-            """Update the IR projector status label."""
-            if is_active:
-                self.ir_status_label.setText("🔆 IR Projector: ON")
-                self.ir_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-            else:
-                self.ir_status_label.setText("🔆 IR Projector: OFF")
-                self.ir_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
-
-        def populate_camera_settings(self):
-            """Populate the camera settings dropdown with available JSON files."""
-            self.camera_settings_combo.clear()
-            
-            # Look for camera settings files in the camera_settings directory
-            camera_settings_dir = os.path.join("..", "camera_settings")
-            if os.path.exists(camera_settings_dir):
-                for filename in os.listdir(camera_settings_dir):
-                    if filename.endswith('.json'):
-                        # Remove .json extension for display name
-                        display_name = filename[:-5].replace('_', ' ').title()
-                        # Use filename without extension as the data value
-                        profile_name = filename[:-5]
-                        self.camera_settings_combo.addItem(display_name, profile_name)
-            
-            # If no files found, add default options
-            if self.camera_settings_combo.count() == 0:
-                self.camera_settings_combo.addItem("Default", "default")
-                self.camera_settings_combo.addItem("No Blur", "no_blur")
-            
-            # Set default to "default" profile
-            default_index = self.camera_settings_combo.findData("default")
-            if default_index >= 0:
-                self.camera_settings_combo.setCurrentIndex(default_index)
-
-        def populate_resolution_options(self):
-            """Populate the resolution dropdown with D455 supported resolutions."""
-            self.resolution_combo.clear()
-            for resolution in self.resolution_fps_map.keys():
-                self.resolution_combo.addItem(resolution)
-            
-            # Set default to 640x480
-            default_index = self.resolution_combo.findText("640 x 480")
-            if default_index >= 0:
-                self.resolution_combo.setCurrentIndex(default_index)
-
-        def populate_fps_options(self):
-            """Populate the FPS dropdown based on selected resolution."""
-            current_resolution = self.resolution_combo.currentText()
-            if current_resolution in self.resolution_fps_map:
-                fps_options = self.resolution_fps_map[current_resolution]
-                
-                self.fps_combo.clear()
-                for fps in fps_options:
-                    self.fps_combo.addItem(f"{fps} FPS", fps)
-                
-                # Set default to 60 FPS if available, otherwise first option
-                default_index = self.fps_combo.findText("60 FPS")
-                if default_index >= 0:
-                    self.fps_combo.setCurrentIndex(default_index)
-                elif self.fps_combo.count() > 0:
-                    self.fps_combo.setCurrentIndex(0)
-
-        def on_resolution_changed(self):
-            """Handle resolution change to update FPS options."""
-            self.populate_fps_options()
-        
-        def toggle_depth_sensor(self):
-            """Toggle the depth sensor on/off."""
-            is_enabled = self.depth_sensor_toggle.isChecked()
-            command = juggler_pb2.CommandRequest()
-            command.type = juggler_pb2.CommandRequest.CommandType.SET_DEPTH_SENSOR_ENABLED
-            command.depth_sensor_enabled = is_enabled
-            
-            try:
-                response = self.zmq_client.send_command(command)
-                if response.success:
-                    print(f"✅ Depth sensor {'enabled' if is_enabled else 'disabled'}")
-                    # Auto-save settings after depth sensor toggle
-                    if not self._loading_settings:
-                        self.save_settings()
-                else:
-                    print(f"❌ Failed to toggle depth sensor: {response.message}")
-                    QMessageBox.warning(self, "Depth Sensor Toggle Failed",
-                                      f"Failed to toggle depth sensor:\n{response.message}")
-            except Exception as e:
-                print(f"❌ Error toggling depth sensor: {e}")
-                QMessageBox.critical(self, "Error",
-                                   f"Error toggling depth sensor:\n{str(e)}")
-        
-        def on_tracking_system_changed(self):
-            """Handle tracking system selection change"""
-            tracker_type = self.tracking_system_combo.currentData()
-            
-            print(f"🔄 Switching to tracker: {tracker_type}")
-            
-            # Send command to engine to switch tracker
+            # Send tracker switch command to engine
             command = juggler_pb2.CommandRequest()
             command.type = juggler_pb2.CommandRequest.CommandType.SET_TRACKER_TYPE
-            command.tracker_type = tracker_type
+            command.tracker_type = new_tracker
             
             try:
                 response = self.zmq_client.send_command(command)
                 if response.success:
                     print(f"✅ {response.message}")
-                    # Auto-save settings after successful switch
-                    if not self._loading_settings:
-                        self.save_settings()
+                    # Note: Settings are already saved above before switching
+                    # No need to save again here - that was causing wrong file to be saved
                 else:
                     print(f"❌ Failed to switch tracker: {response.message}")
                     QMessageBox.warning(self, "Tracker Switch Failed",
                                       f"Failed to switch tracking system:\n{response.message}")
             except Exception as e:
                 print(f"❌ Error switching tracker: {e}")
-                QMessageBox.critical(self, "Error",
-                                   f"Error switching tracking system:\n{str(e)}")
+                QMessageBox.critical(self, "Error", f"Error switching tracking system:\n{str(e)}")
 
-        def stop_camera_feed(self):
-            """Stop the camera feed."""
-            try:
-                command = juggler_pb2.CommandRequest()
-                command.type = juggler_pb2.CommandRequest.CommandType.CAMERA_STOP
-                
-                response = self.zmq_client.send_command(command)
-                if response.success:
-                    self.stop_camera_button.setEnabled(False)
-                    self.start_camera_button.setEnabled(True)
-                    self.camera_status_label.setText("● Camera Stopped")
-                    self.camera_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
-                    self.update_ir_status(False)
-                    print(f"✅ Camera stopped: {response.message}")
-                else:
-                    QMessageBox.critical(self, "Error", f"Failed to stop camera: {response.message}")
-                    print(f"❌ Failed to stop camera: {response.message}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Error stopping camera: {str(e)}")
-                print(f"❌ Error stopping camera: {e}")
-
-        def start_camera_feed(self):
-            """Start the camera feed with selected settings."""
-            try:
-                selected_profile = self.camera_settings_combo.currentData()
-                settings_name = self.camera_settings_combo.currentText()
-                
-                # Get selected resolution and FPS
-                selected_resolution = self.resolution_combo.currentText()
-                selected_fps = self.fps_combo.currentData()
-                
-                # Parse resolution (e.g., "640 x 480" -> width=640, height=480)
-                width, height = map(int, selected_resolution.split(' x '))
-                
-                # Construct the full path to the camera settings file
-                settings_file_path = f"camera_settings/{selected_profile}.json"
-                
-                command = juggler_pb2.CommandRequest()
-                command.type = juggler_pb2.CommandRequest.CommandType.CAMERA_START
-                command.camera_settings_file = settings_file_path
-                
-                # Add resolution and FPS parameters
-                command.camera_width = width
-                command.camera_height = height
-                command.camera_fps = selected_fps
-                
-                response = self.zmq_client.send_command(command)
-                if response.success:
-                    self.stop_camera_button.setEnabled(True)
-                    self.start_camera_button.setEnabled(False)
-                    self.camera_status_label.setText(f"● Camera Running ({selected_resolution} @ {selected_fps} FPS)")
-                    self.camera_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-                    print(f"✅ Camera started with {settings_name} at {selected_resolution} @ {selected_fps} FPS: {response.message}")
-                    # Auto-save settings after camera starts successfully
-                    self.save_settings()
-                else:
-                    QMessageBox.critical(self, "Error", f"Failed to start camera: {response.message}")
-                    print(f"❌ Failed to start camera: {response.message}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Error starting camera: {str(e)}")
-                print(f"❌ Error starting camera: {e}")
-
-        def update_setting(self, key: str, value: Any):
-            self.udp_client.send_setting(key, value)
-            # Auto-save settings whenever they change (but not during initial load)
-            if not self._loading_settings:
-                self.save_settings()
-
-        def _safe_get_slider_value(self, slider, default_value):
-            """Safely get slider value, handling deleted Qt objects."""
-            try:
-                if slider is not None:
-                    return slider.value()
-            except RuntimeError:
-                # Qt object has been deleted
-                pass
-            return default_value
-        
         def get_current_settings(self) -> dict:
-            """Get current calibration settings as a dictionary."""
-            # Check if ALL UI elements exist before accessing them
-            required_attrs = [
-                'ball_confidence_slider', 'ball_held_confidence_slider', 'nms_slider',
-                'pose_model_toggle', 'camera_settings_combo', 'resolution_combo', 'fps_combo',
-                # Distance and state sliders
-                'tc_undetected_near_hand_slider', 'tc_min_frames_slider',
-                'tc_max_tracker_distance_slider',
-                # Throw/catch sound toggles
-                'tc_sound_on_catch_toggle', 'tc_sound_on_throw_toggle'
-            ]
-            
-            for attr in required_attrs:
-                if not hasattr(self, attr):
-                    return {}
-            
+            """Get current settings structured by tracker type"""
             settings = {
-                'camera_settings_profile': self.camera_settings_combo.currentData(),
-                'resolution': self.resolution_combo.currentText(),
-                'fps': self.fps_combo.currentData(),
+                'tracker_type': self.current_tracker,
+                'camera_settings_profile': self.camera_settings_combo.currentData() if hasattr(self, 'camera_settings_combo') else 'default',
+                'resolution': self.resolution_combo.currentText() if hasattr(self, 'resolution_combo') else '640 x 480',
+                'fps': self.fps_combo.currentData() if hasattr(self, 'fps_combo') else 60,
                 'depth_sensor_enabled': self.depth_sensor_toggle.isChecked() if hasattr(self, 'depth_sensor_toggle') else True,
-                'tracking_system': self.tracking_system_combo.currentData(),
+                'tracking_system': self.current_tracker,
                 'enable_ball_detection': self.use_dnn_tracker_toggle.isChecked() if hasattr(self, 'use_dnn_tracker_toggle') else True,
-                'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0,
-                'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0,
-                'nms_threshold': self.nms_slider.value() / 100.0,
+                'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0 if hasattr(self, 'ball_confidence_slider') else 0.25,
+                'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0 if hasattr(self, 'ball_held_confidence_slider') else 0.25,
+                'nms_threshold': self.nms_slider.value() / 100.0 if hasattr(self, 'nms_slider') else 0.50,
                 'show_raw_yolo_detections': self.show_raw_yolo_toggle.isChecked() if hasattr(self, 'show_raw_yolo_toggle') else False,
-                'pose_model_enabled': self.pose_model_toggle.isChecked(),
-                
-                # Tracking Detection settings
-                'undetected_near_hand_threshold': self.tc_undetected_near_hand_slider.value() / 100.0,  # cm to m
-                'min_frames_for_state_change': self.tc_min_frames_slider.value(),
-                'hand_distance_threshold': self.tc_hand_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_hand_distance_threshold_slider') else 0.25,  # cm to m
-                'min_throw_distance': self.tc_min_throw_distance_slider.value() / 100.0 if hasattr(self, 'tc_min_throw_distance_slider') else 0.20,  # cm to m
-                'min_frames_before_catch': self.tc_min_frames_before_catch_slider.value() if hasattr(self, 'tc_min_frames_before_catch_slider') else 3,
-                'ignore_class': self.tc_ignore_class_toggle.isChecked() if hasattr(self, 'tc_ignore_class_toggle') else False,
-                'max_tracker_distance_per_frame': self.tc_max_tracker_distance_slider.value() / 100.0,  # cm to m
-                'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked(),
-                'tc_sound_on_throw': self.tc_sound_on_throw_toggle.isChecked(),
-                'tc_name_on_catch': self.tc_name_on_catch_toggle.isChecked(),
-                'tc_name_on_throw': self.tc_name_on_throw_toggle.isChecked(),
-                
-                # Collapsed states for UI persistence
-                'collapsed_camera': self.camera_section.is_collapsed,
-                'collapsed_yolo': self.yolo_section.is_collapsed,
-                'collapsed_pose': self.pose_section.is_collapsed,
-                'collapsed_throw_catch': self.throw_catch_section.is_collapsed,
-                'collapsed_color_tracker_weights': self.color_tracker_weights_section.is_collapsed if hasattr(self, 'color_tracker_weights_section') and self.color_tracker_weights_section else False,
-                'collapsed_adaptive_color': self.adaptive_color_section.is_collapsed if hasattr(self, 'adaptive_color_section') else False,
-                'collapsed_override_detection': self.override_detection_section.is_collapsed if hasattr(self, 'override_detection_section') else False,
-                'collapsed_held_color_blob': self.held_color_blob_section.is_collapsed if hasattr(self, 'held_color_blob_section') else False,
-                'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False,
-                
-                # Euclidean Matching Temporal Consistency
-                'temporal_consistency_bonus': self._safe_get_slider_value(self.ct_temporal_consistency_bonus_slider, 25) / 100.0 if hasattr(self, 'ct_temporal_consistency_bonus_slider') else 0.25,
-                'spatial_threshold': self._safe_get_slider_value(self.ct_spatial_threshold_slider, 40) / 100.0 if hasattr(self, 'ct_spatial_threshold_slider') else 0.40,
-                
-                # Color Sample Radius
-                'color_sample_radius': self._safe_get_slider_value(self.ct_color_sample_radius_slider, 1) if hasattr(self, 'ct_color_sample_radius_slider') else 1,
-                
-                # Identity Swap Prevention settings
-                'max_euclidean_distance': self._safe_get_slider_value(self.ct_max_euclidean_distance_slider, 15) / 100.0 if hasattr(self, 'ct_max_euclidean_distance_slider') else 0.15,
-                'min_euclidean_color_score': self._safe_get_slider_value(self.ct_min_euclidean_color_score_slider, 30) / 100.0 if hasattr(self, 'ct_min_euclidean_color_score_slider') else 0.30,
-                'max_depth_jump_strict': self._safe_get_slider_value(self.ct_max_depth_jump_strict_slider, 20) / 100.0 if hasattr(self, 'ct_max_depth_jump_strict_slider') else 0.20,
-                
-                # Ball Separation & Hand Change settings
-                'min_color_confidence_override': self._safe_get_slider_value(self.ct_min_color_confidence_override_slider, 35) / 100.0 if hasattr(self, 'ct_min_color_confidence_override_slider') else 0.35,
-                'min_ball_separation': self._safe_get_slider_value(self.ct_min_ball_separation_slider, 15) / 100.0 if hasattr(self, 'ct_min_ball_separation_slider') else 0.15,
-                'min_hand_change_distance': self._safe_get_slider_value(self.ct_min_hand_change_distance_slider, 25) / 100.0 if hasattr(self, 'ct_min_hand_change_distance_slider') else 0.25,
-                
-                # Override Detection settings (NEW: class-specific thresholds)
-                'override_ball_confidence_threshold': self._safe_get_slider_value(self.od_ball_confidence_slider, 70) / 100.0 if hasattr(self, 'od_ball_confidence_slider') else 0.70,
-                'override_ball_color_threshold': self._safe_get_slider_value(self.od_ball_color_slider, 80) / 100.0 if hasattr(self, 'od_ball_color_slider') else 0.80,
-                'override_ball_held_confidence_threshold': self._safe_get_slider_value(self.od_ball_held_confidence_slider, 70) / 100.0 if hasattr(self, 'od_ball_held_confidence_slider') else 0.70,
-                'override_ball_held_color_threshold': self._safe_get_slider_value(self.od_ball_held_color_slider, 80) / 100.0 if hasattr(self, 'od_ball_held_color_slider') else 0.80,
-                
-                # DEPRECATED: Keep old settings for backward compatibility
-                'override_min_confidence_tracked': self._safe_get_slider_value(self.od_min_confidence_tracked_slider, 50) / 100.0 if hasattr(self, 'od_min_confidence_tracked_slider') else 0.50,
-                'override_min_color_score_tracked': self._safe_get_slider_value(self.od_min_color_score_tracked_slider, 60) / 100.0 if hasattr(self, 'od_min_color_score_tracked_slider') else 0.60,
-                'override_min_confidence_missing': self._safe_get_slider_value(self.od_min_confidence_missing_slider, 70) / 100.0 if hasattr(self, 'od_min_confidence_missing_slider') else 0.70,
-                'override_min_color_score_missing': self._safe_get_slider_value(self.od_min_color_score_missing_slider, 80) / 100.0 if hasattr(self, 'od_min_color_score_missing_slider') else 0.80,
-                
-                # Held Color Blob Detection settings
-                'held_color_search_radius': self._safe_get_slider_value(self.hcb_search_radius_slider, 120) if hasattr(self, 'hcb_search_radius_slider') else 120,
-                'held_color_min_score': self._safe_get_slider_value(self.hcb_min_color_score_slider, 30) / 100.0 if hasattr(self, 'hcb_min_color_score_slider') else 0.30,
-                'held_color_max_distance': self._safe_get_slider_value(self.hcb_max_distance_slider, 25) / 100.0 if hasattr(self, 'hcb_max_distance_slider') else 0.25,
-                
-                # Trajectory Settings
-                'traj_gravity': self._safe_get_slider_value(self.traj_gravity_slider, 98) / 10.0 if hasattr(self, 'traj_gravity_slider') else 9.81,
-                'traj_time_step': self._safe_get_slider_value(self.traj_time_step_slider, 33) / 1000.0 if hasattr(self, 'traj_time_step_slider') else 0.033,
-                'traj_max_time': self._safe_get_slider_value(self.traj_max_time_slider, 30) / 10.0 if hasattr(self, 'traj_max_time_slider') else 3.0,
-                'traj_search_radius': self._safe_get_slider_value(self.traj_search_radius_slider, 15) / 100.0 if hasattr(self, 'traj_search_radius_slider') else 0.15,
-                'traj_min_points_for_prediction': self._safe_get_slider_value(self.traj_min_points_for_prediction_slider, 3) if hasattr(self, 'traj_min_points_for_prediction_slider') else 3,
-                'traj_color_match_threshold': self._safe_get_slider_value(self.traj_color_match_threshold_slider, 50) / 100.0 if hasattr(self, 'traj_color_match_threshold_slider') else 0.50,
-                'traj_yolo_confidence_threshold': self._safe_get_slider_value(self.traj_yolo_confidence_threshold_slider, 70) / 100.0 if hasattr(self, 'traj_yolo_confidence_threshold_slider') else 0.70,
-                'throw_yolo_confidence_threshold': self._safe_get_slider_value(self.throw_yolo_confidence_threshold_slider, 50) / 100.0 if hasattr(self, 'throw_yolo_confidence_threshold_slider') else 0.50,
-                'traj_velocity_estimation_time': self._safe_get_slider_value(self.traj_velocity_estimation_time_slider, 10) / 100.0 if hasattr(self, 'traj_velocity_estimation_time_slider') else 0.10,
-                'traj_max_search_distance': self._safe_get_slider_value(self.traj_max_search_distance_slider, 50) / 100.0 if hasattr(self, 'traj_max_search_distance_slider') else 0.50,
-                
-                # Threshold visualization toggle
-                'show_hand_distance_threshold': self.show_hand_distance_threshold_toggle.isChecked() if hasattr(self, 'show_hand_distance_threshold_toggle') else True,
-                'show_hand_velocity_zone': self.show_hand_velocity_zone_toggle.isChecked() if hasattr(self, 'show_hand_velocity_zone_toggle') else False,
-                
-                # Hand Velocity Tracking settings
-                'hand_velocity_enabled': self.hand_velocity_enabled_toggle.isChecked() if hasattr(self, 'hand_velocity_enabled_toggle') else True,
-                'hand_velocity_threshold': self._safe_get_slider_value(self.hand_velocity_threshold_slider, 100) / 100.0 if hasattr(self, 'hand_velocity_threshold_slider') else 1.0,
-                'hand_velocity_confidence_reduction': self._safe_get_slider_value(self.hand_velocity_confidence_reduction_slider, 30) / 100.0 if hasattr(self, 'hand_velocity_confidence_reduction_slider') else 0.3,
-                'hand_velocity_detection_radius': self._safe_get_slider_value(self.hand_velocity_detection_radius_slider, 15) / 100.0 if hasattr(self, 'hand_velocity_detection_radius_slider') else 0.15,
-                'hand_velocity_distance_reduction': self._safe_get_slider_value(self.hand_velocity_distance_reduction_slider, 10) / 100.0 if hasattr(self, 'hand_velocity_distance_reduction_slider') else 0.10,
-                'hand_velocity_ignore_class': self.hand_velocity_ignore_class_toggle.isChecked() if hasattr(self, 'hand_velocity_ignore_class_toggle') else False,
+                'pose_model_enabled': self.pose_model_toggle.isChecked() if hasattr(self, 'pose_model_toggle') else True,
             }
             
-            # Add visualization toggle states from main window
-            if self.main_window:
-                if hasattr(self.main_window, 'show_raw_detections_toggle'):
-                    settings['viz_show_raw_detections'] = self.main_window.show_raw_detections_toggle.isChecked()
-                if hasattr(self.main_window, 'show_hand_tracking_toggle'):
-                    settings['viz_show_hand_tracking'] = self.main_window.show_hand_tracking_toggle.isChecked()
-                if hasattr(self.main_window, 'show_ball_states_toggle'):
-                    settings['viz_show_ball_states'] = self.main_window.show_ball_states_toggle.isChecked()
-                if hasattr(self.main_window, 'show_skeleton_toggle'):
-                    settings['viz_show_skeleton'] = self.main_window.show_skeleton_toggle.isChecked()
-                if hasattr(self.main_window, 'show_color_search_toggle'):
-                    settings['viz_show_color_search'] = self.main_window.show_color_search_toggle.isChecked()
-                if hasattr(self.main_window, 'show_color_tracker_toggle'):
-                    settings['viz_show_color_tracker'] = self.main_window.show_color_tracker_toggle.isChecked()
-                if hasattr(self.main_window, 'show_tracked_boxes_toggle'):
-                    settings['viz_show_tracked_boxes'] = self.main_window.show_tracked_boxes_toggle.isChecked()
-                if hasattr(self.main_window, 'show_unmatched_detections_toggle'):
-                    settings['viz_show_unmatched_detections'] = self.main_window.show_unmatched_detections_toggle.isChecked()
-                if hasattr(self.main_window, 'show_trajectory_toggle'):
-                    settings['viz_show_trajectory'] = self.main_window.show_trajectory_toggle.isChecked()
-                if hasattr(self.main_window, 'show_trajectory_points_toggle'):
-                    settings['viz_show_trajectory_points'] = self.main_window.show_trajectory_points_toggle.isChecked()
-                if hasattr(self.main_window, 'show_throw_threshold_toggle'):
-                    settings['viz_show_throw_threshold'] = self.main_window.show_throw_threshold_toggle.isChecked()
-                if hasattr(self.main_window, 'show_catch_threshold_toggle'):
-                    settings['viz_show_catch_threshold'] = self.main_window.show_catch_threshold_toggle.isChecked()
-                if hasattr(self.main_window, 'show_tails_toggle'):
-                    settings['viz_show_tails'] = self.main_window.show_tails_toggle.isChecked()
-                if hasattr(self.main_window, 'hide_video_feed_toggle'):
-                    settings['viz_hide_video_feed'] = self.main_window.hide_video_feed_toggle.isChecked()
+            # Add 3D-specific settings if current tracker is 3D
+            if self.current_tracker == "depth_based":
+                settings.update(self._get_3d_tracker_settings())
             
-            # Add ball profile settings
-            if hasattr(self, 'ball_checkboxes') and hasattr(self, 'ball_hue_sliders'):
-                ball_tracking = {}
-                ball_hues = {}
-                
-                for ball_name, checkbox in self.ball_checkboxes.items():
-                    ball_tracking[ball_name] = checkbox.isChecked()
-                
-                for ball_name, sliders in self.ball_hue_sliders.items():
-                    ball_hues[ball_name] = {
-                        'min_hue': sliders['min'].value(),
-                        'max_hue': sliders['max'].value()
-                    }
-                
-                settings['ball_tracking_enabled'] = ball_tracking
-                settings['ball_hue_ranges'] = ball_hues
+            # Add 2D-specific settings if current tracker is 2D
+            elif self.current_tracker == "simple_2d":
+                settings.update(self._get_2d_tracker_settings())
+            
+            # Add UI state
+            settings.update(self._get_ui_state())
             
             return settings
 
+        def _get_3d_tracker_settings(self) -> dict:
+            """Get 3D tracker-specific settings"""
+            return {
+                'undetected_near_hand_threshold': self.tc_undetected_near_hand_slider.value() / 100.0 if hasattr(self, 'tc_undetected_near_hand_slider') else 0.20,
+                'min_frames_for_state_change': self.tc_min_frames_slider.value() if hasattr(self, 'tc_min_frames_slider') else 3,
+                'hand_distance_threshold': self.tc_hand_distance_threshold_slider.value() / 100.0 if hasattr(self, 'tc_hand_distance_threshold_slider') else 0.25,
+                'min_throw_distance': self.tc_min_throw_distance_slider.value() / 100.0 if hasattr(self, 'tc_min_throw_distance_slider') else 0.20,
+                'min_frames_before_catch': self.tc_min_frames_before_catch_slider.value() if hasattr(self, 'tc_min_frames_before_catch_slider') else 3,
+                'ignore_class': self.tc_ignore_class_toggle.isChecked() if hasattr(self, 'tc_ignore_class_toggle') else False,
+                'max_tracker_distance_per_frame': self.tc_max_tracker_distance_slider.value() / 100.0 if hasattr(self, 'tc_max_tracker_distance_slider') else 0.50,
+                'tc_sound_on_catch': self.tc_sound_on_catch_toggle.isChecked() if hasattr(self, 'tc_sound_on_catch_toggle') else False,
+                'tc_sound_on_throw': self.tc_sound_on_throw_toggle.isChecked() if hasattr(self, 'tc_sound_on_throw_toggle') else False,
+                'tc_name_on_catch': self.tc_name_on_catch_toggle.isChecked() if hasattr(self, 'tc_name_on_catch_toggle') else False,
+                'tc_name_on_throw': self.tc_name_on_throw_toggle.isChecked() if hasattr(self, 'tc_name_on_throw_toggle') else False,
+                'temporal_consistency_bonus': self.ct_temporal_consistency_bonus_slider.value() / 100.0 if hasattr(self, 'ct_temporal_consistency_bonus_slider') else 0.25,
+                'spatial_threshold': self.ct_spatial_threshold_slider.value() / 100.0 if hasattr(self, 'ct_spatial_threshold_slider') else 0.40,
+                'color_sample_radius': self.ct_color_sample_radius_slider.value() if hasattr(self, 'ct_color_sample_radius_slider') else 1,
+                'max_euclidean_distance': self.ct_max_euclidean_distance_slider.value() / 100.0 if hasattr(self, 'ct_max_euclidean_distance_slider') else 0.15,
+                'min_euclidean_color_score': self.ct_min_euclidean_color_score_slider.value() / 100.0 if hasattr(self, 'ct_min_euclidean_color_score_slider') else 0.30,
+                'max_depth_jump_strict': self.ct_max_depth_jump_strict_slider.value() / 100.0 if hasattr(self, 'ct_max_depth_jump_strict_slider') else 0.20,
+                'min_color_confidence_override': self.ct_min_color_confidence_override_slider.value() / 100.0 if hasattr(self, 'ct_min_color_confidence_override_slider') else 0.35,
+                'min_ball_separation': self.ct_min_ball_separation_slider.value() / 100.0 if hasattr(self, 'ct_min_ball_separation_slider') else 0.15,
+                'min_hand_change_distance': self.ct_min_hand_change_distance_slider.value() / 100.0 if hasattr(self, 'ct_min_hand_change_distance_slider') else 0.25,
+                'override_ball_confidence_threshold': self.od_ball_confidence_slider.value() / 100.0 if hasattr(self, 'od_ball_confidence_slider') else 0.70,
+                'override_ball_color_threshold': self.od_ball_color_slider.value() / 100.0 if hasattr(self, 'od_ball_color_slider') else 0.80,
+                'override_ball_held_confidence_threshold': self.od_ball_held_confidence_slider.value() / 100.0 if hasattr(self, 'od_ball_held_confidence_slider') else 0.70,
+                'override_ball_held_color_threshold': self.od_ball_held_color_slider.value() / 100.0 if hasattr(self, 'od_ball_held_color_slider') else 0.80,
+                'held_color_search_radius': self.hcb_search_radius_slider.value() if hasattr(self, 'hcb_search_radius_slider') else 120,
+                'held_color_min_score': self.hcb_min_color_score_slider.value() / 100.0 if hasattr(self, 'hcb_min_color_score_slider') else 0.30,
+                'held_color_max_distance': self.hcb_max_distance_slider.value() / 100.0 if hasattr(self, 'hcb_max_distance_slider') else 0.25,
+                'traj_gravity': self.traj_gravity_slider.value() / 10.0 if hasattr(self, 'traj_gravity_slider') else 9.81,
+                'traj_time_step': self.traj_time_step_slider.value() / 1000.0 if hasattr(self, 'traj_time_step_slider') else 0.033,
+                'traj_max_time': self.traj_max_time_slider.value() / 10.0 if hasattr(self, 'traj_max_time_slider') else 3.0,
+                'traj_search_radius': self.traj_search_radius_slider.value() / 100.0 if hasattr(self, 'traj_search_radius_slider') else 0.15,
+                'traj_min_points_for_prediction': self.traj_min_points_for_prediction_slider.value() if hasattr(self, 'traj_min_points_for_prediction_slider') else 3,
+                'traj_color_match_threshold': self.traj_color_match_threshold_slider.value() / 100.0 if hasattr(self, 'traj_color_match_threshold_slider') else 0.50,
+                'traj_yolo_confidence_threshold': self.traj_yolo_confidence_threshold_slider.value() / 100.0 if hasattr(self, 'traj_yolo_confidence_threshold_slider') else 0.70,
+                'throw_yolo_confidence_threshold': self.throw_yolo_confidence_threshold_slider.value() / 100.0 if hasattr(self, 'throw_yolo_confidence_threshold_slider') else 0.50,
+                'traj_velocity_estimation_time': self.traj_velocity_estimation_time_slider.value() / 100.0 if hasattr(self, 'traj_velocity_estimation_time_slider') else 0.10,
+                'traj_max_search_distance': self.traj_max_search_distance_slider.value() / 100.0 if hasattr(self, 'traj_max_search_distance_slider') else 0.50,
+                'show_hand_distance_threshold': self.show_hand_distance_threshold_toggle.isChecked() if hasattr(self, 'show_hand_distance_threshold_toggle') else True,
+                'show_hand_velocity_zone': self.show_hand_velocity_zone_toggle.isChecked() if hasattr(self, 'show_hand_velocity_zone_toggle') else False,
+                'hand_velocity_enabled': self.hand_velocity_enabled_toggle.isChecked() if hasattr(self, 'hand_velocity_enabled_toggle') else True,
+                'hand_velocity_threshold': self.hand_velocity_threshold_slider.value() / 100.0 if hasattr(self, 'hand_velocity_threshold_slider') else 1.0,
+                'hand_velocity_confidence_reduction': self.hand_velocity_confidence_reduction_slider.value() / 100.0 if hasattr(self, 'hand_velocity_confidence_reduction_slider') else 0.3,
+                'hand_velocity_detection_radius': self.hand_velocity_detection_radius_slider.value() / 100.0 if hasattr(self, 'hand_velocity_detection_radius_slider') else 0.15,
+                'hand_velocity_distance_reduction': self.hand_velocity_distance_reduction_slider.value() / 100.0 if hasattr(self, 'hand_velocity_distance_reduction_slider') else 0.10,
+                'hand_velocity_ignore_class': self.hand_velocity_ignore_class_toggle.isChecked() if hasattr(self, 'hand_velocity_ignore_class_toggle') else False,
+            }
+
+        def _get_2d_tracker_settings(self) -> dict:
+            """Get 2D tracker-specific settings"""
+            return {}
+
+        def _get_ui_state(self) -> dict:
+            """Get UI collapsed states"""
+            return {
+                'collapsed_camera': self.camera_section.is_collapsed if hasattr(self, 'camera_section') else False,
+                'collapsed_yolo': self.yolo_section.is_collapsed if hasattr(self, 'yolo_section') else False,
+                'collapsed_pose': self.pose_section.is_collapsed if hasattr(self, 'pose_section') else False,
+                'collapsed_throw_catch': self.throw_catch_section.is_collapsed if hasattr(self, 'throw_catch_section') else False,
+                'collapsed_color_tracker_weights': self.color_tracker_weights_section.is_collapsed if hasattr(self, 'color_tracker_weights_section') else False,
+                'collapsed_override_detection': self.override_detection_section.is_collapsed if hasattr(self, 'override_detection_section') else False,
+                'collapsed_held_color_blob': self.held_color_blob_section.is_collapsed if hasattr(self, 'held_color_blob_section') else False,
+                'collapsed_trajectory': self.trajectory_section.is_collapsed if hasattr(self, 'trajectory_section') else False,
+                'collapsed_hand_velocity': self.hand_velocity_section.is_collapsed if hasattr(self, 'hand_velocity_section') else False,
+                'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False,
+            }
+
         def apply_settings(self, settings: dict):
-            """Apply settings from a dictionary to the UI controls."""
+            """Apply settings from dictionary to UI controls"""
             # Camera settings
             if 'camera_settings_profile' in settings:
                 index = self.camera_settings_combo.findData(settings['camera_settings_profile'])
@@ -2151,44 +356,29 @@ if PYQT_AVAILABLE:
             if 'depth_sensor_enabled' in settings and hasattr(self, 'depth_sensor_toggle'):
                 self.depth_sensor_toggle.setChecked(settings['depth_sensor_enabled'])
             
-            # Tracking system
+            # Tracking system - block signals to prevent recursion
             if 'tracking_system' in settings:
                 index = self.tracking_system_combo.findData(settings['tracking_system'])
                 if index >= 0:
+                    # Block signals to prevent triggering on_tracking_system_changed
+                    self.tracking_system_combo.blockSignals(True)
                     self.tracking_system_combo.setCurrentIndex(index)
+                    self.tracking_system_combo.blockSignals(False)
             
-            # Ball detection enable/disable (check both old and new setting names for backward compatibility)
+            # Ball detection
             if 'enable_ball_detection' in settings and hasattr(self, 'use_dnn_tracker_toggle'):
                 is_enabled = settings['enable_ball_detection']
                 self.use_dnn_tracker_toggle.setChecked(is_enabled)
-                # Update button text based on loaded state
-                if is_enabled:
-                    self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
-                else:
-                    self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
-                # Send to engine
-                self.udp_client.send_setting('enable_ball_detection', 1 if is_enabled else 0)
-            elif 'use_dnn_tracker' in settings and hasattr(self, 'use_dnn_tracker_toggle'):
-                # Backward compatibility with old setting name
-                is_enabled = settings['use_dnn_tracker']
-                self.use_dnn_tracker_toggle.setChecked(is_enabled)
-                if is_enabled:
-                    self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
-                else:
-                    self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
-                # Send to engine
+                self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection" if is_enabled else "YOLO Ball Detection DISABLED")
                 self.udp_client.send_setting('enable_ball_detection', 1 if is_enabled else 0)
             
-            # DNN Tracker settings
+            # YOLO settings
             if 'ball_confidence_threshold' in settings:
                 self.ball_confidence_slider.setValue(int(settings['ball_confidence_threshold'] * 100))
-            
             if 'ball_held_confidence_threshold' in settings:
                 self.ball_held_confidence_slider.setValue(int(settings['ball_held_confidence_threshold'] * 100))
-            
             if 'nms_threshold' in settings:
                 self.nms_slider.setValue(int(settings['nms_threshold'] * 100))
-            
             if 'show_raw_yolo_detections' in settings and hasattr(self, 'show_raw_yolo_toggle'):
                 self.show_raw_yolo_toggle.setChecked(settings['show_raw_yolo_detections'])
             
@@ -2196,623 +386,680 @@ if PYQT_AVAILABLE:
             if 'pose_model_enabled' in settings:
                 self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
             
-            # Tracking Detection settings
-            if 'undetected_near_hand_threshold' in settings:
-                self.tc_undetected_near_hand_slider.setValue(int(settings['undetected_near_hand_threshold'] * 100))  # m to cm
+            # Apply 3D-specific settings
+            if self.current_tracker == "depth_based":
+                self._apply_3d_tracker_settings(settings)
             
+            # Apply 2D-specific settings
+            elif self.current_tracker == "simple_2d":
+                self._apply_2d_tracker_settings(settings)
+            
+            # Restore collapsed states
+            self._apply_ui_state(settings)
+
+        def _apply_3d_tracker_settings(self, settings: dict):
+            """Apply 3D tracker-specific settings"""
+            # Ball State Detection
+            if 'undetected_near_hand_threshold' in settings:
+                self.tc_undetected_near_hand_slider.setValue(int(settings['undetected_near_hand_threshold'] * 100))
             if 'min_frames_for_state_change' in settings:
                 self.tc_min_frames_slider.setValue(settings['min_frames_for_state_change'])
-
-            # Handle unified hand_distance_threshold with backward compatibility
             if 'hand_distance_threshold' in settings and hasattr(self, 'tc_hand_distance_threshold_slider'):
-                self.tc_hand_distance_threshold_slider.setValue(int(settings['hand_distance_threshold'] * 100))  # m to cm
-            elif 'throw_distance_threshold' in settings or 'catch_distance_threshold' in settings:
-                # Backward compatibility: use average of old thresholds if both exist, otherwise use whichever exists
-                if hasattr(self, 'tc_hand_distance_threshold_slider'):
-                    throw_val = settings.get('throw_distance_threshold', 0.20)
-                    catch_val = settings.get('catch_distance_threshold', 0.30)
-                    # Use average of the two old values
-                    unified_val = (throw_val + catch_val) / 2.0
-                    self.tc_hand_distance_threshold_slider.setValue(int(unified_val * 100))  # m to cm
-            
+                self.tc_hand_distance_threshold_slider.setValue(int(settings['hand_distance_threshold'] * 100))
             if 'min_throw_distance' in settings and hasattr(self, 'tc_min_throw_distance_slider'):
-                self.tc_min_throw_distance_slider.setValue(int(settings['min_throw_distance'] * 100))  # m to cm
-            
+                self.tc_min_throw_distance_slider.setValue(int(settings['min_throw_distance'] * 100))
             if 'min_frames_before_catch' in settings and hasattr(self, 'tc_min_frames_before_catch_slider'):
                 self.tc_min_frames_before_catch_slider.setValue(settings['min_frames_before_catch'])
-
             if 'max_tracker_distance_per_frame' in settings:
-                self.tc_max_tracker_distance_slider.setValue(int(settings['max_tracker_distance_per_frame'] * 100))  # m to cm
-            
+                self.tc_max_tracker_distance_slider.setValue(int(settings['max_tracker_distance_per_frame'] * 100))
             if 'tc_sound_on_catch' in settings:
                 self.tc_sound_on_catch_toggle.setChecked(settings['tc_sound_on_catch'])
-            
             if 'tc_sound_on_throw' in settings:
                 self.tc_sound_on_throw_toggle.setChecked(settings['tc_sound_on_throw'])
-            
             if 'tc_name_on_catch' in settings:
                 self.tc_name_on_catch_toggle.setChecked(settings['tc_name_on_catch'])
-            
             if 'tc_name_on_throw' in settings:
                 self.tc_name_on_throw_toggle.setChecked(settings['tc_name_on_throw'])
-            
             if 'ignore_class' in settings and hasattr(self, 'tc_ignore_class_toggle'):
                 self.tc_ignore_class_toggle.setChecked(settings['ignore_class'])
             
-            # Restore collapsed states
-            if 'collapsed_camera' in settings:
-                if settings['collapsed_camera'] != self.camera_section.is_collapsed:
-                    self.camera_section.toggle_collapsed()
-            
-            if 'collapsed_yolo' in settings:
-                if settings['collapsed_yolo'] != self.yolo_section.is_collapsed:
-                    self.yolo_section.toggle_collapsed()
-            
-            if 'collapsed_pose' in settings:
-                if settings['collapsed_pose'] != self.pose_section.is_collapsed:
-                    self.pose_section.toggle_collapsed()
-            
-            if 'collapsed_throw_catch' in settings:
-                if settings['collapsed_throw_catch'] != self.throw_catch_section.is_collapsed:
-                    self.throw_catch_section.toggle_collapsed()
-            
-            if 'collapsed_color_tracker_weights' in settings and hasattr(self, 'color_tracker_weights_section'):
-                if settings['collapsed_color_tracker_weights'] != self.color_tracker_weights_section.is_collapsed:
-                    self.color_tracker_weights_section.toggle_collapsed()
-            
-            # Euclidean Matching Temporal Consistency settings
+            # Color Tracker Weights
             if 'temporal_consistency_bonus' in settings and hasattr(self, 'ct_temporal_consistency_bonus_slider'):
                 self.ct_temporal_consistency_bonus_slider.setValue(int(settings['temporal_consistency_bonus'] * 100))
-            
             if 'spatial_threshold' in settings and hasattr(self, 'ct_spatial_threshold_slider'):
-                self.ct_spatial_threshold_slider.setValue(int(settings['spatial_threshold'] * 100))  # m to cm
-            
-            # Color Sample Radius
+                self.ct_spatial_threshold_slider.setValue(int(settings['spatial_threshold'] * 100))
             if 'color_sample_radius' in settings and hasattr(self, 'ct_color_sample_radius_slider'):
                 self.ct_color_sample_radius_slider.setValue(settings['color_sample_radius'])
-            
-            # Identity Swap Prevention settings
             if 'max_euclidean_distance' in settings and hasattr(self, 'ct_max_euclidean_distance_slider'):
                 self.ct_max_euclidean_distance_slider.setValue(int(settings['max_euclidean_distance'] * 100))
-            
             if 'min_euclidean_color_score' in settings and hasattr(self, 'ct_min_euclidean_color_score_slider'):
                 self.ct_min_euclidean_color_score_slider.setValue(int(settings['min_euclidean_color_score'] * 100))
-            
             if 'max_depth_jump_strict' in settings and hasattr(self, 'ct_max_depth_jump_strict_slider'):
                 self.ct_max_depth_jump_strict_slider.setValue(int(settings['max_depth_jump_strict'] * 100))
-            
-            # Ball Separation & Hand Change settings
             if 'min_color_confidence_override' in settings and hasattr(self, 'ct_min_color_confidence_override_slider'):
                 self.ct_min_color_confidence_override_slider.setValue(int(settings['min_color_confidence_override'] * 100))
-            
             if 'min_ball_separation' in settings and hasattr(self, 'ct_min_ball_separation_slider'):
                 self.ct_min_ball_separation_slider.setValue(int(settings['min_ball_separation'] * 100))
-            
             if 'min_hand_change_distance' in settings and hasattr(self, 'ct_min_hand_change_distance_slider'):
                 self.ct_min_hand_change_distance_slider.setValue(int(settings['min_hand_change_distance'] * 100))
             
-            # Override Detection settings (NEW: class-specific thresholds)
+            # Override Detection settings
             if 'override_ball_confidence_threshold' in settings and hasattr(self, 'od_ball_confidence_slider'):
                 self.od_ball_confidence_slider.setValue(int(settings['override_ball_confidence_threshold'] * 100))
-            
             if 'override_ball_color_threshold' in settings and hasattr(self, 'od_ball_color_slider'):
                 self.od_ball_color_slider.setValue(int(settings['override_ball_color_threshold'] * 100))
-            
             if 'override_ball_held_confidence_threshold' in settings and hasattr(self, 'od_ball_held_confidence_slider'):
                 self.od_ball_held_confidence_slider.setValue(int(settings['override_ball_held_confidence_threshold'] * 100))
-            
             if 'override_ball_held_color_threshold' in settings and hasattr(self, 'od_ball_held_color_slider'):
                 self.od_ball_held_color_slider.setValue(int(settings['override_ball_held_color_threshold'] * 100))
-            
-            # DEPRECATED: Keep old settings for backward compatibility
-            if 'override_min_confidence_tracked' in settings and hasattr(self, 'od_min_confidence_tracked_slider'):
-                self.od_min_confidence_tracked_slider.setValue(int(settings['override_min_confidence_tracked'] * 100))
-            
-            if 'override_min_color_score_tracked' in settings and hasattr(self, 'od_min_color_score_tracked_slider'):
-                self.od_min_color_score_tracked_slider.setValue(int(settings['override_min_color_score_tracked'] * 100))
-            
-            if 'override_min_confidence_missing' in settings and hasattr(self, 'od_min_confidence_missing_slider'):
-                self.od_min_confidence_missing_slider.setValue(int(settings['override_min_confidence_missing'] * 100))
-            
-            if 'override_min_color_score_missing' in settings and hasattr(self, 'od_min_color_score_missing_slider'):
-                self.od_min_color_score_missing_slider.setValue(int(settings['override_min_color_score_missing'] * 100))
             
             # Held Color Blob Detection settings
             if 'held_color_search_radius' in settings and hasattr(self, 'hcb_search_radius_slider'):
                 self.hcb_search_radius_slider.setValue(settings['held_color_search_radius'])
-            
             if 'held_color_min_score' in settings and hasattr(self, 'hcb_min_color_score_slider'):
                 self.hcb_min_color_score_slider.setValue(int(settings['held_color_min_score'] * 100))
-            
             if 'held_color_max_distance' in settings and hasattr(self, 'hcb_max_distance_slider'):
-                self.hcb_max_distance_slider.setValue(int(settings['held_color_max_distance'] * 100))  # m to cm
+                self.hcb_max_distance_slider.setValue(int(settings['held_color_max_distance'] * 100))
             
             # Trajectory Settings
             if 'traj_gravity' in settings and hasattr(self, 'traj_gravity_slider'):
-                self.traj_gravity_slider.setValue(int(settings['traj_gravity'] * 10))  # to 10ths
-            
+                self.traj_gravity_slider.setValue(int(settings['traj_gravity'] * 10))
             if 'traj_time_step' in settings and hasattr(self, 'traj_time_step_slider'):
-                self.traj_time_step_slider.setValue(int(settings['traj_time_step'] * 1000))  # s to ms
-            
+                self.traj_time_step_slider.setValue(int(settings['traj_time_step'] * 1000))
             if 'traj_max_time' in settings and hasattr(self, 'traj_max_time_slider'):
-                self.traj_max_time_slider.setValue(int(settings['traj_max_time'] * 10))  # to 10ths
-            
+                self.traj_max_time_slider.setValue(int(settings['traj_max_time'] * 10))
             if 'traj_search_radius' in settings and hasattr(self, 'traj_search_radius_slider'):
-                self.traj_search_radius_slider.setValue(int(settings['traj_search_radius'] * 100))  # m to cm
-            
+                self.traj_search_radius_slider.setValue(int(settings['traj_search_radius'] * 100))
             if 'traj_min_points_for_prediction' in settings and hasattr(self, 'traj_min_points_for_prediction_slider'):
                 self.traj_min_points_for_prediction_slider.setValue(settings['traj_min_points_for_prediction'])
-            
             if 'traj_color_match_threshold' in settings and hasattr(self, 'traj_color_match_threshold_slider'):
                 self.traj_color_match_threshold_slider.setValue(int(settings['traj_color_match_threshold'] * 100))
-            
             if 'traj_yolo_confidence_threshold' in settings and hasattr(self, 'traj_yolo_confidence_threshold_slider'):
                 self.traj_yolo_confidence_threshold_slider.setValue(int(settings['traj_yolo_confidence_threshold'] * 100))
-            
             if 'throw_yolo_confidence_threshold' in settings and hasattr(self, 'throw_yolo_confidence_threshold_slider'):
                 self.throw_yolo_confidence_threshold_slider.setValue(int(settings['throw_yolo_confidence_threshold'] * 100))
-            
             if 'traj_velocity_estimation_time' in settings and hasattr(self, 'traj_velocity_estimation_time_slider'):
-                self.traj_velocity_estimation_time_slider.setValue(int(settings['traj_velocity_estimation_time'] * 100))  # s to cs
-            
+                self.traj_velocity_estimation_time_slider.setValue(int(settings['traj_velocity_estimation_time'] * 100))
             if 'traj_max_search_distance' in settings and hasattr(self, 'traj_max_search_distance_slider'):
-                self.traj_max_search_distance_slider.setValue(int(settings['traj_max_search_distance'] * 100))  # m to cm
+                self.traj_max_search_distance_slider.setValue(int(settings['traj_max_search_distance'] * 100))
             
-            # Threshold visualization toggle with backward compatibility
+            # Threshold visualization toggles
             if 'show_hand_distance_threshold' in settings and hasattr(self, 'show_hand_distance_threshold_toggle'):
                 self.show_hand_distance_threshold_toggle.setChecked(settings['show_hand_distance_threshold'])
-            elif 'show_throw_distance_threshold' in settings or 'show_catch_distance_threshold' in settings:
-                # Backward compatibility: show if either old toggle was enabled
-                if hasattr(self, 'show_hand_distance_threshold_toggle'):
-                    show_throw = settings.get('show_throw_distance_threshold', True)
-                    show_catch = settings.get('show_catch_distance_threshold', True)
-                    self.show_hand_distance_threshold_toggle.setChecked(show_throw or show_catch)
-            
-            # Hand velocity zone visualization toggle
             if 'show_hand_velocity_zone' in settings and hasattr(self, 'show_hand_velocity_zone_toggle'):
                 self.show_hand_velocity_zone_toggle.setChecked(settings['show_hand_velocity_zone'])
             
             # Hand Velocity Tracking settings
             if 'hand_velocity_enabled' in settings and hasattr(self, 'hand_velocity_enabled_toggle'):
                 self.hand_velocity_enabled_toggle.setChecked(settings['hand_velocity_enabled'])
-            
             if 'hand_velocity_threshold' in settings and hasattr(self, 'hand_velocity_threshold_slider'):
                 self.hand_velocity_threshold_slider.setValue(int(settings['hand_velocity_threshold'] * 100))
-            
             if 'hand_velocity_confidence_reduction' in settings and hasattr(self, 'hand_velocity_confidence_reduction_slider'):
                 self.hand_velocity_confidence_reduction_slider.setValue(int(settings['hand_velocity_confidence_reduction'] * 100))
-            
             if 'hand_velocity_detection_radius' in settings and hasattr(self, 'hand_velocity_detection_radius_slider'):
                 self.hand_velocity_detection_radius_slider.setValue(int(settings['hand_velocity_detection_radius'] * 100))
-            
             if 'hand_velocity_distance_reduction' in settings and hasattr(self, 'hand_velocity_distance_reduction_slider'):
                 self.hand_velocity_distance_reduction_slider.setValue(int(settings['hand_velocity_distance_reduction'] * 100))
-            
             if 'hand_velocity_ignore_class' in settings and hasattr(self, 'hand_velocity_ignore_class_toggle'):
                 self.hand_velocity_ignore_class_toggle.setChecked(settings['hand_velocity_ignore_class'])
-            
-            # Restore visualization toggle states to main window
-            if self.main_window:
-                if 'viz_show_raw_detections' in settings and hasattr(self.main_window, 'show_raw_detections_toggle'):
-                    self.main_window.show_raw_detections_toggle.setChecked(settings['viz_show_raw_detections'])
-                if 'viz_show_hand_tracking' in settings and hasattr(self.main_window, 'show_hand_tracking_toggle'):
-                    self.main_window.show_hand_tracking_toggle.setChecked(settings['viz_show_hand_tracking'])
-                if 'viz_show_ball_states' in settings and hasattr(self.main_window, 'show_ball_states_toggle'):
-                    self.main_window.show_ball_states_toggle.setChecked(settings['viz_show_ball_states'])
-                if 'viz_show_skeleton' in settings and hasattr(self.main_window, 'show_skeleton_toggle'):
-                    self.main_window.show_skeleton_toggle.setChecked(settings['viz_show_skeleton'])
-                if 'viz_show_color_search' in settings and hasattr(self.main_window, 'show_color_search_toggle'):
-                    self.main_window.show_color_search_toggle.setChecked(settings['viz_show_color_search'])
-                if 'viz_show_color_tracker' in settings and hasattr(self.main_window, 'show_color_tracker_toggle'):
-                    self.main_window.show_color_tracker_toggle.setChecked(settings['viz_show_color_tracker'])
-                if 'viz_show_tracked_boxes' in settings and hasattr(self.main_window, 'show_tracked_boxes_toggle'):
-                    self.main_window.show_tracked_boxes_toggle.setChecked(settings['viz_show_tracked_boxes'])
-                if 'viz_show_unmatched_detections' in settings and hasattr(self.main_window, 'show_unmatched_detections_toggle'):
-                    self.main_window.show_unmatched_detections_toggle.setChecked(settings['viz_show_unmatched_detections'])
-                if 'viz_show_trajectory' in settings and hasattr(self.main_window, 'show_trajectory_toggle'):
-                    self.main_window.show_trajectory_toggle.setChecked(settings['viz_show_trajectory'])
-                if 'viz_show_trajectory_points' in settings and hasattr(self.main_window, 'show_trajectory_points_toggle'):
-                    self.main_window.show_trajectory_points_toggle.setChecked(settings['viz_show_trajectory_points'])
-                if 'viz_show_throw_threshold' in settings and hasattr(self.main_window, 'show_throw_threshold_toggle'):
-                    self.main_window.show_throw_threshold_toggle.setChecked(settings['viz_show_throw_threshold'])
-                if 'viz_show_catch_threshold' in settings and hasattr(self.main_window, 'show_catch_threshold_toggle'):
-                    self.main_window.show_catch_threshold_toggle.setChecked(settings['viz_show_catch_threshold'])
-                if 'viz_show_tails' in settings and hasattr(self.main_window, 'show_tails_toggle'):
-                    self.main_window.show_tails_toggle.setChecked(settings['viz_show_tails'])
-                if 'viz_hide_video_feed' in settings and hasattr(self.main_window, 'hide_video_feed_toggle'):
-                    self.main_window.hide_video_feed_toggle.setChecked(settings['viz_hide_video_feed'])
-            
-            if 'collapsed_adaptive_color' in settings and hasattr(self, 'adaptive_color_section'):
-                if settings['collapsed_adaptive_color'] != self.adaptive_color_section.is_collapsed:
-                    self.adaptive_color_section.toggle_collapsed()
-            
+
+        def _apply_2d_tracker_settings(self, settings: dict):
+            """Apply 2D tracker-specific settings"""
+            # Placeholder for 2D tracker settings when implemented
+            pass
+
+        def _apply_ui_state(self, settings: dict):
+            """Restore UI collapsed states"""
+            if 'collapsed_camera' in settings and hasattr(self, 'camera_section'):
+                if settings['collapsed_camera'] != self.camera_section.is_collapsed:
+                    self.camera_section.toggle_collapsed()
+            if 'collapsed_yolo' in settings and hasattr(self, 'yolo_section'):
+                if settings['collapsed_yolo'] != self.yolo_section.is_collapsed:
+                    self.yolo_section.toggle_collapsed()
+            if 'collapsed_pose' in settings and hasattr(self, 'pose_section'):
+                if settings['collapsed_pose'] != self.pose_section.is_collapsed:
+                    self.pose_section.toggle_collapsed()
+            if 'collapsed_throw_catch' in settings and hasattr(self, 'throw_catch_section'):
+                if settings['collapsed_throw_catch'] != self.throw_catch_section.is_collapsed:
+                    self.throw_catch_section.toggle_collapsed()
+            if 'collapsed_color_tracker_weights' in settings and hasattr(self, 'color_tracker_weights_section'):
+                if settings['collapsed_color_tracker_weights'] != self.color_tracker_weights_section.is_collapsed:
+                    self.color_tracker_weights_section.toggle_collapsed()
             if 'collapsed_override_detection' in settings and hasattr(self, 'override_detection_section'):
                 if settings['collapsed_override_detection'] != self.override_detection_section.is_collapsed:
                     self.override_detection_section.toggle_collapsed()
-            
             if 'collapsed_held_color_blob' in settings and hasattr(self, 'held_color_blob_section'):
                 if settings['collapsed_held_color_blob'] != self.held_color_blob_section.is_collapsed:
                     self.held_color_blob_section.toggle_collapsed()
-            
+            if 'collapsed_trajectory' in settings and hasattr(self, 'trajectory_section'):
+                if settings['collapsed_trajectory'] != self.trajectory_section.is_collapsed:
+                    self.trajectory_section.toggle_collapsed()
+            if 'collapsed_hand_velocity' in settings and hasattr(self, 'hand_velocity_section'):
+                if settings['collapsed_hand_velocity'] != self.hand_velocity_section.is_collapsed:
+                    self.hand_velocity_section.toggle_collapsed()
             if 'collapsed_ball_profiles' in settings and hasattr(self, 'ball_profiles_section'):
                 if settings['collapsed_ball_profiles'] != self.ball_profiles_section.is_collapsed:
                     self.ball_profiles_section.toggle_collapsed()
-            
-            # Restore ball profile settings
-            if 'ball_tracking_enabled' in settings and hasattr(self, 'ball_checkboxes'):
-                for ball_name, enabled in settings['ball_tracking_enabled'].items():
-                    if ball_name in self.ball_checkboxes:
-                        self.ball_checkboxes[ball_name].setChecked(enabled)
 
-        def save_settings(self, filepath: str = None):
-            """Save current calibration settings to a JSON file."""
-            if filepath is None:
-                filepath = self.settings_file
-            
-            settings = self.get_current_settings()
-            settings['saved_at'] = datetime.now().isoformat()
-            
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            
-            try:
-                with open(filepath, 'w') as f:
-                    json.dump(settings, f, indent=2)
-                print(f"✅ Settings saved to {filepath}")
-                return True
-            except Exception as e:
-                print(f"❌ Error saving settings: {e}")
-                return False
-
-        def load_settings(self, filepath: str = None):
-            """Load calibration settings from a JSON file."""
-            if filepath is None:
-                filepath = self.settings_file
-            
-            if not os.path.exists(filepath):
-                print(f"ℹ️ No saved settings found at {filepath}")
-                return False
-            
-            try:
-                # Set flag to prevent auto-save during load
+        def load_settings(self):
+            """Load settings for current tracker"""
+            settings = self.settings_manager.load_settings(self.current_tracker)
+            if settings:
                 self._loading_settings = True
-                
-                with open(filepath, 'r') as f:
-                    settings = json.load(f)
-                
                 self.apply_settings(settings)
-                print(f"✅ Settings loaded from {filepath}")
-                if 'saved_at' in settings:
-                    print(f"   Saved at: {settings['saved_at']}")
+                self._loading_settings = False
+                print(f"✅ Settings loaded for {self.current_tracker}")
                 
-                # CRITICAL FIX: Send all loaded settings to the engine
-                # The UI sliders are now set, but the engine doesn't know about them yet
-                # Add a delay to ensure the engine's UDP listener is fully initialized
+                # Send all settings to engine
                 print("📤 Sending loaded settings to engine...")
                 import time
-                time.sleep(2.0)  # Wait 2 seconds for engine to be fully ready
+                time.sleep(0.5)  # Brief delay to ensure engine is ready
                 self._send_all_settings_to_engine(settings)
                 print("✅ All settings sent to engine")
+            else:
+                print(f"ℹ️ No saved settings found for {self.current_tracker}")
+
+        def save_settings(self):
+            """Save current settings"""
+            if self._loading_settings:
+                return
+            settings = self.get_current_settings()
+            self.settings_manager.save_settings(self.current_tracker, settings)
+            print(f"💾 Settings saved for {self.current_tracker}")
+
+        def start_camera_feed(self):
+            """Start the camera feed with selected settings"""
+            try:
+                selected_profile = self.camera_settings_combo.currentData()
+                selected_resolution = self.resolution_combo.currentText()
+                selected_fps = self.fps_combo.currentData()
                 
-                return True
+                width, height = map(int, selected_resolution.split(' x '))
+                settings_file_path = f"camera_settings/{selected_profile}.json"
+                
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.CAMERA_START
+                command.camera_settings_file = settings_file_path
+                command.camera_width = width
+                command.camera_height = height
+                command.camera_fps = selected_fps
+                
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Camera started: {selected_resolution} @ {selected_fps} FPS")
+                    if not self._loading_settings:
+                        self.save_settings()
+                else:
+                    print(f"❌ Failed to start camera: {response.message}")
+                    QMessageBox.critical(self, "Error", f"Failed to start camera:\n{response.message}")
             except Exception as e:
-                print(f"❌ Error loading settings: {e}")
-                return False
-            finally:
-                # Always reset the flag
-                self._loading_settings = False
-        
-        def _send_all_settings_to_engine(self, settings: dict):
-            """Send all settings from the loaded configuration to the engine.
-            
-            This is called after loading settings to ensure the engine receives
-            all configuration values, not just the UI slider positions.
-            """
-            # DNN Tracker enable/disable (support both old and new setting names)
-            if 'enable_ball_detection' in settings:
-                self.udp_client.send_setting('enable_ball_detection', 1 if settings['enable_ball_detection'] else 0)
-            elif 'use_dnn_tracker' in settings:
-                # Backward compatibility with old setting name
-                self.udp_client.send_setting('enable_ball_detection', 1 if settings['use_dnn_tracker'] else 0)
-            
-            # YOLO Tracker settings
-            if 'ball_confidence_threshold' in settings:
-                self.udp_client.send_setting('ball_confidence_threshold', settings['ball_confidence_threshold'])
-            
-            if 'ball_held_confidence_threshold' in settings:
-                self.udp_client.send_setting('ball_held_confidence_threshold', settings['ball_held_confidence_threshold'])
-            
-            if 'nms_threshold' in settings:
-                self.udp_client.send_setting('nms_threshold', settings['nms_threshold'])
-            
-            if 'show_raw_yolo_detections' in settings:
-                self.udp_client.send_setting('show_raw_yolo_detections', 1 if settings['show_raw_yolo_detections'] else 0)
-            
-            # Throw/Catch Detection settings
-            if 'undetected_near_hand_threshold' in settings:
-                self.udp_client.send_setting('undetected_near_hand_threshold', settings['undetected_near_hand_threshold'])
-            
-            if 'min_frames_for_state_change' in settings:
-                self.udp_client.send_setting('min_frames_for_state_change', settings['min_frames_for_state_change'])
+                print(f"❌ Error starting camera: {e}")
+                QMessageBox.critical(self, "Error", f"Error starting camera:\n{str(e)}")
 
-            # Send unified hand_distance_threshold with backward compatibility
-            if 'hand_distance_threshold' in settings:
-                self.udp_client.send_setting('hand_distance_threshold', settings['hand_distance_threshold'])
-            elif 'throw_distance_threshold' in settings or 'catch_distance_threshold' in settings:
-                # Backward compatibility: calculate unified value from old settings
-                throw_val = settings.get('throw_distance_threshold', 0.20)
-                catch_val = settings.get('catch_distance_threshold', 0.30)
-                unified_val = (throw_val + catch_val) / 2.0
-                self.udp_client.send_setting('hand_distance_threshold', unified_val)
-            
-            if 'min_throw_distance' in settings:
-                self.udp_client.send_setting('min_throw_distance', settings['min_throw_distance'])
-            
-            if 'min_frames_before_catch' in settings:
-                self.udp_client.send_setting('min_frames_before_catch', settings['min_frames_before_catch'])
+        def stop_camera_feed(self):
+            """Stop the camera feed"""
+            try:
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.CAMERA_STOP
+                
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Camera stopped")
+                else:
+                    print(f"❌ Failed to stop camera: {response.message}")
+                    QMessageBox.critical(self, "Error", f"Failed to stop camera:\n{response.message}")
+            except Exception as e:
+                print(f"❌ Error stopping camera: {e}")
+                QMessageBox.critical(self, "Error", f"Error stopping camera:\n{str(e)}")
+        def update_ir_status(self, is_active: bool):
+            """Update IR projector status indicator"""
+            if hasattr(self, 'ir_status_label'):
+                if is_active:
+                    self.ir_status_label.setText("🔆 IR Projector: Active")
+                    self.ir_status_label.setStyleSheet("color: #4caf50; font-weight: bold;")
+                else:
+                    self.ir_status_label.setText("🔆 IR Projector: Inactive")
+                    self.ir_status_label.setStyleSheet("color: #f44336;")
 
-            if 'max_tracker_distance_per_frame' in settings:
-                self.udp_client.send_setting('max_tracker_distance_per_frame', settings['max_tracker_distance_per_frame'])
+        def populate_camera_settings(self):
+            """Populate camera settings dropdown"""
+            self.camera_settings_combo.clear()
+            camera_settings_dir = os.path.join("..", "camera_settings")
+            if os.path.exists(camera_settings_dir):
+                for filename in os.listdir(camera_settings_dir):
+                    if filename.endswith('.json'):
+                        display_name = filename[:-5].replace('_', ' ').title()
+                        profile_name = filename[:-5]
+                        self.camera_settings_combo.addItem(display_name, profile_name)
+            if self.camera_settings_combo.count() == 0:
+                self.camera_settings_combo.addItem("Default", "default")
+            default_index = self.camera_settings_combo.findData("default")
+            if default_index >= 0:
+                self.camera_settings_combo.setCurrentIndex(default_index)
+
+        def on_camera_profile_changed(self):
+            """Handle camera profile change"""
+            if not self._loading_settings:
+                self.save_settings()
+
+        def on_resolution_changed(self):
+            """Handle resolution change"""
+            current_resolution = self.resolution_combo.currentText()
+            if current_resolution in self.resolution_fps_map:
+                fps_options = self.resolution_fps_map[current_resolution]
+                self.fps_combo.clear()
+                for fps in fps_options:
+                    self.fps_combo.addItem(f"{fps} FPS", fps)
+                default_index = self.fps_combo.findText("60 FPS")
+                if default_index >= 0:
+                    self.fps_combo.setCurrentIndex(default_index)
+                elif self.fps_combo.count() > 0:
+                    self.fps_combo.setCurrentIndex(0)
+
+        def on_fps_changed(self):
+            """Handle FPS change"""
+            if not self._loading_settings:
+                self.save_settings()
+
+        def toggle_dnn_tracker(self):
+            """Toggle YOLO ball detection"""
+            is_enabled = self.use_dnn_tracker_toggle.isChecked()
+            self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection" if is_enabled else "YOLO Ball Detection DISABLED")
+            self.udp_client.send_setting('enable_ball_detection', 1 if is_enabled else 0)
+            print(f"✅ YOLO ball detection {'enabled' if is_enabled else 'disabled'}")
+            if not self._loading_settings:
+                self.save_settings()
+
+        def toggle_pose_model(self):
+            """Toggle pose model"""
+            is_enabled = self.pose_model_toggle.isChecked()
+            command = juggler_pb2.CommandRequest(
+                type=juggler_pb2.CommandRequest.CommandType.SET_POSE_MODEL_ENABLED,
+                pose_model_enabled=is_enabled
+            )
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Pose model {'enabled' if is_enabled else 'disabled'}")
+                    if not self._loading_settings:
+                        self.save_settings()
+                else:
+                    print(f"❌ Failed to toggle pose model: {response.message}")
+            except Exception as e:
+                print(f"❌ Error toggling pose model: {e}")
+
+        def toggle_depth_sensor(self):
+            """Toggle depth sensor"""
+            is_enabled = self.depth_sensor_toggle.isChecked()
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.SET_DEPTH_SENSOR_ENABLED
+            command.depth_sensor_enabled = is_enabled
             
-            if 'tc_sound_on_catch' in settings:
-                self.udp_client.send_setting('tc_sound_on_catch', 1 if settings['tc_sound_on_catch'] else 0)
-            
-            if 'tc_sound_on_throw' in settings:
-                self.udp_client.send_setting('tc_sound_on_throw', 1 if settings['tc_sound_on_throw'] else 0)
-            
-            if 'tc_name_on_catch' in settings:
-                self.udp_client.send_setting('tc_name_on_catch', 1 if settings['tc_name_on_catch'] else 0)
-            
-            if 'tc_name_on_throw' in settings:
-                self.udp_client.send_setting('tc_name_on_throw', 1 if settings['tc_name_on_throw'] else 0)
-            
-            if 'ignore_class' in settings:
-                self.udp_client.send_setting('ignore_class', 1 if settings['ignore_class'] else 0)
-            
-            # Euclidean Matching Temporal Consistency
-            if 'temporal_consistency_bonus' in settings:
-                self.udp_client.send_setting('temporal_consistency_bonus', settings['temporal_consistency_bonus'])
-            
-            if 'spatial_threshold' in settings:
-                self.udp_client.send_setting('spatial_threshold', settings['spatial_threshold'])
-            
-            # Color Sample Radius
-            if 'color_sample_radius' in settings:
-                self.udp_client.send_setting('color_sample_radius', settings['color_sample_radius'])
-            
-            # Identity Swap Prevention settings
-            if 'max_euclidean_distance' in settings:
-                self.udp_client.send_setting('max_euclidean_distance', settings['max_euclidean_distance'])
-            
-            if 'min_euclidean_color_score' in settings:
-                self.udp_client.send_setting('min_euclidean_color_score', settings['min_euclidean_color_score'])
-            
-            if 'max_depth_jump_strict' in settings:
-                self.udp_client.send_setting('max_depth_jump_strict', settings['max_depth_jump_strict'])
-            
-            # Ball Separation & Hand Change settings
-            if 'min_color_confidence_override' in settings:
-                self.udp_client.send_setting('min_color_confidence_override', settings['min_color_confidence_override'])
-            
-            if 'min_ball_separation' in settings:
-                self.udp_client.send_setting('min_ball_separation', settings['min_ball_separation'])
-            
-            if 'min_hand_change_distance' in settings:
-                self.udp_client.send_setting('min_hand_change_distance', settings['min_hand_change_distance'])
-            
-            # Override Detection settings (NEW: class-specific thresholds)
-            if 'override_ball_confidence_threshold' in settings:
-                self.udp_client.send_setting('override_ball_confidence_threshold', settings['override_ball_confidence_threshold'])
-            
-            if 'override_ball_color_threshold' in settings:
-                self.udp_client.send_setting('override_ball_color_threshold', settings['override_ball_color_threshold'])
-            
-            if 'override_ball_held_confidence_threshold' in settings:
-                self.udp_client.send_setting('override_ball_held_confidence_threshold', settings['override_ball_held_confidence_threshold'])
-            
-            if 'override_ball_held_color_threshold' in settings:
-                self.udp_client.send_setting('override_ball_held_color_threshold', settings['override_ball_held_color_threshold'])
-            
-            # DEPRECATED: Keep old settings for backward compatibility
-            if 'override_min_confidence_tracked' in settings:
-                self.udp_client.send_setting('override_min_confidence_tracked', settings['override_min_confidence_tracked'])
-            
-            if 'override_min_color_score_tracked' in settings:
-                self.udp_client.send_setting('override_min_color_score_tracked', settings['override_min_color_score_tracked'])
-            
-            if 'override_min_confidence_missing' in settings:
-                self.udp_client.send_setting('override_min_confidence_missing', settings['override_min_confidence_missing'])
-            
-            if 'override_min_color_score_missing' in settings:
-                self.udp_client.send_setting('override_min_color_score_missing', settings['override_min_color_score_missing'])
-            
-            # Held Color Blob Detection settings
-            if 'held_color_search_radius' in settings:
-                self.udp_client.send_setting('held_color_search_radius', settings['held_color_search_radius'])
-            
-            if 'held_color_min_score' in settings:
-                self.udp_client.send_setting('held_color_min_score', settings['held_color_min_score'])
-            
-            if 'held_color_max_distance' in settings:
-                self.udp_client.send_setting('held_color_max_distance', settings['held_color_max_distance'])
-            
-            # Trajectory Settings
-            if 'traj_gravity' in settings:
-                self.udp_client.send_setting('traj_gravity', settings['traj_gravity'])
-            
-            if 'traj_time_step' in settings:
-                self.udp_client.send_setting('traj_time_step', settings['traj_time_step'])
-            
-            if 'traj_max_time' in settings:
-                self.udp_client.send_setting('traj_max_time', settings['traj_max_time'])
-            
-            if 'traj_search_radius' in settings:
-                self.udp_client.send_setting('traj_search_radius', settings['traj_search_radius'])
-            
-            if 'traj_min_points_for_prediction' in settings:
-                self.udp_client.send_setting('traj_min_points_for_prediction', settings['traj_min_points_for_prediction'])
-            
-            if 'traj_color_match_threshold' in settings:
-                self.udp_client.send_setting('traj_color_match_threshold', settings['traj_color_match_threshold'])
-            
-            if 'traj_yolo_confidence_threshold' in settings:
-                self.udp_client.send_setting('traj_yolo_confidence_threshold', settings['traj_yolo_confidence_threshold'])
-            
-            if 'throw_yolo_confidence_threshold' in settings:
-                self.udp_client.send_setting('throw_yolo_confidence_threshold', settings['throw_yolo_confidence_threshold'])
-            
-            if 'traj_velocity_estimation_time' in settings:
-                self.udp_client.send_setting('traj_velocity_estimation_time', settings['traj_velocity_estimation_time'])
-            
-            if 'traj_max_search_distance' in settings:
-                self.udp_client.send_setting('traj_max_search_distance', settings['traj_max_search_distance'])
-            
-            # Hand Velocity Tracking settings
-            if 'hand_velocity_enabled' in settings:
-                self.udp_client.send_setting('hand_velocity_enabled', 1 if settings['hand_velocity_enabled'] else 0)
-            
-            if 'hand_velocity_threshold' in settings:
-                self.udp_client.send_setting('hand_velocity_threshold', settings['hand_velocity_threshold'])
-            
-            if 'hand_velocity_confidence_reduction' in settings:
-                self.udp_client.send_setting('hand_velocity_confidence_reduction', settings['hand_velocity_confidence_reduction'])
-            
-            if 'hand_velocity_ignore_class' in settings:
-                self.udp_client.send_setting('hand_velocity_ignore_class', 1 if settings['hand_velocity_ignore_class'] else 0)
-            
-            if 'hand_velocity_detection_radius' in settings:
-                self.udp_client.send_setting('hand_velocity_detection_radius', settings['hand_velocity_detection_radius'])
-            
-            if 'hand_velocity_distance_reduction' in settings:
-                self.udp_client.send_setting('hand_velocity_distance_reduction', settings['hand_velocity_distance_reduction'])
-            
-            # Threshold visualization toggle with backward compatibility
-            if 'show_hand_distance_threshold' in settings:
-                self.udp_client.send_setting('show_hand_distance_threshold', 1 if settings['show_hand_distance_threshold'] else 0)
-            elif 'show_throw_distance_threshold' in settings or 'show_catch_distance_threshold' in settings:
-                # Backward compatibility: show if either old toggle was enabled
-                show_throw = settings.get('show_throw_distance_threshold', True)
-                show_catch = settings.get('show_catch_distance_threshold', True)
-                self.udp_client.send_setting('show_hand_distance_threshold', 1 if (show_throw or show_catch) else 0)
-            
-            # Hand velocity zone visualization toggle
-            if 'show_hand_velocity_zone' in settings:
-                self.udp_client.send_setting('show_hand_velocity_zone', 1 if settings['show_hand_velocity_zone'] else 0)
-            
-            # Ball tracking enabled states
-            if 'ball_tracking_enabled' in settings:
-                for ball_name, enabled in settings['ball_tracking_enabled'].items():
-                    self.udp_client.send_setting(f'track_{ball_name}', 1 if enabled else 0)
-            
-            # Ball hue ranges (send to engine, not just ball_settings.json)
-            if 'ball_hue_ranges' in settings:
-                for ball_name, hue_range in settings['ball_hue_ranges'].items():
-                    if 'min_hue' in hue_range:
-                        self.udp_client.send_setting(f'{ball_name}_min_hue', hue_range['min_hue'])
-                    if 'max_hue' in hue_range:
-                        self.udp_client.send_setting(f'{ball_name}_max_hue', hue_range['max_hue'])
-        
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Depth sensor {'enabled' if is_enabled else 'disabled'}")
+                    if not self._loading_settings:
+                        self.save_settings()
+                else:
+                    print(f"❌ Failed to toggle depth sensor: {response.message}")
+                    QMessageBox.warning(self, "Depth Sensor Toggle Failed",
+                                      f"Failed to toggle depth sensor:\n{response.message}")
+            except Exception as e:
+                print(f"❌ Error toggling depth sensor: {e}")
+                QMessageBox.critical(self, "Error", f"Error toggling depth sensor:\n{str(e)}")
+
         def test_catch_sound(self):
-            """Play a test sound for catch events"""
+            """Play test sound for catch events"""
             self.play_system_sound(frequency=800, duration=100)
             print("🔊 Playing catch test sound (800 Hz)")
-        
+        def populate_resolution_options(self):
+            """Populate resolution dropdown with supported resolutions"""
+            self.resolution_combo.clear()
+            for resolution in self.resolution_fps_map.keys():
+                self.resolution_combo.addItem(resolution)
+            default_index = self.resolution_combo.findText("640 x 480")
+            if default_index >= 0:
+                self.resolution_combo.setCurrentIndex(default_index)
+
+        def populate_fps_options(self):
+            """Populate FPS dropdown based on selected resolution"""
+            current_resolution = self.resolution_combo.currentText()
+            if current_resolution in self.resolution_fps_map:
+                fps_options = self.resolution_fps_map[current_resolution]
+                self.fps_combo.clear()
+                for fps in fps_options:
+                    self.fps_combo.addItem(f"{fps} FPS", fps)
+                default_index = self.fps_combo.findText("60 FPS")
+                if default_index >= 0:
+                    self.fps_combo.setCurrentIndex(default_index)
+                elif self.fps_combo.count() > 0:
+                    self.fps_combo.setCurrentIndex(0)
+
+
         def test_throw_sound(self):
-            """Play a test sound for throw events"""
+            """Play test sound for throw events"""
             self.play_system_sound(frequency=1200, duration=100)
             print("🔊 Playing throw test sound (1200 Hz)")
-        
-        def test_catch_name(self):
-            """Play a test color name for catch events"""
-            # Play a random color name as test
-            test_color = 'red'  # Default test color
-            self.play_color_name(test_color)
-            print(f"🔊 Playing catch test name: {test_color}")
-        
-        def test_throw_name(self):
-            """Play a test color name for throw events"""
-            # Play a random color name as test
-            test_color = 'blue'  # Default test color
-            self.play_color_name(test_color)
-            print(f"🔊 Playing throw test name: {test_color}")
-        
-        def play_color_name(self, color_name: str):
-            """Play audio file for the given color name"""
-            def play_in_thread():
-                try:
-                    # Path to audio files: hub/audio/color_names/{color}.mp3
-                    audio_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio", "color_names")
-                    audio_file = os.path.join(audio_dir, f"{color_name.lower()}.mp3")
-                    
-                    if not os.path.exists(audio_file):
-                        print(f"⚠️ Audio file not found: {audio_file}")
-                        print(f"   Please add {color_name}.mp3 to hub/audio/color_names/")
-                        return
-                    
-                    system = platform.system()
-                    if system == "Linux":
-                        # Use paplay for instant playback (same as beep sounds)
-                        # This is much faster than mpg123/ffplay
-                        try:
-                            subprocess.Popen(['paplay', audio_file],
-                                           stdout=subprocess.DEVNULL,
-                                           stderr=subprocess.DEVNULL)
-                        except FileNotFoundError:
-                            # Fallback to mpg123 if paplay not available
-                            try:
-                                subprocess.Popen(['mpg123', '-q', audio_file],
-                                               stdout=subprocess.DEVNULL,
-                                               stderr=subprocess.DEVNULL)
-                            except FileNotFoundError:
-                                print("⚠️ Neither paplay nor mpg123 found. Install with: sudo apt install pulseaudio-utils")
-                    elif system == "Darwin":  # macOS
-                        subprocess.Popen(['afplay', audio_file],
-                                       stdout=subprocess.DEVNULL,
-                                       stderr=subprocess.DEVNULL)
-                    elif system == "Windows":
-                        # Use winsound for instant playback
-                        import winsound
-                        winsound.PlaySound(audio_file, winsound.SND_FILENAME | winsound.SND_ASYNC)
-                except Exception as e:
-                    print(f"⚠️ Could not play color name audio: {e}")
-            
-            # Play sound in background thread to avoid blocking UI
-            threading.Thread(target=play_in_thread, daemon=True).start()
-        
+
         def play_system_sound(self, frequency=1000, duration=100):
-            """Play a simple beep sound using system commands"""
+            """Play a simple beep sound"""
             def play_in_thread():
                 try:
                     system = platform.system()
                     if system == "Linux":
-                        # Use paplay with a generated sine wave
-                        subprocess.run([
-                            'paplay', '--raw',
-                            '/dev/stdin'
-                        ], input=self.generate_sine_wave(frequency, duration),
-                        timeout=1, check=False)
-                    elif system == "Darwin":  # macOS
-                        # Use afplay with a generated audio file
+                        subprocess.run(['paplay', '--raw', '/dev/stdin'],
+                                     input=self.generate_sine_wave(frequency, duration),
+                                     timeout=1, check=False)
+                    elif system == "Darwin":
                         subprocess.run(['afplay', '/System/Library/Sounds/Pop.aiff'],
                                      timeout=1, check=False)
                     elif system == "Windows":
-                        # Use winsound
                         import winsound
                         winsound.Beep(frequency, duration)
                 except Exception as e:
                     print(f"⚠️ Could not play sound: {e}")
-                    # Fallback: print to console
-                    print(f"\a")  # Terminal bell
-            
-            # Play sound in background thread to avoid blocking UI
+                    print(f"\a")
             threading.Thread(target=play_in_thread, daemon=True).start()
-        
+
         def generate_sine_wave(self, frequency=1000, duration=100):
-            """Generate a sine wave for audio playback"""
+            """Generate sine wave for audio"""
             sample_rate = 44100
             num_samples = int(sample_rate * duration / 1000)
             t = np.linspace(0, duration / 1000, num_samples, False)
             wave = np.sin(2 * np.pi * frequency * t)
-            # Convert to 16-bit PCM
             audio = (wave * 32767).astype(np.int16)
             return audio.tobytes()
+
+        def test_catch_name(self):
+            """Play test sound for catch name announcement"""
+            # Play a sample color name (e.g., "red")
+            self.play_color_name("red")
+            print("🔊 Playing catch name test sound (red)")
+
+        def test_throw_name(self):
+            """Play test sound for throw name announcement"""
+            # Play a sample color name (e.g., "blue")
+            self.play_color_name("blue")
+            print("🔊 Playing throw name test sound (blue)")
+
+        def play_color_name(self, color_name: str):
+            """Play audio file for color name"""
+            def play_in_thread():
+                try:
+                    # Look for audio file in hub/audio directory
+                    audio_file = os.path.join(os.path.dirname(__file__), "..", "audio", f"{color_name.lower()}.wav")
+                    
+                    if not os.path.exists(audio_file):
+                        print(f"⚠️ Audio file not found: {audio_file}")
+                        # Fall back to system beep
+                        self.play_system_sound(frequency=1000, duration=200)
+                        return
+                    
+                    system = platform.system()
+                    if system == "Linux":
+                        subprocess.run(['paplay', audio_file], timeout=2, check=False)
+                    elif system == "Darwin":
+                        subprocess.run(['afplay', audio_file], timeout=2, check=False)
+                    elif system == "Windows":
+                        import winsound
+                        winsound.PlaySound(audio_file, winsound.SND_FILENAME)
+                except Exception as e:
+                    print(f"⚠️ Could not play color name audio: {e}")
+                    # Fall back to system beep
+                    self.play_system_sound(frequency=1000, duration=200)
+            
+            threading.Thread(target=play_in_thread, daemon=True).start()
+
+        def auto_calibrate_hues(self):
+            """Auto-calibrate hue ranges for all ball profiles"""
+            print("🎨 Auto-calibrating hue ranges for all ball profiles...")
+            # This would typically analyze the current ball_settings.json and adjust hue ranges
+            # For now, just reload the profiles
+            if hasattr(self, 'tracker_3d_sections'):
+                # Trigger a reload of ball profiles in the UI
+                print("✅ Ball profiles reloaded")
+                QMessageBox.information(self, "Auto-Calibration",
+                                      "Auto-calibration feature is not yet implemented.\n"
+                                      "Please use manual calibration for each ball color.")
+            
+        def start_color_calibration(self, ball_name: str):
+            """Start color calibration for a specific ball"""
+            print(f"🎨 Starting color calibration for {ball_name}")
+            # This would typically open a calibration dialog or mode
+            # For now, just show a message
+            QMessageBox.information(self, "Color Calibration",
+                                  f"Color calibration for '{ball_name}' ball.\n\n"
+                                  f"To calibrate:\n"
+                                  f"1. Select '{ball_name}' from the Color Profile dropdown in the main UI\n"
+                                  f"2. Click 'Set Color Profile'\n"
+                                  f"3. Click on a {ball_name} ball in the video feed")
+
+        def toggle_ball_tracking(self, ball_name: str, enabled: bool):
+            """Toggle tracking for specific ball"""
+            print(f"🔄 {'Enabling' if enabled else 'Disabling'} tracking for {ball_name}")
+            self.udp_client.send_setting(f"track_{ball_name}", 1 if enabled else 0)
+            if not self._loading_settings:
+                self.save_settings()
+
+        def save_ball_settings(self):
+            """Save ball profiles to ball_settings.json"""
+            # This is handled by the ball profile sections
+            pass
+
+        def reload_ball_profiles(self):
+            """Reload ball profiles from file"""
+            # This is handled by the ball profile sections
+            pass
+
+        def on_ball_profile_changed(self):
+            """Handle ball profile change"""
+            if not self._loading_settings:
+                self.save_settings()
+
+        def update_setting(self, key: str, value: Any):
+            """Update a setting and send to engine"""
+            self.udp_client.send_setting(key, value)
+            if not self._loading_settings:
+                self.save_settings()
+
+        def _create_slider_widget(self, parent_layout, row, label_text, tooltip_text,
+                                  range_min, range_max, initial_value,
+                                  update_func, is_float=False):
+            """Helper to create labeled slider with value display"""
+            label = QLabel(label_text)
+            label.setToolTip(tooltip_text)
+            parent_layout.addWidget(label, row, 0)
+            
+            slider = QSlider(Qt.Orientation.Horizontal)
+            slider.setRange(range_min, range_max)
+            slider.setValue(initial_value)
+            parent_layout.addWidget(slider, row, 1)
+
+            value_label = QLabel()
+            value_label.setMinimumWidth(40)
+            parent_layout.addWidget(value_label, row, 2)
+            
+            def on_value_changed(value):
+                if is_float:
+                    display_value = f"{value / 100.0:.2f}"
+                    update_func(value)
+                else:
+                    display_value = str(value)
+                    update_func(value)
+                value_label.setText(display_value)
+
+            slider.valueChanged.connect(on_value_changed)
+            on_value_changed(initial_value)
+            
+            return slider, value_label
+
+        def _safe_get_slider_value(self, slider, default_value):
+            """Safely get slider value, handling deleted Qt objects"""
+            try:
+                if slider is not None:
+                    return slider.value()
+            except RuntimeError:
+                pass
+            return default_value
+
+        def _calculate_hsv_range_from_rgb(self, rgb):
+            """Calculate HSV range from RGB color"""
+            import cv2
+            rgb_array = np.uint8([[rgb]])
+            hsv_array = cv2.cvtColor(rgb_array, cv2.COLOR_RGB2HSV)
+            h, s, v = hsv_array[0][0]
+            
+            hue_tolerance = 15
+            min_hue = float(max(0, h - hue_tolerance))
+            max_hue = float(min(180, h + hue_tolerance))
+            
+            if h < 15:
+                min_hue = float(max(0, 180 - (15 - h)))
+                max_hue = float(h + hue_tolerance)
+            elif h > 165:
+                min_hue = float(h - hue_tolerance)
+                max_hue = float(min(15, h + hue_tolerance - 180))
+            
+            min_s = float(max(30, s - 80))
+            max_s = 255.0
+            min_v = float(max(30, v - 80))
+            max_v = 255.0
+            
+            return [min_hue, min_s, min_v], [max_hue, max_s, max_v]
+        def _send_all_settings_to_engine(self, settings: dict):
+            """Send settings to engine via UDP, filtered by tracker type"""
+            # Determine active tracker type
+            tracker_type = settings.get('tracker_type', self.current_tracker)
+            
+            # Send common settings (always sent regardless of tracker type)
+            if 'enable_ball_detection' in settings:
+                self.udp_client.send_setting('enable_ball_detection', 1 if settings['enable_ball_detection'] else 0)
+            
+            # YOLO settings (common)
+            if 'ball_confidence_threshold' in settings:
+                self.udp_client.send_setting('ball_confidence_threshold', settings['ball_confidence_threshold'])
+            if 'ball_held_confidence_threshold' in settings:
+                self.udp_client.send_setting('ball_held_confidence_threshold', settings['ball_held_confidence_threshold'])
+            if 'nms_threshold' in settings:
+                self.udp_client.send_setting('nms_threshold', settings['nms_threshold'])
+            if 'show_raw_yolo_detections' in settings:
+                self.udp_client.send_setting('show_raw_yolo_detections', 1 if settings['show_raw_yolo_detections'] else 0)
+            
+            # Send tracker-specific settings based on active tracker
+            if tracker_type == "depth_based":
+                self._send_3d_tracker_settings(settings)
+            elif tracker_type == "simple_2d":
+                self._send_2d_tracker_settings(settings)
+        
+        def _send_3d_tracker_settings(self, settings: dict):
+            """Send 3D tracker-specific settings to engine"""
+            # Ball state detection
+            if 'undetected_near_hand_threshold' in settings:
+                self.udp_client.send_setting('undetected_near_hand_threshold', settings['undetected_near_hand_threshold'])
+            if 'min_frames_for_state_change' in settings:
+                self.udp_client.send_setting('min_frames_for_state_change', settings['min_frames_for_state_change'])
+            if 'hand_distance_threshold' in settings:
+                self.udp_client.send_setting('hand_distance_threshold', settings['hand_distance_threshold'])
+            if 'min_throw_distance' in settings:
+                self.udp_client.send_setting('min_throw_distance', settings['min_throw_distance'])
+            if 'min_frames_before_catch' in settings:
+                self.udp_client.send_setting('min_frames_before_catch', settings['min_frames_before_catch'])
+            if 'max_tracker_distance_per_frame' in settings:
+                self.udp_client.send_setting('max_tracker_distance_per_frame', settings['max_tracker_distance_per_frame'])
+            if 'tc_sound_on_catch' in settings:
+                self.udp_client.send_setting('tc_sound_on_catch', 1 if settings['tc_sound_on_catch'] else 0)
+            if 'tc_sound_on_throw' in settings:
+                self.udp_client.send_setting('tc_sound_on_throw', 1 if settings['tc_sound_on_throw'] else 0)
+            if 'tc_name_on_catch' in settings:
+                self.udp_client.send_setting('tc_name_on_catch', 1 if settings['tc_name_on_catch'] else 0)
+            if 'tc_name_on_throw' in settings:
+                self.udp_client.send_setting('tc_name_on_throw', 1 if settings['tc_name_on_throw'] else 0)
+            if 'ignore_class' in settings:
+                self.udp_client.send_setting('ignore_class', 1 if settings['ignore_class'] else 0)
+            
+            # Color tracker weights
+            if 'temporal_consistency_bonus' in settings:
+                self.udp_client.send_setting('temporal_consistency_bonus', settings['temporal_consistency_bonus'])
+            if 'spatial_threshold' in settings:
+                self.udp_client.send_setting('spatial_threshold', settings['spatial_threshold'])
+            if 'color_sample_radius' in settings:
+                self.udp_client.send_setting('color_sample_radius', settings['color_sample_radius'])
+            if 'max_euclidean_distance' in settings:
+                self.udp_client.send_setting('max_euclidean_distance', settings['max_euclidean_distance'])
+            if 'min_euclidean_color_score' in settings:
+                self.udp_client.send_setting('min_euclidean_color_score', settings['min_euclidean_color_score'])
+            if 'max_depth_jump_strict' in settings:
+                self.udp_client.send_setting('max_depth_jump_strict', settings['max_depth_jump_strict'])
+            if 'min_color_confidence_override' in settings:
+                self.udp_client.send_setting('min_color_confidence_override', settings['min_color_confidence_override'])
+            if 'min_ball_separation' in settings:
+                self.udp_client.send_setting('min_ball_separation', settings['min_ball_separation'])
+            if 'min_hand_change_distance' in settings:
+                self.udp_client.send_setting('min_hand_change_distance', settings['min_hand_change_distance'])
+            
+            # Override detection
+            if 'override_ball_confidence_threshold' in settings:
+                self.udp_client.send_setting('override_ball_confidence_threshold', settings['override_ball_confidence_threshold'])
+            if 'override_ball_color_threshold' in settings:
+                self.udp_client.send_setting('override_ball_color_threshold', settings['override_ball_color_threshold'])
+            if 'override_ball_held_confidence_threshold' in settings:
+                self.udp_client.send_setting('override_ball_held_confidence_threshold', settings['override_ball_held_confidence_threshold'])
+            if 'override_ball_held_color_threshold' in settings:
+                self.udp_client.send_setting('override_ball_held_color_threshold', settings['override_ball_held_color_threshold'])
+            
+            # Held color blob
+            if 'held_color_search_radius' in settings:
+                self.udp_client.send_setting('held_color_search_radius', settings['held_color_search_radius'])
+            if 'held_color_min_score' in settings:
+                self.udp_client.send_setting('held_color_min_score', settings['held_color_min_score'])
+            if 'held_color_max_distance' in settings:
+                self.udp_client.send_setting('held_color_max_distance', settings['held_color_max_distance'])
+            
+            # Trajectory settings
+            if 'traj_gravity' in settings:
+                self.udp_client.send_setting('traj_gravity', settings['traj_gravity'])
+            if 'traj_time_step' in settings:
+                self.udp_client.send_setting('traj_time_step', settings['traj_time_step'])
+            if 'traj_max_time' in settings:
+                self.udp_client.send_setting('traj_max_time', settings['traj_max_time'])
+            if 'traj_search_radius' in settings:
+                self.udp_client.send_setting('traj_search_radius', settings['traj_search_radius'])
+            if 'traj_min_points_for_prediction' in settings:
+                self.udp_client.send_setting('traj_min_points_for_prediction', settings['traj_min_points_for_prediction'])
+            if 'traj_color_match_threshold' in settings:
+                self.udp_client.send_setting('traj_color_match_threshold', settings['traj_color_match_threshold'])
+            if 'traj_yolo_confidence_threshold' in settings:
+                self.udp_client.send_setting('traj_yolo_confidence_threshold', settings['traj_yolo_confidence_threshold'])
+            if 'throw_yolo_confidence_threshold' in settings:
+                self.udp_client.send_setting('throw_yolo_confidence_threshold', settings['throw_yolo_confidence_threshold'])
+            if 'traj_velocity_estimation_time' in settings:
+                self.udp_client.send_setting('traj_velocity_estimation_time', settings['traj_velocity_estimation_time'])
+            if 'traj_max_search_distance' in settings:
+                self.udp_client.send_setting('traj_max_search_distance', settings['traj_max_search_distance'])
+            
+            # Hand velocity tracking
+            if 'hand_velocity_enabled' in settings:
+                self.udp_client.send_setting('hand_velocity_enabled', 1 if settings['hand_velocity_enabled'] else 0)
+            if 'hand_velocity_threshold' in settings:
+                self.udp_client.send_setting('hand_velocity_threshold', settings['hand_velocity_threshold'])
+            if 'hand_velocity_confidence_reduction' in settings:
+                self.udp_client.send_setting('hand_velocity_confidence_reduction', settings['hand_velocity_confidence_reduction'])
+            if 'hand_velocity_detection_radius' in settings:
+                self.udp_client.send_setting('hand_velocity_detection_radius', settings['hand_velocity_detection_radius'])
+            if 'hand_velocity_distance_reduction' in settings:
+                self.udp_client.send_setting('hand_velocity_distance_reduction', settings['hand_velocity_distance_reduction'])
+            if 'hand_velocity_ignore_class' in settings:
+                self.udp_client.send_setting('hand_velocity_ignore_class', 1 if settings['hand_velocity_ignore_class'] else 0)
+            
+            # Visualization toggles
+            if 'show_hand_distance_threshold' in settings:
+                self.udp_client.send_setting('show_hand_distance_threshold', 1 if settings['show_hand_distance_threshold'] else 0)
+            if 'show_hand_velocity_zone' in settings:
+                self.udp_client.send_setting('show_hand_velocity_zone', 1 if settings['show_hand_velocity_zone'] else 0)
+        
+        def _send_2d_tracker_settings(self, settings: dict):
+            """Send 2D tracker-specific settings to engine"""
+            # Currently no 2D-specific settings
+            # This method is a placeholder for future 2D tracker settings
+            pass

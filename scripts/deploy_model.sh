@@ -8,6 +8,7 @@ set -e  # Exit on any error
 # Default values
 DEFAULT_PT_PATH="$HOME/Downloads/best.pt"
 DEFAULT_MODEL_SIZE="nano"
+DEFAULT_IMGSZ=640
 DEPLOY_FLAG=false
 
 # Project paths
@@ -25,12 +26,14 @@ usage() {
     echo "Optional arguments:"
     echo "  -p, --pt-path PATH  Path to the best.pt file (default: ~/Downloads/best.pt)"
     echo "  -s, --size SIZE     Model size: 'nano' or 'small' (default: nano)"
+    echo "  -i, --imgsz SIZE    Image size for export (default: 640)"
     echo "  -d, --deploy        Deploy to root models directory (replaces current models)"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Examples:"
     echo "  $0 V2_3_lonely_hands"
     echo "  $0 V2_3_lonely_hands -p /path/to/model.pt -s small"
+    echo "  $0 V2_3_lonely_hands -i 1280"
     echo "  $0 V2_3_lonely_hands --deploy"
     exit 1
 }
@@ -75,6 +78,7 @@ shift
 
 PT_PATH="$DEFAULT_PT_PATH"
 MODEL_SIZE="$DEFAULT_MODEL_SIZE"
+IMGSZ="$DEFAULT_IMGSZ"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -84,6 +88,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -s|--size)
             MODEL_SIZE="$2"
+            shift 2
+            ;;
+        -i|--imgsz)
+            IMGSZ="$2"
             shift 2
             ;;
         -d|--deploy)
@@ -118,6 +126,7 @@ MODEL_DEPLOY_DIR="$MODELS_DIR/$MODEL_NAME"
 
 log "Starting deployment for model: $MODEL_NAME"
 log "Model size: $MODEL_SIZE"
+log "Image size: $IMGSZ"
 log "Source PT file: $PT_PATH"
 log "Deploy flag: $DEPLOY_FLAG"
 
@@ -138,7 +147,7 @@ log "Step 2: Exporting model to OpenVINO format"
 cd "$MODEL_ZIPPED_DIR"
 
 log "Running YOLO export command..."
-yolo export model="$TARGET_PT_PATH" format=openvino imgsz=640
+yolo export model="$TARGET_PT_PATH" format=openvino imgsz="$IMGSZ"
 
 # Check if export was successful
 OPENVINO_DIR="$MODEL_ZIPPED_DIR/best_openvino_model"
@@ -200,6 +209,7 @@ echo ""
 echo "=== Deployment Summary ==="
 echo "Model Name: $MODEL_NAME"
 echo "Model Size: $MODEL_SIZE"
+echo "Image Size: $IMGSZ"
 echo "Source PT: $PT_PATH"
 echo "Deployed to: $MODEL_DEPLOY_DIR"
 if [[ "$DEPLOY_FLAG" == true ]]; then

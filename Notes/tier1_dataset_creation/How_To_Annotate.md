@@ -611,12 +611,19 @@ Usage Examples:
 # Specify custom PT file location and small model size
 ./scripts/deploy_model.sh V2_3_lonely_hands -p /path/to/model.pt -s small
 
+# Specify custom PT file location and imgsz
+./scripts/deploy_model.sh V2_3_lonely_hands -p /path/to/model.pt -i 416
+
 # Deploy and replace current root models
 ./scripts/deploy_model.sh V2_3_lonely_hands --deploy
 
 # Full example with all options
 ./scripts/deploy_model.sh V8_balls_held -p ~/Downloads/best.pt -s nano --deploy
 ./scripts/deploy_model.sh V9_1_1small_targeted -p ~/Downloads/best.pt -s small --deploy
+
+./scripts/deploy_model.sh V8_balls_held416 -p /home/twain/Projects/JuggleHub/engine/models/zipped/V8_balls_held/best.pt -s nano -i 416 --deploy
+
+./scripts/deploy_pose_model.sh yolo11n-pose416 -p /home/twain/Projects/JuggleHub/engine/models/zipped/yolo11n-pose/yolo11n-pose.pt -s nano -i 416 --deploy
 
 What the script does:
 Validates inputs and checks if the PT file exists

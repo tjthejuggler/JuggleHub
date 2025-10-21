@@ -6,6 +6,7 @@ Contains settings sections that are ONLY visible when new_3d tracker is selected
 from PyQt6.QtWidgets import (QLabel, QPushButton, QGridLayout, QCheckBox, QVBoxLayout, QGroupBox)
 from PyQt6.QtCore import Qt
 from .ui_widgets import CollapsibleGroupBox
+import juggler_pb2
 
 
 class New3DSettingsSections:
@@ -434,15 +435,53 @@ class New3DSettingsSections:
         settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
         settings_path = os.path.normpath(settings_path)
         
+        # Get default profiles from ColorProfileManager
+        from .color_profile_manager import ColorProfileManager
+        color_manager = ColorProfileManager()
+        
         try:
             with open(settings_path, 'r') as f:
                 settings_data = json.load(f)
                 color_profiles = settings_data.get('color_profiles', [])
+            
+            # If no profiles exist, initialize from ColorProfileManager
+            if not color_profiles:
+                print(f"ℹ️ No color_profiles found in {settings_path}, initializing from ColorProfileManager")
+                color_profiles = []
+                for profile in color_manager.profiles:
+                    color_profiles.append({
+                        'name': profile['name'],
+                        'enabled': profile.get('enabled', True),
+                        'avg_hue': -1.0,
+                        'avg_saturation': -1.0,
+                        'min_hsv': [0.0, 0.0, 0.0],
+                        'max_hsv': [180.0, 255.0, 255.0],
+                        'min_hsv2': [-1.0, 0.0, 0.0],
+                        'max_hsv2': [-1.0, 255.0, 255.0]
+                    })
+                # Save the initialized profiles
+                settings_data['color_profiles'] = color_profiles
+                with open(settings_path, 'w') as f:
+                    json.dump(settings_data, f, indent=4)
+                print(f"✅ Initialized {len(color_profiles)} default color profiles")
+            
             print(f"✅ Loaded color profiles from {settings_path}")
             print(f"   Profiles loaded: {[p['name'] for p in color_profiles]}")
         except Exception as e:
             print(f"❌ Error loading calibration_settings_new3d.json: {e}")
+            # Initialize with default profiles as fallback
             color_profiles = []
+            for profile in color_manager.profiles:
+                color_profiles.append({
+                    'name': profile['name'],
+                    'enabled': profile.get('enabled', True),
+                    'avg_hue': -1.0,
+                    'avg_saturation': -1.0,
+                    'min_hsv': [0.0, 0.0, 0.0],
+                    'max_hsv': [180.0, 255.0, 255.0],
+                    'min_hsv2': [-1.0, 0.0, 0.0],
+                    'max_hsv2': [-1.0, 255.0, 255.0]
+                })
         
         # Store references for later use
         if not hasattr(self.parent, 'new3d_ball_checkboxes'):
@@ -559,3 +598,228 @@ class New3DSettingsSections:
         layout.addWidget(auto_cal_button)
         
         return section
+    
+    def create_ball_profiles_section(self):
+        """Create the Ball Profiles section (New 3D only)"""
+        section = CollapsibleGroupBox("🎨 Ball Profiles", collapsed=False)
+        layout = QVBoxLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        # Load ball profiles from calibration_settings_new3d.json
+        import json
+        import os
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+        settings_path = os.path.normpath(settings_path)
+        
+        # Get default profiles from ColorProfileManager
+        from .color_profile_manager import ColorProfileManager
+        color_manager = ColorProfileManager()
+        
+        try:
+            with open(settings_path, 'r') as f:
+                settings_data = json.load(f)
+                self.parent.new3d_ball_profiles = settings_data.get('color_profiles', [])
+            
+            # If no profiles exist, initialize from ColorProfileManager
+            if not self.parent.new3d_ball_profiles:
+                print(f"ℹ️ No color_profiles found in {settings_path}, initializing from ColorProfileManager")
+                self.parent.new3d_ball_profiles = []
+                for profile in color_manager.profiles:
+                    self.parent.new3d_ball_profiles.append({
+                        'name': profile['name'],
+                        'enabled': profile.get('enabled', True),
+                        'avg_hue': -1.0,
+                        'avg_saturation': -1.0,
+                        'min_hsv': [0.0, 0.0, 0.0],
+                        'max_hsv': [180.0, 255.0, 255.0],
+                        'min_hsv2': [-1.0, 0.0, 0.0],
+                        'max_hsv2': [-1.0, 255.0, 255.0]
+                    })
+                # Save the initialized profiles
+                self._save_new3d_profiles()
+                print(f"✅ Initialized {len(self.parent.new3d_ball_profiles)} default color profiles")
+            
+            print(f"✅ Loaded {len(self.parent.new3d_ball_profiles)} ball profiles from {settings_path}")
+            print(f"   Profiles loaded: {[p['name'] for p in self.parent.new3d_ball_profiles]}")
+        except Exception as e:
+            print(f"❌ Error loading calibration_settings_new3d.json: {e}")
+            # Initialize with default profiles as fallback
+            self.parent.new3d_ball_profiles = []
+            for profile in color_manager.profiles:
+                self.parent.new3d_ball_profiles.append({
+                    'name': profile['name'],
+                    'enabled': profile.get('enabled', True),
+                    'avg_hue': -1.0,
+                    'avg_saturation': -1.0,
+                    'min_hsv': [0.0, 0.0, 0.0],
+                    'max_hsv': [180.0, 255.0, 255.0],
+                    'min_hsv2': [-1.0, 0.0, 0.0],
+                    'max_hsv2': [-1.0, 255.0, 255.0]
+                })
+        
+        # Store checkbox references
+        self.parent.new3d_ball_checkboxes = {}
+        
+        # Create a widget for each ball profile
+        for profile in self.parent.new3d_ball_profiles:
+            ball_name = profile['name']
+            ball_group = QGroupBox(ball_name.capitalize())
+            ball_layout = QGridLayout(ball_group)
+            
+            # Checkbox for enabling/disabling this ball
+            checkbox = QPushButton(f"Track {ball_name.capitalize()}")
+            checkbox.setCheckable(True)
+            is_enabled = profile.get('enabled', True)
+            checkbox.setChecked(is_enabled)
+            checkbox.clicked.connect(lambda checked, name=ball_name: self._toggle_new3d_ball_tracking(name, checked))
+            self.parent.new3d_ball_checkboxes[ball_name] = checkbox
+            ball_layout.addWidget(checkbox, 0, 0, 1, 3)
+            
+            # Get current calibration values
+            avg_hue = profile.get('avg_hue', -1.0)
+            avg_sat = profile.get('avg_saturation', -1.0)
+            
+            # Display calibrated values (read-only)
+            row = 1
+            
+            # Average Hue display
+            ball_layout.addWidget(QLabel("Average Hue:"), row, 0)
+            if avg_hue >= 0:
+                hue_value_label = QLabel(f"{avg_hue:.1f}°")
+                hue_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            else:
+                hue_value_label = QLabel("Not calibrated")
+                hue_value_label.setStyleSheet("color: #f44336;")
+            ball_layout.addWidget(hue_value_label, row, 1, 1, 2)
+            row += 1
+            
+            # Average Saturation display
+            ball_layout.addWidget(QLabel("Average Saturation:"), row, 0)
+            if avg_sat >= 0:
+                sat_value_label = QLabel(f"{avg_sat:.1f}")
+                sat_value_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            else:
+                sat_value_label = QLabel("Not calibrated")
+                sat_value_label.setStyleSheet("color: #f44336;")
+            ball_layout.addWidget(sat_value_label, row, 1, 1, 2)
+            row += 1
+            
+            # Store label references for updates
+            if not hasattr(self.parent, 'new3d_ball_calibration_labels'):
+                self.parent.new3d_ball_calibration_labels = {}
+            self.parent.new3d_ball_calibration_labels[ball_name] = {
+                'hue': hue_value_label,
+                'saturation': sat_value_label
+            }
+            
+            # Calibrate button
+            calibrate_button = QPushButton("🎯 Calibrate Color")
+            calibrate_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    padding: 8px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #1976D2; }
+                QPushButton:pressed { background-color: #0D47A1; }
+            """)
+            calibrate_button.clicked.connect(lambda checked, name=ball_name: self._start_new3d_color_calibration(name))
+            ball_layout.addWidget(calibrate_button, row, 0, 1, 3)
+            row += 1
+            
+            # Info label
+            info_label = QLabel("ℹ️ Click 'Set Color Profile' in Visualization, then click on a ball")
+            info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+            info_label.setWordWrap(True)
+            ball_layout.addWidget(info_label, row, 0, 1, 3)
+            
+            layout.addWidget(ball_group)
+        
+        # Info about the active roster system
+        roster_info = QLabel("💡 Active Roster System: The tracker will only look for enabled colors. "
+                            "Maximum one track per enabled color at any time. When a track is lost, "
+                            "its color becomes available again.")
+        roster_info.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic; padding: 10px;")
+        roster_info.setWordWrap(True)
+        layout.addWidget(roster_info)
+        
+        return section
+    
+    def _toggle_new3d_ball_tracking(self, ball_name: str, enabled: bool):
+        """Toggle tracking for specific ball in New 3D tracker"""
+        print(f"🔄 {'Enabling' if enabled else 'Disabling'} tracking for {ball_name} (New 3D)")
+        
+        # Update the profile in memory
+        for profile in self.parent.new3d_ball_profiles:
+            if profile['name'] == ball_name:
+                profile['enabled'] = enabled
+                break
+        
+        # Save to calibration_settings_new3d.json
+        self._save_new3d_profiles()
+        
+        # Send to engine via ZMQ command
+        command = juggler_pb2.CommandRequest()
+        command.type = juggler_pb2.CommandRequest.CommandType.UPDATE_COLOR_PROFILE
+        command.color_profile_name = ball_name
+        command.color_profile_enabled = enabled
+        
+        try:
+            response = self.zmq_client.send_command(command)
+            if response.success:
+                print(f"✅ {ball_name} tracking {'enabled' if enabled else 'disabled'}")
+            else:
+                print(f"❌ Failed to update {ball_name}: {response.message}")
+        except Exception as e:
+            print(f"❌ Error updating {ball_name}: {e}")
+        
+        if not self.parent._loading_settings:
+            self.parent.save_settings()
+    
+    def _start_new3d_color_calibration(self, ball_name: str):
+        """Start color calibration for a specific ball in New 3D tracker"""
+        print(f"🎨 Starting color calibration for {ball_name} (New 3D)")
+        
+        # This will be handled by the main window's color calibration system
+        # which is already integrated with the visualization tab
+        if hasattr(self.parent, 'main_window') and self.parent.main_window:
+            # Set the active color profile in the visualization tab
+            viz_tab = self.parent.main_window.visualization_tab
+            if hasattr(viz_tab, 'color_profile_combo'):
+                # Find and select this color in the dropdown
+                index = viz_tab.color_profile_combo.findText(ball_name.capitalize())
+                if index >= 0:
+                    viz_tab.color_profile_combo.setCurrentIndex(index)
+                    print(f"✅ Selected '{ball_name}' in color profile dropdown")
+                    print(f"   Now click 'Set Color Profile' and then click on a {ball_name} ball in the video")
+                else:
+                    print(f"⚠️ Color '{ball_name}' not found in dropdown")
+            else:
+                print(f"⚠️ Visualization tab not fully initialized")
+        else:
+            print(f"⚠️ Main window reference not available")
+    
+    def _save_new3d_profiles(self):
+        """Save New 3D ball profiles to calibration_settings_new3d.json"""
+        import json
+        import os
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+        settings_path = os.path.normpath(settings_path)
+        
+        try:
+            # Load existing settings
+            with open(settings_path, 'r') as f:
+                settings_data = json.load(f)
+            
+            # Update color_profiles
+            settings_data['color_profiles'] = self.parent.new3d_ball_profiles
+            
+            # Save back
+            with open(settings_path, 'w') as f:
+                json.dump(settings_data, f, indent=4)
+            
+            print(f"✅ Saved New 3D ball profiles to {settings_path}")
+        except Exception as e:
+            print(f"❌ Error saving New 3D profiles: {e}")

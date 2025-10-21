@@ -253,6 +253,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("association_max_distance_m")) {
             settings_.association_max_distance_m = j["association_max_distance_m"];
         }
+        if (j.contains("color_mismatch_penalty_m")) {
+            settings_.color_mismatch_penalty_m = j["color_mismatch_penalty_m"];
+        }
         if (j.contains("throw_velocity_threshold_mps")) {
             settings_.throw_velocity_threshold_mps = j["throw_velocity_threshold_mps"];
         }
@@ -353,6 +356,7 @@ void New3DTracker::saveSettings() {
         // Save New3DTrackerSettings
         j["held_radius_m"] = settings_.held_radius_m;
         j["association_max_distance_m"] = settings_.association_max_distance_m;
+        j["color_mismatch_penalty_m"] = settings_.color_mismatch_penalty_m;
         j["throw_velocity_threshold_mps"] = settings_.throw_velocity_threshold_mps;
         j["gravity_mps2"] = {
             {"x", settings_.gravity_mps2.x},
@@ -407,7 +411,8 @@ void New3DTracker::saveSettings() {
 New3DTracker::AssociationResult New3DTracker::associateDetections(
     std::vector<New3DBall>& balls,
     const std::vector<Detection>& detections,
-    float max_distance) {
+    float max_distance,
+    const cv::Mat& color_frame) {
     
     AssociationResult result;
     
@@ -436,36 +441,57 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
     std::vector<bool> ball_matched(balls.size(), false);
     std::vector<bool> detection_matched(detections.size(), false);
     
-    // Greedy nearest-neighbor association
+    // Greedy nearest-neighbor association with color-aware cost
     // Repeatedly find the closest ball-detection pair until no valid matches remain
     while (true) {
-        float min_distance = max_distance;
+        float min_cost = max_distance;
         int best_ball_idx = -1;
         int best_detection_idx = -1;
         
-        // Find the closest unmatched ball-detection pair
+        // Find the best unmatched ball-detection pair based on combined cost
         for (size_t i = 0; i < balls.size(); ++i) {
             if (ball_matched[i]) continue;
+            
+            const New3DBall& track = balls[i];
             
             for (size_t j = 0; j < detections.size(); ++j) {
                 if (detection_matched[j]) continue;
                 
-                // Calculate 3D Euclidean distance between predicted ball position and detection
-                const cv::Point3f& pred_pos = balls[i].predicted_position;
-                const cv::Point3f& det_pos = detections[j].world_pos;
+                const Detection& detection = detections[j];
+                
+                // 1. Calculate the distance cost
+                const cv::Point3f& pred_pos = track.predicted_position;
+                const cv::Point3f& det_pos = detection.world_pos;
                 
                 float dx = pred_pos.x - det_pos.x;
                 float dy = pred_pos.y - det_pos.y;
                 float dz = pred_pos.z - det_pos.z;
                 float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
                 
-                // Check if this is the best match so far
-                // Note: Color matching as a tie-breaker would require calling matchColor()
-                // which is expensive. For now, we use pure distance-based matching.
-                // In future phases, we can add color scoring here if needed.
+                // If it's too far, it's not a candidate at all
+                if (distance >= max_distance) {
+                    continue;
+                }
                 
-                if (distance < min_distance) {
-                    min_distance = distance;
+                // 2. Calculate the color mismatch penalty
+                float color_penalty = 0.0f;
+                
+                // If the track's color is locked, check for color mismatch
+                if (track.color_locked && settings_.use_color_tracking) {
+                    // Determine the detection's color
+                    std::string detection_color = determineColor(detection, color_frame);
+                    
+                    // Apply penalty if colors don't match
+                    if (detection_color != track.color_name) {
+                        color_penalty = settings_.color_mismatch_penalty_m;
+                    }
+                }
+                
+                // 3. Calculate the final cost
+                float total_cost = distance + color_penalty;
+                
+                if (total_cost < min_cost) {
+                    min_cost = total_cost;
                     best_ball_idx = static_cast<int>(i);
                     best_detection_idx = static_cast<int>(j);
                 }
@@ -481,7 +507,7 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
         MatchPair match;
         match.ball = &balls[best_ball_idx];
         match.detection = &detections[best_detection_idx];
-        match.distance = min_distance;
+        match.distance = min_cost;  // Store total cost instead of just distance
         result.matched_pairs.push_back(match);
         
         // Mark as matched
@@ -751,104 +777,207 @@ void New3DTracker::handleUnmatchedBalls(
     }
     
     // Delete tracks that exceed max_frames_unseen threshold
-    // Use erase-remove idiom for efficient deletion
+    // When deleting tracks, also update the active_track_colors_ set
     tracked_balls_.erase(
         std::remove_if(tracked_balls_.begin(), tracked_balls_.end(),
             [this](const New3DBall& ball) {
-                return ball.frames_since_seen > settings_.max_frames_unseen;
+                if (ball.frames_since_seen > settings_.max_frames_unseen) {
+                    // This ball is about to be deleted. Free up its color.
+                    active_track_colors_.erase(ball.color_name);
+                    std::cout << "[New3DTracker] Deleted track ID=" << ball.id
+                              << " color=" << ball.color_name
+                              << ". Now actively searching for '" << ball.color_name << "' again."
+                              << std::endl;
+                    return true;  // Mark for deletion
+                }
+                return false;
             }),
         tracked_balls_.end()
     );
 }
 
 void New3DTracker::createNewTracks(
-    const std::vector<const Detection*>& unmatched_detections,
+    std::vector<const Detection*>& unmatched_detections,
+    std::vector<New3DBall*>& unmatched_balls,
     const cv::Mat& color_frame) {
     
-    // For simplicity, use immediate track creation (Option 1)
-    // Multi-frame confirmation can be added later if needed
+    if (unmatched_detections.empty()) {
+        return;
+    }
+    
+    // ========================================================================
+    // ACTIVE BALL ROSTER LOGIC
+    // Find all ACTIVE and UNTRACKED color profiles from our settings
+    // ========================================================================
+    
+    std::vector<const ColorProfile*> available_color_profiles;
+    for (const auto& profile : color_profiles_) {
+        // A color is available if it's enabled in the UI AND not already being tracked
+        if (profile.enabled && active_track_colors_.find(profile.name) == active_track_colors_.end()) {
+            available_color_profiles.push_back(&profile);
+        }
+    }
+    
+    // CRITICAL FIX: Reserve space to prevent vector reallocation during push_back
+    // This avoids excessive copy constructor calls that cause double-free errors
+    tracked_balls_.reserve(tracked_balls_.size() + available_color_profiles.size());
+    
+    // If there are no available colors to look for, we can't create new tracks
+    if (available_color_profiles.empty()) {
+        std::cout << "[New3DTracker] No available color profiles to track (all enabled colors are already tracked)" << std::endl;
+        return;
+    }
+    
+    std::cout << "[New3DTracker] Looking for " << available_color_profiles.size()
+              << " available colors: ";
+    for (const auto* profile : available_color_profiles) {
+        std::cout << profile->name << " ";
+    }
+    std::cout << std::endl;
+    
+    // ========================================================================
+    // MATCH DETECTIONS TO AVAILABLE COLORS
+    // For each unmatched detection, find the best-matching *available* color
+    // ========================================================================
     
     for (const auto* detection : unmatched_detections) {
-        // Check if detection meets confidence threshold
+        // Check confidence threshold
         if (detection->confidence < settings_.ball_confidence_threshold) {
-            continue;  // Skip low-confidence detections
+            continue;
         }
         
-        // Create new ball
-        New3DBall new_ball;
+        const ColorProfile* best_match_profile = nullptr;
+        float best_score = settings_.color_match_threshold;  // Must beat this threshold
         
-        // Assign unique ID
-        new_ball.id = next_track_id_++;
+        // Test this detection against every color we're currently looking for
+        for (const auto* profile : available_color_profiles) {
+            float score = matchColor(*detection, *profile, color_frame);
+            if (score > best_score) {
+                best_score = score;
+                best_match_profile = profile;
+            }
+        }
         
-        // Determine color
-        new_ball.color_name = determineColor(*detection, color_frame);
+        // ====================================================================
+        // CREATE NEW TRACK FOR MATCHED COLOR
+        // If we found a confident match, create a new track for that specific color
+        // ====================================================================
         
-        // Find color profile
-        for (const auto& profile : color_profiles_) {
-            if (profile.name == new_ball.color_name) {
-                new_ball.color_profile = profile;
+        if (best_match_profile != nullptr) {
+            // WE FOUND ONE! Let's create the track for this color
+            std::cout << "[New3DTracker] DEBUG: Creating new ball for color: " << best_match_profile->name << std::endl;
+            
+            New3DBall new_ball;
+            std::cout << "[New3DTracker] DEBUG: New3DBall default constructed" << std::endl;
+            
+            new_ball.id = next_track_id_++;
+            new_ball.color_name = best_match_profile->name;
+            std::cout << "[New3DTracker] DEBUG: Set color_name to: " << new_ball.color_name << std::endl;
+            
+            new_ball.color_profile = *best_match_profile;
+            std::cout << "[New3DTracker] DEBUG: Copied color_profile" << std::endl;
+            
+            // Initialize Kalman filter with detection position
+            std::cout << "[New3DTracker] DEBUG: Creating Kalman filter at position: "
+                      << detection->world_pos.x << ", " << detection->world_pos.y << ", " << detection->world_pos.z << std::endl;
+            new_ball.kf = createKalmanFilter(detection->world_pos);
+            std::cout << "[New3DTracker] DEBUG: Kalman filter created and assigned" << std::endl;
+            
+            // Set initial positions
+            new_ball.last_known_position = detection->world_pos;
+            new_ball.predicted_position = detection->world_pos;
+            std::cout << "[New3DTracker] DEBUG: Set initial positions" << std::endl;
+            
+            // Determine initial state based on proximity to hands
+            bool near_hand = false;
+            int closest_hand_id = -1;
+            float min_distance = settings_.held_radius_m;
+            
+            for (const auto& hand : hands_) {
+                float dx = detection->world_pos.x - hand.wrist_pos_3d.x;
+                float dy = detection->world_pos.y - hand.wrist_pos_3d.y;
+                float dz = detection->world_pos.z - hand.wrist_pos_3d.z;
+                float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+                
+                if (distance < min_distance && isHandAvailable(hand.id, tracked_balls_)) {
+                    near_hand = true;
+                    min_distance = distance;
+                    closest_hand_id = hand.id;
+                }
+            }
+            
+            // Set initial state
+            if (near_hand) {
+                new_ball.state = HELD;
+                new_ball.associated_hand_id = closest_hand_id;
+                new_ball.tracking_reason = "New track (HELD)";
+            } else {
+                new_ball.state = IN_FLIGHT;
+                new_ball.associated_hand_id = -1;
+                new_ball.tracking_reason = "New track (IN_FLIGHT)";
+            }
+            
+            // Initialize tracking quality
+            new_ball.frames_since_seen = 0;
+            new_ball.consecutive_frames_seen = 1;
+            new_ball.color_locked = false;
+            
+            // Initialize visualization data
+            new_ball.pixel_pos = cv::Point2f(
+                detection->box.x + detection->box.width / 2.0f,
+                detection->box.y + detection->box.height / 2.0f
+            );
+            new_ball.bbox = detection->box;
+            new_ball.yolo_confidence = detection->confidence;
+            new_ball.color_match_score = best_score;
+            std::cout << "[New3DTracker] DEBUG: Set color_match_score to: " << best_score << std::endl;
+            
+            // Add to tracked balls using move semantics to avoid copy
+            std::cout << "[New3DTracker] DEBUG: About to emplace_back new_ball to tracked_balls_ (current size: "
+                      << tracked_balls_.size() << ")" << std::endl;
+            std::cout << "[New3DTracker] DEBUG: new_ball ID=" << new_ball.id << " color=" << new_ball.color_name << std::endl;
+            
+            tracked_balls_.emplace_back(std::move(new_ball));
+            
+            std::cout << "[New3DTracker] DEBUG: emplace_back completed (new size: " << tracked_balls_.size() << ")" << std::endl;
+            
+            // CRITICAL: Mark this color as now being tracked
+            active_track_colors_.insert(new_ball.color_name);
+            std::cout << "[New3DTracker] DEBUG: Inserted color into active_track_colors_" << std::endl;
+            
+            std::cout << "[New3DTracker] Found and created new track for ACTIVE color: "
+                      << new_ball.color_name << " (ID=" << new_ball.id
+                      << ", score=" << best_score << ")" << std::endl;
+            
+            // To prevent multiple detections from creating the same color track in one frame,
+            // remove this color from the available list by finding and erasing the matching pointer
+            std::cout << "[New3DTracker] DEBUG: Removing color from available_color_profiles (current size: "
+                      << available_color_profiles.size() << ")" << std::endl;
+            auto it = std::find(available_color_profiles.begin(), available_color_profiles.end(), best_match_profile);
+            if (it != available_color_profiles.end()) {
+                available_color_profiles.erase(it);
+                std::cout << "[New3DTracker] DEBUG: Erased color from available list (new size: "
+                          << available_color_profiles.size() << ")" << std::endl;
+            } else {
+                std::cout << "[New3DTracker] DEBUG: Color not found in available list (this shouldn't happen!)" << std::endl;
+            }
+            
+            // If we've found all the balls we're looking for, we can stop early
+            if (available_color_profiles.empty()) {
+                std::cout << "[New3DTracker] All available colors have been found and tracked" << std::endl;
                 break;
             }
         }
-        
-        // Initialize Kalman filter with detection position
-        new_ball.kf = createKalmanFilter(detection->world_pos);
-        
-        // Set initial positions
-        new_ball.last_known_position = detection->world_pos;
-        new_ball.predicted_position = detection->world_pos;
-        
-        // Determine initial state based on proximity to hands
-        bool near_hand = false;
-        int closest_hand_id = -1;
-        float min_distance = settings_.held_radius_m;
-        
-        for (const auto& hand : hands_) {
-            float dx = detection->world_pos.x - hand.wrist_pos_3d.x;
-            float dy = detection->world_pos.y - hand.wrist_pos_3d.y;
-            float dz = detection->world_pos.z - hand.wrist_pos_3d.z;
-            float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
-            
-            if (distance < min_distance && isHandAvailable(hand.id, tracked_balls_)) {
-                near_hand = true;
-                min_distance = distance;
-                closest_hand_id = hand.id;
-            }
-        }
-        
-        // Set initial state
-        if (near_hand) {
-            new_ball.state = HELD;
-            new_ball.associated_hand_id = closest_hand_id;
-            new_ball.tracking_reason = "New track (HELD)";
-        } else {
-            new_ball.state = IN_FLIGHT;
-            new_ball.associated_hand_id = -1;
-            new_ball.tracking_reason = "New track (IN_FLIGHT)";
-        }
-        
-        // Initialize tracking quality
-        new_ball.frames_since_seen = 0;
-        new_ball.consecutive_frames_seen = 1;
-        new_ball.color_locked = false;
-        
-        // Initialize visualization data
-        new_ball.pixel_pos = cv::Point2f(
-            detection->box.x + detection->box.width / 2.0f,
-            detection->box.y + detection->box.height / 2.0f
-        );
-        new_ball.bbox = detection->box;
-        new_ball.yolo_confidence = detection->confidence;
-        new_ball.color_match_score = matchColor(*detection, new_ball.color_profile, color_frame);
-        
-        // Add to tracked balls
-        tracked_balls_.push_back(new_ball);
-        
-        std::cout << "[New3DTracker] Created new track ID=" << new_ball.id
-                  << " color=" << new_ball.color_name
-                  << " state=" << (new_ball.state == HELD ? "HELD" : "IN_FLIGHT")
-                  << std::endl;
     }
+    
+    std::cout << "[New3DTracker] DEBUG: createNewTracks() about to return. tracked_balls_.size()="
+              << tracked_balls_.size() << std::endl;
+    std::cout << "[New3DTracker] DEBUG: Listing all tracked balls before return:" << std::endl;
+    for (size_t i = 0; i < tracked_balls_.size(); ++i) {
+        std::cout << "[New3DTracker] DEBUG:   Ball[" << i << "]: ID=" << tracked_balls_[i].id
+                  << " color=" << tracked_balls_[i].color_name << std::endl;
+    }
+    std::cout << "[New3DTracker] DEBUG: createNewTracks() returning now..." << std::endl;
 }
 
 void New3DTracker::finalizeBallPositions(const std::vector<SimpleHand>& hands) {
@@ -1356,19 +1485,22 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     // STEP 1: PREDICTION
     predictAllBalls(dt);
     
-    // STEP 2: ASSOCIATION
+    // STEP 2: ASSOCIATION (with color-aware cost)
     auto association = associateDetections(tracked_balls_, detections,
-                                          settings_.association_max_distance_m);
+                                          settings_.association_max_distance_m,
+                                          color_frame);
     
     // STEP 3: UPDATE MATCHED
     updateMatchedBalls(association.matched_pairs, current_hands,
                       previous_frame_pose_, dt, events);
     
-    // STEP 4: HANDLE UNMATCHED BALLS
-    handleUnmatchedBalls(association.unmatched_balls);
+    // STEP 4: CREATE NEW TRACKS (with re-acquisition logic)
+    // This must happen BEFORE handleUnmatchedBalls so we can re-acquire lost tracks
+    createNewTracks(association.unmatched_detections, association.unmatched_balls, color_frame);
     
-    // STEP 5: HANDLE UNMATCHED DETECTIONS
-    createNewTracks(association.unmatched_detections, color_frame);
+    // STEP 5: HANDLE UNMATCHED BALLS
+    // Now handle any remaining unmatched balls (those that weren't re-acquired)
+    handleUnmatchedBalls(association.unmatched_balls);
     
     // STEP 6: FINALIZE
     finalizeBallPositions(current_hands);

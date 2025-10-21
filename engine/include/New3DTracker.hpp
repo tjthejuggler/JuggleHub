@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <chrono>
+#include <unordered_set>
 #include "json.hpp"
 #include "GpuHsvConverter.hpp"
 #include "IBallTracker.hpp"
@@ -59,7 +60,101 @@ struct New3DBall {
     New3DBall() : id(-1), state(HELD), associated_hand_id(-1),
                   frames_since_seen(0), consecutive_frames_seen(0),
                   color_locked(false), yolo_confidence(0.0f),
-                  color_match_score(0.0f) {}
+                  color_match_score(0.0f) {
+        std::cout << "[New3DBall] Default constructor called" << std::endl;
+    }
+    
+    // Destructor with logging
+    ~New3DBall() {
+        std::cout << "[New3DBall] Destructor called for ball ID=" << id << " color=" << color_name << std::endl;
+    }
+    
+    // Copy constructor - properly handle Kalman filter
+    New3DBall(const New3DBall& other)
+        : id(other.id), color_name(other.color_name), color_profile(other.color_profile),
+          state(other.state), associated_hand_id(other.associated_hand_id),
+          last_known_position(other.last_known_position), predicted_position(other.predicted_position),
+          frames_since_seen(other.frames_since_seen), consecutive_frames_seen(other.consecutive_frames_seen),
+          color_locked(other.color_locked), pixel_pos(other.pixel_pos), bbox(other.bbox),
+          yolo_confidence(other.yolo_confidence), color_match_score(other.color_match_score),
+          tracking_reason(other.tracking_reason), position_history(other.position_history),
+          timestamp_history(other.timestamp_history) {
+        std::cout << "[New3DBall] Copy constructor called: copying ball ID=" << other.id
+                  << " color=" << other.color_name << std::endl;
+        
+        // Deep copy the Kalman filter - must initialize first, then copy
+        std::cout << "[New3DBall] Initializing new Kalman filter..." << std::endl;
+        kf = cv::KalmanFilter(6, 3, 0);  // Initialize with same dimensions
+        std::cout << "[New3DBall] Kalman filter initialized, now copying matrices..." << std::endl;
+        
+        // Now copy all matrices
+        if (!other.kf.statePre.empty()) other.kf.statePre.copyTo(kf.statePre);
+        if (!other.kf.statePost.empty()) other.kf.statePost.copyTo(kf.statePost);
+        if (!other.kf.transitionMatrix.empty()) other.kf.transitionMatrix.copyTo(kf.transitionMatrix);
+        if (!other.kf.controlMatrix.empty()) other.kf.controlMatrix.copyTo(kf.controlMatrix);
+        if (!other.kf.measurementMatrix.empty()) other.kf.measurementMatrix.copyTo(kf.measurementMatrix);
+        if (!other.kf.processNoiseCov.empty()) other.kf.processNoiseCov.copyTo(kf.processNoiseCov);
+        if (!other.kf.measurementNoiseCov.empty()) other.kf.measurementNoiseCov.copyTo(kf.measurementNoiseCov);
+        if (!other.kf.errorCovPre.empty()) other.kf.errorCovPre.copyTo(kf.errorCovPre);
+        if (!other.kf.gain.empty()) other.kf.gain.copyTo(kf.gain);
+        if (!other.kf.errorCovPost.empty()) other.kf.errorCovPost.copyTo(kf.errorCovPost);
+        
+        std::cout << "[New3DBall] Copy constructor completed for ball ID=" << id << std::endl;
+    }
+    
+    // Move constructor - transfer ownership without copying
+    New3DBall(New3DBall&& other) noexcept
+        : id(other.id), color_name(std::move(other.color_name)), color_profile(other.color_profile),
+          state(other.state), associated_hand_id(other.associated_hand_id),
+          kf(std::move(other.kf)),  // Move the Kalman filter
+          last_known_position(other.last_known_position), predicted_position(other.predicted_position),
+          frames_since_seen(other.frames_since_seen), consecutive_frames_seen(other.consecutive_frames_seen),
+          color_locked(other.color_locked), pixel_pos(other.pixel_pos), bbox(other.bbox),
+          yolo_confidence(other.yolo_confidence), color_match_score(other.color_match_score),
+          tracking_reason(std::move(other.tracking_reason)),
+          position_history(std::move(other.position_history)),
+          timestamp_history(std::move(other.timestamp_history)) {
+        std::cout << "[New3DBall] Move constructor called for ball ID=" << id << " color=" << color_name << std::endl;
+    }
+    
+    // Assignment operator - properly handle Kalman filter
+    New3DBall& operator=(const New3DBall& other) {
+        if (this != &other) {
+            id = other.id;
+            color_name = other.color_name;
+            color_profile = other.color_profile;
+            state = other.state;
+            associated_hand_id = other.associated_hand_id;
+            last_known_position = other.last_known_position;
+            predicted_position = other.predicted_position;
+            frames_since_seen = other.frames_since_seen;
+            consecutive_frames_seen = other.consecutive_frames_seen;
+            color_locked = other.color_locked;
+            pixel_pos = other.pixel_pos;
+            bbox = other.bbox;
+            yolo_confidence = other.yolo_confidence;
+            color_match_score = other.color_match_score;
+            tracking_reason = other.tracking_reason;
+            position_history = other.position_history;
+            timestamp_history = other.timestamp_history;
+            
+            // Deep copy the Kalman filter - reinitialize first
+            kf = cv::KalmanFilter(6, 3, 0);  // Reinitialize with same dimensions
+            
+            // Now copy all matrices
+            if (!other.kf.statePre.empty()) other.kf.statePre.copyTo(kf.statePre);
+            if (!other.kf.statePost.empty()) other.kf.statePost.copyTo(kf.statePost);
+            if (!other.kf.transitionMatrix.empty()) other.kf.transitionMatrix.copyTo(kf.transitionMatrix);
+            if (!other.kf.controlMatrix.empty()) other.kf.controlMatrix.copyTo(kf.controlMatrix);
+            if (!other.kf.measurementMatrix.empty()) other.kf.measurementMatrix.copyTo(kf.measurementMatrix);
+            if (!other.kf.processNoiseCov.empty()) other.kf.processNoiseCov.copyTo(kf.processNoiseCov);
+            if (!other.kf.measurementNoiseCov.empty()) other.kf.measurementNoiseCov.copyTo(kf.measurementNoiseCov);
+            if (!other.kf.errorCovPre.empty()) other.kf.errorCovPre.copyTo(kf.errorCovPre);
+            if (!other.kf.gain.empty()) other.kf.gain.copyTo(kf.gain);
+            if (!other.kf.errorCovPost.empty()) other.kf.errorCovPost.copyTo(kf.errorCovPost);
+        }
+        return *this;
+    }
 };
 
 /**
@@ -78,6 +173,7 @@ struct New3DTrackerSettings {
     // === GEOMETRY & DISTANCE (meters) ===
     float held_radius_m = 0.12f;                    // 12cm radius for "held" detection
     float association_max_distance_m = 0.50f;       // Max distance for detection matching
+    float color_mismatch_penalty_m = 1.0f;          // Distance penalty for color mismatch (meters)
     
     // === PHYSICS & DYNAMICS ===
     float throw_velocity_threshold_mps = 0.50f;     // Min relative velocity for throw
@@ -263,16 +359,18 @@ private:
     };
     
     /**
-     * @brief Associate detections to tracked balls using Hungarian algorithm
+     * @brief Associate detections to tracked balls using color-aware cost
      * @param balls Current tracked balls
      * @param detections New detections from YOLO
      * @param max_distance Maximum distance for valid association
+     * @param color_frame Color image for color determination
      * @return Association result with matched pairs and unmatched items
      */
     AssociationResult associateDetections(
         std::vector<New3DBall>& balls,
         const std::vector<Detection>& detections,
-        float max_distance
+        float max_distance,
+        const cv::Mat& color_frame
     );
     
     // ========================================================================
@@ -344,12 +442,14 @@ private:
     // ========================================================================
     
     /**
-     * @brief Create new tracks for unmatched detections
+     * @brief Create new tracks for unmatched detections (with re-acquisition logic)
      * @param unmatched_detections Detections without matching balls
+     * @param unmatched_balls Balls without matching detections (for re-acquisition)
      * @param color_frame Color image for color sampling
      */
     void createNewTracks(
-        const std::vector<const Detection*>& unmatched_detections,
+        std::vector<const Detection*>& unmatched_detections,
+        std::vector<New3DBall*>& unmatched_balls,
         const cv::Mat& color_frame
     );
     
@@ -532,6 +632,7 @@ private:
     Pose3D previous_frame_pose_;                    // Previous frame hand positions
     std::vector<Detection> last_raw_detections_;    // Last raw YOLO detections
     std::vector<ColorProfile> color_profiles_;      // Color profiles for identification
+    std::unordered_set<std::string> active_track_colors_;  // Colors currently being tracked
     long long next_track_id_ = 0;                   // Next available track ID
     int recording_frame_number_ = -1;               // Current recording frame (-1 if not recording)
     

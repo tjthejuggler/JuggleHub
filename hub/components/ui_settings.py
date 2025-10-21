@@ -178,11 +178,17 @@ if PYQT_AVAILABLE:
             
             self.new3d_audio_indicators_section = self.tracker_new3d_sections.create_audio_indicators_section()
             container_layout.addWidget(self.new3d_audio_indicators_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_audio_indicators_section)
+            
+            # Add Ball Profiles section
+            self.new3d_ball_profiles_section = self.tracker_new3d_sections.create_ball_profiles_section()
+            container_layout.addWidget(self.new3d_ball_profiles_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_ball_profiles_section)
             
             # Add Color Calibration section
             self.new3d_color_calibration_section = self.tracker_new3d_sections.create_color_calibration_section()
             container_layout.addWidget(self.new3d_color_calibration_section)
-            self.tracker_new3d_section_widgets.append(self.new3d_audio_indicators_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_color_calibration_section)
             
             # Add 2D tracker sections (currently none, but ready for future)
             # When 2D sections are added, append them to self.tracker_2d_section_widgets
@@ -403,6 +409,7 @@ if PYQT_AVAILABLE:
                 'collapsed_trajectory': self.trajectory_section.is_collapsed if hasattr(self, 'trajectory_section') else False,
                 'collapsed_hand_velocity': self.hand_velocity_section.is_collapsed if hasattr(self, 'hand_velocity_section') else False,
                 'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False,
+                'collapsed_new3d_ball_profiles': self.new3d_ball_profiles_section.is_collapsed if hasattr(self, 'new3d_ball_profiles_section') else False,
             }
 
         def apply_settings(self, settings: dict):
@@ -661,6 +668,9 @@ if PYQT_AVAILABLE:
             if 'collapsed_ball_profiles' in settings and hasattr(self, 'ball_profiles_section'):
                 if settings['collapsed_ball_profiles'] != self.ball_profiles_section.is_collapsed:
                     self.ball_profiles_section.toggle_collapsed()
+            if 'collapsed_new3d_ball_profiles' in settings and hasattr(self, 'new3d_ball_profiles_section'):
+                if settings['collapsed_new3d_ball_profiles'] != self.new3d_ball_profiles_section.is_collapsed:
+                    self.new3d_ball_profiles_section.toggle_collapsed()
 
         def load_settings(self):
             """Load settings for current tracker"""
@@ -969,9 +979,63 @@ if PYQT_AVAILABLE:
             pass
 
         def reload_ball_profiles(self):
-            """Reload ball profiles from file"""
-            # This is handled by the ball profile sections
-            pass
+            """Reload ball profiles from file and update UI"""
+            import json
+            import os
+            
+            print(f"🔄 Reloading ball profiles for {self.current_tracker}")
+            
+            if self.current_tracker == "new_3d":
+                # Reload New 3D tracker profiles
+                settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+                settings_path = os.path.normpath(settings_path)
+                
+                try:
+                    with open(settings_path, 'r') as f:
+                        settings_data = json.load(f)
+                        color_profiles = settings_data.get('color_profiles', [])
+                    
+                    print(f"✅ Loaded {len(color_profiles)} profiles from {settings_path}")
+                    
+                    # Update UI labels for each profile
+                    if hasattr(self, 'new3d_ball_calibration_labels'):
+                        for profile in color_profiles:
+                            ball_name = profile['name']
+                            if ball_name in self.new3d_ball_calibration_labels:
+                                labels = self.new3d_ball_calibration_labels[ball_name]
+                                
+                                # Update hue label
+                                avg_hue = profile.get('avg_hue', -1.0)
+                                if avg_hue >= 0:
+                                    labels['hue'].setText(f"{avg_hue:.1f}°")
+                                    labels['hue'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+                                else:
+                                    labels['hue'].setText("Not calibrated")
+                                    labels['hue'].setStyleSheet("color: #f44336;")
+                                
+                                # Update saturation label
+                                avg_sat = profile.get('avg_saturation', -1.0)
+                                if avg_sat >= 0:
+                                    labels['saturation'].setText(f"{avg_sat:.1f}")
+                                    labels['saturation'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+                                else:
+                                    labels['saturation'].setText("Not calibrated")
+                                    labels['saturation'].setStyleSheet("color: #f44336;")
+                                
+                                print(f"   ✅ Updated UI for {ball_name}: H={avg_hue:.1f}° S={avg_sat:.1f}")
+                    
+                    print("✅ Ball profiles UI updated successfully")
+                    
+                except Exception as e:
+                    print(f"❌ Error reloading New 3D profiles: {e}")
+            
+            elif self.current_tracker == "depth_based":
+                # Reload 3D tracker profiles (if needed in the future)
+                print("ℹ️ 3D tracker profile reload not yet implemented")
+                pass
+            
+            else:
+                print(f"ℹ️ No profile reload needed for {self.current_tracker}")
 
         def on_ball_profile_changed(self):
             """Handle ball profile change"""

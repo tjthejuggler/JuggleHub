@@ -51,8 +51,8 @@ if PYQT_AVAILABLE:
             # Initialize settings manager
             self.settings_manager = SettingsManager()
             
-            # Initialize current tracker type
-            self.current_tracker = "depth_based"  # Default to 3D tracker
+            # Determine which tracker was last used by checking saved settings
+            self.current_tracker = self._determine_last_used_tracker()
             
             # Ensure calibration_saves directory exists
             os.makedirs(self.calibration_saves_dir, exist_ok=True)
@@ -83,6 +83,42 @@ if PYQT_AVAILABLE:
             
             # Allow auto-save
             self._loading_settings = False
+
+        def _determine_last_used_tracker(self) -> str:
+            """
+            Determine which tracker was last used by checking saved settings files.
+            Returns the tracker type that was most recently saved.
+            """
+            import os
+            from datetime import datetime
+            
+            tracker_files = {
+                "depth_based": self.settings_manager.settings_3d_file,
+                "new_3d": self.settings_manager.settings_new3d_file,
+                "simple_2d": self.settings_manager.settings_2d_file,
+            }
+            
+            latest_tracker = "depth_based"  # Default fallback
+            latest_time = None
+            
+            for tracker_type, filepath in tracker_files.items():
+                if os.path.exists(filepath):
+                    try:
+                        with open(filepath, 'r') as f:
+                            settings = json.load(f)
+                        
+                        # Check if this file has a saved_at timestamp
+                        if 'saved_at' in settings:
+                            saved_time = datetime.fromisoformat(settings['saved_at'])
+                            if latest_time is None or saved_time > latest_time:
+                                latest_time = saved_time
+                                latest_tracker = tracker_type
+                                print(f"🔍 Found {tracker_type} settings saved at {settings['saved_at']}")
+                    except Exception as e:
+                        print(f"⚠️ Error reading {filepath}: {e}")
+            
+            print(f"✅ Determined last used tracker: {latest_tracker}")
+            return latest_tracker
 
         def init_ui(self):
             """Initialize the UI with modular sections"""
@@ -436,12 +472,16 @@ if PYQT_AVAILABLE:
             
             # Tracking system - block signals to prevent recursion
             if 'tracking_system' in settings:
-                index = self.tracking_system_combo.findData(settings['tracking_system'])
+                tracker_type = settings['tracking_system']
+                index = self.tracking_system_combo.findData(tracker_type)
                 if index >= 0:
                     # Block signals to prevent triggering on_tracking_system_changed
                     self.tracking_system_combo.blockSignals(True)
                     self.tracking_system_combo.setCurrentIndex(index)
                     self.tracking_system_combo.blockSignals(False)
+                    # Update current_tracker to match loaded settings
+                    self.current_tracker = tracker_type
+                    print(f"✅ Tracking system combo set to: {tracker_type}")
             
             # Ball detection
             if 'enable_ball_detection' in settings and hasattr(self, 'use_dnn_tracker_toggle'):
@@ -680,6 +720,21 @@ if PYQT_AVAILABLE:
                 self.apply_settings(settings)
                 self._loading_settings = False
                 print(f"✅ Settings loaded for {self.current_tracker}")
+                
+                # Send tracker switch command to engine FIRST
+                print(f"📤 Sending tracker switch command to engine: {self.current_tracker}")
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.SET_TRACKER_TYPE
+                command.tracker_type = self.current_tracker
+                
+                try:
+                    response = self.zmq_client.send_command(command)
+                    if response.success:
+                        print(f"✅ Engine switched to {self.current_tracker}: {response.message}")
+                    else:
+                        print(f"❌ Failed to switch tracker in engine: {response.message}")
+                except Exception as e:
+                    print(f"❌ Error switching tracker in engine: {e}")
                 
                 # Send all settings to engine
                 print("📤 Sending loaded settings to engine...")
@@ -987,7 +1042,7 @@ if PYQT_AVAILABLE:
             
             if self.current_tracker == "new_3d":
                 # Reload New 3D tracker profiles
-                settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+                settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "calibration_settings_new3d.json")
                 settings_path = os.path.normpath(settings_path)
                 
                 try:

@@ -429,10 +429,10 @@ class New3DSettingsSections:
         layout = QVBoxLayout()
         section.get_content_layout().addLayout(layout)
         
-        # Load color profiles from calibration_settings_new3d.json
+        # Load color profiles from config/calibration_settings_new3d.json
         import json
         import os
-        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "calibration_settings_new3d.json")
         settings_path = os.path.normpath(settings_path)
         
         # Get default profiles from ColorProfileManager
@@ -605,10 +605,10 @@ class New3DSettingsSections:
         layout = QVBoxLayout()
         section.get_content_layout().addLayout(layout)
         
-        # Load ball profiles from calibration_settings_new3d.json
+        # Load ball profiles from config/calibration_settings_new3d.json
         import json
         import os
-        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "calibration_settings_new3d.json")
         settings_path = os.path.normpath(settings_path)
         
         # Get default profiles from ColorProfileManager
@@ -802,10 +802,10 @@ class New3DSettingsSections:
             print(f"⚠️ Main window reference not available")
     
     def _save_new3d_profiles(self):
-        """Save New 3D ball profiles to calibration_settings_new3d.json"""
+        """Save New 3D ball profiles to config/calibration_settings_new3d.json"""
         import json
         import os
-        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "calibration_settings_new3d.json")
         settings_path = os.path.normpath(settings_path)
         
         try:

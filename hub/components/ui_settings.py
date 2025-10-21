@@ -1042,7 +1042,7 @@ if PYQT_AVAILABLE:
             
             if self.current_tracker == "new_3d":
                 # Reload New 3D tracker profiles
-                settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "calibration_settings_new3d.json")
+                settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
                 settings_path = os.path.normpath(settings_path)
                 
                 try:

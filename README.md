@@ -2,7 +2,18 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-17 12:11 CEST
+**Last Updated:** 2025-10-21 10:31 CEST
+
+**Recent Changes (2025-10-21):**
+- **🎯 PERSISTENT BALL ARCHITECTURE - STABLE BALL IDs FOREVER ✅**
+  - **Problem Solved**: Balls no longer get deleted after 30 frames unseen
+  - **One Color = One ID**: Each enabled color gets exactly ONE permanent ball that never gets deleted
+  - **Survives Occlusions**: Ball IDs remain stable through any length of occlusion
+  - **Simplified Logic**: Removed complex track creation/deletion, now just match detections to persistent balls by color
+  - **Key Insight**: This is an identification problem, not a tracking problem - we know we have one ball per color
+  - **Implementation**: [`PERSISTENT_BALL_ARCHITECTURE_IMPLEMENTATION.md`](PERSISTENT_BALL_ARCHITECTURE_IMPLEMENTATION.md:1)
+  - **Files Modified**: [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp:312), [`engine/src/New3DTracker.cpp`](engine/src/New3DTracker.cpp:56,817,849)
+  - **Status**: Compiled successfully, ready for runtime testing
 
 **Recent Changes (2025-10-17):**
 - **🎯 NEW 3D KALMAN TRACKER - PHASE 12 COMPLETE ✅**

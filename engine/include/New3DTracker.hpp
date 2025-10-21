@@ -180,7 +180,7 @@ struct New3DTrackerSettings {
     cv::Point3f gravity_mps2 = {0.0f, -9.81f, 0.0f}; // Gravity vector (Y-down in camera space)
     
     // === TRACKING LOGIC (frames) ===
-    int max_frames_unseen = 30;                     // Delete after 30 frames
+    // NOTE: max_frames_unseen removed - balls are now persistent and never deleted
     int min_frames_for_new_track = 3;               // Confirm new track after 3 frames
     int min_frames_for_color_lock = 5;              // Lock color after 5 frames
     
@@ -304,6 +304,26 @@ public:
     // === SETTINGS MANAGEMENT ===
     bool loadSettings();
     void saveSettings();
+    
+    /**
+     * @brief Reload color profiles and reinitialize persistent balls
+     *
+     * Called when color profiles are updated via UI. Reloads the color
+     * profiles from the settings file and reinitializes the persistent
+     * ball roster to match the new enabled/disabled states.
+     */
+    void reloadColorProfiles();
+    
+    // === PERSISTENT BALL INITIALIZATION ===
+    /**
+     * @brief Initialize one persistent ball per enabled color profile
+     *
+     * Creates permanent ball objects that are never deleted. Each enabled
+     * color profile gets exactly one ball that persists for the entire
+     * tracking session. When detections come in, they are matched to these
+     * persistent balls by color only.
+     */
+    void initializePersistentBalls();
     
     // === GETTERS (New3D-specific) ===
     const std::vector<New3DBall>& getBalls() const { return tracked_balls_; }

@@ -429,59 +429,11 @@ class New3DSettingsSections:
         layout = QVBoxLayout()
         section.get_content_layout().addLayout(layout)
         
-        # Load color profiles from config/calibration_settings_new3d.json
-        import json
-        import os
-        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "calibration_settings_new3d.json")
-        settings_path = os.path.normpath(settings_path)
+        # Use shared ball profiles - ensure they're loaded first
+        if not hasattr(self.parent, 'new3d_ball_profiles'):
+            self._load_new3d_profiles()
         
-        # Get default profiles from ColorProfileManager
-        from .color_profile_manager import ColorProfileManager
-        color_manager = ColorProfileManager()
-        
-        try:
-            with open(settings_path, 'r') as f:
-                settings_data = json.load(f)
-                color_profiles = settings_data.get('color_profiles', [])
-            
-            # If no profiles exist, initialize from ColorProfileManager
-            if not color_profiles:
-                print(f"ℹ️ No color_profiles found in {settings_path}, initializing from ColorProfileManager")
-                color_profiles = []
-                for profile in color_manager.profiles:
-                    color_profiles.append({
-                        'name': profile['name'],
-                        'enabled': profile.get('enabled', True),
-                        'avg_hue': -1.0,
-                        'avg_saturation': -1.0,
-                        'min_hsv': [0.0, 0.0, 0.0],
-                        'max_hsv': [180.0, 255.0, 255.0],
-                        'min_hsv2': [-1.0, 0.0, 0.0],
-                        'max_hsv2': [-1.0, 255.0, 255.0]
-                    })
-                # Save the initialized profiles
-                settings_data['color_profiles'] = color_profiles
-                with open(settings_path, 'w') as f:
-                    json.dump(settings_data, f, indent=4)
-                print(f"✅ Initialized {len(color_profiles)} default color profiles")
-            
-            print(f"✅ Loaded color profiles from {settings_path}")
-            print(f"   Profiles loaded: {[p['name'] for p in color_profiles]}")
-        except Exception as e:
-            print(f"❌ Error loading calibration_settings_new3d.json: {e}")
-            # Initialize with default profiles as fallback
-            color_profiles = []
-            for profile in color_manager.profiles:
-                color_profiles.append({
-                    'name': profile['name'],
-                    'enabled': profile.get('enabled', True),
-                    'avg_hue': -1.0,
-                    'avg_saturation': -1.0,
-                    'min_hsv': [0.0, 0.0, 0.0],
-                    'max_hsv': [180.0, 255.0, 255.0],
-                    'min_hsv2': [-1.0, 0.0, 0.0],
-                    'max_hsv2': [-1.0, 255.0, 255.0]
-                })
+        color_profiles = self.parent.new3d_ball_profiles
         
         # Store references for later use
         if not hasattr(self.parent, 'new3d_ball_checkboxes'):
@@ -500,7 +452,7 @@ class New3DSettingsSections:
             checkbox.setCheckable(True)
             is_enabled = profile.get('enabled', True)
             checkbox.setChecked(is_enabled)
-            checkbox.clicked.connect(lambda checked, name=ball_name: self.parent.toggle_ball_tracking(name, checked))
+            checkbox.clicked.connect(lambda checked, name=ball_name: self._toggle_new3d_ball_tracking(name, checked))
             self.parent.new3d_ball_checkboxes[ball_name] = checkbox
             ball_layout.addWidget(checkbox, 0, 0, 1, 3)
             
@@ -605,57 +557,9 @@ class New3DSettingsSections:
         layout = QVBoxLayout()
         section.get_content_layout().addLayout(layout)
         
-        # Load ball profiles from config/calibration_settings_new3d.json
-        import json
-        import os
-        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "calibration_settings_new3d.json")
-        settings_path = os.path.normpath(settings_path)
-        
-        # Get default profiles from ColorProfileManager
-        from .color_profile_manager import ColorProfileManager
-        color_manager = ColorProfileManager()
-        
-        try:
-            with open(settings_path, 'r') as f:
-                settings_data = json.load(f)
-                self.parent.new3d_ball_profiles = settings_data.get('color_profiles', [])
-            
-            # If no profiles exist, initialize from ColorProfileManager
-            if not self.parent.new3d_ball_profiles:
-                print(f"ℹ️ No color_profiles found in {settings_path}, initializing from ColorProfileManager")
-                self.parent.new3d_ball_profiles = []
-                for profile in color_manager.profiles:
-                    self.parent.new3d_ball_profiles.append({
-                        'name': profile['name'],
-                        'enabled': profile.get('enabled', True),
-                        'avg_hue': -1.0,
-                        'avg_saturation': -1.0,
-                        'min_hsv': [0.0, 0.0, 0.0],
-                        'max_hsv': [180.0, 255.0, 255.0],
-                        'min_hsv2': [-1.0, 0.0, 0.0],
-                        'max_hsv2': [-1.0, 255.0, 255.0]
-                    })
-                # Save the initialized profiles
-                self._save_new3d_profiles()
-                print(f"✅ Initialized {len(self.parent.new3d_ball_profiles)} default color profiles")
-            
-            print(f"✅ Loaded {len(self.parent.new3d_ball_profiles)} ball profiles from {settings_path}")
-            print(f"   Profiles loaded: {[p['name'] for p in self.parent.new3d_ball_profiles]}")
-        except Exception as e:
-            print(f"❌ Error loading calibration_settings_new3d.json: {e}")
-            # Initialize with default profiles as fallback
-            self.parent.new3d_ball_profiles = []
-            for profile in color_manager.profiles:
-                self.parent.new3d_ball_profiles.append({
-                    'name': profile['name'],
-                    'enabled': profile.get('enabled', True),
-                    'avg_hue': -1.0,
-                    'avg_saturation': -1.0,
-                    'min_hsv': [0.0, 0.0, 0.0],
-                    'max_hsv': [180.0, 255.0, 255.0],
-                    'min_hsv2': [-1.0, 0.0, 0.0],
-                    'max_hsv2': [-1.0, 255.0, 255.0]
-                })
+        # Use shared ball profiles - ensure they're loaded first
+        if not hasattr(self.parent, 'new3d_ball_profiles'):
+            self._load_new3d_profiles()
         
         # Store checkbox references
         self.parent.new3d_ball_checkboxes = {}
@@ -747,6 +651,59 @@ class New3DSettingsSections:
         
         return section
     
+    def _load_new3d_profiles(self):
+        """Load New 3D ball profiles from calibration_settings_new3d.json"""
+        import json
+        import os
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+        settings_path = os.path.normpath(settings_path)
+        
+        # Get default profiles from ColorProfileManager
+        from .color_profile_manager import ColorProfileManager
+        color_manager = ColorProfileManager()
+        
+        try:
+            with open(settings_path, 'r') as f:
+                settings_data = json.load(f)
+                self.parent.new3d_ball_profiles = settings_data.get('color_profiles', [])
+            
+            # If no profiles exist, initialize from ColorProfileManager
+            if not self.parent.new3d_ball_profiles:
+                print(f"ℹ️ No color_profiles found in {settings_path}, initializing from ColorProfileManager")
+                self.parent.new3d_ball_profiles = []
+                for profile in color_manager.profiles:
+                    self.parent.new3d_ball_profiles.append({
+                        'name': profile['name'],
+                        'enabled': profile.get('enabled', True),
+                        'avg_hue': -1.0,
+                        'avg_saturation': -1.0,
+                        'min_hsv': [0.0, 0.0, 0.0],
+                        'max_hsv': [180.0, 255.0, 255.0],
+                        'min_hsv2': [-1.0, 0.0, 0.0],
+                        'max_hsv2': [-1.0, 255.0, 255.0]
+                    })
+                # Save the initialized profiles
+                self._save_new3d_profiles()
+                print(f"✅ Initialized {len(self.parent.new3d_ball_profiles)} default color profiles")
+            
+            print(f"✅ Loaded {len(self.parent.new3d_ball_profiles)} ball profiles from {settings_path}")
+            print(f"   Profiles loaded: {[p['name'] for p in self.parent.new3d_ball_profiles]}")
+        except Exception as e:
+            print(f"❌ Error loading calibration_settings_new3d.json: {e}")
+            # Initialize with default profiles as fallback
+            self.parent.new3d_ball_profiles = []
+            for profile in color_manager.profiles:
+                self.parent.new3d_ball_profiles.append({
+                    'name': profile['name'],
+                    'enabled': profile.get('enabled', True),
+                    'avg_hue': -1.0,
+                    'avg_saturation': -1.0,
+                    'min_hsv': [0.0, 0.0, 0.0],
+                    'max_hsv': [180.0, 255.0, 255.0],
+                    'min_hsv2': [-1.0, 0.0, 0.0],
+                    'max_hsv2': [-1.0, 255.0, 255.0]
+                })
+    
     def _toggle_new3d_ball_tracking(self, ball_name: str, enabled: bool):
         """Toggle tracking for specific ball in New 3D tracker"""
         print(f"🔄 {'Enabling' if enabled else 'Disabling'} tracking for {ball_name} (New 3D)")
@@ -758,22 +715,11 @@ class New3DSettingsSections:
                 break
         
         # Save to calibration_settings_new3d.json
+        # The engine will reload these settings on next startup
         self._save_new3d_profiles()
         
-        # Send to engine via ZMQ command
-        command = juggler_pb2.CommandRequest()
-        command.type = juggler_pb2.CommandRequest.CommandType.UPDATE_COLOR_PROFILE
-        command.color_profile_name = ball_name
-        command.color_profile_enabled = enabled
-        
-        try:
-            response = self.zmq_client.send_command(command)
-            if response.success:
-                print(f"✅ {ball_name} tracking {'enabled' if enabled else 'disabled'}")
-            else:
-                print(f"❌ Failed to update {ball_name}: {response.message}")
-        except Exception as e:
-            print(f"❌ Error updating {ball_name}: {e}")
+        print(f"✅ Saved {ball_name} tracking state: {'enabled' if enabled else 'disabled'}")
+        print(f"   Settings will take effect on next engine restart")
         
         if not self.parent._loading_settings:
             self.parent.save_settings()
@@ -802,10 +748,10 @@ class New3DSettingsSections:
             print(f"⚠️ Main window reference not available")
     
     def _save_new3d_profiles(self):
-        """Save New 3D ball profiles to config/calibration_settings_new3d.json"""
+        """Save New 3D ball profiles to calibration_settings_new3d.json"""
         import json
         import os
-        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "calibration_settings_new3d.json")
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
         settings_path = os.path.normpath(settings_path)
         
         try:

@@ -973,8 +973,8 @@ if PYQT_AVAILABLE:
             """Play audio file for color name"""
             def play_in_thread():
                 try:
-                    # Look for audio file in hub/audio directory
-                    audio_file = os.path.join(os.path.dirname(__file__), "..", "audio", f"{color_name.lower()}.wav")
+                    # Look for audio file in hub/audio/color_names directory
+                    audio_file = os.path.join(os.path.dirname(__file__), "..", "audio", "color_names", f"{color_name.lower()}.mp3")
                     
                     if not os.path.exists(audio_file):
                         print(f"⚠️ Audio file not found: {audio_file}")
@@ -984,12 +984,16 @@ if PYQT_AVAILABLE:
                     
                     system = platform.system()
                     if system == "Linux":
-                        subprocess.run(['paplay', audio_file], timeout=2, check=False)
+                        # Try mpg123 first (recommended for MP3), fall back to ffplay
+                        try:
+                            subprocess.run(['mpg123', '-q', audio_file], timeout=2, check=True)
+                        except (subprocess.CalledProcessError, FileNotFoundError):
+                            subprocess.run(['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', audio_file], timeout=2, check=False)
                     elif system == "Darwin":
                         subprocess.run(['afplay', audio_file], timeout=2, check=False)
                     elif system == "Windows":
-                        import winsound
-                        winsound.PlaySound(audio_file, winsound.SND_FILENAME)
+                        # Windows Media Player can handle MP3
+                        subprocess.run(['powershell', '-c', f'(New-Object Media.SoundPlayer "{audio_file}").PlaySync()'], timeout=2, check=False)
                 except Exception as e:
                     print(f"⚠️ Could not play color name audio: {e}")
                     # Fall back to system beep

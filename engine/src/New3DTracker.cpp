@@ -763,8 +763,8 @@ void New3DTracker::handleHeldStateUpdate(
             float dz_other = detection.world_pos.z - other_hand_pos.z;
             float distance_to_other = std::sqrt(dx_other*dx_other + dy_other*dy_other + dz_other*dz_other);
             
-            if (distance_to_other < settings_.held_radius_m && isHandAvailable(hand.id, tracked_balls_)) {
-                // Hand-off detected
+            if (distance_to_other < settings_.held_radius_m) {
+                // Hand-off detected - hands can hold multiple balls
                 ball.associated_hand_id = hand.id;
                 ball.tracking_reason = "Hand-off detected";
                 break;
@@ -790,7 +790,7 @@ void New3DTracker::handleInFlightStateUpdate(
     );
     ball.kf.correct(measurement);
     
-    // Check distance to all available hands for catch detection
+    // Check distance to all hands for catch detection
     for (const auto& hand : current_hands) {
         cv::Point3f hand_pos = hand.wrist_pos_3d;
         float dx = detection.world_pos.x - hand_pos.x;
@@ -798,8 +798,9 @@ void New3DTracker::handleInFlightStateUpdate(
         float dz = detection.world_pos.z - hand_pos.z;
         float distance_to_hand = std::sqrt(dx*dx + dy*dy + dz*dz);
         
-        // Detect catch: ball comes within held_radius of an available hand
-        if (distance_to_hand < settings_.held_radius_m && isHandAvailable(hand.id, tracked_balls_)) {
+        // Detect catch: ball comes within held_radius of any hand
+        // Hands can hold multiple balls simultaneously
+        if (distance_to_hand < settings_.held_radius_m) {
             // Transition to HELD state
             ball.state = HELD;
             ball.associated_hand_id = hand.id;
@@ -825,15 +826,8 @@ void New3DTracker::handleInFlightStateUpdate(
     ball.last_known_position = detection.world_pos;
 }
 
-bool New3DTracker::isHandAvailable(int hand_id, const std::vector<New3DBall>& balls) {
-    // Check if any ball is already held by this hand
-    for (const auto& ball : balls) {
-        if (ball.state == HELD && ball.associated_hand_id == hand_id) {
-            return false;  // Hand is already holding a ball
-        }
-    }
-    return true;  // Hand is available
-}
+// REMOVED: isHandAvailable() function
+// Hands can now hold multiple balls simultaneously
 
 // ============================================================================
 // PHASE 5: TRACK MANAGEMENT
@@ -955,7 +949,8 @@ void New3DTracker::createNewTracks(
             float dz = detection->world_pos.z - hand.wrist_pos_3d.z;
             float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
             
-            if (distance < min_distance && isHandAvailable(hand.id, tracked_balls_)) {
+            // Hands can hold multiple balls simultaneously
+            if (distance < min_distance) {
                 near_hand = true;
                 min_distance = distance;
                 closest_hand_id = hand.id;

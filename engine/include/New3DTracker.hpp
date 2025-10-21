@@ -503,13 +503,7 @@ private:
      */
     cv::Point3f calculateHandVelocity(const SimpleHand& hand, const Pose3D& previous_pose, float dt);
     
-    /**
-     * @brief Check if a hand is available (not holding another ball)
-     * @param hand_id Hand ID to check (-1=none, 0=left, 1=right)
-     * @param balls Current tracked balls
-     * @return True if hand is available
-     */
-    bool isHandAvailable(int hand_id, const std::vector<New3DBall>& balls);
+    // REMOVED: isHandAvailable() - hands can now hold multiple balls simultaneously
     
     /**
      * @brief Match detection color to a color profile

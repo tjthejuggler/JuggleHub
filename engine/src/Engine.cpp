@@ -681,6 +681,18 @@ void Engine::processCommands() {
                                        (command.depth_sensor_enabled() ? "enable" : "disable") +
                                        " requested. Note: This requires camera restart to take effect.");
                     break;
+                case juggler::v1::CommandRequest::RELOAD_COLOR_PROFILES:
+                    // Reload color profiles for New3D tracker
+                    if (current_tracker_type_ == "new_3d" && new_3d_tracker_) {
+                        writeDebugLog("processCommands() - RELOAD_COLOR_PROFILES command received");
+                        new_3d_tracker_->reloadColorProfiles();
+                        response.set_message("Color profiles reloaded successfully");
+                        writeDebugLog("processCommands() - Color profiles reloaded");
+                    } else {
+                        response.set_success(false);
+                        response.set_message("Color profile reload only supported for New3D tracker (current: " + current_tracker_type_ + ")");
+                    }
+                    break;
                 default:
                     response.set_success(false);
                     response.set_message("Unknown command");

@@ -269,6 +269,7 @@ message CommandRequest {
     SET_VIDEO_FEED_ENABLED = 16; // Enable or disable video feed encoding
     SET_TRACKER_TYPE = 17; // Switch between tracking system implementations
     SET_DEPTH_SENSOR_ENABLED = 18; // Enable or disable the RealSense depth sensor
+    RELOAD_COLOR_PROFILES = 19; // Reload color profiles from settings file (New3D tracker)
   }
   
   CommandType type = 1;

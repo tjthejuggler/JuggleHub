@@ -1048,7 +1048,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "r.v1.BallState\0224\n\020occlusion_states\030\026 \003(\013"
   "2\032.juggler.v1.OcclusionState\022;\n\024color_se"
   "arch_regions\030\027 \003(\0132\035.juggler.v1.ColorSea"
-  "rchRegion\"\240\t\n\016CommandRequest\0224\n\004type\030\001 \001"
+  "rchRegion\"\273\t\n\016CommandRequest\0224\n\004type\030\001 \001"
   "(\0162&.juggler.v1.CommandRequest.CommandTy"
   "pe\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestamp_us\030"
   "\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.juggler.v"
@@ -1066,7 +1066,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "feature_name\030\022 \001(\t\022\032\n\022video_feed_enabled"
   "\030\024 \001(\010\022\024\n\014tracker_type\030\025 \001(\t\022\034\n\024depth_se"
   "nsor_enabled\030\026 \001(\010\0321\n\017ModuleArgsEntry\022\013\n"
-  "\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\274\003\n\013Comman"
+  "\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\327\003\n\013Comman"
   "dType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rU"
   "NLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMMAND\020\003\022\024"
   "\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_START\020\005\022\033"
@@ -1077,27 +1077,28 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "ODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COLOR\020\r\022\022\n\016E"
   "NABLE_FEATURE\020\016\022\023\n\017DISABLE_FEATURE\020\017\022\032\n\026"
   "SET_VIDEO_FEED_ENABLED\020\020\022\024\n\020SET_TRACKER_"
-  "TYPE\020\021\022\034\n\030SET_DEPTH_SENSOR_ENABLED\020\022\"\330\003\n"
-  "\023VisualizationStates\022#\n\033show_trajectory_"
-  "predictions\030\001 \001(\010\022\033\n\023show_raw_detections"
-  "\030\002 \001(\010\022 \n\030show_filtered_detections\030\003 \001(\010"
-  "\022\031\n\021show_associations\030\004 \001(\010\022\031\n\021show_new_"
-  "trackers\030\005 \001(\010\022\032\n\022show_hand_tracking\030\006 \001"
-  "(\010\022\030\n\020show_ball_states\030\007 \001(\010\022\026\n\016show_occ"
-  "lusion\030\010 \001(\010\022\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021s"
-  "how_color_search\030\n \001(\010\022\032\n\022show_color_tra"
-  "cker\030\013 \001(\010\022\032\n\022show_tracked_boxes\030\014 \001(\010\022!"
-  "\n\031show_unmatched_detections\030\r \001(\010\022\022\n\nsho"
-  "w_tails\030\016 \001(\010\022\027\n\017show_trajectory\030\017 \001(\010\022\037"
-  "\n\027show_hand_velocity_zone\030\020 \001(\010\"A\n\014Color"
-  "Command\022\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132"
-  "\021.juggler.v1.Color\"I\n\017CommandResponse\022\017\n"
-  "\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014times"
-  "tamp_us\030\003 \001(\004b\006proto3"
+  "TYPE\020\021\022\034\n\030SET_DEPTH_SENSOR_ENABLED\020\022\022\031\n\025"
+  "RELOAD_COLOR_PROFILES\020\023\"\330\003\n\023Visualizatio"
+  "nStates\022#\n\033show_trajectory_predictions\030\001"
+  " \001(\010\022\033\n\023show_raw_detections\030\002 \001(\010\022 \n\030sho"
+  "w_filtered_detections\030\003 \001(\010\022\031\n\021show_asso"
+  "ciations\030\004 \001(\010\022\031\n\021show_new_trackers\030\005 \001("
+  "\010\022\032\n\022show_hand_tracking\030\006 \001(\010\022\030\n\020show_ba"
+  "ll_states\030\007 \001(\010\022\026\n\016show_occlusion\030\010 \001(\010\022"
+  "\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021show_color_sea"
+  "rch\030\n \001(\010\022\032\n\022show_color_tracker\030\013 \001(\010\022\032\n"
+  "\022show_tracked_boxes\030\014 \001(\010\022!\n\031show_unmatc"
+  "hed_detections\030\r \001(\010\022\022\n\nshow_tails\030\016 \001(\010"
+  "\022\027\n\017show_trajectory\030\017 \001(\010\022\037\n\027show_hand_v"
+  "elocity_zone\030\020 \001(\010\"A\n\014ColorCommand\022\017\n\007ba"
+  "ll_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1."
+  "Color\"I\n\017CommandResponse\022\017\n\007success\030\001 \001("
+  "\010\022\017\n\007message\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004"
+  "b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 6301, descriptor_table_protodef_juggler_2eproto,
+    false, false, 6328, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 27,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -1204,6 +1205,7 @@ bool CommandRequest_CommandType_IsValid(int value) {
     case 16:
     case 17:
     case 18:
+    case 19:
       return true;
     default:
       return false;
@@ -1230,6 +1232,7 @@ constexpr CommandRequest_CommandType CommandRequest::DISABLE_FEATURE;
 constexpr CommandRequest_CommandType CommandRequest::SET_VIDEO_FEED_ENABLED;
 constexpr CommandRequest_CommandType CommandRequest::SET_TRACKER_TYPE;
 constexpr CommandRequest_CommandType CommandRequest::SET_DEPTH_SENSOR_ENABLED;
+constexpr CommandRequest_CommandType CommandRequest::RELOAD_COLOR_PROFILES;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MIN;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MAX;
 constexpr int CommandRequest::CommandType_ARRAYSIZE;

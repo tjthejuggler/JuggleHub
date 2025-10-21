@@ -715,11 +715,31 @@ class New3DSettingsSections:
                 break
         
         # Save to calibration_settings_new3d.json
-        # The engine will reload these settings on next startup
         self._save_new3d_profiles()
         
         print(f"✅ Saved {ball_name} tracking state: {'enabled' if enabled else 'disabled'}")
-        print(f"   Settings will take effect on next engine restart")
+        
+        # CRITICAL FIX: Send reload command to engine immediately
+        if self.zmq_client:
+            print(f"🔄 Sending RELOAD_COLOR_PROFILES command to engine...")
+            try:
+                import juggler_pb2
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.RELOAD_COLOR_PROFILES
+                
+                # Send command and wait for response
+                response = self.zmq_client.send_command(command)
+                
+                if response and response.success:
+                    print(f"✅ Engine reloaded color profiles successfully!")
+                    print(f"   {ball_name} tracking is now {'ACTIVE' if enabled else 'STOPPED'}")
+                else:
+                    error_msg = response.message if response else "No response"
+                    print(f"⚠️ Engine reload failed: {error_msg}")
+            except Exception as e:
+                print(f"❌ Error sending reload command: {e}")
+        else:
+            print(f"⚠️ ZMQ client not available - changes will take effect on next engine restart")
         
         if not self.parent._loading_settings:
             self.parent.save_settings()

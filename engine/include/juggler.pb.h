@@ -262,12 +262,13 @@ enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_SET_VIDEO_FEED_ENABLED = 16,
   CommandRequest_CommandType_SET_TRACKER_TYPE = 17,
   CommandRequest_CommandType_SET_DEPTH_SENSOR_ENABLED = 18,
+  CommandRequest_CommandType_RELOAD_COLOR_PROFILES = 19,
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool CommandRequest_CommandType_IsValid(int value);
 constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MIN = CommandRequest_CommandType_UNKNOWN;
-constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_SET_DEPTH_SENSOR_ENABLED;
+constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_RELOAD_COLOR_PROFILES;
 constexpr int CommandRequest_CommandType_CommandType_ARRAYSIZE = CommandRequest_CommandType_CommandType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor();
@@ -5552,6 +5553,8 @@ class CommandRequest final :
     CommandRequest_CommandType_SET_TRACKER_TYPE;
   static constexpr CommandType SET_DEPTH_SENSOR_ENABLED =
     CommandRequest_CommandType_SET_DEPTH_SENSOR_ENABLED;
+  static constexpr CommandType RELOAD_COLOR_PROFILES =
+    CommandRequest_CommandType_RELOAD_COLOR_PROFILES;
   static inline bool CommandType_IsValid(int value) {
     return CommandRequest_CommandType_IsValid(value);
   }

@@ -674,10 +674,11 @@ private:
     std::unique_ptr<GpuHsvConverter> gpu_hsv_converter_;  // GPU HSV conversion
     
     // ========================================================================
-    // TIMING
+    // TIMING & FRAME TRACKING
     // ========================================================================
     
     std::chrono::steady_clock::time_point last_update_time_;  // Last update timestamp
+    int frame_counter_ = 0;                                   // Frame counter for debug logging
     
     // ========================================================================
     // MODEL PARAMETERS

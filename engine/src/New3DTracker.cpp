@@ -4,6 +4,18 @@
 #include <iostream>
 #include <chrono>
 #include <cmath>
+#include <sstream>
+
+// External debug log function from main.cpp
+extern void writeDebugLog(const std::string& message);
+
+// Helper function to build debug log messages with multiple arguments
+template<typename... Args>
+void logDebug(Args&&... args) {
+    std::ostringstream oss;
+    (oss << ... << args);
+    writeDebugLog(oss.str());
+}
 
 // ============================================================================
 // CONSTRUCTOR
@@ -491,12 +503,16 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
     
     AssociationResult result;
     
+    logDebug("  associateDetections: ", balls.size(), " balls, ", detections.size(), " detections");
+    
     // Handle edge cases
     if (balls.empty() && detections.empty()) {
+        logDebug("  No balls and no detections - nothing to associate");
         return result;  // Nothing to associate
     }
     
     if (balls.empty()) {
+        logDebug("  No balls - all detections unmatched");
         // All detections are unmatched
         for (const auto& det : detections) {
             result.unmatched_detections.push_back(&det);
@@ -505,6 +521,7 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
     }
     
     if (detections.empty()) {
+        logDebug("  No detections - all balls unmatched");
         // All balls are unmatched
         for (auto& ball : balls) {
             result.unmatched_balls.push_back(&ball);
@@ -518,10 +535,14 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
     
     // Greedy nearest-neighbor association with color-aware cost
     // Repeatedly find the closest ball-detection pair until no valid matches remain
+    logDebug("  Starting greedy association...");
+    int iteration = 0;
     while (true) {
+        iteration++;
         float min_cost = max_distance;
         int best_ball_idx = -1;
         int best_detection_idx = -1;
+        std::string best_match_reason;
         
         // Find the best unmatched ball-detection pair based on combined cost
         for (size_t i = 0; i < balls.size(); ++i) {
@@ -550,11 +571,12 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
                 
                 // 2. Calculate the color mismatch penalty
                 float color_penalty = 0.0f;
+                std::string detection_color = "unknown";
                 
                 // If the track's color is locked, check for color mismatch
                 if (track.color_locked && settings_.use_color_tracking) {
                     // Determine the detection's color
-                    std::string detection_color = determineColor(detection, color_frame);
+                    detection_color = determineColor(detection, color_frame);
                     
                     // Apply penalty if colors don't match
                     if (detection_color != track.color_name) {
@@ -569,12 +591,25 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
                     min_cost = total_cost;
                     best_ball_idx = static_cast<int>(i);
                     best_detection_idx = static_cast<int>(j);
+                    
+                    // Build reason string
+                    std::ostringstream reason;
+                    reason << "dist=" << distance << "m";
+                    if (color_penalty > 0) {
+                        reason << " + color_penalty=" << color_penalty << "m (det_color="
+                               << detection_color << " vs ball_color=" << track.color_name << ")";
+                    } else if (track.color_locked && settings_.use_color_tracking) {
+                        reason << " (colors match: " << detection_color << ")";
+                    }
+                    reason << " = total_cost=" << total_cost << "m";
+                    best_match_reason = reason.str();
                 }
             }
         }
         
         // If no valid match found, we're done
         if (best_ball_idx == -1 || best_detection_idx == -1) {
+            logDebug("  Iteration ", iteration, ": No more valid matches found");
             break;
         }
         
@@ -584,6 +619,10 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
         match.detection = &detections[best_detection_idx];
         match.distance = min_cost;  // Store total cost instead of just distance
         result.matched_pairs.push_back(match);
+        
+        logDebug("  Iteration ", iteration, ": Matched Ball ", match.ball->id, " (", match.ball->color_name,
+                  ") to Detection at (", match.detection->world_pos.x, ", ", match.detection->world_pos.y, ", ",
+                  match.detection->world_pos.z, ") | ", best_match_reason);
         
         // Mark as matched
         ball_matched[best_ball_idx] = true;
@@ -652,6 +691,11 @@ void New3DTracker::handleHeldStateUpdate(
     float dt,
     std::vector<BallEvent>& events) {
     
+    logDebug("    handleHeldStateUpdate for Ball ", ball.id, " (", ball.color_name, ")");
+    logDebug("      Currently held by Hand ", ball.associated_hand_id);
+    logDebug("      Detection at: (", detection.world_pos.x, ", ", detection.world_pos.y, ", ",
+              detection.world_pos.z, ") m");
+    
     // Update Kalman filter with detection measurement
     cv::Mat measurement = (cv::Mat_<float>(3, 1) <<
         detection.world_pos.x,
@@ -677,6 +721,8 @@ void New3DTracker::handleHeldStateUpdate(
     }
     
     if (!holding_hand) {
+        logDebug("      >>> HAND LOST! Holding hand ", ball.associated_hand_id, " not found");
+        
         // Hand not found - ball may have been thrown
         // Transition to IN_FLIGHT state
         ball.state = IN_FLIGHT;
@@ -704,6 +750,9 @@ void New3DTracker::handleHeldStateUpdate(
     float dz = detection.world_pos.z - hand_pos.z;
     float distance_to_hand = std::sqrt(dx*dx + dy*dy + dz*dz);
     
+    logDebug("      Distance to holding hand: ", distance_to_hand, "m (threshold: ",
+              settings_.held_radius_m, "m)");
+    
     // Calculate hand velocity
     cv::Point3f hand_velocity = calculateHandVelocity(*holding_hand, previous_pose, dt);
     
@@ -730,7 +779,12 @@ void New3DTracker::handleHeldStateUpdate(
     }
     
     // Detect throw: ball moves beyond held_radius AND has sufficient relative velocity
+    logDebug("      Throw detection: distance_exceeded=", distance_exceeded,
+              ", velocity_exceeded=", velocity_exceeded, ", hand_velocity_check=", hand_velocity_check);
+    
     if (distance_exceeded && velocity_exceeded && hand_velocity_check) {
+        logDebug("      >>> THROW DETECTED! Ball ", ball.id, " thrown from Hand ", ball.associated_hand_id);
+        
         // Transition to IN_FLIGHT state
         ball.state = IN_FLIGHT;
         int previous_hand_id = ball.associated_hand_id;
@@ -749,6 +803,8 @@ void New3DTracker::handleHeldStateUpdate(
         events.push_back(throw_event);
         
         return;
+    } else {
+        logDebug("      No throw detected - ball remains HELD");
     }
     
     // Check for hand-off (ball moves to other hand while staying held)
@@ -782,6 +838,10 @@ void New3DTracker::handleInFlightStateUpdate(
     const std::vector<SimpleHand>& current_hands,
     std::vector<BallEvent>& events) {
     
+    logDebug("    handleInFlightStateUpdate for Ball ", ball.id, " (", ball.color_name, ")");
+    logDebug("      Detection at: (", detection.world_pos.x, ", ", detection.world_pos.y, ", ",
+              detection.world_pos.z, ") m");
+    
     // Update Kalman filter with detection measurement
     cv::Mat measurement = (cv::Mat_<float>(3, 1) <<
         detection.world_pos.x,
@@ -791,6 +851,7 @@ void New3DTracker::handleInFlightStateUpdate(
     ball.kf.correct(measurement);
     
     // Check distance to all hands for catch detection
+    logDebug("      Checking catch distances (threshold: ", settings_.held_radius_m, "m):");
     for (const auto& hand : current_hands) {
         cv::Point3f hand_pos = hand.wrist_pos_3d;
         float dx = detection.world_pos.x - hand_pos.x;
@@ -798,9 +859,14 @@ void New3DTracker::handleInFlightStateUpdate(
         float dz = detection.world_pos.z - hand_pos.z;
         float distance_to_hand = std::sqrt(dx*dx + dy*dy + dz*dz);
         
+        logDebug("        Hand ", hand.id, " (", (hand.id == 0 ? "LEFT" : "RIGHT"), "): distance=",
+                  distance_to_hand, "m");
+        
         // Detect catch: ball comes within held_radius of any hand
         // Hands can hold multiple balls simultaneously
         if (distance_to_hand < settings_.held_radius_m) {
+            logDebug("        >>> CATCH DETECTED! Ball ", ball.id, " caught by Hand ", hand.id);
+            
             // Transition to HELD state
             ball.state = HELD;
             ball.associated_hand_id = hand.id;
@@ -819,11 +885,16 @@ void New3DTracker::handleInFlightStateUpdate(
             
             events.push_back(catch_event);
             break;  // Only catch with one hand
+        } else {
+            logDebug("        No catch (distance ", distance_to_hand, "m >= threshold ",
+                      settings_.held_radius_m, "m)");
         }
     }
     
     // Update last known position
     ball.last_known_position = detection.world_pos;
+    logDebug("      Ball position updated to: (", ball.last_known_position.x, ", ",
+              ball.last_known_position.y, ", ", ball.last_known_position.z, ") m");
 }
 
 // REMOVED: isHandAvailable() function
@@ -957,15 +1028,20 @@ void New3DTracker::createNewTracks(
             }
         }
         
-        // Update state
-        if (near_hand) {
+        // Update state - CRITICAL: Only set to HELD if ball was already HELD before losing detection
+        // If ball was IN_FLIGHT, it should stay IN_FLIGHT until a proper catch is detected
+        if (near_hand && ball->state == HELD) {
+            // Ball was held, lost detection briefly, now re-acquired near same/different hand
             ball->state = HELD;
             ball->associated_hand_id = closest_hand_id;
             ball->tracking_reason = "Re-acquired (HELD)";
+            logDebug("  Re-acquired ball ", ball->id, " as HELD by hand ", closest_hand_id);
         } else {
+            // Ball was IN_FLIGHT or not near any hand - keep/set as IN_FLIGHT
             ball->state = IN_FLIGHT;
             ball->associated_hand_id = -1;
             ball->tracking_reason = "Re-acquired (IN_FLIGHT)";
+            logDebug("  Re-acquired ball ", ball->id, " as IN_FLIGHT");
         }
         
         // Update visualization data
@@ -998,13 +1074,21 @@ void New3DTracker::finalizeBallPositions(const std::vector<SimpleHand>& hands) {
             
             if (holding_hand) {
                 ball.last_known_position = holding_hand->wrist_pos_3d;
+                logDebug("  Ball ", ball.id, " (", ball.color_name, ") finalized at hand ", 
+                         ball.associated_hand_id, " wrist: (", holding_hand->wrist_pos_3d.x, ", ",
+                         holding_hand->wrist_pos_3d.y, ", ", holding_hand->wrist_pos_3d.z, ") m");
             } else {
                 // Hand not found, keep predicted position
                 ball.last_known_position = ball.predicted_position;
+                logDebug("  Ball ", ball.id, " (", ball.color_name, ") hand ", ball.associated_hand_id,
+                         " not found, using predicted position");
             }
         } else {
             // For IN_FLIGHT balls: Use Kalman prediction as final position
             ball.last_known_position = ball.predicted_position;
+            logDebug("  Ball ", ball.id, " (", ball.color_name, ") IN_FLIGHT, using predicted position: (",
+                     ball.predicted_position.x, ", ", ball.predicted_position.y, ", ", 
+                     ball.predicted_position.z, ") m");
         }
         
         // Lock color after sufficient frames
@@ -1469,6 +1553,18 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     // Clamp dt to reasonable values (10ms to 1s)
     dt = std::max(0.01f, std::min(dt, 1.0f));
     
+    // Increment frame counter
+    frame_counter_++;
+    
+    // DEBUG LOGGING: Frame header
+    logDebug("\n================================================================================");
+    if (recording_frame_number_ >= 0) {
+        logDebug("FRAME ", frame_counter_, " (Recording Frame: ", recording_frame_number_, ")");
+    } else {
+        logDebug("FRAME ", frame_counter_);
+    }
+    logDebug("\n================================================================================");
+    
     // Preprocess frame once for both models
     float scale_x, scale_y;
     cv::Mat preprocessed = preprocess(color_frame, scale_x, scale_y);
@@ -1485,28 +1581,102 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     hands_ = current_hands;
     last_raw_detections_ = detections;
     
+    // DEBUG LOGGING: YOLO detections
+    logDebug("--- YOLO DETECTIONS ---");
+    logDebug("Number of detections: ", detections.size());
+    for (size_t i = 0; i < detections.size(); ++i) {
+        const auto& det = detections[i];
+        logDebug("  Detection ", i, ":");
+        logDebug("    BBox: [", det.box.x, ", ", det.box.y, ", ", det.box.width, ", ", det.box.height, "]");
+        logDebug("    Center 2D: (", det.box.x + det.box.width/2, ", ", det.box.y + det.box.height/2, ")");
+        logDebug("    World Pos: (", det.world_pos.x, ", ", det.world_pos.y, ", ", det.world_pos.z, ") m");
+        logDebug("    Confidence: ", det.confidence);
+        logDebug("    Class: ", (det.class_id == 0 ? "ball" : "ball_held"));
+    }
+    
+    // DEBUG LOGGING: Hand positions
+    logDebug("\n--- HAND POSITIONS ---");
+    logDebug("Number of hands: ", current_hands.size());
+    for (const auto& hand : current_hands) {
+        logDebug("  Hand ", hand.id, " (", (hand.id == 0 ? "LEFT" : "RIGHT"), "):");
+        logDebug("    Wrist 3D: (", hand.wrist_pos_3d.x, ", ", hand.wrist_pos_3d.y, ", ", hand.wrist_pos_3d.z, ") m");
+        logDebug("    Visible: ", (hand.is_visible ? "YES" : "NO"));
+        logDebug("    Confidence: ", hand.confidence);
+    }
+    
     // STEP 1: PREDICTION
+    logDebug("\n--- STEP 1: PREDICTION ---");
     predictAllBalls(dt);
     
+    // Log predicted positions for all balls
+    for (const auto& ball : tracked_balls_) {
+        logDebug("Ball ", ball.id, " (", ball.color_name, ") predicted at: (",
+                  ball.predicted_position.x, ", ", ball.predicted_position.y, ", ",
+                  ball.predicted_position.z, ") m");
+    }
+    
     // STEP 2: ASSOCIATION (with color-aware cost)
+    logDebug("\n--- STEP 2: ASSOCIATION ---");
     auto association = associateDetections(tracked_balls_, detections,
                                           settings_.association_max_distance_m,
                                           color_frame);
     
+    // DEBUG LOGGING: Association results
+    logDebug("Matched pairs: ", association.matched_pairs.size());
+    for (const auto& match : association.matched_pairs) {
+        logDebug("  Ball ", match.ball->id, " (", match.ball->color_name, ") <-> Detection at (",
+                  match.detection->world_pos.x, ", ", match.detection->world_pos.y, ", ",
+                  match.detection->world_pos.z, ") | Distance: ", match.distance, "m");
+    }
+    logDebug("Unmatched balls: ", association.unmatched_balls.size());
+    for (const auto* ball : association.unmatched_balls) {
+        logDebug("  Ball ", ball->id, " (", ball->color_name, ") - no detection match");
+    }
+    logDebug("Unmatched detections: ", association.unmatched_detections.size());
+    for (const auto* det : association.unmatched_detections) {
+        logDebug("  Detection at (", det->world_pos.x, ", ", det->world_pos.y, ", ",
+                  det->world_pos.z, ") - no ball match");
+    }
+    
     // STEP 3: UPDATE MATCHED
+    logDebug("\n--- STEP 3: UPDATE MATCHED BALLS ---");
     updateMatchedBalls(association.matched_pairs, current_hands,
                       previous_frame_pose_, dt, events);
     
     // STEP 4: CREATE NEW TRACKS (with re-acquisition logic)
+    logDebug("\n--- STEP 4: RE-ACQUIRE LOST BALLS ---");
     // This must happen BEFORE handleUnmatchedBalls so we can re-acquire lost tracks
     createNewTracks(association.unmatched_detections, association.unmatched_balls, color_frame);
     
     // STEP 5: HANDLE UNMATCHED BALLS
+    logDebug("\n--- STEP 5: HANDLE UNMATCHED BALLS ---");
     // Now handle any remaining unmatched balls (those that weren't re-acquired)
     handleUnmatchedBalls(association.unmatched_balls);
     
     // STEP 6: FINALIZE
+    logDebug("\n--- STEP 6: FINALIZE POSITIONS ---");
     finalizeBallPositions(current_hands);
+    
+    // DEBUG LOGGING: Final ball states
+    logDebug("\n--- FINAL BALL STATES ---");
+    for (const auto& ball : tracked_balls_) {
+        logDebug("Ball ", ball.id, " (", ball.color_name, "):");
+        logDebug("  State: ", (ball.state == HELD ? "HELD" : "IN_FLIGHT"));
+        logDebug("  Position: (", ball.last_known_position.x, ", ", ball.last_known_position.y, ", ",
+                  ball.last_known_position.z, ") m");
+        logDebug("  Held by hand: ", ball.associated_hand_id);
+        logDebug("  Frames since seen: ", ball.frames_since_seen);
+        logDebug("  Tracking reason: ", ball.tracking_reason);
+    }
+    
+    // DEBUG LOGGING: Events
+    if (!events.empty()) {
+        logDebug("\n--- EVENTS ---");
+        for (const auto& event : events) {
+            logDebug((event.type == BallEvent::THROW ? "THROW" : "CATCH"),
+                      " event for ball ", event.ball_id, " and hand ", event.hand_id);
+        }
+    }
     
     // Store current pose for next frame
     previous_frame_pose_ = createPose3D(current_hands);

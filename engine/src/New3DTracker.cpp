@@ -917,6 +917,8 @@ void New3DTracker::handleUnmatchedBalls(
         ball->consecutive_frames_seen = 0;  // Reset consecutive frames counter
         
         // CRITICAL FIX: If ball is HELD, keep it locked to the wrist even when not visible
+        // The ball should ONLY transition to IN_FLIGHT when we actually SEE it leave the hand
+        // (detected outside the held_radius), NOT when the hand is temporarily lost
         if (ball->state == HELD) {
             // Find the hand holding this ball
             const SimpleHand* holding_hand = nullptr;
@@ -936,14 +938,15 @@ void New3DTracker::handleUnmatchedBalls(
                 logDebug("  Ball ", ball->id, " (", ball->color_name, ") HELD but not visible - ",
                          "keeping at wrist of hand ", ball->associated_hand_id);
             } else {
-                // Hand lost - transition to IN_FLIGHT
-                ball->state = IN_FLIGHT;
-                ball->associated_hand_id = -1;
-                ball->tracking_reason = "Hand lost (not detected for " +
-                                       std::to_string(ball->frames_since_seen) + " frames)";
+                // Hand temporarily lost (e.g., pose detection failed or hand occluded)
+                // DO NOT transition to IN_FLIGHT! Keep the ball HELD and use last known wrist position
+                // The ball will only transition to IN_FLIGHT when we SEE it leave the hand
+                ball->predicted_position = ball->last_known_position;  // Keep at last wrist position
+                ball->tracking_reason = "HELD (hand temporarily lost, keeping last wrist position) - " +
+                                       std::to_string(ball->frames_since_seen) + " frames";
                 
-                logDebug("  Ball ", ball->id, " (", ball->color_name, ") was HELD but hand ",
-                         ball->associated_hand_id, " lost - transitioning to IN_FLIGHT");
+                logDebug("  Ball ", ball->id, " (", ball->color_name, ") HELD but hand ",
+                         ball->associated_hand_id, " temporarily lost - keeping HELD at last wrist position");
             }
         } else {
             // Ball is IN_FLIGHT and not detected
@@ -979,13 +982,9 @@ void New3DTracker::reacquireHeldBallsByProximity(
             continue;
         }
         
-        // Don't re-acquire a ball that was just seen. This prevents a ball that was
-        // just thrown from being immediately re-caught by the same hand.
-        // Allow re-acquisition if it has been unseen for a few frames.
-        if (ball->frames_since_seen < 5) {
-            still_unmatched_balls.push_back(ball);
-            continue;
-        }
+        // REMOVED the frames_since_seen < 5 check - we want immediate re-acquisition
+        // when a ball comes near a hand, regardless of how long it's been unseen.
+        // The key is the distance check below.
         
         bool reacquired = false;
         for (const auto& hand : hands) {
@@ -1048,8 +1047,25 @@ void New3DTracker::createNewTracks(
         return;
     }
     
-    std::cout << "[New3DTracker] Attempting to re-acquire " << unmatched_balls.size()
-              << " lost balls using " << unmatched_detections.size() << " unmatched detections" << std::endl;
+    // CRITICAL: Filter out HELD balls - they should NEVER be re-acquired by distant detections
+    // Only IN_FLIGHT balls that have been lost for a while should be re-acquired
+    std::vector<New3DBall*> reacquirable_balls;
+    for (auto* ball : unmatched_balls) {
+        if (ball->state == IN_FLIGHT) {
+            reacquirable_balls.push_back(ball);
+        } else {
+            logDebug("  Skipping HELD ball ", ball->id, " (", ball->color_name,
+                     ") - will not re-acquire with distant detection");
+        }
+    }
+    
+    if (reacquirable_balls.empty()) {
+        logDebug("  No IN_FLIGHT balls to re-acquire");
+        return;
+    }
+    
+    std::cout << "[New3DTracker] Attempting to re-acquire " << reacquirable_balls.size()
+              << " lost IN_FLIGHT balls using " << unmatched_detections.size() << " unmatched detections" << std::endl;
     
     // For each unmatched detection, find the best matching unmatched ball by color
     std::vector<bool> detection_used(unmatched_detections.size(), false);
@@ -1072,10 +1088,10 @@ void New3DTracker::createNewTracks(
                 continue;
             }
             
-            for (size_t b = 0; b < unmatched_balls.size(); ++b) {
+            for (size_t b = 0; b < reacquirable_balls.size(); ++b) {
                 if (ball_used[b]) continue;
                 
-                New3DBall* ball = unmatched_balls[b];
+                New3DBall* ball = reacquirable_balls[b];
                 
                 // Match detection color to ball's color profile
                 float score = matchColor(*detection, ball->color_profile, color_frame);
@@ -1095,7 +1111,7 @@ void New3DTracker::createNewTracks(
         
         // Re-acquire the ball with this detection
         const Detection* detection = unmatched_detections[best_detection_idx];
-        New3DBall* ball = unmatched_balls[best_ball_idx];
+        New3DBall* ball = reacquirable_balls[best_ball_idx];
         
         std::cout << "[New3DTracker] Re-acquiring ball ID=" << ball->id
                   << " color=" << ball->color_name
@@ -1689,13 +1705,27 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     float scale_x, scale_y;
     cv::Mat preprocessed = preprocess(color_frame, scale_x, scale_y);
     
-    // Run YOLO ball detection
+    // Run YOLO ball detection (every frame)
     std::vector<Detection> detections = runBallDetection(
         preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
     
-    // Run YOLO pose estimation
-    std::vector<SimpleHand> current_hands = runPoseEstimation(
-        preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
+    // Run YOLO pose estimation (every other frame)
+    std::vector<SimpleHand> current_hands;
+    pose_frame_counter_++;
+    
+    if (pose_frame_counter_ % 2 == 1) {
+        // Run pose detection on odd frames (1, 3, 5, ...)
+        current_hands = runPoseEstimation(
+            preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
+        
+        logDebug("--- POSE DETECTION: RUNNING (frame ", pose_frame_counter_, ") ---");
+    } else {
+        // Skip pose detection on even frames (2, 4, 6, ...)
+        // Use previous frame's hand positions
+        current_hands = hands_;
+        
+        logDebug("--- POSE DETECTION: SKIPPED (frame ", pose_frame_counter_, ") - using previous hands ---");
+    }
     
     // Store for visualization/debugging
     hands_ = current_hands;

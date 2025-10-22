@@ -700,6 +700,7 @@ private:
     
     std::chrono::steady_clock::time_point last_update_time_;  // Last update timestamp
     int frame_counter_ = 0;                                   // Frame counter for debug logging
+    int pose_frame_counter_ = 0;                              // Frame counter for pose detection skipping
     
     // ========================================================================
     // MODEL PARAMETERS

@@ -480,8 +480,10 @@ private:
     /**
      * @brief Finalize ball positions and prepare for next frame
      * @param hands Current hand detections
+     * @param intrinsics Camera intrinsics for pixel position projection
      */
-    void finalizeBallPositions(const std::vector<SimpleHand>& hands);
+    void finalizeBallPositions(const std::vector<SimpleHand>& hands,
+                              const CameraIntrinsics& intrinsics);
     
     // ========================================================================
     // HELPER METHODS

@@ -401,6 +401,10 @@ if PYQT_AVAILABLE:
         def _get_new3d_tracker_settings(self) -> dict:
             """Get New 3D Kalman tracker-specific settings"""
             return {
+                # Physics settings
+                'held_radius_m': self.new3d_held_radius_slider.value() / 100.0 if hasattr(self, 'new3d_held_radius_slider') else 0.12,
+                'throw_velocity_threshold_mps': self.new3d_throw_velocity_slider.value() / 100.0 if hasattr(self, 'new3d_throw_velocity_slider') else 0.50,
+                
                 # Kalman Filter settings
                 'kalman_process_noise_pos': self.kalman_process_noise_pos_slider.value() / 100.0 if hasattr(self, 'kalman_process_noise_pos_slider') else 0.01,
                 'kalman_process_noise_vel': self.kalman_process_noise_vel_slider.value() / 100.0 if hasattr(self, 'kalman_process_noise_vel_slider') else 0.1,
@@ -627,6 +631,12 @@ if PYQT_AVAILABLE:
 
         def _apply_new3d_tracker_settings(self, settings: dict):
             """Apply New 3D Kalman tracker-specific settings"""
+            # Physics settings
+            if 'held_radius_m' in settings and hasattr(self, 'new3d_held_radius_slider'):
+                self.new3d_held_radius_slider.setValue(int(settings['held_radius_m'] * 100))
+            if 'throw_velocity_threshold_mps' in settings and hasattr(self, 'new3d_throw_velocity_slider'):
+                self.new3d_throw_velocity_slider.setValue(int(settings['throw_velocity_threshold_mps'] * 100))
+            
             # Kalman Filter settings
             if 'kalman_process_noise_pos' in settings and hasattr(self, 'kalman_process_noise_pos_slider'):
                 self.kalman_process_noise_pos_slider.setValue(int(settings['kalman_process_noise_pos'] * 100))
@@ -1303,6 +1313,12 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('show_hand_velocity_zone', 1 if settings['show_hand_velocity_zone'] else 0)
         def _send_new3d_tracker_settings(self, settings: dict):
             """Send New 3D Kalman tracker-specific settings to engine"""
+            # Physics settings
+            if 'held_radius_m' in settings:
+                self.udp_client.send_setting('held_radius_m', settings['held_radius_m'])
+            if 'throw_velocity_threshold_mps' in settings:
+                self.udp_client.send_setting('throw_velocity_threshold_mps', settings['throw_velocity_threshold_mps'])
+            
             # Kalman Filter settings
             if 'kalman_process_noise_pos' in settings:
                 self.udp_client.send_setting('kalman_process_noise_pos', settings['kalman_process_noise_pos'])

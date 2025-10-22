@@ -189,8 +189,11 @@ void New3DTracker::predictAllBalls(float dt) {
                 predictHeldBall(ball, *holding_hand, dt);
             } else {
                 // Hand not found, but ball is marked as held
-                // Keep last known position
+                // This can happen if hand detection temporarily fails
+                // Keep last known position (which should be the wrist from previous frame)
                 ball.predicted_position = ball.last_known_position;
+                logDebug("  Ball ", ball.id, " (", ball.color_name, ") is HELD but hand ",
+                         ball.associated_hand_id, " not detected - keeping last position");
             }
         } else {
             // Ball is in flight
@@ -913,11 +916,44 @@ void New3DTracker::handleUnmatchedBalls(
         ball->frames_since_seen++;
         ball->consecutive_frames_seen = 0;  // Reset consecutive frames counter
         
-        // Update tracking reason to show how long the ball has been unseen
-        ball->tracking_reason = "Not detected (" + std::to_string(ball->frames_since_seen) + " frames)";
+        // CRITICAL FIX: If ball is HELD, keep it locked to the wrist even when not visible
+        if (ball->state == HELD) {
+            // Find the hand holding this ball
+            const SimpleHand* holding_hand = nullptr;
+            for (const auto& hand : hands_) {
+                if (hand.id == ball->associated_hand_id) {
+                    holding_hand = &hand;
+                    break;
+                }
+            }
+            
+            if (holding_hand) {
+                // Keep ball locked to wrist position even though it's not detected
+                ball->predicted_position = holding_hand->wrist_pos_3d;
+                ball->tracking_reason = "HELD (not visible, tracking wrist) - " +
+                                       std::to_string(ball->frames_since_seen) + " frames";
+                
+                logDebug("  Ball ", ball->id, " (", ball->color_name, ") HELD but not visible - ",
+                         "keeping at wrist of hand ", ball->associated_hand_id);
+            } else {
+                // Hand lost - transition to IN_FLIGHT
+                ball->state = IN_FLIGHT;
+                ball->associated_hand_id = -1;
+                ball->tracking_reason = "Hand lost (not detected for " +
+                                       std::to_string(ball->frames_since_seen) + " frames)";
+                
+                logDebug("  Ball ", ball->id, " (", ball->color_name, ") was HELD but hand ",
+                         ball->associated_hand_id, " lost - transitioning to IN_FLIGHT");
+            }
+        } else {
+            // Ball is IN_FLIGHT and not detected
+            ball->tracking_reason = "IN_FLIGHT (not detected for " +
+                                   std::to_string(ball->frames_since_seen) + " frames)";
+        }
         
         std::cout << "[New3DTracker] Ball ID=" << ball->id << " color=" << ball->color_name
-                  << " not detected for " << ball->frames_since_seen << " frames" << std::endl;
+                  << " not detected for " << ball->frames_since_seen << " frames"
+                  << " | State: " << (ball->state == HELD ? "HELD" : "IN_FLIGHT") << std::endl;
     }
     
     // NOTE: We do NOT delete balls anymore. Each color has exactly one permanent ball.
@@ -1026,20 +1062,23 @@ void New3DTracker::createNewTracks(
             }
         }
         
-        // Update state - CRITICAL: Only set to HELD if ball was already HELD before losing detection
-        // If ball was IN_FLIGHT, it should stay IN_FLIGHT until a proper catch is detected
-        if (near_hand && ball->state == HELD) {
-            // Ball was held, lost detection briefly, now re-acquired near same/different hand
+        // Update state - CRITICAL FIX: Set to HELD if ball is within held_radius of any hand
+        // This ensures balls are properly detected as HELD when re-acquired near a hand
+        if (near_hand) {
+            // Ball is within held_radius of a hand - set to HELD
             ball->state = HELD;
             ball->associated_hand_id = closest_hand_id;
-            ball->tracking_reason = "Re-acquired (HELD)";
-            logDebug("  Re-acquired ball ", ball->id, " as HELD by hand ", closest_hand_id);
+            ball->tracking_reason = "Re-acquired (HELD, distance=" +
+                                   std::to_string(min_distance) + "m)";
+            logDebug("  Re-acquired ball ", ball->id, " as HELD by hand ", closest_hand_id,
+                     " (distance: ", min_distance, "m)");
         } else {
-            // Ball was IN_FLIGHT or not near any hand - keep/set as IN_FLIGHT
+            // Ball is not near any hand - set as IN_FLIGHT
             ball->state = IN_FLIGHT;
             ball->associated_hand_id = -1;
-            ball->tracking_reason = "Re-acquired (IN_FLIGHT)";
-            logDebug("  Re-acquired ball ", ball->id, " as IN_FLIGHT");
+            ball->tracking_reason = "Re-acquired (IN_FLIGHT, no hand nearby)";
+            logDebug("  Re-acquired ball ", ball->id, " as IN_FLIGHT (no hand within ",
+                     settings_.held_radius_m, "m)");
         }
         
         // Update visualization data
@@ -1057,11 +1096,13 @@ void New3DTracker::createNewTracks(
     }
 }
 
-void New3DTracker::finalizeBallPositions(const std::vector<SimpleHand>& hands) {
+void New3DTracker::finalizeBallPositions(const std::vector<SimpleHand>& hands,
+                                         const CameraIntrinsics& intrinsics) {
     for (auto& ball : tracked_balls_) {
         // Update final position based on state
         if (ball.state == HELD) {
-            // For HELD balls: Use hand position as final position
+            // For HELD balls: ALWAYS use hand position as final position
+            // This ensures the tracker stays locked to the wrist even when ball is not visible
             const SimpleHand* holding_hand = nullptr;
             for (const auto& hand : hands) {
                 if (hand.id == ball.associated_hand_id) {
@@ -1071,21 +1112,27 @@ void New3DTracker::finalizeBallPositions(const std::vector<SimpleHand>& hands) {
             }
             
             if (holding_hand) {
+                // Lock ball position to wrist - this is the key fix
                 ball.last_known_position = holding_hand->wrist_pos_3d;
-                logDebug("  Ball ", ball.id, " (", ball.color_name, ") finalized at hand ", 
+                
+                // Also update pixel position for visualization
+                ball.pixel_pos = project3DTo2D(holding_hand->wrist_pos_3d, intrinsics);
+                
+                logDebug("  Ball ", ball.id, " (", ball.color_name, ") HELD - locked to hand ",
                          ball.associated_hand_id, " wrist: (", holding_hand->wrist_pos_3d.x, ", ",
                          holding_hand->wrist_pos_3d.y, ", ", holding_hand->wrist_pos_3d.z, ") m");
             } else {
-                // Hand not found, keep predicted position
+                // Hand not found - this shouldn't happen after handleUnmatchedBalls,
+                // but keep predicted position as fallback
                 ball.last_known_position = ball.predicted_position;
-                logDebug("  Ball ", ball.id, " (", ball.color_name, ") hand ", ball.associated_hand_id,
-                         " not found, using predicted position");
+                logDebug("  Ball ", ball.id, " (", ball.color_name, ") HELD but hand ",
+                         ball.associated_hand_id, " not found - using predicted position");
             }
         } else {
             // For IN_FLIGHT balls: Use Kalman prediction as final position
             ball.last_known_position = ball.predicted_position;
             logDebug("  Ball ", ball.id, " (", ball.color_name, ") IN_FLIGHT, using predicted position: (",
-                     ball.predicted_position.x, ", ", ball.predicted_position.y, ", ", 
+                     ball.predicted_position.x, ", ", ball.predicted_position.y, ", ",
                      ball.predicted_position.z, ") m");
         }
         
@@ -1653,7 +1700,7 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     
     // STEP 6: FINALIZE
     logDebug("\n--- STEP 6: FINALIZE POSITIONS ---");
-    finalizeBallPositions(current_hands);
+    finalizeBallPositions(current_hands, intrinsics);
     
     // DEBUG LOGGING: Final ball states
     logDebug("\n--- FINAL BALL STATES ---");
@@ -1897,6 +1944,63 @@ void New3DTracker::evaluateOverrideCriteria(std::vector<Detection>& detections,
 }
 
 bool New3DTracker::updateSetting(const std::string& key, const std::string& value) {
-    // Stub - will be implemented when UI integration is added
-    return false;
+    std::cout << "[New3DTracker] updateSetting: " << key << " = " << value << std::endl;
+    
+    try {
+        // Parse and update the setting
+        if (key == "held_radius_m") {
+            settings_.held_radius_m = std::stof(value);
+        } else if (key == "association_max_distance_m") {
+            settings_.association_max_distance_m = std::stof(value);
+        } else if (key == "color_mismatch_penalty_m") {
+            settings_.color_mismatch_penalty_m = std::stof(value);
+        } else if (key == "throw_velocity_threshold_mps") {
+            settings_.throw_velocity_threshold_mps = std::stof(value);
+        } else if (key == "min_frames_for_new_track") {
+            settings_.min_frames_for_new_track = std::stoi(value);
+        } else if (key == "min_frames_for_color_lock") {
+            settings_.min_frames_for_color_lock = std::stoi(value);
+        } else if (key == "use_color_tracking") {
+            settings_.use_color_tracking = (value == "true" || value == "1");
+        } else if (key == "color_match_threshold") {
+            settings_.color_match_threshold = std::stof(value);
+        } else if (key == "color_sample_radius") {
+            settings_.color_sample_radius = std::stoi(value);
+        } else if (key == "ball_confidence_threshold") {
+            settings_.ball_confidence_threshold = std::stof(value);
+        } else if (key == "ball_held_confidence_threshold") {
+            settings_.ball_held_confidence_threshold = std::stof(value);
+        } else if (key == "ignore_class") {
+            settings_.ignore_class = (value == "true" || value == "1");
+        } else if (key == "hand_velocity_enabled") {
+            settings_.hand_velocity_enabled = (value == "true" || value == "1");
+        } else if (key == "hand_velocity_threshold") {
+            settings_.hand_velocity_threshold = std::stof(value);
+        } else if (key == "show_kalman_prediction") {
+            settings_.show_kalman_prediction = (value == "true" || value == "1");
+        } else if (key == "show_held_radius") {
+            settings_.show_held_radius = (value == "true" || value == "1");
+        } else if (key == "show_association_lines") {
+            settings_.show_association_lines = (value == "true" || value == "1");
+        } else if (key == "gravity_x") {
+            settings_.gravity_mps2.x = std::stof(value);
+        } else if (key == "gravity_y") {
+            settings_.gravity_mps2.y = std::stof(value);
+        } else if (key == "gravity_z") {
+            settings_.gravity_mps2.z = std::stof(value);
+        } else {
+            std::cerr << "[New3DTracker] Unknown setting key: " << key << std::endl;
+            return false;
+        }
+        
+        // Save settings to file immediately after update
+        saveSettings();
+        
+        std::cout << "[New3DTracker] Setting updated and saved: " << key << " = " << value << std::endl;
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[New3DTracker] Error updating setting " << key << ": " << e.what() << std::endl;
+        return false;
+    }
 }

@@ -196,9 +196,15 @@ void Engine::run() {
         // Ball detection is controlled internally by tracker's enable_ball_detection_ flag
         if (tracker_) {
             
-            // Set recording frame number if recording is active
-            if (recording_logger_.isActive()) {
-                tracker_->setRecordingFrameNumber(recording_logger_.getFrameNumber());
+            // Set recording frame number based on whether we're actively buffering frames
+            // For continuous recording, use the continuous buffer size
+            // For regular recording, use the frame buffer size
+            if (continuous_recording_) {
+                std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
+                tracker_->setRecordingFrameNumber(continuous_frame_buffer_.size());
+            } else if (!frame_buffer_.empty()) {
+                std::lock_guard<std::mutex> lock(frame_buffer_mutex_);
+                tracker_->setRecordingFrameNumber(frame_buffer_.size());
             } else {
                 tracker_->setRecordingFrameNumber(-1);  // Not recording
             }

@@ -696,13 +696,11 @@ void New3DTracker::handleHeldStateUpdate(
     logDebug("      Detection at: (", detection.world_pos.x, ", ", detection.world_pos.y, ", ",
               detection.world_pos.z, ") m");
     
-    // Update Kalman filter with detection measurement
-    cv::Mat measurement = (cv::Mat_<float>(3, 1) <<
-        detection.world_pos.x,
-        detection.world_pos.y,
-        detection.world_pos.z
-    );
-    ball.kf.correct(measurement);
+    // For a HELD ball, we trust the hand position entirely. The Kalman filter
+    // has already been updated to track the hand's wrist in predictHeldBall().
+    // We do NOT correct with the ball's detection, as that would pull the
+    // tracker away from the wrist. The detection only serves to confirm the
+    // ball is still present and to check for a throw.
     
     // Extract current velocity from Kalman state
     cv::Point3f ball_velocity(
@@ -828,8 +826,8 @@ void New3DTracker::handleHeldStateUpdate(
         }
     }
     
-    // Update last known position
-    ball.last_known_position = detection.world_pos;
+    // The final position will be set to the hand's wrist in finalizeBallPositions().
+    // We don't update last_known_position here to avoid inconsistency.
 }
 
 void New3DTracker::handleInFlightStateUpdate(

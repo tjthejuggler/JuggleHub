@@ -311,6 +311,14 @@ fi
 
 echo "Engine command: $ENGINE_EXECUTABLE ${ENGINE_ARGS[@]}"
 
+# Clear log files before starting engine to ensure fresh logs each time
+if [ "$ENGINE_LOG" = true ]; then
+    echo -e "${YELLOW}🧹 Clearing previous log files for fresh start...${NC}"
+    rm -f "$PROJECT_ROOT/engine.log" "$PROJECT_ROOT/engine_debug.log" 2>/dev/null
+    touch "$PROJECT_ROOT/engine.log" "$PROJECT_ROOT/engine_debug.log"
+    echo -e "${GREEN}✅ Log files cleared and ready for new session${NC}"
+fi
+
 # Clean up old log files if logging is disabled
 if [ "$ENGINE_LOG" != true ]; then
     rm -f "$PROJECT_ROOT/engine.log" "$PROJECT_ROOT/engine_debug.log" 2>/dev/null

@@ -2,187 +2,134 @@
 
 **Date:** 2025-10-22
 **Component:** New 3D Kalman Tracking System
-**Issue:** Balls held in hands were not staying locked to wrist when not visible, and balls within held_radius were incorrectly marked as IN_FLIGHT
+**Issue:** When a hand holding a ball is temporarily lost and then redetected, the ball tracker fails to re-associate the ball with the hand, causing it to be stuck in mid-air.
 
 ## Problem Description
 
-There were two critical issues:
-
-1. **Invisible Held Balls**: When a ball was held in a hand and became invisible (not detected by YOLO), the tracker would lose track of the ball's position. The ball would remain in the HELD state but wouldn't follow the hand's movement.
-
-2. **Incorrect State Assignment**: When a ball was re-acquired after being lost, it was being set to IN_FLIGHT even when clearly within `held_radius` of a hand. This was because the re-acquisition logic only set balls to HELD if they were already HELD before losing detection.
+When a ball is held, its state is marked as `HELD`, and its position is locked to the detected wrist. If hand detection is temporarily lost, the ball correctly transitions to an `IN_FLIGHT` state. However, upon re-detection of the hand, the system fails to transition the ball back to the `HELD` state because there is no new visual detection to trigger a "catch" event. As a result, the ball remains `IN_FLIGHT` and its trajectory is predicted by the Kalman filter, making it appear stuck in the air.
 
 ## Root Cause
 
-The tracking system had four areas where held balls needed fixes:
-
-1. **`handleUnmatchedBalls()`**: When a ball was not matched to any detection, it would only increment the `frames_since_seen` counter without updating the position for HELD balls
-2. **`predictAllBalls()`**: Missing logging for when a hand wasn't found
-3. **`finalizeBallPositions()`**: Not updating pixel position for visualization when ball was held but not detected
-4. **`createNewTracks()` (CRITICAL)**: Re-acquisition logic was too restrictive - only setting balls to HELD if they were already HELD before, instead of checking distance to hands
+The root cause of this issue is the absence of a mechanism to re-establish the `HELD` state based on proximity when a hand is re-detected. The system previously relied on visual detections to catch a ball, which is not possible when the ball is occluded by the hand.
 
 ## Solution
 
-### 1. Enhanced `handleUnmatchedBalls()` (lines 905-955)
+To resolve this, a new function, `reacquireHeldBallsByProximity`, has been introduced. This function is called after the main association step and is responsible for checking `IN_FLIGHT` balls against current hand positions. If a ball's predicted position is within the defined `held_radius` of a hand, its state is transitioned back to `HELD`.
 
-**Key Changes:**
-- Added state-aware handling for unmatched balls
-- For HELD balls: Lock position to wrist even when not detected
-- For IN_FLIGHT balls: Keep using Kalman prediction
-- Transition HELD balls to IN_FLIGHT if their associated hand is lost
+### 1. `reacquireHeldBallsByProximity()` Implementation
+
+This new function iterates through unmatched balls that are in the `IN_FLIGHT` state and have been unseen for a few frames. It calculates the distance between the ball's predicted position and each hand's wrist. If the distance is within the `held_radius`, the ball is "re-caught," its state is updated to `HELD`, and a `CATCH` event is generated.
 
 ```cpp
-if (ball->state == HELD) {
-    // Find the hand holding this ball
-    const SimpleHand* holding_hand = nullptr;
-    for (const auto& hand : hands_) {
-        if (hand.id == ball->associated_hand_id) {
-            holding_hand = &hand;
-            break;
+void New3DTracker::reacquireHeldBallsByProximity(
+    std::vector<New3DBall*>& unmatched_balls,
+    const std::vector<SimpleHand>& hands,
+    std::vector<BallEvent>& events) {
+    
+    logDebug("  reacquireHeldBallsByProximity: Checking ", unmatched_balls.size(),
+             " unmatched balls against ", hands.size(), " hands");
+    
+    // This list will hold balls that remain unmatched after this check
+    std::vector<New3DBall*> still_unmatched_balls;
+    
+    for (auto* ball : unmatched_balls) {
+        // Only consider balls that are IN_FLIGHT. A HELD ball without its hand
+        // is handled in handleUnmatchedBalls.
+        if (ball->state != IN_FLIGHT) {
+            still_unmatched_balls.push_back(ball);
+            continue;
+        }
+        
+        // Don't re-acquire a ball that was just seen. This prevents a ball that was
+        // just thrown from being immediately re-caught by the same hand.
+        // Allow re-acquisition if it has been unseen for a few frames.
+        if (ball->frames_since_seen < 5) {
+            still_unmatched_balls.push_back(ball);
+            continue;
+        }
+        
+        bool reacquired = false;
+        for (const auto& hand : hands) {
+            // Check distance from ball's predicted position to hand's wrist
+            const cv::Point3f& pred_pos = ball->predicted_position;
+            const cv::Point3f& hand_pos = hand.wrist_pos_3d;
+            
+            float dx = pred_pos.x - hand_pos.x;
+            float dy = pred_pos.y - hand_pos.y;
+            float dz = pred_pos.z - hand_pos.z;
+            float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+            
+            // If ball is within held_radius, re-acquire it as HELD
+            if (distance < settings_.held_radius_m) {
+                logDebug("    >>> PROXIMITY RE-ACQUIRE! Ball ", ball->id, " (", ball->color_name,
+                         ") re-acquired by Hand ", hand.id, " (distance: ", distance, "m)");
+                
+                // Transition to HELD state
+                ball->state = HELD;
+                ball->associated_hand_id = hand.id;
+                ball->frames_since_seen = 0; // It is now "seen" via proximity
+                ball->tracking_reason = "Re-acquired by proximity";
+                
+                // Generate CATCH event
+                BallEvent catch_event;
+                catch_event.type = BallEvent::CATCH;
+                catch_event.ball_id = static_cast<int>(ball->id);
+                catch_event.hand_id = hand.id;
+                catch_event.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()
+                ).count();
+                events.push_back(catch_event);
+                
+                reacquired = true;
+                break; // Ball is re-acquired, no need to check other hand
+            }
+        }
+        
+        // If not re-acquired, add it to the list of balls that are still unmatched
+        if (!reacquired) {
+            still_unmatched_balls.push_back(ball);
         }
     }
     
-    if (holding_hand) {
-        // Keep ball locked to wrist position even though it's not detected
-        ball->predicted_position = holding_hand->wrist_pos_3d;
-        ball->tracking_reason = "HELD (not visible, tracking wrist) - " + 
-                               std::to_string(ball->frames_since_seen) + " frames";
-    } else {
-        // Hand lost - transition to IN_FLIGHT
-        ball->state = IN_FLIGHT;
-        ball->associated_hand_id = -1;
-    }
+    // The original unmatched_balls list is updated to only contain balls that
+    // were not re-acquired by proximity.
+    unmatched_balls = still_unmatched_balls;
 }
 ```
 
-### 2. Improved `predictAllBalls()` (lines 176-200)
+### 2. Integration into `updateNew3D()`
 
-**Key Changes:**
-- Added debug logging when hand is not found for a HELD ball
-- Clarified that keeping last position is intentional behavior
+The `reacquireHeldBallsByProximity` function is now called in the main `updateNew3D` loop between the re-acquisition of lost balls and the handling of unmatched balls. This ensures that any `IN_FLIGHT` balls are checked for proximity to a hand before being marked as lost.
 
-```cpp
-if (holding_hand) {
-    predictHeldBall(ball, *holding_hand, dt);
-} else {
-    // Hand not found, but ball is marked as held
-    // This can happen if hand detection temporarily fails
-    // Keep last known position (which should be the wrist from previous frame)
-    ball.predicted_position = ball.last_known_position;
-    logDebug("  Ball ", ball.id, " (", ball.color_name, ") is HELD but hand ", 
-             ball.associated_hand_id, " not detected - keeping last position");
-}
-```
-
-### 3. Enhanced `finalizeBallPositions()` (lines 1095-1148)
-
-**Key Changes:**
-- Updated function signature to accept `CameraIntrinsics` for pixel projection
-- Always lock HELD balls to wrist position, even when not detected
-- Update pixel position for proper visualization
-
-```cpp
-void New3DTracker::finalizeBallPositions(const std::vector<SimpleHand>& hands, 
-                                         const CameraIntrinsics& intrinsics) {
-    // ...
-    if (ball.state == HELD) {
-        if (holding_hand) {
-            // Lock ball position to wrist - this is the key fix
-            ball.last_known_position = holding_hand->wrist_pos_3d;
-            
-            // Also update pixel position for visualization
-            ball.pixel_pos = project3DTo2D(holding_hand->wrist_pos_3d, intrinsics);
-        }
-    }
-    // ...
-}
-```
-
-### 4. Fixed Re-Acquisition Logic in `createNewTracks()` (lines 1010-1047) **CRITICAL FIX**
-
-**Key Changes:**
-- Removed the restrictive check that only set balls to HELD if they were already HELD
-- Now properly checks distance to hands and sets state based on proximity
-- Any ball within `held_radius` of a hand is set to HELD, regardless of previous state
-
-**Before (BROKEN):**
-```cpp
-// Update state - CRITICAL: Only set to HELD if ball was already HELD before losing detection
-if (near_hand && ball->state == HELD) {
-    ball->state = HELD;
-    ball->associated_hand_id = closest_hand_id;
-} else {
-    ball->state = IN_FLIGHT;  // <-- WRONG! Ball is near hand but marked as IN_FLIGHT
-}
-```
-
-**After (FIXED):**
-```cpp
-// Update state - CRITICAL FIX: Set to HELD if ball is within held_radius of any hand
-if (near_hand) {
-    // Ball is within held_radius of a hand - set to HELD
-    ball->state = HELD;
-    ball->associated_hand_id = closest_hand_id;
-    ball->tracking_reason = "Re-acquired (HELD, distance=" +
-                           std::to_string(min_distance) + "m)";
-} else {
-    // Ball is not near any hand - set as IN_FLIGHT
-    ball->state = IN_FLIGHT;
-    ball->associated_hand_id = -1;
-}
-```
-
-### 5. Updated Header File
-
-**File:** [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp:485)
-
-Updated function signature to match implementation:
-```cpp
-void finalizeBallPositions(const std::vector<SimpleHand>& hands,
-                          const CameraIntrinsics& intrinsics);
-```
+**`updateNew3D()` call order:**
+1. `predictAllBalls()`
+2. `associateDetections()`
+3. `updateMatchedBalls()`
+4. `createNewTracks()`
+5. **`reacquireHeldBallsByProximity()` (NEW STEP)**
+6. `handleUnmatchedBalls()`
+7. `finalizeBallPositions()`
 
 ## Behavior After Fix
 
-### When Ball is HELD and Not Detected:
-
-1. **Position Tracking**: Ball position is locked to the wrist of the associated hand
-2. **State Maintenance**: Ball remains in HELD state as long as the hand is detected
-3. **Visual Feedback**: Tracker displays at wrist position with appropriate tracking reason
-4. **Frame Counter**: `frames_since_seen` increments but doesn't affect position
-5. **Hand Loss**: If hand is lost, ball transitions to IN_FLIGHT state
-
-### Tracking Reasons:
-
-- `"HELD (not visible, tracking wrist) - N frames"` - Ball is held but not detected
-- `"Hand lost (not detected for N frames)"` - Hand was lost, transitioning to IN_FLIGHT
-- `"HELD - locked to hand X wrist: (x, y, z) m"` - Normal HELD state with detection
-
-## Testing Recommendations
-
-1. **Hold a ball in hand and move it around** - Tracker should follow wrist
-2. **Occlude the ball completely** - Tracker should stay on wrist
-3. **Move hand while ball is occluded** - Tracker should follow hand movement
-4. **Release ball while occluded** - Should detect throw when ball becomes visible again
-5. **Lose hand detection temporarily** - Ball should transition to IN_FLIGHT
+- **Hand Re-detection:** When a hand is re-detected after being temporarily lost, any nearby `IN_FLIGHT` balls are immediately transitioned back to `HELD`.
+- **Seamless Tracking:** The tracker no longer gets stuck in mid-air, and the ball's position remains locked to the wrist as intended.
+- **Improved Robustness:** The system is now more resilient to brief interruptions in hand tracking, which is a common scenario in juggling.
 
 ## Files Modified
 
 1. [`engine/src/New3DTracker.cpp`](engine/src/New3DTracker.cpp)
-   - `handleUnmatchedBalls()` (lines 905-955)
-   - `predictAllBalls()` (lines 176-200)
-   - `finalizeBallPositions()` (lines 1095-1148)
-   - `updateNew3D()` (line 1703) - Updated function call
+   - Added `reacquireHeldBallsByProximity()` implementation.
+   - Updated `updateNew3D()` to include the new re-acquisition step and corrected debug log numbering.
 
-2. [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp:485)
-   - Updated `finalizeBallPositions()` signature
+2. [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp)
+   - Added the function declaration for `reacquireHeldBallsByProximity()`.
 
 ## Impact
 
-- **Improved User Experience**: Tracker no longer appears frozen when ball is held but not visible
-- **Better Juggling Support**: Handles common scenarios where balls are temporarily occluded in hands
-- **Consistent Behavior**: Ball position always reflects the actual state (wrist for HELD, prediction for IN_FLIGHT)
-- **No Breaking Changes**: All existing functionality preserved, only enhanced behavior for edge cases
+- **Improved User Experience:** The tracker now behaves as expected, with held balls remaining locked to the wrist even after temporary hand loss.
+- **Enhanced Juggling Support:** The fix addresses a common occlusion scenario, making the tracker more reliable for juggling analysis.
+- **No Breaking Changes:** The change is an enhancement to the existing logic and does not introduce any breaking changes.
 
 ## Related Documentation
 

@@ -401,31 +401,41 @@ if PYQT_AVAILABLE:
         def _get_new3d_tracker_settings(self) -> dict:
             """Get New 3D Kalman tracker-specific settings"""
             return {
-                # Physics settings
+                # === GEOMETRY & DISTANCE (meters) ===
                 'held_radius_m': self.new3d_held_radius_slider.value() / 100.0 if hasattr(self, 'new3d_held_radius_slider') else 0.12,
+                'association_max_distance_m': self.new3d_association_max_distance_slider.value() / 100.0 if hasattr(self, 'new3d_association_max_distance_slider') else 0.50,
+                'color_mismatch_penalty_m': self.new3d_color_mismatch_penalty_slider.value() / 100.0 if hasattr(self, 'new3d_color_mismatch_penalty_slider') else 1.0,
+                
+                # === PHYSICS & DYNAMICS ===
                 'throw_velocity_threshold_mps': self.new3d_throw_velocity_slider.value() / 100.0 if hasattr(self, 'new3d_throw_velocity_slider') else 0.50,
+                'gravity_x': self.new3d_gravity_x_slider.value() / 100.0 if hasattr(self, 'new3d_gravity_x_slider') else 0.0,
+                'gravity_y': self.new3d_gravity_y_slider.value() / 100.0 if hasattr(self, 'new3d_gravity_y_slider') else -9.81,
+                'gravity_z': self.new3d_gravity_z_slider.value() / 100.0 if hasattr(self, 'new3d_gravity_z_slider') else 0.0,
                 
-                # Kalman Filter settings
-                'kalman_process_noise_pos': self.kalman_process_noise_pos_slider.value() / 100.0 if hasattr(self, 'kalman_process_noise_pos_slider') else 0.01,
-                'kalman_process_noise_vel': self.kalman_process_noise_vel_slider.value() / 100.0 if hasattr(self, 'kalman_process_noise_vel_slider') else 0.1,
-                'kalman_measurement_noise': self.kalman_measurement_noise_slider.value() / 100.0 if hasattr(self, 'kalman_measurement_noise_slider') else 0.05,
-                'kalman_max_prediction_time': self.kalman_max_prediction_time_slider.value() / 10.0 if hasattr(self, 'kalman_max_prediction_time_slider') else 1.0,
-                'kalman_velocity_smoothing': self.kalman_velocity_smoothing_slider.value() / 100.0 if hasattr(self, 'kalman_velocity_smoothing_slider') else 0.3,
+                # === TRACKING LOGIC (frames) ===
+                'min_frames_for_new_track': self.new3d_min_frames_for_new_track_slider.value() if hasattr(self, 'new3d_min_frames_for_new_track_slider') else 3,
+                'min_frames_for_color_lock': self.new3d_min_frames_for_color_lock_slider.value() if hasattr(self, 'new3d_min_frames_for_color_lock_slider') else 5,
                 
-                # Association settings
-                'assoc_max_distance': self.assoc_max_distance_slider.value() / 100.0 if hasattr(self, 'assoc_max_distance_slider') else 0.30,
-                'assoc_iou_threshold': self.assoc_iou_threshold_slider.value() / 100.0 if hasattr(self, 'assoc_iou_threshold_slider') else 0.3,
-                'assoc_color_weight': self.assoc_color_weight_slider.value() / 100.0 if hasattr(self, 'assoc_color_weight_slider') else 0.4,
-                'assoc_spatial_weight': self.assoc_spatial_weight_slider.value() / 100.0 if hasattr(self, 'assoc_spatial_weight_slider') else 0.6,
-                'assoc_max_missed_frames': self.assoc_max_missed_frames_slider.value() if hasattr(self, 'assoc_max_missed_frames_slider') else 5,
+                # === COLOR TRACKING ===
+                'use_color_tracking': self.new3d_use_color_tracking_toggle.isChecked() if hasattr(self, 'new3d_use_color_tracking_toggle') else True,
+                'color_match_threshold': self.new3d_color_match_threshold_slider.value() / 100.0 if hasattr(self, 'new3d_color_match_threshold_slider') else 0.50,
+                'color_sample_radius': self.new3d_color_sample_radius_slider.value() if hasattr(self, 'new3d_color_sample_radius_slider') else 1,
                 
-                # State management settings
-                'state_min_hits_to_confirm': self.state_min_hits_to_confirm_slider.value() if hasattr(self, 'state_min_hits_to_confirm_slider') else 3,
-                'state_max_age': self.state_max_age_slider.value() if hasattr(self, 'state_max_age_slider') else 10,
-                'state_confidence_decay': self.state_confidence_decay_slider.value() / 100.0 if hasattr(self, 'state_confidence_decay_slider') else 0.95,
-                'state_min_confidence': self.state_min_confidence_slider.value() / 100.0 if hasattr(self, 'state_min_confidence_slider') else 0.3,
+                # === YOLO INTEGRATION ===
+                'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0 if hasattr(self, 'ball_confidence_slider') else 0.25,
+                'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0 if hasattr(self, 'ball_held_confidence_slider') else 0.25,
+                'ignore_class': self.new3d_ignore_class_toggle.isChecked() if hasattr(self, 'new3d_ignore_class_toggle') else False,
                 
-                # Audio indicators
+                # === HAND VELOCITY ===
+                'hand_velocity_enabled': self.new3d_hand_velocity_enabled_toggle.isChecked() if hasattr(self, 'new3d_hand_velocity_enabled_toggle') else True,
+                'hand_velocity_threshold': self.new3d_hand_velocity_threshold_slider.value() / 100.0 if hasattr(self, 'new3d_hand_velocity_threshold_slider') else 1.0,
+                
+                # === VISUALIZATION ===
+                'show_kalman_prediction': self.new3d_show_kalman_prediction_toggle.isChecked() if hasattr(self, 'new3d_show_kalman_prediction_toggle') else True,
+                'show_held_radius': self.new3d_show_held_radius_toggle.isChecked() if hasattr(self, 'new3d_show_held_radius_toggle') else True,
+                'show_association_lines': self.new3d_show_association_lines_toggle.isChecked() if hasattr(self, 'new3d_show_association_lines_toggle') else True,
+                
+                # === AUDIO INDICATORS ===
                 'tc_sound_on_catch': self.new3d_sound_on_catch_toggle.isChecked() if hasattr(self, 'new3d_sound_on_catch_toggle') else False,
                 'tc_sound_on_throw': self.new3d_sound_on_throw_toggle.isChecked() if hasattr(self, 'new3d_sound_on_throw_toggle') else False,
                 'tc_name_on_catch': self.new3d_name_on_catch_toggle.isChecked() if hasattr(self, 'new3d_name_on_catch_toggle') else False,
@@ -631,47 +641,57 @@ if PYQT_AVAILABLE:
 
         def _apply_new3d_tracker_settings(self, settings: dict):
             """Apply New 3D Kalman tracker-specific settings"""
-            # Physics settings
+            # === GEOMETRY & DISTANCE ===
             if 'held_radius_m' in settings and hasattr(self, 'new3d_held_radius_slider'):
                 self.new3d_held_radius_slider.setValue(int(settings['held_radius_m'] * 100))
+            if 'association_max_distance_m' in settings and hasattr(self, 'new3d_association_max_distance_slider'):
+                self.new3d_association_max_distance_slider.setValue(int(settings['association_max_distance_m'] * 100))
+            if 'color_mismatch_penalty_m' in settings and hasattr(self, 'new3d_color_mismatch_penalty_slider'):
+                self.new3d_color_mismatch_penalty_slider.setValue(int(settings['color_mismatch_penalty_m'] * 100))
+            
+            # === PHYSICS & DYNAMICS ===
             if 'throw_velocity_threshold_mps' in settings and hasattr(self, 'new3d_throw_velocity_slider'):
                 self.new3d_throw_velocity_slider.setValue(int(settings['throw_velocity_threshold_mps'] * 100))
+            if 'gravity_x' in settings and hasattr(self, 'new3d_gravity_x_slider'):
+                self.new3d_gravity_x_slider.setValue(int(settings['gravity_x'] * 100))
+            if 'gravity_y' in settings and hasattr(self, 'new3d_gravity_y_slider'):
+                self.new3d_gravity_y_slider.setValue(int(settings['gravity_y'] * 100))
+            if 'gravity_z' in settings and hasattr(self, 'new3d_gravity_z_slider'):
+                self.new3d_gravity_z_slider.setValue(int(settings['gravity_z'] * 100))
             
-            # Kalman Filter settings
-            if 'kalman_process_noise_pos' in settings and hasattr(self, 'kalman_process_noise_pos_slider'):
-                self.kalman_process_noise_pos_slider.setValue(int(settings['kalman_process_noise_pos'] * 100))
-            if 'kalman_process_noise_vel' in settings and hasattr(self, 'kalman_process_noise_vel_slider'):
-                self.kalman_process_noise_vel_slider.setValue(int(settings['kalman_process_noise_vel'] * 100))
-            if 'kalman_measurement_noise' in settings and hasattr(self, 'kalman_measurement_noise_slider'):
-                self.kalman_measurement_noise_slider.setValue(int(settings['kalman_measurement_noise'] * 100))
-            if 'kalman_max_prediction_time' in settings and hasattr(self, 'kalman_max_prediction_time_slider'):
-                self.kalman_max_prediction_time_slider.setValue(int(settings['kalman_max_prediction_time'] * 10))
-            if 'kalman_velocity_smoothing' in settings and hasattr(self, 'kalman_velocity_smoothing_slider'):
-                self.kalman_velocity_smoothing_slider.setValue(int(settings['kalman_velocity_smoothing'] * 100))
+            # === TRACKING LOGIC ===
+            if 'min_frames_for_new_track' in settings and hasattr(self, 'new3d_min_frames_for_new_track_slider'):
+                self.new3d_min_frames_for_new_track_slider.setValue(settings['min_frames_for_new_track'])
+            if 'min_frames_for_color_lock' in settings and hasattr(self, 'new3d_min_frames_for_color_lock_slider'):
+                self.new3d_min_frames_for_color_lock_slider.setValue(settings['min_frames_for_color_lock'])
             
-            # Association settings
-            if 'assoc_max_distance' in settings and hasattr(self, 'assoc_max_distance_slider'):
-                self.assoc_max_distance_slider.setValue(int(settings['assoc_max_distance'] * 100))
-            if 'assoc_iou_threshold' in settings and hasattr(self, 'assoc_iou_threshold_slider'):
-                self.assoc_iou_threshold_slider.setValue(int(settings['assoc_iou_threshold'] * 100))
-            if 'assoc_color_weight' in settings and hasattr(self, 'assoc_color_weight_slider'):
-                self.assoc_color_weight_slider.setValue(int(settings['assoc_color_weight'] * 100))
-            if 'assoc_spatial_weight' in settings and hasattr(self, 'assoc_spatial_weight_slider'):
-                self.assoc_spatial_weight_slider.setValue(int(settings['assoc_spatial_weight'] * 100))
-            if 'assoc_max_missed_frames' in settings and hasattr(self, 'assoc_max_missed_frames_slider'):
-                self.assoc_max_missed_frames_slider.setValue(settings['assoc_max_missed_frames'])
+            # === COLOR TRACKING ===
+            if 'use_color_tracking' in settings and hasattr(self, 'new3d_use_color_tracking_toggle'):
+                self.new3d_use_color_tracking_toggle.setChecked(settings['use_color_tracking'])
+            if 'color_match_threshold' in settings and hasattr(self, 'new3d_color_match_threshold_slider'):
+                self.new3d_color_match_threshold_slider.setValue(int(settings['color_match_threshold'] * 100))
+            if 'color_sample_radius' in settings and hasattr(self, 'new3d_color_sample_radius_slider'):
+                self.new3d_color_sample_radius_slider.setValue(settings['color_sample_radius'])
             
-            # State management settings
-            if 'state_min_hits_to_confirm' in settings and hasattr(self, 'state_min_hits_to_confirm_slider'):
-                self.state_min_hits_to_confirm_slider.setValue(settings['state_min_hits_to_confirm'])
-            if 'state_max_age' in settings and hasattr(self, 'state_max_age_slider'):
-                self.state_max_age_slider.setValue(settings['state_max_age'])
-            if 'state_confidence_decay' in settings and hasattr(self, 'state_confidence_decay_slider'):
-                self.state_confidence_decay_slider.setValue(int(settings['state_confidence_decay'] * 100))
-            if 'state_min_confidence' in settings and hasattr(self, 'state_min_confidence_slider'):
-                self.state_min_confidence_slider.setValue(int(settings['state_min_confidence'] * 100))
+            # === YOLO INTEGRATION ===
+            if 'ignore_class' in settings and hasattr(self, 'new3d_ignore_class_toggle'):
+                self.new3d_ignore_class_toggle.setChecked(settings['ignore_class'])
             
-            # Audio indicators
+            # === HAND VELOCITY ===
+            if 'hand_velocity_enabled' in settings and hasattr(self, 'new3d_hand_velocity_enabled_toggle'):
+                self.new3d_hand_velocity_enabled_toggle.setChecked(settings['hand_velocity_enabled'])
+            if 'hand_velocity_threshold' in settings and hasattr(self, 'new3d_hand_velocity_threshold_slider'):
+                self.new3d_hand_velocity_threshold_slider.setValue(int(settings['hand_velocity_threshold'] * 100))
+            
+            # === VISUALIZATION ===
+            if 'show_kalman_prediction' in settings and hasattr(self, 'new3d_show_kalman_prediction_toggle'):
+                self.new3d_show_kalman_prediction_toggle.setChecked(settings['show_kalman_prediction'])
+            if 'show_held_radius' in settings and hasattr(self, 'new3d_show_held_radius_toggle'):
+                self.new3d_show_held_radius_toggle.setChecked(settings['show_held_radius'])
+            if 'show_association_lines' in settings and hasattr(self, 'new3d_show_association_lines_toggle'):
+                self.new3d_show_association_lines_toggle.setChecked(settings['show_association_lines'])
+            
+            # === AUDIO INDICATORS ===
             if 'tc_sound_on_catch' in settings and hasattr(self, 'new3d_sound_on_catch_toggle'):
                 self.new3d_sound_on_catch_toggle.setChecked(settings['tc_sound_on_catch'])
             if 'tc_sound_on_throw' in settings and hasattr(self, 'new3d_sound_on_throw_toggle'):
@@ -1313,47 +1333,57 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('show_hand_velocity_zone', 1 if settings['show_hand_velocity_zone'] else 0)
         def _send_new3d_tracker_settings(self, settings: dict):
             """Send New 3D Kalman tracker-specific settings to engine"""
-            # Physics settings
+            # === GEOMETRY & DISTANCE ===
             if 'held_radius_m' in settings:
                 self.udp_client.send_setting('held_radius_m', settings['held_radius_m'])
+            if 'association_max_distance_m' in settings:
+                self.udp_client.send_setting('association_max_distance_m', settings['association_max_distance_m'])
+            if 'color_mismatch_penalty_m' in settings:
+                self.udp_client.send_setting('color_mismatch_penalty_m', settings['color_mismatch_penalty_m'])
+            
+            # === PHYSICS & DYNAMICS ===
             if 'throw_velocity_threshold_mps' in settings:
                 self.udp_client.send_setting('throw_velocity_threshold_mps', settings['throw_velocity_threshold_mps'])
+            if 'gravity_x' in settings:
+                self.udp_client.send_setting('gravity_x', settings['gravity_x'])
+            if 'gravity_y' in settings:
+                self.udp_client.send_setting('gravity_y', settings['gravity_y'])
+            if 'gravity_z' in settings:
+                self.udp_client.send_setting('gravity_z', settings['gravity_z'])
             
-            # Kalman Filter settings
-            if 'kalman_process_noise_pos' in settings:
-                self.udp_client.send_setting('kalman_process_noise_pos', settings['kalman_process_noise_pos'])
-            if 'kalman_process_noise_vel' in settings:
-                self.udp_client.send_setting('kalman_process_noise_vel', settings['kalman_process_noise_vel'])
-            if 'kalman_measurement_noise' in settings:
-                self.udp_client.send_setting('kalman_measurement_noise', settings['kalman_measurement_noise'])
-            if 'kalman_max_prediction_time' in settings:
-                self.udp_client.send_setting('kalman_max_prediction_time', settings['kalman_max_prediction_time'])
-            if 'kalman_velocity_smoothing' in settings:
-                self.udp_client.send_setting('kalman_velocity_smoothing', settings['kalman_velocity_smoothing'])
+            # === TRACKING LOGIC ===
+            if 'min_frames_for_new_track' in settings:
+                self.udp_client.send_setting('min_frames_for_new_track', settings['min_frames_for_new_track'])
+            if 'min_frames_for_color_lock' in settings:
+                self.udp_client.send_setting('min_frames_for_color_lock', settings['min_frames_for_color_lock'])
             
-            # Association settings
-            if 'assoc_max_distance' in settings:
-                self.udp_client.send_setting('assoc_max_distance', settings['assoc_max_distance'])
-            if 'assoc_iou_threshold' in settings:
-                self.udp_client.send_setting('assoc_iou_threshold', settings['assoc_iou_threshold'])
-            if 'assoc_color_weight' in settings:
-                self.udp_client.send_setting('assoc_color_weight', settings['assoc_color_weight'])
-            if 'assoc_spatial_weight' in settings:
-                self.udp_client.send_setting('assoc_spatial_weight', settings['assoc_spatial_weight'])
-            if 'assoc_max_missed_frames' in settings:
-                self.udp_client.send_setting('assoc_max_missed_frames', settings['assoc_max_missed_frames'])
+            # === COLOR TRACKING ===
+            if 'use_color_tracking' in settings:
+                self.udp_client.send_setting('use_color_tracking', 1 if settings['use_color_tracking'] else 0)
+            if 'color_match_threshold' in settings:
+                self.udp_client.send_setting('color_match_threshold', settings['color_match_threshold'])
+            if 'color_sample_radius' in settings:
+                self.udp_client.send_setting('color_sample_radius', settings['color_sample_radius'])
             
-            # State management settings
-            if 'state_min_hits_to_confirm' in settings:
-                self.udp_client.send_setting('state_min_hits_to_confirm', settings['state_min_hits_to_confirm'])
-            if 'state_max_age' in settings:
-                self.udp_client.send_setting('state_max_age', settings['state_max_age'])
-            if 'state_confidence_decay' in settings:
-                self.udp_client.send_setting('state_confidence_decay', settings['state_confidence_decay'])
-            if 'state_min_confidence' in settings:
-                self.udp_client.send_setting('state_min_confidence', settings['state_min_confidence'])
+            # === YOLO INTEGRATION ===
+            if 'ignore_class' in settings:
+                self.udp_client.send_setting('ignore_class', 1 if settings['ignore_class'] else 0)
             
-            # Audio indicators
+            # === HAND VELOCITY ===
+            if 'hand_velocity_enabled' in settings:
+                self.udp_client.send_setting('hand_velocity_enabled', 1 if settings['hand_velocity_enabled'] else 0)
+            if 'hand_velocity_threshold' in settings:
+                self.udp_client.send_setting('hand_velocity_threshold', settings['hand_velocity_threshold'])
+            
+            # === VISUALIZATION ===
+            if 'show_kalman_prediction' in settings:
+                self.udp_client.send_setting('show_kalman_prediction', 1 if settings['show_kalman_prediction'] else 0)
+            if 'show_held_radius' in settings:
+                self.udp_client.send_setting('show_held_radius', 1 if settings['show_held_radius'] else 0)
+            if 'show_association_lines' in settings:
+                self.udp_client.send_setting('show_association_lines', 1 if settings['show_association_lines'] else 0)
+            
+            # === AUDIO INDICATORS ===
             if 'tc_sound_on_catch' in settings:
                 self.udp_client.send_setting('tc_sound_on_catch', 1 if settings['tc_sound_on_catch'] else 0)
             if 'tc_sound_on_throw' in settings:

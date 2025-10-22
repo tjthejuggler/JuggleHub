@@ -960,6 +960,81 @@ void New3DTracker::handleUnmatchedBalls(
     // The ball will be re-acquired when a detection of that color appears again.
 }
 
+void New3DTracker::reacquireHeldBallsByProximity(
+    std::vector<New3DBall*>& unmatched_balls,
+    const std::vector<SimpleHand>& hands,
+    std::vector<BallEvent>& events) {
+    
+    logDebug("  reacquireHeldBallsByProximity: Checking ", unmatched_balls.size(),
+             " unmatched balls against ", hands.size(), " hands");
+    
+    // This list will hold balls that remain unmatched after this check
+    std::vector<New3DBall*> still_unmatched_balls;
+    
+    for (auto* ball : unmatched_balls) {
+        // Only consider balls that are IN_FLIGHT. A HELD ball without its hand
+        // is handled in handleUnmatchedBalls.
+        if (ball->state != IN_FLIGHT) {
+            still_unmatched_balls.push_back(ball);
+            continue;
+        }
+        
+        // Don't re-acquire a ball that was just seen. This prevents a ball that was
+        // just thrown from being immediately re-caught by the same hand.
+        // Allow re-acquisition if it has been unseen for a few frames.
+        if (ball->frames_since_seen < 5) {
+            still_unmatched_balls.push_back(ball);
+            continue;
+        }
+        
+        bool reacquired = false;
+        for (const auto& hand : hands) {
+            // Check distance from ball's predicted position to hand's wrist
+            const cv::Point3f& pred_pos = ball->predicted_position;
+            const cv::Point3f& hand_pos = hand.wrist_pos_3d;
+            
+            float dx = pred_pos.x - hand_pos.x;
+            float dy = pred_pos.y - hand_pos.y;
+            float dz = pred_pos.z - hand_pos.z;
+            float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+            
+            // If ball is within held_radius, re-acquire it as HELD
+            if (distance < settings_.held_radius_m) {
+                logDebug("    >>> PROXIMITY RE-ACQUIRE! Ball ", ball->id, " (", ball->color_name,
+                         ") re-acquired by Hand ", hand.id, " (distance: ", distance, "m)");
+                
+                // Transition to HELD state
+                ball->state = HELD;
+                ball->associated_hand_id = hand.id;
+                ball->frames_since_seen = 0; // It is now "seen" via proximity
+                ball->tracking_reason = "Re-acquired by proximity";
+                
+                // Generate CATCH event
+                BallEvent catch_event;
+                catch_event.type = BallEvent::CATCH;
+                catch_event.ball_id = static_cast<int>(ball->id);
+                catch_event.hand_id = hand.id;
+                catch_event.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()
+                ).count();
+                events.push_back(catch_event);
+                
+                reacquired = true;
+                break; // Ball is re-acquired, no need to check other hand
+            }
+        }
+        
+        // If not re-acquired, add it to the list of balls that are still unmatched
+        if (!reacquired) {
+            still_unmatched_balls.push_back(ball);
+        }
+    }
+    
+    // The original unmatched_balls list is updated to only contain balls that
+    // were not re-acquired by proximity.
+    unmatched_balls = still_unmatched_balls;
+}
+
 void New3DTracker::createNewTracks(
     std::vector<const Detection*>& unmatched_detections,
     std::vector<New3DBall*>& unmatched_balls,
@@ -1692,14 +1767,20 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     logDebug("\n--- STEP 4: RE-ACQUIRE LOST BALLS ---");
     // This must happen BEFORE handleUnmatchedBalls so we can re-acquire lost tracks
     createNewTracks(association.unmatched_detections, association.unmatched_balls, color_frame);
+
+    // STEP 5: RE-ACQUIRE HELD BALLS BY PROXIMITY
+    logDebug("\n--- STEP 5: RE-ACQUIRE HELD BALLS BY PROXIMITY ---");
+    // This is the crucial step to handle occluded held balls when the hand reappears.
+    // It takes the remaining unmatched balls and checks if they are near a hand.
+    reacquireHeldBallsByProximity(association.unmatched_balls, current_hands, events);
     
-    // STEP 5: HANDLE UNMATCHED BALLS
-    logDebug("\n--- STEP 5: HANDLE UNMATCHED BALLS ---");
-    // Now handle any remaining unmatched balls (those that weren't re-acquired)
+    // STEP 6: HANDLE UNMATCHED BALLS
+    logDebug("\n--- STEP 6: HANDLE UNMATCHED BALLS ---");
+    // Now handle any remaining unmatched balls (those that weren't re-acquired by detection or proximity)
     handleUnmatchedBalls(association.unmatched_balls);
     
-    // STEP 6: FINALIZE
-    logDebug("\n--- STEP 6: FINALIZE POSITIONS ---");
+    // STEP 7: FINALIZE
+    logDebug("\n--- STEP 7: FINALIZE POSITIONS ---");
     finalizeBallPositions(current_hands, intrinsics);
     
     // DEBUG LOGGING: Final ball states

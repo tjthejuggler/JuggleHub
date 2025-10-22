@@ -456,6 +456,25 @@ private:
     void handleUnmatchedBalls(
         const std::vector<New3DBall*>& unmatched_balls
     );
+
+    /**
+     * @brief For IN_FLIGHT balls that were not seen, check if they are near a hand.
+     *
+     * This handles cases where a held ball is occluded and the hand is lost
+     * temporarily. When the hand reappears, this function re-establishes the
+     * HELD state without needing a visual detection of the ball.
+     *
+     * @param unmatched_balls A list of balls that were not matched to any detection.
+     *                        This list will be modified in-place; re-acquired balls
+     *                        will be removed from the list.
+     * @param hands Current hand detections.
+     * @param events Output vector for ball events (e.g., CATCH).
+     */
+    void reacquireHeldBallsByProximity(
+        std::vector<New3DBall*>& unmatched_balls,
+        const std::vector<SimpleHand>& hands,
+        std::vector<BallEvent>& events
+    );
     
     // ========================================================================
     // STEP 5: HANDLE UNMATCHED DETECTIONS

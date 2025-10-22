@@ -105,21 +105,8 @@ class New3DSettingsSections:
         layout.addWidget(info_label, row, 0, 1, 3)
         row += 1
         
-        # Max Frames Unseen
-        self.parent.new3d_max_frames_unseen_slider, self.parent.new3d_max_frames_unseen_label = self.parent._create_slider_widget(
-            parent_layout=layout,
-            row=row,
-            label_text="Max Frames Unseen",
-            tooltip_text="Maximum frames without detection before deleting track.\n"
-                         "Range: 10-60 frames. Default: 30 frames (~1 second at 30fps).\n"
-                         "Higher = more persistent tracking, Lower = faster cleanup.",
-            range_min=10,
-            range_max=60,
-            initial_value=30,
-            update_func=lambda v: self.parent.update_setting('max_frames_unseen', v),
-            is_float=False
-        )
-        row += 1
+        # NOTE: "Max Frames Unseen" removed - New3D tracker uses persistent balls that never delete
+        # Balls stay tracked indefinitely, with HELD balls locked to wrist even when not visible
         
         # Min Frames for New Track
         self.parent.new3d_min_frames_new_track_slider, self.parent.new3d_min_frames_new_track_label = self.parent._create_slider_widget(

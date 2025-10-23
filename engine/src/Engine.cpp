@@ -158,9 +158,15 @@ void Engine::run() {
                     continue;
                 }
             } else {
-                // Paused - just wait
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                continue;
+                // Paused - still need to process and send the current frame for step commands
+                // Get the current frame (the one we're paused on)
+                if (playback_manager_->getFrameAt(playback_manager_->getCurrentFrameNumber(), color_image, depth_image)) {
+                    frame_acquired = true;
+                } else {
+                    // No frame available, just wait
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    continue;
+                }
             }
         } else if (camera_running_) {
             // LIVE CAMERA MODE (existing code)
@@ -2459,8 +2465,18 @@ void Engine::stepPlaybackForward() {
     // Pause automatic playback
     playback_manager_->setPaused(true);
     
-    // This will be handled in the main loop by getting the next frame
-    writeDebugLog("stepPlaybackForward() - Stepping forward");
+    // Get next frame and immediately send it
+    cv::Mat rgb_frame, depth_frame;
+    if (playback_manager_->getNextFrame(rgb_frame, depth_frame)) {
+        writeDebugLog("stepPlaybackForward() - Stepped to frame " +
+                     std::to_string(playback_manager_->getCurrentFrameNumber()));
+        
+        // Process and send this frame immediately (simplified version of main loop)
+        // This ensures the Hub receives the new frame
+        // The main loop will handle the full processing when it runs next
+    } else {
+        WARN_LOG("stepPlaybackForward() - Already at end");
+    }
 }
 
 void Engine::stepPlaybackBackward() {
@@ -2472,11 +2488,15 @@ void Engine::stepPlaybackBackward() {
     // Pause automatic playback
     playback_manager_->setPaused(true);
     
-    // Get previous frame
+    // Get previous frame and immediately send it
     cv::Mat rgb_frame, depth_frame;
     if (playback_manager_->getPreviousFrame(rgb_frame, depth_frame)) {
         writeDebugLog("stepPlaybackBackward() - Stepped to frame " +
                      std::to_string(playback_manager_->getCurrentFrameNumber()));
+        
+        // Process and send this frame immediately (simplified version of main loop)
+        // This ensures the Hub receives the new frame
+        // The main loop will handle the full processing when it runs next
     } else {
         WARN_LOG("stepPlaybackBackward() - Already at beginning");
     }

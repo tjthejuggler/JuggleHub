@@ -1497,6 +1497,11 @@ if PYQT_AVAILABLE:
             self.playback_frame_label.setText(f"Frame: 0 / {frame_count}")
             print(f"📊 Recording contains {frame_count} frames")
             
+            # Enable step buttons now that we have a recording loaded
+            self.playback_step_forward_button.setEnabled(True)
+            self.playback_step_back_button.setEnabled(True)
+            print("✅ Step buttons enabled")
+            
             # Automatically start playback in paused mode to show first frame
             print("🎬 Loading first frame from recording...")
             command = juggler_pb2.CommandRequest()

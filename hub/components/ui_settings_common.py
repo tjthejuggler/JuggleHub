@@ -219,6 +219,7 @@ class CommonSettingsSections:
         self.parent.playback_step_back_button = QPushButton("◀ Step Back")
         self.parent.playback_step_back_button.clicked.connect(
             self.parent.playback_step_backward)
+        self.parent.playback_step_back_button.setEnabled(False)  # Disabled until recording is loaded
         self.parent.playback_step_back_button.setStyleSheet("""
             QPushButton {
                 background-color: #555555;
@@ -227,6 +228,10 @@ class CommonSettingsSections:
                 border-radius: 3px;
             }
             QPushButton:hover { background-color: #666666; }
+            QPushButton:disabled {
+                background-color: #333333;
+                color: #666666;
+            }
         """)
         playback_controls_layout.addWidget(self.parent.playback_step_back_button, 1, 0)
 
@@ -255,6 +260,7 @@ class CommonSettingsSections:
         self.parent.playback_step_forward_button = QPushButton("Step Forward ▶")
         self.parent.playback_step_forward_button.clicked.connect(
             self.parent.playback_step_forward)
+        self.parent.playback_step_forward_button.setEnabled(False)  # Disabled until recording is loaded
         self.parent.playback_step_forward_button.setStyleSheet("""
             QPushButton {
                 background-color: #555555;
@@ -263,6 +269,10 @@ class CommonSettingsSections:
                 border-radius: 3px;
             }
             QPushButton:hover { background-color: #666666; }
+            QPushButton:disabled {
+                background-color: #333333;
+                color: #666666;
+            }
         """)
         playback_controls_layout.addWidget(self.parent.playback_step_forward_button, 1, 2)
 

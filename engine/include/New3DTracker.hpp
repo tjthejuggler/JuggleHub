@@ -192,6 +192,7 @@ struct New3DTrackerSettings {
     // === YOLO INTEGRATION ===
     bool enable_ball_detection = true;              // Enable/disable YOLO ball detection
     bool enable_pose_estimation = true;             // Enable/disable YOLO pose estimation
+    int pose_processing_density = 50;               // Percentage of frames to process pose (10-100%)
     float ball_confidence_threshold = 0.25f;        // Min confidence for 'ball' class
     float ball_held_confidence_threshold = 0.25f;   // Min confidence for 'ball_held' class
     bool ignore_class = false;                      // Treat ball/ball_held same

@@ -207,7 +207,11 @@ if PYQT_AVAILABLE:
             self.new3d_hand_velocity_section = self.tracker_new3d_sections.create_hand_velocity_section()
             container_layout.addWidget(self.new3d_hand_velocity_section)
             self.tracker_new3d_section_widgets.append(self.new3d_hand_velocity_section)
-            
+
+            self.new3d_pose_model_section = self.tracker_new3d_sections.create_pose_model_section()
+            container_layout.addWidget(self.new3d_pose_model_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_pose_model_section)
+
             self.new3d_visualization_section = self.tracker_new3d_sections.create_visualization_section()
             container_layout.addWidget(self.new3d_visualization_section)
             self.tracker_new3d_section_widgets.append(self.new3d_visualization_section)

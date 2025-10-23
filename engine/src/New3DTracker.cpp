@@ -349,6 +349,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("enable_pose_estimation")) {
             settings_.enable_pose_estimation = j["enable_pose_estimation"];
         }
+        if (j.contains("pose_processing_density")) {
+            settings_.pose_processing_density = j["pose_processing_density"];
+        }
         if (j.contains("use_color_tracking")) {
             settings_.use_color_tracking = j["use_color_tracking"];
         }
@@ -443,6 +446,7 @@ void New3DTracker::saveSettings() {
         j["min_frames_for_color_lock"] = settings_.min_frames_for_color_lock;
         j["enable_ball_detection"] = settings_.enable_ball_detection;
         j["enable_pose_estimation"] = settings_.enable_pose_estimation;
+        j["pose_processing_density"] = settings_.pose_processing_density;
         j["use_color_tracking"] = settings_.use_color_tracking;
         j["color_match_threshold"] = settings_.color_match_threshold;
         j["color_sample_radius"] = settings_.color_sample_radius;
@@ -1731,23 +1735,44 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
         logDebug("--- BALL DETECTION: DISABLED ---");
     }
     
-    // Run YOLO pose estimation (conditionally, every other frame when enabled)
+    // Run YOLO pose estimation (conditionally, based on processing density)
     std::vector<SimpleHand> current_hands;
     pose_frame_counter_++;
     
     if (settings_.enable_pose_estimation) {
-        if (pose_frame_counter_ % 2 == 1) {
-            // Run pose detection on odd frames (1, 3, 5, ...)
+        // Determine if we should process this frame based on density percentage
+        bool should_process = false;
+        int density = settings_.pose_processing_density;
+        
+        // Edge cases
+        if (density >= 100) {
+            should_process = true;  // Process every frame
+        } else if (density <= 0) {
+            should_process = false;  // Process no frames
+        } else if (density < 50) {
+            // Process 1 out of N frames
+            int N = static_cast<int>(std::round(100.0f / density));
+            should_process = (pose_frame_counter_ % N == 0);
+        } else {
+            // Skip 1 out of N frames
+            int skip_percentage = 100 - density;
+            int N = static_cast<int>(std::round(100.0f / skip_percentage));
+            should_process = (pose_frame_counter_ % N != 0);
+        }
+        
+        if (should_process) {
+            // Run pose detection
             current_hands = runPoseEstimation(
                 preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
             
-            logDebug("--- POSE DETECTION: RUNNING (frame ", pose_frame_counter_, ") ---");
+            logDebug("--- POSE DETECTION: RUNNING (frame ", pose_frame_counter_,
+                     ", density ", density, "%) ---");
         } else {
-            // Skip pose detection on even frames (2, 4, 6, ...)
-            // Use previous frame's hand positions
+            // Skip pose detection - use previous frame's hand positions
             current_hands = hands_;
             
-            logDebug("--- POSE DETECTION: SKIPPED (frame ", pose_frame_counter_, ") - using previous hands ---");
+            logDebug("--- POSE DETECTION: SKIPPED (frame ", pose_frame_counter_,
+                     ", density ", density, "%) - using previous hands ---");
         }
     } else {
         // Pose estimation disabled - use empty hands list
@@ -2103,6 +2128,8 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.enable_ball_detection = (value == "true" || value == "1");
         } else if (key == "enable_pose_estimation") {
             settings_.enable_pose_estimation = (value == "true" || value == "1");
+        } else if (key == "pose_processing_density") {
+            settings_.pose_processing_density = std::stoi(value);
         } else if (key == "use_color_tracking") {
             settings_.use_color_tracking = (value == "true" || value == "1");
         } else if (key == "color_match_threshold") {

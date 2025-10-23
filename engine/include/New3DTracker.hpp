@@ -190,6 +190,8 @@ struct New3DTrackerSettings {
     int color_sample_radius = 1;                    // Pixel radius for color sampling
     
     // === YOLO INTEGRATION ===
+    bool enable_ball_detection = true;              // Enable/disable YOLO ball detection
+    bool enable_pose_estimation = true;             // Enable/disable YOLO pose estimation
     float ball_confidence_threshold = 0.25f;        // Min confidence for 'ball' class
     float ball_held_confidence_threshold = 0.25f;   // Min confidence for 'ball_held' class
     bool ignore_class = false;                      // Treat ball/ball_held same

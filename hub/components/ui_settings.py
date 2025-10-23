@@ -329,6 +329,7 @@ if PYQT_AVAILABLE:
                 'nms_threshold': self.nms_slider.value() / 100.0 if hasattr(self, 'nms_slider') else 0.50,
                 'show_raw_yolo_detections': self.show_raw_yolo_toggle.isChecked() if hasattr(self, 'show_raw_yolo_toggle') else False,
                 'pose_model_enabled': self.pose_model_toggle.isChecked() if hasattr(self, 'pose_model_toggle') else True,
+                'enable_pose_estimation': self.pose_model_toggle.isChecked() if hasattr(self, 'pose_model_toggle') else True,
             }
             
             # Add 3D-specific settings if current tracker is 3D
@@ -517,6 +518,11 @@ if PYQT_AVAILABLE:
             # Pose model
             if 'pose_model_enabled' in settings:
                 self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
+            if 'enable_pose_estimation' in settings and hasattr(self, 'pose_model_toggle'):
+                is_enabled = settings['enable_pose_estimation']
+                self.pose_model_toggle.setChecked(is_enabled)
+                self.pose_model_toggle.setText("Enable Pose Model" if is_enabled else "Pose Model DISABLED")
+                self.udp_client.send_setting('enable_pose_estimation', 1 if is_enabled else 0)
             
             # Apply 3D-specific settings
             if self.current_tracker == "depth_based":
@@ -889,20 +895,11 @@ if PYQT_AVAILABLE:
         def toggle_pose_model(self):
             """Toggle pose model"""
             is_enabled = self.pose_model_toggle.isChecked()
-            command = juggler_pb2.CommandRequest(
-                type=juggler_pb2.CommandRequest.CommandType.SET_POSE_MODEL_ENABLED,
-                pose_model_enabled=is_enabled
-            )
-            try:
-                response = self.zmq_client.send_command(command)
-                if response.success:
-                    print(f"✅ Pose model {'enabled' if is_enabled else 'disabled'}")
-                    if not self._loading_settings:
-                        self.save_settings()
-                else:
-                    print(f"❌ Failed to toggle pose model: {response.message}")
-            except Exception as e:
-                print(f"❌ Error toggling pose model: {e}")
+            self.pose_model_toggle.setText("Enable Pose Model" if is_enabled else "Pose Model DISABLED")
+            self.udp_client.send_setting('enable_pose_estimation', 1 if is_enabled else 0)
+            print(f"✅ Pose model {'enabled' if is_enabled else 'disabled'}")
+            if not self._loading_settings:
+                self.save_settings()
 
         def toggle_depth_sensor(self):
             """Toggle depth sensor"""
@@ -1209,6 +1206,8 @@ if PYQT_AVAILABLE:
             # Send common settings (always sent regardless of tracker type)
             if 'enable_ball_detection' in settings:
                 self.udp_client.send_setting('enable_ball_detection', 1 if settings['enable_ball_detection'] else 0)
+            if 'enable_pose_estimation' in settings:
+                self.udp_client.send_setting('enable_pose_estimation', 1 if settings['enable_pose_estimation'] else 0)
             
             # YOLO settings (common)
             if 'ball_confidence_threshold' in settings:

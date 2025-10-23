@@ -343,6 +343,12 @@ bool New3DTracker::loadSettings() {
         if (j.contains("min_frames_for_color_lock")) {
             settings_.min_frames_for_color_lock = j["min_frames_for_color_lock"];
         }
+        if (j.contains("enable_ball_detection")) {
+            settings_.enable_ball_detection = j["enable_ball_detection"];
+        }
+        if (j.contains("enable_pose_estimation")) {
+            settings_.enable_pose_estimation = j["enable_pose_estimation"];
+        }
         if (j.contains("use_color_tracking")) {
             settings_.use_color_tracking = j["use_color_tracking"];
         }
@@ -435,6 +441,8 @@ void New3DTracker::saveSettings() {
         // NOTE: max_frames_unseen removed - balls are now persistent and never deleted
         j["min_frames_for_new_track"] = settings_.min_frames_for_new_track;
         j["min_frames_for_color_lock"] = settings_.min_frames_for_color_lock;
+        j["enable_ball_detection"] = settings_.enable_ball_detection;
+        j["enable_pose_estimation"] = settings_.enable_pose_estimation;
         j["use_color_tracking"] = settings_.use_color_tracking;
         j["color_match_threshold"] = settings_.color_match_threshold;
         j["color_sample_radius"] = settings_.color_sample_radius;
@@ -1705,30 +1713,46 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     }
     logDebug("\n================================================================================");
     
-    // Preprocess frame once for both models
-    float scale_x, scale_y;
-    cv::Mat preprocessed = preprocess(color_frame, scale_x, scale_y);
+    // Preprocess frame only if at least one YOLO model is enabled
+    float scale_x = 1.0f, scale_y = 1.0f;
+    cv::Mat preprocessed;
     
-    // Run YOLO ball detection (every frame)
-    std::vector<Detection> detections = runBallDetection(
-        preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
+    if (settings_.enable_ball_detection || settings_.enable_pose_estimation) {
+        preprocessed = preprocess(color_frame, scale_x, scale_y);
+    }
     
-    // Run YOLO pose estimation (every other frame)
+    // Run YOLO ball detection (conditionally)
+    std::vector<Detection> detections;
+    if (settings_.enable_ball_detection) {
+        detections = runBallDetection(
+            preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
+        logDebug("--- BALL DETECTION: ENABLED (", detections.size(), " detections) ---");
+    } else {
+        logDebug("--- BALL DETECTION: DISABLED ---");
+    }
+    
+    // Run YOLO pose estimation (conditionally, every other frame when enabled)
     std::vector<SimpleHand> current_hands;
     pose_frame_counter_++;
     
-    if (pose_frame_counter_ % 2 == 1) {
-        // Run pose detection on odd frames (1, 3, 5, ...)
-        current_hands = runPoseEstimation(
-            preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
-        
-        logDebug("--- POSE DETECTION: RUNNING (frame ", pose_frame_counter_, ") ---");
+    if (settings_.enable_pose_estimation) {
+        if (pose_frame_counter_ % 2 == 1) {
+            // Run pose detection on odd frames (1, 3, 5, ...)
+            current_hands = runPoseEstimation(
+                preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
+            
+            logDebug("--- POSE DETECTION: RUNNING (frame ", pose_frame_counter_, ") ---");
+        } else {
+            // Skip pose detection on even frames (2, 4, 6, ...)
+            // Use previous frame's hand positions
+            current_hands = hands_;
+            
+            logDebug("--- POSE DETECTION: SKIPPED (frame ", pose_frame_counter_, ") - using previous hands ---");
+        }
     } else {
-        // Skip pose detection on even frames (2, 4, 6, ...)
-        // Use previous frame's hand positions
-        current_hands = hands_;
-        
-        logDebug("--- POSE DETECTION: SKIPPED (frame ", pose_frame_counter_, ") - using previous hands ---");
+        // Pose estimation disabled - use empty hands list
+        current_hands.clear();
+        logDebug("--- POSE DETECTION: DISABLED ---");
     }
     
     // Store for visualization/debugging
@@ -2075,6 +2099,10 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.min_frames_for_new_track = std::stoi(value);
         } else if (key == "min_frames_for_color_lock") {
             settings_.min_frames_for_color_lock = std::stoi(value);
+        } else if (key == "enable_ball_detection") {
+            settings_.enable_ball_detection = (value == "true" || value == "1");
+        } else if (key == "enable_pose_estimation") {
+            settings_.enable_pose_estimation = (value == "true" || value == "1");
         } else if (key == "use_color_tracking") {
             settings_.use_color_tracking = (value == "true" || value == "1");
         } else if (key == "color_match_threshold") {

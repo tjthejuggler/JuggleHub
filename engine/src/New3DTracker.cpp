@@ -1649,6 +1649,8 @@ std::vector<SimpleHand> New3DTracker::runPoseEstimation(
             left_hand.confidence = keypoint_confidences[9];
             left_hand.id = 0;
             left_hand.is_visible = true;
+            // Populate full skeleton keypoints for visualization
+            left_hand.keypoints = keypoints_3d;
             hands.push_back(left_hand);
         }
         
@@ -1660,6 +1662,8 @@ std::vector<SimpleHand> New3DTracker::runPoseEstimation(
             right_hand.confidence = keypoint_confidences[10];
             right_hand.id = 1;
             right_hand.is_visible = true;
+            // Populate full skeleton keypoints for visualization
+            right_hand.keypoints = keypoints_3d;
             hands.push_back(right_hand);
         }
         

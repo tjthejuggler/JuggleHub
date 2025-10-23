@@ -768,11 +768,15 @@ if PYQT_AVAILABLE:
             self.frame_count += 1
             
             # Update rolling window of frame timestamps for FPS calculation
-            current_time = time.time()
-            self.frame_timestamps.append(current_time)
-            # Keep only the last fps_window_size frames
-            if len(self.frame_timestamps) > self.fps_window_size:
-                self.frame_timestamps.pop(0)
+            # Only update timestamps when NOT in playback mode (for live camera FPS)
+            if not (frame_data.HasField('status') and
+                    hasattr(frame_data.status, 'playback_mode') and
+                    frame_data.status.playback_mode):
+                current_time = time.time()
+                self.frame_timestamps.append(current_time)
+                # Keep only the last fps_window_size frames
+                if len(self.frame_timestamps) > self.fps_window_size:
+                    self.frame_timestamps.pop(0)
             
             
             # Check for throw/catch events and play sounds/flash indicator if enabled
@@ -951,19 +955,54 @@ if PYQT_AVAILABLE:
             self.status_label.setText(f"✅ Receiving data - Frame {frame_data.frame_number}")
         
         def _periodic_update(self):
-            # Calculate FPS using rolling window for more responsive display
-            if len(self.frame_timestamps) >= 2:
-                # Calculate FPS from the time span of frames in the window
-                time_span = self.frame_timestamps[-1] - self.frame_timestamps[0]
-                if time_span > 0:
-                    fps = (len(self.frame_timestamps) - 1) / time_span
+            # Check if we're in playback mode
+            is_playback_mode = False
+            playback_speed = 1.0
+            playback_paused = False
+            playback_frame = 0
+            
+            if self.last_frame_data and self.last_frame_data.HasField('status'):
+                status = self.last_frame_data.status
+                if hasattr(status, 'playback_mode'):
+                    is_playback_mode = status.playback_mode
+                    if is_playback_mode:
+                        if hasattr(status, 'playback_speed'):
+                            playback_speed = status.playback_speed
+                        if hasattr(status, 'playback_paused'):
+                            playback_paused = status.playback_paused
+                        if hasattr(status, 'playback_current_frame'):
+                            playback_frame = status.playback_current_frame
+            
+            # Calculate and display FPS based on mode
+            if is_playback_mode:
+                # In playback mode: FPS is based on playback speed
+                if playback_paused:
+                    # When paused or stepping frame-by-frame, FPS is 0
+                    fps = 0.0
+                else:
+                    # FPS = camera_fps * playback_speed
+                    # Assuming 60 FPS camera (could be made dynamic)
+                    camera_fps = 60.0
+                    fps = camera_fps * playback_speed
+                
+                # Display playback frame number instead of total frames received
+                self.fps_label.setText(f"FPS: {fps:.1f} (playback)")
+                self.frame_count_label.setText(f"Frame: {playback_frame}")
+            else:
+                # In live camera mode: Calculate FPS from rolling window
+                if len(self.frame_timestamps) >= 2:
+                    # Calculate FPS from the time span of frames in the window
+                    time_span = self.frame_timestamps[-1] - self.frame_timestamps[0]
+                    if time_span > 0:
+                        fps = (len(self.frame_timestamps) - 1) / time_span
+                    else:
+                        fps = 0.0
                 else:
                     fps = 0.0
-            else:
-                fps = 0.0
+                
+                self.fps_label.setText(f"FPS: {fps:.1f}")
+                self.frame_count_label.setText(f"Frames: {self.frame_count}")
             
-            self.fps_label.setText(f"FPS: {fps:.1f}")
-            self.frame_count_label.setText(f"Frames: {self.frame_count}")
             if self.last_frame_data:
                 time_since_last = (time.time() * 1000000 - self.last_frame_data.timestamp_us) / 1000000
                 if time_since_last > 2.0: self.status_label.setText("⚠️ No data received recently")

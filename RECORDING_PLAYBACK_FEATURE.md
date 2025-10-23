@@ -304,6 +304,13 @@ Potential improvements for future versions:
 
 ## Changelog
 
+### Version 1.0.2 (October 23, 2025)
+- **Bug Fix**: FPS and Frame number displays in upper right corner now correctly reflect playback mode
+  - FPS now shows playback speed (e.g., "FPS: 30.0 (playback)" at 0.5x speed with 60 FPS camera)
+  - FPS shows 0.0 when paused or stepping frame-by-frame
+  - Frame number shows current playback frame instead of total frames received
+  - Camera FPS is no longer displayed when using recording playback
+
 ### Version 1.0.1 (October 23, 2025)
 - **Bug Fix**: Camera now properly stops when switching to Recording Playback mode
 - **Bug Fix**: Playback now properly stops when switching back to Live Camera mode

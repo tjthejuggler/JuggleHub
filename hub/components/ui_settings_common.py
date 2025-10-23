@@ -431,10 +431,99 @@ class CommonSettingsSections:
         pose_layout = QGridLayout()
         section.get_content_layout().addLayout(pose_layout)
 
+        row = 0
+        
+        # Info label
+        from PyQt6.QtWidgets import QLabel
+        info_label = QLabel("ℹ️ Configure pose estimation model and processing frequency")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setWordWrap(True)
+        pose_layout.addWidget(info_label, row, 0, 1, 3)
+        row += 1
+        
+        # Enable Pose Model Toggle
+        label = QLabel("Enable Pose Model")
+        label.setToolTip("Enable YOLO pose estimation for hand tracking.\n"
+                        "When disabled, no hand detection occurs.")
+        pose_layout.addWidget(label, row, 0)
+        
         self.parent.pose_model_toggle = QPushButton("Enable Pose Model")
         self.parent.pose_model_toggle.setCheckable(True)
         self.parent.pose_model_toggle.setChecked(True)
         self.parent.pose_model_toggle.clicked.connect(self.parent.toggle_pose_model)
-        pose_layout.addWidget(self.parent.pose_model_toggle, 0, 0, 1, 2)
-
+        self.parent.pose_model_toggle.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:pressed { background-color: #2e7d32; }
+            QPushButton:checked { background-color: #4CAF50; }
+            QPushButton:!checked { background-color: #f44336; }
+        """)
+        pose_layout.addWidget(self.parent.pose_model_toggle, row, 1, 1, 2)
+        row += 1
+        
+        # Processing Density Slider
+        self.parent.pose_density_slider, self.parent.pose_density_label = self.parent._create_slider_widget(
+            parent_layout=pose_layout,
+            row=row,
+            label_text="Processing Density (%)",
+            tooltip_text="Percentage of frames to process with pose model.\n"
+                         "100% = Every frame (real-time)\n"
+                         "50% = Every 2nd frame (default, balanced)\n"
+                         "33% = Every 3rd frame (power saver)\n"
+                         "25% = Every 4th frame (low)\n"
+                         "Range: 10-100%. Default: 50%.\n"
+                         "Lower values save CPU/GPU but reduce hand tracking smoothness.",
+            range_min=10,
+            range_max=100,
+            initial_value=50,
+            update_func=lambda v: self.parent.update_setting('pose_processing_density', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Density description label
+        self.parent.pose_density_desc = QLabel("Balanced (Every 2nd frame)")
+        self.parent.pose_density_desc.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
+        pose_layout.addWidget(self.parent.pose_density_desc, row, 1, 1, 2)
+        row += 1
+        
+        # Connect slider to update description
+        self.parent.pose_density_slider.valueChanged.connect(self._update_density_description)
+        
         return section
+    
+    def _update_density_description(self, value):
+        """Update the density description label based on slider value"""
+        if value >= 100:
+            desc = "Real-time (Every frame)"
+            color = "#FF9800"  # Orange
+        elif value >= 90:
+            desc = "Near Real-time (9/10 frames)"
+            color = "#8BC34A"  # Light green
+        elif value >= 75:
+            desc = "High Quality (3/4 frames)"
+            color = "#4CAF50"  # Green
+        elif value >= 67:
+            desc = "Balanced (2/3 frames)"
+            color = "#4CAF50"  # Green
+        elif value == 50:
+            desc = "Balanced (Every 2nd frame)"
+            color = "#4CAF50"  # Green
+        elif value >= 33:
+            desc = "Medium (Every 3rd frame)"
+            color = "#2196F3"  # Blue
+        elif value >= 25:
+            desc = "Power Saver (Every 4th frame)"
+            color = "#2196F3"  # Blue
+        else:
+            desc = f"Low ({value}% of frames)"
+            color = "#9E9E9E"  # Gray
+        
+        self.parent.pose_density_desc.setText(desc)
+        self.parent.pose_density_desc.setStyleSheet(f"color: {color}; font-size: 9px; font-style: italic;")

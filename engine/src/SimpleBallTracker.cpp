@@ -556,8 +556,14 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             enable_ball_detection_ = (value == "true" || value == "1");
             return true;
         }
-        else if (key == "enable_pose_detection") {
+        else if (key == "enable_pose_detection" || key == "enable_pose_estimation") {
             enable_pose_detection_ = (value == "true" || value == "1");
+            return true;
+        }
+        else if (key == "pose_processing_density") {
+            int val = std::stoi(value);
+            // Clamp value to 0-100 range
+            pose_processing_density_ = std::max(0, std::min(100, val));
             return true;
         }
     } catch (const std::exception& e) {
@@ -1217,10 +1223,42 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
         }
     });
 
-    // Run pose estimation (reusing preprocessed frame)
-    std::cout << "[FRAME " << frame_counter_ << "] Running pose estimation..." << std::endl;
-    std::vector<SimpleHand> hands = runPoseEstimation(preprocessed_frame, preprocess_scale_x, preprocess_scale_y, color_frame, depth_frame, intrinsics);
-    std::cout << "[FRAME " << frame_counter_ << "] Pose estimation complete: " << hands.size() << " hands" << std::endl;
+    // Run pose estimation (reusing preprocessed frame) with density-based frame skipping
+    std::vector<SimpleHand> hands;
+    
+    // Increment frame counter
+    pose_frame_counter_++;
+    
+    // Determine if we should process pose this frame based on density setting
+    bool should_process_pose = false;
+    
+    if (pose_processing_density_ >= 100) {
+        // 100%: Process every frame
+        should_process_pose = true;
+    } else if (pose_processing_density_ <= 0) {
+        // 0% or less: Never process (edge case)
+        should_process_pose = false;
+    } else if (pose_processing_density_ >= 50) {
+        // 50-99%: Skip 1 out of N frames
+        // Example: 75% = skip 1 out of 4 frames (process 3, skip 1)
+        int skip_interval = static_cast<int>(100.0f / (100.0f - pose_processing_density_));
+        should_process_pose = (pose_frame_counter_ % skip_interval != 0);
+    } else {
+        // 1-49%: Process 1 out of N frames
+        // Example: 25% = process 1 out of 4 frames
+        int process_interval = static_cast<int>(100.0f / pose_processing_density_);
+        should_process_pose = (pose_frame_counter_ % process_interval == 1);
+    }
+    
+    if (should_process_pose) {
+        std::cout << "[FRAME " << frame_counter_ << "] Running pose estimation (density: " << pose_processing_density_ << "%)..." << std::endl;
+        hands = runPoseEstimation(preprocessed_frame, preprocess_scale_x, preprocess_scale_y, color_frame, depth_frame, intrinsics);
+        std::cout << "[FRAME " << frame_counter_ << "] Pose estimation complete: " << hands.size() << " hands" << std::endl;
+    } else {
+        std::cout << "[FRAME " << frame_counter_ << "] Skipping pose estimation (density: " << pose_processing_density_ << "%)" << std::endl;
+        // Return empty hands vector when skipping
+        hands = std::vector<SimpleHand>();
+    }
     
     // Update hand velocity for all detected hands
     // CRITICAL FIX: Transfer position_history from last frame's hands to preserve velocity tracking

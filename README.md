@@ -2,7 +2,18 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-21 10:31 CEST
+**Last Updated:** 2025-10-23 09:34 CEST
+
+**Recent Changes (2025-10-23):**
+- **📹 DEPTH DATA RECORDING - COMPLETE ✅**
+  - **New Feature**: Recording system now saves depth frames alongside RGB frames
+  - **Depth Folder**: Depth data saved as 16-bit PNG files in separate `depth/` folder
+  - **Format**: Preserves full depth precision (0-65535mm range)
+  - **Automatic**: Works with both 5-second clip and continuous recording modes
+  - **All Trackers**: Depth recording works with all tracking systems (depth_based, simple_2d, new_3d)
+  - **File Structure**: `recording_dir/no_boxes/` for RGB, `recording_dir/depth/` for depth data
+  - **Implementation**: [`engine/include/Engine.hpp`](engine/include/Engine.hpp:126), [`engine/src/Engine.cpp`](engine/src/Engine.cpp:326,779,803,938,961)
+  - **Use Case**: Essential for 3D reconstruction, depth-based analysis, and training depth-aware models
 
 **Recent Changes (2025-10-21):**
 - **🎯 PERSISTENT BALL ARCHITECTURE - STABLE BALL IDs FOREVER ✅**

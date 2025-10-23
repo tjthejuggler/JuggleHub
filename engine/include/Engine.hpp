@@ -124,6 +124,7 @@ private:
     // Frame buffer for recording
     struct RecordingFrame {
         cv::Mat frame;
+        cv::Mat depth_frame;  // Store depth data for recording
         std::vector<Detection> raw_detections;
         std::vector<TrackedObject> tracked_objects;
         std::vector<TrackedHand> tracked_hands;

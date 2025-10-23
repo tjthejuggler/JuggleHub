@@ -322,8 +322,8 @@ void Engine::run() {
             
             last_tracked_objects_ = tracked_objects_compat;
 
-            // Add to frame buffers
-            RecordingFrame rec_frame = {color_image.clone(), last_raw_detections_,
+            // Add to frame buffers (including depth data)
+            RecordingFrame rec_frame = {color_image.clone(), depth_image.clone(), last_raw_detections_,
                                        tracked_objects_compat, tracked_hands_compat, tracked_balls,
                                        tracked_hands, ball_events, visualization_states_};
             {
@@ -777,9 +777,11 @@ void Engine::saveRecording() {
     fs::path recording_dir = data_dir / ss.str();
     
     fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
+    fs::path recording_dir_depth = recording_dir / "depth";
 
     try {
         fs::create_directories(recording_dir_no_boxes);
+        fs::create_directories(recording_dir_depth);
         
         // Start recording logger
         if (recording_logger_.start(recording_dir.string())) {
@@ -788,9 +790,17 @@ void Engine::saveRecording() {
         
         int frame_num = 0;
         for (const auto& rec_frame : frame_buffer_) {
-            std::string filename = ss.str() + "_frame_" + std::to_string(frame_num++) + ".jpg";
+            // Save RGB frame
+            std::string filename = ss.str() + "_frame_" + std::to_string(frame_num) + ".jpg";
             fs::path filepath = recording_dir_no_boxes / filename;
             cv::imwrite(filepath.string(), rec_frame.frame);
+            
+            // Save depth frame as 16-bit PNG (preserves depth values)
+            std::string depth_filename = ss.str() + "_frame_" + std::to_string(frame_num) + "_depth.png";
+            fs::path depth_filepath = recording_dir_depth / depth_filename;
+            cv::imwrite(depth_filepath.string(), rec_frame.depth_frame);
+            
+            frame_num++;
             
             // Log frame data to recording.log
             if (recording_logger_.isActive()) {
@@ -807,7 +817,8 @@ void Engine::saveRecording() {
         // Close recording logger
         recording_logger_.close();
         
-        INFO_LOG("Saved ", frame_buffer_.size(), " frames to ", recording_dir_no_boxes.string());
+        INFO_LOG("Saved ", frame_buffer_.size(), " RGB frames to ", recording_dir_no_boxes.string());
+        INFO_LOG("Saved ", frame_buffer_.size(), " depth frames to ", recording_dir_depth.string());
 
         writeDebugLog("saveRecording() - Checking for visualizations...");
         // Check if any visualizations are enabled
@@ -925,9 +936,11 @@ void Engine::stopContinuousRecording() {
     fs::path data_dir = "engine/data/1_raw_recordings";
     fs::path recording_dir = data_dir / session_name;
     fs::path recording_dir_no_boxes = recording_dir / "no_boxes";
+    fs::path recording_dir_depth = recording_dir / "depth";
 
     try {
         fs::create_directories(recording_dir_no_boxes);
+        fs::create_directories(recording_dir_depth);
         
         // Start recording logger
         if (recording_logger_.start(recording_dir.string())) {
@@ -936,9 +949,17 @@ void Engine::stopContinuousRecording() {
         
         int frame_num = 0;
         for (const auto& rec_frame : frames_to_save) {
-            std::string filename = session_name + "_frame_" + std::to_string(frame_num++) + ".jpg";
+            // Save RGB frame
+            std::string filename = session_name + "_frame_" + std::to_string(frame_num) + ".jpg";
             fs::path filepath = recording_dir_no_boxes / filename;
             cv::imwrite(filepath.string(), rec_frame.frame);
+            
+            // Save depth frame as 16-bit PNG (preserves depth values)
+            std::string depth_filename = session_name + "_frame_" + std::to_string(frame_num) + "_depth.png";
+            fs::path depth_filepath = recording_dir_depth / depth_filename;
+            cv::imwrite(depth_filepath.string(), rec_frame.depth_frame);
+            
+            frame_num++;
             
             // Log frame data to recording.log
             if (recording_logger_.isActive()) {
@@ -955,7 +976,8 @@ void Engine::stopContinuousRecording() {
         // Close recording logger
         recording_logger_.close();
         
-        INFO_LOG("Saved ", frames_to_save.size(), " frames to ", recording_dir_no_boxes.string());
+        INFO_LOG("Saved ", frames_to_save.size(), " RGB frames to ", recording_dir_no_boxes.string());
+        INFO_LOG("Saved ", frames_to_save.size(), " depth frames to ", recording_dir_depth.string());
         writeDebugLog("stopContinuousRecording() - Saved " + std::to_string(frames_to_save.size()) + " frames without visualizations");
 
         // Check if any visualizations are enabled

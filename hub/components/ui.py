@@ -925,6 +925,20 @@ if PYQT_AVAILABLE:
                 self.engine_status.setText(f"🔧 Engine: {'Running' if status.engine_running else 'Stopped'}")
                 self.mode_status.setText(f"🎯 Mode: {status.mode}")
                 if status.error_message: print(f"❌ Error: {status.error_message}")
+                
+                # Update playback frame counter if in playback mode
+                if hasattr(status, 'playback_mode') and status.playback_mode:
+                    if hasattr(self, 'settings_widget') and self.settings_widget:
+                        if hasattr(self.settings_widget, 'playback_frame_label'):
+                            current_frame = status.playback_current_frame if hasattr(status, 'playback_current_frame') else 0
+                            total_frames = status.playback_total_frames if hasattr(status, 'playback_total_frames') else 0
+                            self.settings_widget.playback_frame_label.setText(f"Frame: {current_frame} / {total_frames}")
+                        
+                        # Enable/disable step buttons based on playback state
+                        if hasattr(self.settings_widget, 'playback_step_forward_button'):
+                            self.settings_widget.playback_step_forward_button.setEnabled(True)
+                        if hasattr(self.settings_widget, 'playback_step_back_button'):
+                            self.settings_widget.playback_step_back_button.setEnabled(True)
             
             self.hand_status.setText(f"👋 Hands: {len(frame_data.hands)}")
             self.imu_status.setText(f"📱 IMU: {len(frame_data.imu_data)} sensors")

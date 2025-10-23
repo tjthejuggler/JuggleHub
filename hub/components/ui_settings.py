@@ -1419,6 +1419,15 @@ if PYQT_AVAILABLE:
             self.fps_combo.setEnabled(not is_playback)
             self.camera_settings_combo.setEnabled(not is_playback)
             
+            if is_playback:
+                # Switching to playback mode - stop the camera
+                print("📺 Switching to Playback mode - stopping camera...")
+                self.stop_camera_feed()
+            else:
+                # Switching back to live camera mode - stop any active playback
+                print("📺 Switching to Live Camera mode - stopping playback...")
+                self.playback_stop()
+            
             print(f"📺 Input source changed to: {'Playback' if is_playback else 'Live Camera'}")
 
         def browse_playback_directory(self):
@@ -1476,7 +1485,7 @@ if PYQT_AVAILABLE:
             return os.path.isdir(no_boxes) and os.path.isdir(depth)
 
         def _load_playback_info(self, directory):
-            """Load recording info and update UI"""
+            """Load recording info and update UI, then load first frame"""
             import os
             import glob
             
@@ -1487,6 +1496,31 @@ if PYQT_AVAILABLE:
             
             self.playback_frame_label.setText(f"Frame: 0 / {frame_count}")
             print(f"📊 Recording contains {frame_count} frames")
+            
+            # Automatically start playback in paused mode to show first frame
+            print("🎬 Loading first frame from recording...")
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_START
+            command.playback_directory = directory
+            command.playback_speed = self.playback_speed_slider.value() / 100.0
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Playback loaded: {response.message}")
+                    # Immediately pause to show just the first frame
+                    pause_command = juggler_pb2.CommandRequest()
+                    pause_command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_PAUSE
+                    pause_response = self.zmq_client.send_command(pause_command)
+                    if pause_response.success:
+                        print("⏸ Playback paused on first frame")
+                        # Update UI to show paused state
+                        self.playback_play_pause_button.setChecked(False)
+                        self.playback_play_pause_button.setText("▶ Play")
+                else:
+                    print(f"❌ Failed to load playback: {response.message}")
+            except Exception as e:
+                print(f"❌ Error loading playback: {e}")
 
         def playback_start(self):
             """Start playback of selected recording"""

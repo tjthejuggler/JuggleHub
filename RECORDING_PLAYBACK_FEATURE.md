@@ -304,6 +304,13 @@ Potential improvements for future versions:
 
 ## Changelog
 
+### Version 1.0.1 (October 23, 2025)
+- **Bug Fix**: Camera now properly stops when switching to Recording Playback mode
+- **Bug Fix**: Playback now properly stops when switching back to Live Camera mode
+- **Enhancement**: First frame from selected recording is now automatically loaded and displayed when directory is selected
+- The video feed no longer continues from the camera when playback mode is selected
+- Playback starts in paused mode showing the first frame, ready for user to press Play
+
 ### Version 1.0 (October 23, 2025)
 - Initial implementation
 - Dual-mode input (live/playback)

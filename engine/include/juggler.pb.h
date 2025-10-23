@@ -263,12 +263,19 @@ enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_SET_TRACKER_TYPE = 17,
   CommandRequest_CommandType_SET_DEPTH_SENSOR_ENABLED = 18,
   CommandRequest_CommandType_RELOAD_COLOR_PROFILES = 19,
+  CommandRequest_CommandType_PLAYBACK_START = 23,
+  CommandRequest_CommandType_PLAYBACK_STOP = 24,
+  CommandRequest_CommandType_PLAYBACK_STEP_FORWARD = 25,
+  CommandRequest_CommandType_PLAYBACK_STEP_BACKWARD = 26,
+  CommandRequest_CommandType_PLAYBACK_SET_SPEED = 27,
+  CommandRequest_CommandType_PLAYBACK_PAUSE = 28,
+  CommandRequest_CommandType_PLAYBACK_RESUME = 29,
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool CommandRequest_CommandType_IsValid(int value);
 constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MIN = CommandRequest_CommandType_UNKNOWN;
-constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_RELOAD_COLOR_PROFILES;
+constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_PLAYBACK_RESUME;
 constexpr int CommandRequest_CommandType_CommandType_ARRAYSIZE = CommandRequest_CommandType_CommandType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor();
@@ -3065,11 +3072,17 @@ class SystemStatus final :
   enum : int {
     kModeFieldNumber = 5,
     kErrorMessageFieldNumber = 6,
+    kPlaybackDirectoryFieldNumber = 9,
+    kFpsFieldNumber = 3,
+    kFrameCountFieldNumber = 4,
     kCameraConnectedFieldNumber = 1,
     kEngineRunningFieldNumber = 2,
-    kFrameCountFieldNumber = 4,
-    kFpsFieldNumber = 3,
+    kPlaybackModeFieldNumber = 8,
+    kPlaybackPausedFieldNumber = 12,
     kTimestampUsFieldNumber = 7,
+    kPlaybackCurrentFrameFieldNumber = 10,
+    kPlaybackTotalFramesFieldNumber = 11,
+    kPlaybackSpeedFieldNumber = 13,
   };
   // string mode = 5;
   void clear_mode();
@@ -3099,6 +3112,38 @@ class SystemStatus final :
   std::string* _internal_mutable_error_message();
   public:
 
+  // string playback_directory = 9;
+  void clear_playback_directory();
+  const std::string& playback_directory() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_playback_directory(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_playback_directory();
+  PROTOBUF_NODISCARD std::string* release_playback_directory();
+  void set_allocated_playback_directory(std::string* playback_directory);
+  private:
+  const std::string& _internal_playback_directory() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_playback_directory(const std::string& value);
+  std::string* _internal_mutable_playback_directory();
+  public:
+
+  // double fps = 3;
+  void clear_fps();
+  double fps() const;
+  void set_fps(double value);
+  private:
+  double _internal_fps() const;
+  void _internal_set_fps(double value);
+  public:
+
+  // uint32 frame_count = 4;
+  void clear_frame_count();
+  uint32_t frame_count() const;
+  void set_frame_count(uint32_t value);
+  private:
+  uint32_t _internal_frame_count() const;
+  void _internal_set_frame_count(uint32_t value);
+  public:
+
   // bool camera_connected = 1;
   void clear_camera_connected();
   bool camera_connected() const;
@@ -3117,22 +3162,22 @@ class SystemStatus final :
   void _internal_set_engine_running(bool value);
   public:
 
-  // uint32 frame_count = 4;
-  void clear_frame_count();
-  uint32_t frame_count() const;
-  void set_frame_count(uint32_t value);
+  // bool playback_mode = 8;
+  void clear_playback_mode();
+  bool playback_mode() const;
+  void set_playback_mode(bool value);
   private:
-  uint32_t _internal_frame_count() const;
-  void _internal_set_frame_count(uint32_t value);
+  bool _internal_playback_mode() const;
+  void _internal_set_playback_mode(bool value);
   public:
 
-  // double fps = 3;
-  void clear_fps();
-  double fps() const;
-  void set_fps(double value);
+  // bool playback_paused = 12;
+  void clear_playback_paused();
+  bool playback_paused() const;
+  void set_playback_paused(bool value);
   private:
-  double _internal_fps() const;
-  void _internal_set_fps(double value);
+  bool _internal_playback_paused() const;
+  void _internal_set_playback_paused(bool value);
   public:
 
   // uint64 timestamp_us = 7;
@@ -3142,6 +3187,33 @@ class SystemStatus final :
   private:
   uint64_t _internal_timestamp_us() const;
   void _internal_set_timestamp_us(uint64_t value);
+  public:
+
+  // int32 playback_current_frame = 10;
+  void clear_playback_current_frame();
+  int32_t playback_current_frame() const;
+  void set_playback_current_frame(int32_t value);
+  private:
+  int32_t _internal_playback_current_frame() const;
+  void _internal_set_playback_current_frame(int32_t value);
+  public:
+
+  // int32 playback_total_frames = 11;
+  void clear_playback_total_frames();
+  int32_t playback_total_frames() const;
+  void set_playback_total_frames(int32_t value);
+  private:
+  int32_t _internal_playback_total_frames() const;
+  void _internal_set_playback_total_frames(int32_t value);
+  public:
+
+  // float playback_speed = 13;
+  void clear_playback_speed();
+  float playback_speed() const;
+  void set_playback_speed(float value);
+  private:
+  float _internal_playback_speed() const;
+  void _internal_set_playback_speed(float value);
   public:
 
   // @@protoc_insertion_point(class_scope:juggler.v1.SystemStatus)
@@ -3154,11 +3226,17 @@ class SystemStatus final :
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr mode_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_message_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr playback_directory_;
+    double fps_;
+    uint32_t frame_count_;
     bool camera_connected_;
     bool engine_running_;
-    uint32_t frame_count_;
-    double fps_;
+    bool playback_mode_;
+    bool playback_paused_;
     uint64_t timestamp_us_;
+    int32_t playback_current_frame_;
+    int32_t playback_total_frames_;
+    float playback_speed_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -5555,6 +5633,20 @@ class CommandRequest final :
     CommandRequest_CommandType_SET_DEPTH_SENSOR_ENABLED;
   static constexpr CommandType RELOAD_COLOR_PROFILES =
     CommandRequest_CommandType_RELOAD_COLOR_PROFILES;
+  static constexpr CommandType PLAYBACK_START =
+    CommandRequest_CommandType_PLAYBACK_START;
+  static constexpr CommandType PLAYBACK_STOP =
+    CommandRequest_CommandType_PLAYBACK_STOP;
+  static constexpr CommandType PLAYBACK_STEP_FORWARD =
+    CommandRequest_CommandType_PLAYBACK_STEP_FORWARD;
+  static constexpr CommandType PLAYBACK_STEP_BACKWARD =
+    CommandRequest_CommandType_PLAYBACK_STEP_BACKWARD;
+  static constexpr CommandType PLAYBACK_SET_SPEED =
+    CommandRequest_CommandType_PLAYBACK_SET_SPEED;
+  static constexpr CommandType PLAYBACK_PAUSE =
+    CommandRequest_CommandType_PLAYBACK_PAUSE;
+  static constexpr CommandType PLAYBACK_RESUME =
+    CommandRequest_CommandType_PLAYBACK_RESUME;
   static inline bool CommandType_IsValid(int value) {
     return CommandRequest_CommandType_IsValid(value);
   }
@@ -5589,6 +5681,7 @@ class CommandRequest final :
     kColorNameFieldNumber = 15,
     kFeatureNameFieldNumber = 18,
     kTrackerTypeFieldNumber = 21,
+    kPlaybackDirectoryFieldNumber = 30,
     kColorCommandFieldNumber = 4,
     kCalibrationPixelPosFieldNumber = 11,
     kVisualizationStatesFieldNumber = 19,
@@ -5604,6 +5697,8 @@ class CommandRequest final :
     kPoseModelEnabledFieldNumber = 14,
     kVideoFeedEnabledFieldNumber = 20,
     kDepthSensorEnabledFieldNumber = 22,
+    kPlaybackSpeedFieldNumber = 31,
+    kPlaybackFrameNumberFieldNumber = 32,
   };
   // map<string, string> module_args = 5;
   int module_args_size() const;
@@ -5690,6 +5785,20 @@ class CommandRequest final :
   const std::string& _internal_tracker_type() const;
   inline PROTOBUF_ALWAYS_INLINE void _internal_set_tracker_type(const std::string& value);
   std::string* _internal_mutable_tracker_type();
+  public:
+
+  // string playback_directory = 30;
+  void clear_playback_directory();
+  const std::string& playback_directory() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_playback_directory(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_playback_directory();
+  PROTOBUF_NODISCARD std::string* release_playback_directory();
+  void set_allocated_playback_directory(std::string* playback_directory);
+  private:
+  const std::string& _internal_playback_directory() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_playback_directory(const std::string& value);
+  std::string* _internal_mutable_playback_directory();
   public:
 
   // .juggler.v1.ColorCommand color_command = 4;
@@ -5854,6 +5963,24 @@ class CommandRequest final :
   void _internal_set_depth_sensor_enabled(bool value);
   public:
 
+  // float playback_speed = 31;
+  void clear_playback_speed();
+  float playback_speed() const;
+  void set_playback_speed(float value);
+  private:
+  float _internal_playback_speed() const;
+  void _internal_set_playback_speed(float value);
+  public:
+
+  // int32 playback_frame_number = 32;
+  void clear_playback_frame_number();
+  int32_t playback_frame_number() const;
+  void set_playback_frame_number(int32_t value);
+  private:
+  int32_t _internal_playback_frame_number() const;
+  void _internal_set_playback_frame_number(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.CommandRequest)
  private:
   class _Internal;
@@ -5872,6 +5999,7 @@ class CommandRequest final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr color_name_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr feature_name_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr tracker_type_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr playback_directory_;
     ::juggler::v1::ColorCommand* color_command_;
     ::juggler::v1::Vector2* calibration_pixel_pos_;
     ::juggler::v1::VisualizationStates* visualization_states_;
@@ -5887,6 +6015,8 @@ class CommandRequest final :
     bool pose_model_enabled_;
     bool video_feed_enabled_;
     bool depth_sensor_enabled_;
+    float playback_speed_;
+    int32_t playback_frame_number_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -9582,6 +9712,156 @@ inline void SystemStatus::set_timestamp_us(uint64_t value) {
   // @@protoc_insertion_point(field_set:juggler.v1.SystemStatus.timestamp_us)
 }
 
+// bool playback_mode = 8;
+inline void SystemStatus::clear_playback_mode() {
+  _impl_.playback_mode_ = false;
+}
+inline bool SystemStatus::_internal_playback_mode() const {
+  return _impl_.playback_mode_;
+}
+inline bool SystemStatus::playback_mode() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.SystemStatus.playback_mode)
+  return _internal_playback_mode();
+}
+inline void SystemStatus::_internal_set_playback_mode(bool value) {
+  
+  _impl_.playback_mode_ = value;
+}
+inline void SystemStatus::set_playback_mode(bool value) {
+  _internal_set_playback_mode(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.SystemStatus.playback_mode)
+}
+
+// string playback_directory = 9;
+inline void SystemStatus::clear_playback_directory() {
+  _impl_.playback_directory_.ClearToEmpty();
+}
+inline const std::string& SystemStatus::playback_directory() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.SystemStatus.playback_directory)
+  return _internal_playback_directory();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void SystemStatus::set_playback_directory(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.playback_directory_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.SystemStatus.playback_directory)
+}
+inline std::string* SystemStatus::mutable_playback_directory() {
+  std::string* _s = _internal_mutable_playback_directory();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.SystemStatus.playback_directory)
+  return _s;
+}
+inline const std::string& SystemStatus::_internal_playback_directory() const {
+  return _impl_.playback_directory_.Get();
+}
+inline void SystemStatus::_internal_set_playback_directory(const std::string& value) {
+  
+  _impl_.playback_directory_.Set(value, GetArenaForAllocation());
+}
+inline std::string* SystemStatus::_internal_mutable_playback_directory() {
+  
+  return _impl_.playback_directory_.Mutable(GetArenaForAllocation());
+}
+inline std::string* SystemStatus::release_playback_directory() {
+  // @@protoc_insertion_point(field_release:juggler.v1.SystemStatus.playback_directory)
+  return _impl_.playback_directory_.Release();
+}
+inline void SystemStatus::set_allocated_playback_directory(std::string* playback_directory) {
+  if (playback_directory != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.playback_directory_.SetAllocated(playback_directory, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.playback_directory_.IsDefault()) {
+    _impl_.playback_directory_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.SystemStatus.playback_directory)
+}
+
+// int32 playback_current_frame = 10;
+inline void SystemStatus::clear_playback_current_frame() {
+  _impl_.playback_current_frame_ = 0;
+}
+inline int32_t SystemStatus::_internal_playback_current_frame() const {
+  return _impl_.playback_current_frame_;
+}
+inline int32_t SystemStatus::playback_current_frame() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.SystemStatus.playback_current_frame)
+  return _internal_playback_current_frame();
+}
+inline void SystemStatus::_internal_set_playback_current_frame(int32_t value) {
+  
+  _impl_.playback_current_frame_ = value;
+}
+inline void SystemStatus::set_playback_current_frame(int32_t value) {
+  _internal_set_playback_current_frame(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.SystemStatus.playback_current_frame)
+}
+
+// int32 playback_total_frames = 11;
+inline void SystemStatus::clear_playback_total_frames() {
+  _impl_.playback_total_frames_ = 0;
+}
+inline int32_t SystemStatus::_internal_playback_total_frames() const {
+  return _impl_.playback_total_frames_;
+}
+inline int32_t SystemStatus::playback_total_frames() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.SystemStatus.playback_total_frames)
+  return _internal_playback_total_frames();
+}
+inline void SystemStatus::_internal_set_playback_total_frames(int32_t value) {
+  
+  _impl_.playback_total_frames_ = value;
+}
+inline void SystemStatus::set_playback_total_frames(int32_t value) {
+  _internal_set_playback_total_frames(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.SystemStatus.playback_total_frames)
+}
+
+// bool playback_paused = 12;
+inline void SystemStatus::clear_playback_paused() {
+  _impl_.playback_paused_ = false;
+}
+inline bool SystemStatus::_internal_playback_paused() const {
+  return _impl_.playback_paused_;
+}
+inline bool SystemStatus::playback_paused() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.SystemStatus.playback_paused)
+  return _internal_playback_paused();
+}
+inline void SystemStatus::_internal_set_playback_paused(bool value) {
+  
+  _impl_.playback_paused_ = value;
+}
+inline void SystemStatus::set_playback_paused(bool value) {
+  _internal_set_playback_paused(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.SystemStatus.playback_paused)
+}
+
+// float playback_speed = 13;
+inline void SystemStatus::clear_playback_speed() {
+  _impl_.playback_speed_ = 0;
+}
+inline float SystemStatus::_internal_playback_speed() const {
+  return _impl_.playback_speed_;
+}
+inline float SystemStatus::playback_speed() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.SystemStatus.playback_speed)
+  return _internal_playback_speed();
+}
+inline void SystemStatus::_internal_set_playback_speed(float value) {
+  
+  _impl_.playback_speed_ = value;
+}
+inline void SystemStatus::set_playback_speed(float value) {
+  _internal_set_playback_speed(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.SystemStatus.playback_speed)
+}
+
 // -------------------------------------------------------------------
 
 // TrajectoryPrediction
@@ -12891,6 +13171,96 @@ inline void CommandRequest::_internal_set_depth_sensor_enabled(bool value) {
 inline void CommandRequest::set_depth_sensor_enabled(bool value) {
   _internal_set_depth_sensor_enabled(value);
   // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.depth_sensor_enabled)
+}
+
+// string playback_directory = 30;
+inline void CommandRequest::clear_playback_directory() {
+  _impl_.playback_directory_.ClearToEmpty();
+}
+inline const std::string& CommandRequest::playback_directory() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.playback_directory)
+  return _internal_playback_directory();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void CommandRequest::set_playback_directory(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.playback_directory_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.playback_directory)
+}
+inline std::string* CommandRequest::mutable_playback_directory() {
+  std::string* _s = _internal_mutable_playback_directory();
+  // @@protoc_insertion_point(field_mutable:juggler.v1.CommandRequest.playback_directory)
+  return _s;
+}
+inline const std::string& CommandRequest::_internal_playback_directory() const {
+  return _impl_.playback_directory_.Get();
+}
+inline void CommandRequest::_internal_set_playback_directory(const std::string& value) {
+  
+  _impl_.playback_directory_.Set(value, GetArenaForAllocation());
+}
+inline std::string* CommandRequest::_internal_mutable_playback_directory() {
+  
+  return _impl_.playback_directory_.Mutable(GetArenaForAllocation());
+}
+inline std::string* CommandRequest::release_playback_directory() {
+  // @@protoc_insertion_point(field_release:juggler.v1.CommandRequest.playback_directory)
+  return _impl_.playback_directory_.Release();
+}
+inline void CommandRequest::set_allocated_playback_directory(std::string* playback_directory) {
+  if (playback_directory != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.playback_directory_.SetAllocated(playback_directory, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.playback_directory_.IsDefault()) {
+    _impl_.playback_directory_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:juggler.v1.CommandRequest.playback_directory)
+}
+
+// float playback_speed = 31;
+inline void CommandRequest::clear_playback_speed() {
+  _impl_.playback_speed_ = 0;
+}
+inline float CommandRequest::_internal_playback_speed() const {
+  return _impl_.playback_speed_;
+}
+inline float CommandRequest::playback_speed() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.playback_speed)
+  return _internal_playback_speed();
+}
+inline void CommandRequest::_internal_set_playback_speed(float value) {
+  
+  _impl_.playback_speed_ = value;
+}
+inline void CommandRequest::set_playback_speed(float value) {
+  _internal_set_playback_speed(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.playback_speed)
+}
+
+// int32 playback_frame_number = 32;
+inline void CommandRequest::clear_playback_frame_number() {
+  _impl_.playback_frame_number_ = 0;
+}
+inline int32_t CommandRequest::_internal_playback_frame_number() const {
+  return _impl_.playback_frame_number_;
+}
+inline int32_t CommandRequest::playback_frame_number() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.CommandRequest.playback_frame_number)
+  return _internal_playback_frame_number();
+}
+inline void CommandRequest::_internal_set_playback_frame_number(int32_t value) {
+  
+  _impl_.playback_frame_number_ = value;
+}
+inline void CommandRequest::set_playback_frame_number(int32_t value) {
+  _internal_set_playback_frame_number(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.CommandRequest.playback_frame_number)
 }
 
 // -------------------------------------------------------------------

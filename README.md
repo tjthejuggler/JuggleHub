@@ -2,9 +2,22 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-23 09:34 CEST
+**Last Updated:** 2025-10-23 10:05 CEST
 
 **Recent Changes (2025-10-23):**
+- **🎬 RECORDING PLAYBACK FEATURE - COMPLETE ✅**
+  - **New Feature**: Replay previously recorded juggling sessions instead of using live camera
+  - **Dual Input Modes**: Seamlessly switch between live camera and recorded playback
+  - **Playback Controls**: Play, pause, stop, and frame-by-frame stepping
+  - **Variable Speed**: Adjust playback speed from 0.1x to 2.0x
+  - **Frame Counter**: Real-time display of current frame / total frames
+  - **Automatic Looping**: Recordings loop automatically when reaching the end
+  - **Full Tracking Support**: All tracking systems work identically with playback
+  - **RGB + Depth Sync**: Synchronized loading of color and depth frames
+  - **Implementation**: [`engine/include/PlaybackManager.hpp`](engine/include/PlaybackManager.hpp:1), [`engine/src/Engine.cpp`](engine/src/Engine.cpp:703-756), [`hub/components/ui_settings_common.py`](hub/components/ui_settings_common.py:140-273)
+  - **Documentation**: See [`RECORDING_PLAYBACK_FEATURE.md`](RECORDING_PLAYBACK_FEATURE.md:1) for complete user guide and technical details
+  - **Use Cases**: Debugging, algorithm development, performance testing, demonstrations, and training data analysis
+
 - **📹 DEPTH DATA RECORDING - COMPLETE ✅**
   - **New Feature**: Recording system now saves depth frames alongside RGB frames
   - **Depth Folder**: Depth data saved as 16-bit PNG files in separate `depth/` folder

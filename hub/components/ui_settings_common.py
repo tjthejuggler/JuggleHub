@@ -139,6 +139,163 @@ class CommonSettingsSections:
         )
         camera_layout.addWidget(self.parent.tracking_system_combo, 7, 1)
         
+        # ========== PLAYBACK MODE SECTION ==========
+        row = 8  # Adjust based on current row count
+
+        # Separator
+        separator = QLabel("─" * 50)
+        separator.setStyleSheet("color: #555555;")
+        camera_layout.addWidget(separator, row, 0, 1, 2)
+        row += 1
+
+        # Input source selection
+        camera_layout.addWidget(QLabel("Input Source:"), row, 0)
+        self.parent.input_source_combo = QComboBox()
+        self.parent.input_source_combo.addItem("🎥 Live Camera", "live")
+        self.parent.input_source_combo.addItem("📁 Recording Playback", "playback")
+        self.parent.input_source_combo.currentIndexChanged.connect(
+            self.parent.on_input_source_changed)
+        self.parent.input_source_combo.setToolTip(
+            "Select input source:\n"
+            "• Live Camera: Use RealSense camera feed\n"
+            "• Recording Playback: Play back a recorded session"
+        )
+        camera_layout.addWidget(self.parent.input_source_combo, row, 1)
+        row += 1
+
+        # Playback directory selection (initially hidden)
+        self.parent.playback_dir_label = QLabel("Recording Directory:")
+        self.parent.playback_dir_label.setVisible(False)
+        camera_layout.addWidget(self.parent.playback_dir_label, row, 0)
+
+        from PyQt6.QtWidgets import QHBoxLayout
+        playback_dir_layout = QHBoxLayout()
+        self.parent.playback_dir_display = QLabel("No directory selected")
+        self.parent.playback_dir_display.setStyleSheet(
+            "background-color: #1e1e1e; padding: 5px; border-radius: 3px; color: #888888;")
+        self.parent.playback_dir_display.setVisible(False)
+        playback_dir_layout.addWidget(self.parent.playback_dir_display)
+
+        self.parent.playback_browse_button = QPushButton("Browse...")
+        self.parent.playback_browse_button.clicked.connect(
+            self.parent.browse_playback_directory)
+        self.parent.playback_browse_button.setVisible(False)
+        self.parent.playback_browse_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        playback_dir_layout.addWidget(self.parent.playback_browse_button)
+
+        camera_layout.addLayout(playback_dir_layout, row, 1)
+        row += 1
+
+        # Playback controls container (initially hidden)
+        from PyQt6.QtWidgets import QWidget, QSlider
+        self.parent.playback_controls_widget = QWidget()
+        playback_controls_layout = QGridLayout()
+        self.parent.playback_controls_widget.setLayout(playback_controls_layout)
+        self.parent.playback_controls_widget.setVisible(False)
+        self.parent.playback_controls_widget.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e1e;
+                border-radius: 5px;
+                padding: 5px;
+            }
+        """)
+
+        # Frame info label
+        self.parent.playback_frame_label = QLabel("Frame: 0 / 0")
+        self.parent.playback_frame_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        playback_controls_layout.addWidget(self.parent.playback_frame_label, 0, 0, 1, 4)
+
+        # Control buttons row
+        self.parent.playback_step_back_button = QPushButton("◀ Step Back")
+        self.parent.playback_step_back_button.clicked.connect(
+            self.parent.playback_step_backward)
+        self.parent.playback_step_back_button.setStyleSheet("""
+            QPushButton {
+                background-color: #555555;
+                color: white;
+                padding: 5px;
+                border-radius: 3px;
+            }
+            QPushButton:hover { background-color: #666666; }
+        """)
+        playback_controls_layout.addWidget(self.parent.playback_step_back_button, 1, 0)
+
+        self.parent.playback_play_pause_button = QPushButton("▶ Play")
+        self.parent.playback_play_pause_button.setCheckable(True)
+        self.parent.playback_play_pause_button.clicked.connect(
+            self.parent.playback_toggle_play_pause)
+        self.parent.playback_play_pause_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 5px;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:checked {
+                background-color: #f44336;
+            }
+            QPushButton:checked:hover {
+                background-color: #da190b;
+            }
+        """)
+        playback_controls_layout.addWidget(self.parent.playback_play_pause_button, 1, 1)
+
+        self.parent.playback_step_forward_button = QPushButton("Step Forward ▶")
+        self.parent.playback_step_forward_button.clicked.connect(
+            self.parent.playback_step_forward)
+        self.parent.playback_step_forward_button.setStyleSheet("""
+            QPushButton {
+                background-color: #555555;
+                color: white;
+                padding: 5px;
+                border-radius: 3px;
+            }
+            QPushButton:hover { background-color: #666666; }
+        """)
+        playback_controls_layout.addWidget(self.parent.playback_step_forward_button, 1, 2)
+
+        self.parent.playback_stop_button = QPushButton("⏹ Stop")
+        self.parent.playback_stop_button.clicked.connect(
+            self.parent.playback_stop)
+        self.parent.playback_stop_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 5px;
+                border-radius: 3px;
+            }
+            QPushButton:hover { background-color: #da190b; }
+        """)
+        playback_controls_layout.addWidget(self.parent.playback_stop_button, 1, 3)
+
+        # Speed control row
+        playback_controls_layout.addWidget(QLabel("Speed:"), 2, 0)
+        self.parent.playback_speed_slider = QSlider(Qt.Orientation.Horizontal)
+        self.parent.playback_speed_slider.setRange(10, 200)  # 0.1x to 2.0x
+        self.parent.playback_speed_slider.setValue(100)  # 1.0x default
+        self.parent.playback_speed_slider.valueChanged.connect(
+            self.parent.on_playback_speed_changed)
+        playback_controls_layout.addWidget(self.parent.playback_speed_slider, 2, 1, 1, 2)
+
+        self.parent.playback_speed_label = QLabel("1.0x")
+        self.parent.playback_speed_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        playback_controls_layout.addWidget(self.parent.playback_speed_label, 2, 3)
+
+        camera_layout.addWidget(self.parent.playback_controls_widget, row, 0, 1, 2)
+        row += 1
+        
         return section
     
     def create_yolo_section(self):

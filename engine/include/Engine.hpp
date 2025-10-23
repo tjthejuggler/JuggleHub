@@ -8,6 +8,7 @@
 #include "SimpleBallTracker.hpp" // Include the simplified ball tracker
 #include "Simple2DBallTracker.hpp" // Include the 2D-only ball tracker
 #include "New3DTracker.hpp" // Include the new 3D tracker
+#include "PlaybackManager.hpp" // Include playback manager
 #include "RecordingLogger.hpp" // Include recording logger
 #include "json.hpp" // Include nlohmann/json
 #include <memory>
@@ -152,6 +153,20 @@ private:
     
     // Recording logger for detailed frame-by-frame tracking data
     RecordingLogger recording_logger_;
+    
+    // Playback mode
+    std::unique_ptr<PlaybackManager> playback_manager_;
+    std::atomic<bool> playback_mode_;
+    std::chrono::steady_clock::time_point last_playback_frame_time_;
+    
+    // Playback control methods
+    void startPlayback(const std::string& recording_dir);
+    void stopPlayback();
+    void stepPlaybackForward();
+    void stepPlaybackBackward();
+    void setPlaybackSpeed(float speed);
+    void pausePlayback();
+    void resumePlayback();
     
     // Helper function to render visualizations on a frame
     cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame, const RecordingFrame& rec_frame);

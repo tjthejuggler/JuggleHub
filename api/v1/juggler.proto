@@ -137,6 +137,14 @@ message SystemStatus {
   string mode = 5;                  // Current mode (live, playback, etc.)
   string error_message = 6;         // Error message if any
   uint64 timestamp_us = 7;          // Status timestamp
+  
+  // Playback state
+  bool playback_mode = 8;            // Whether in playback mode
+  string playback_directory = 9;     // Current playback directory
+  int32 playback_current_frame = 10; // Current frame number
+  int32 playback_total_frames = 11;  // Total frames in recording
+  bool playback_paused = 12;         // Whether playback is paused
+  float playback_speed = 13;         // Current playback speed
 }
 
 // STEP 2: Trajectory Predictions - Physics-based predicted positions
@@ -270,6 +278,13 @@ message CommandRequest {
     SET_TRACKER_TYPE = 17; // Switch between tracking system implementations
     SET_DEPTH_SENSOR_ENABLED = 18; // Enable or disable the RealSense depth sensor
     RELOAD_COLOR_PROFILES = 19; // Reload color profiles from settings file (New3D tracker)
+    PLAYBACK_START = 23;           // Start playback mode
+    PLAYBACK_STOP = 24;            // Stop playback and return to live
+    PLAYBACK_STEP_FORWARD = 25;    // Step one frame forward
+    PLAYBACK_STEP_BACKWARD = 26;   // Step one frame backward
+    PLAYBACK_SET_SPEED = 27;       // Set playback speed
+    PLAYBACK_PAUSE = 28;           // Pause automatic playback
+    PLAYBACK_RESUME = 29;          // Resume automatic playback
   }
   
   CommandType type = 1;
@@ -308,6 +323,11 @@ message CommandRequest {
   
   // For SET_DEPTH_SENSOR_ENABLED
   bool depth_sensor_enabled = 22;   // Whether to enable the depth sensor
+  
+  // For playback commands
+  string playback_directory = 30;    // Path to recording directory
+  float playback_speed = 31;         // Playback speed multiplier (0.1 to 2.0)
+  int32 playback_frame_number = 32;  // Specific frame to jump to
 }
 
 // Visualization states for recording with overlays

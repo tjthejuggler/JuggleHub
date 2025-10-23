@@ -1398,4 +1398,224 @@ if PYQT_AVAILABLE:
             """Send 2D tracker-specific settings to engine"""
             # Currently no 2D-specific settings
             # This method is a placeholder for future 2D tracker settings
+
+        # ========== PLAYBACK MODE METHODS ==========
+
+        def on_input_source_changed(self):
+            """Handle input source change between live and playback"""
+            source = self.input_source_combo.currentData()
+            is_playback = (source == "playback")
+            
+            # Show/hide playback controls
+            self.playback_dir_label.setVisible(is_playback)
+            self.playback_dir_display.setVisible(is_playback)
+            self.playback_browse_button.setVisible(is_playback)
+            self.playback_controls_widget.setVisible(is_playback)
+            
+            # Disable live camera controls in playback mode
+            self.start_camera_button.setEnabled(not is_playback)
+            self.stop_camera_button.setEnabled(not is_playback)
+            self.resolution_combo.setEnabled(not is_playback)
+            self.fps_combo.setEnabled(not is_playback)
+            self.camera_settings_combo.setEnabled(not is_playback)
+            
+            print(f"📺 Input source changed to: {'Playback' if is_playback else 'Live Camera'}")
+
+        def browse_playback_directory(self):
+            """Open file dialog to select recording directory"""
+            from PyQt6.QtWidgets import QFileDialog
+            import os
+            
+            # Get project root (parent of hub directory)
+            # __file__ is hub/components/ui_settings.py
+            # First dirname: hub/components
+            # Second dirname: hub
+            # Third dirname: project root
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            recordings_dir = os.path.join(project_root, "engine", "data", "1_raw_recordings")
+            
+            # Ensure directory exists
+            if not os.path.exists(recordings_dir):
+                QMessageBox.warning(
+                    self,
+                    "Directory Not Found",
+                    f"Recordings directory not found:\n{recordings_dir}"
+                )
+                return
+            
+            directory = QFileDialog.getExistingDirectory(
+                self,
+                "Select Recording Directory",
+                recordings_dir,
+                QFileDialog.Option.ShowDirsOnly
+            )
+            
+            if directory:
+                # Verify it's a valid recording directory
+                if self._validate_recording_directory(directory):
+                    session_name = os.path.basename(directory)
+                    self.playback_dir_display.setText(session_name)
+                    self.playback_dir_display.setStyleSheet(
+                        "background-color: #1e1e1e; padding: 5px; border-radius: 3px; color: #4CAF50;")
+                    self.current_playback_directory = directory
+                    self._load_playback_info(directory)
+                    print(f"✅ Selected recording: {session_name}")
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Recording",
+                        "Selected directory is not a valid recording.\n"
+                        "Must contain 'no_boxes' and 'depth' subdirectories."
+                    )
+
+        def _validate_recording_directory(self, directory):
+            """Check if directory contains required recording structure"""
+            import os
+            no_boxes = os.path.join(directory, "no_boxes")
+            depth = os.path.join(directory, "depth")
+            return os.path.isdir(no_boxes) and os.path.isdir(depth)
+
+        def _load_playback_info(self, directory):
+            """Load recording info and update UI"""
+            import os
+            import glob
+            
+            # Count frames
+            no_boxes_dir = os.path.join(directory, "no_boxes")
+            rgb_frames = glob.glob(os.path.join(no_boxes_dir, "*.jpg"))
+            frame_count = len(rgb_frames)
+            
+            self.playback_frame_label.setText(f"Frame: 0 / {frame_count}")
+            print(f"📊 Recording contains {frame_count} frames")
+
+        def playback_start(self):
+            """Start playback of selected recording"""
+            if not hasattr(self, 'current_playback_directory'):
+                QMessageBox.warning(self, "No Recording", 
+                                  "Please select a recording directory first.")
+                return
+            
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_START
+            command.playback_directory = self.current_playback_directory
+            command.playback_speed = self.playback_speed_slider.value() / 100.0
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Playback started: {response.message}")
+                    self.playback_play_pause_button.setChecked(True)
+                    self.playback_play_pause_button.setText("⏸ Pause")
+                else:
+                    print(f"❌ Failed to start playback: {response.message}")
+                    QMessageBox.critical(self, "Error", 
+                                       f"Failed to start playback:\n{response.message}")
+            except Exception as e:
+                print(f"❌ Error starting playback: {e}")
+                QMessageBox.critical(self, "Error", f"Error starting playback:\n{str(e)}")
+
+        def playback_stop(self):
+            """Stop playback and return to live mode"""
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_STOP
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print("✅ Playback stopped")
+                    self.playback_play_pause_button.setChecked(False)
+                    self.playback_play_pause_button.setText("▶ Play")
+                    self.playback_frame_label.setText("Frame: 0 / 0")
+                else:
+                    print(f"❌ Failed to stop playback: {response.message}")
+            except Exception as e:
+                print(f"❌ Error stopping playback: {e}")
+
+        def playback_toggle_play_pause(self):
+            """Toggle between play and pause"""
+            is_playing = self.playback_play_pause_button.isChecked()
+            
+            if is_playing:
+                # Start or resume playback
+                if not hasattr(self, 'current_playback_directory'):
+                    QMessageBox.warning(self, "No Recording",
+                                      "Please select a recording directory first.")
+                    self.playback_play_pause_button.setChecked(False)
+                    return
+                
+                # Check if we need to start fresh or just resume
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_RESUME
+                command.playback_directory = self.current_playback_directory
+                command.playback_speed = self.playback_speed_slider.value() / 100.0
+                
+                try:
+                    response = self.zmq_client.send_command(command)
+                    if response.success:
+                        self.playback_play_pause_button.setText("⏸ Pause")
+                        print("▶ Playback resumed")
+                    else:
+                        # Try starting fresh
+                        self.playback_start()
+                except Exception as e:
+                    print(f"❌ Error resuming playback: {e}")
+                    self.playback_play_pause_button.setChecked(False)
+            else:
+                # Pause playback
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_PAUSE
+                
+                try:
+                    response = self.zmq_client.send_command(command)
+                    if response.success:
+                        self.playback_play_pause_button.setText("▶ Play")
+                        print("⏸ Playback paused")
+                except Exception as e:
+                    print(f"❌ Error pausing playback: {e}")
+
+        def playback_step_forward(self):
+            """Step one frame forward"""
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_STEP_FORWARD
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print("▶ Stepped forward one frame")
+                    # Ensure play button shows play state when stepping
+                    self.playback_play_pause_button.setChecked(False)
+                    self.playback_play_pause_button.setText("▶ Play")
+            except Exception as e:
+                print(f"❌ Error stepping forward: {e}")
+
+        def playback_step_backward(self):
+            """Step one frame backward"""
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_STEP_BACKWARD
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print("◀ Stepped backward one frame")
+                    # Ensure play button shows play state when stepping
+                    self.playback_play_pause_button.setChecked(False)
+                    self.playback_play_pause_button.setText("▶ Play")
+            except Exception as e:
+                print(f"❌ Error stepping backward: {e}")
+
+        def on_playback_speed_changed(self, value):
+            """Handle playback speed slider change"""
+            speed = value / 100.0
+            self.playback_speed_label.setText(f"{speed:.1f}x")
+            
+            # Send speed change command if playback is active
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.PLAYBACK_SET_SPEED
+            command.playback_speed = speed
+            
+            try:
+                self.zmq_client.send_command(command)
+                print(f"⚡ Playback speed set to {speed:.1f}x")
+            except Exception as e:
+                print(f"❌ Error setting playback speed: {e}")
             pass

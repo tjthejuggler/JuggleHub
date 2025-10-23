@@ -41,7 +41,9 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
       frame_counter_(0),
       continuous_recording_(false),
       record_with_yolo_boxes_(false),
-      video_feed_enabled_(true) {  // Start with video feed enabled by default
+      video_feed_enabled_(true),  // Start with video feed enabled by default
+      playback_manager_(std::make_unique<PlaybackManager>()),
+      playback_mode_(false) {
    writeDebugLog("Engine constructor: Initializing...");
    
    // Bind ZMQ sockets
@@ -119,51 +121,92 @@ void Engine::run() {
             writeDebugLog("Engine::run() - Main loop iteration: " + std::to_string(loop_iteration));
         }
         
-        // Skip frame processing if camera is stopped
-        if (!camera_running_) {
-            if (loop_iteration % 30 == 0) {
-                writeDebugLog("Engine::run() - Camera not running, sleeping...");
+        cv::Mat color_image, depth_image;
+        bool frame_acquired = false;
+        
+        // ========== PLAYBACK MODE OR LIVE CAMERA MODE ==========
+        if (playback_mode_ && playback_manager_->isLoaded()) {
+            // PLAYBACK MODE
+            if (!playback_manager_->isPaused()) {
+                // Calculate frame timing based on playback speed
+                auto now = std::chrono::steady_clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - last_playback_frame_time_).count();
+                
+                // Target frame time based on camera FPS and playback speed
+                float target_frame_time = (1000.0f / camera_fps_) / playback_manager_->getSpeed();
+                
+                if (elapsed >= target_frame_time) {
+                    // Time for next frame
+                    if (playback_manager_->getNextFrame(color_image, depth_image)) {
+                        frame_acquired = true;
+                        last_playback_frame_time_ = now;
+                        
+                        writeDebugLog("Playback frame " +
+                                    std::to_string(playback_manager_->getCurrentFrameNumber() - 1) +
+                                    " / " + std::to_string(playback_manager_->getTotalFrames()));
+                    } else {
+                        // End of recording - loop back to beginning
+                        INFO_LOG("End of playback reached, looping to beginning");
+                        playback_manager_->reset();
+                        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                        continue;
+                    }
+                } else {
+                    // Not time for next frame yet
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    continue;
+                }
+            } else {
+                // Paused - just wait
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        } else if (camera_running_) {
+            // LIVE CAMERA MODE (existing code)
+            try {
+                rs2::frameset frames = pipe_.wait_for_frames(5000);
+                
+                // Align depth to color
+                rs2::frameset aligned_frames = align_to_color_.process(frames);
+                
+                rs2::video_frame color_frame = aligned_frames.get_color_frame();
+                rs2::depth_frame depth_frame = aligned_frames.get_depth_frame();
+                
+                if (!color_frame || !depth_frame) {
+                    continue;
+                }
+                
+                // Convert to OpenCV Mat
+                color_image = cv::Mat(cv::Size(color_frame.get_width(), color_frame.get_height()),
+                                     CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
+                
+                depth_image = cv::Mat(cv::Size(depth_frame.get_width(), depth_frame.get_height()),
+                                     CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
+                
+                frame_acquired = true;
+                
+            } catch (const rs2::error& e) {
+                ERROR_LOG("RealSense error: ", e.what());
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+        } else {
+            // Neither playback nor camera running
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
-
-        rs2::frameset frames;
-        try {
-            if (loop_iteration % 30 == 0) {
-                writeDebugLog("Engine::run() - Waiting for frames...");
-            }
-            frames = pipe_.wait_for_frames(1000); // 1 second timeout
-            if (loop_iteration % 30 == 0) {
-                writeDebugLog("Engine::run() - Frames received");
-            }
-        } catch (const rs2::error& e) {
-            writeDebugLog("Engine::run() - RealSense error: " + std::string(e.what()));
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        
+        // ========== PROCESS FRAME (same for both modes) ==========
+        if (!frame_acquired || color_image.empty()) {
             continue;
         }
-
-        if (loop_iteration % 30 == 0) {
-            writeDebugLog("Engine::run() - Aligning frames...");
-        }
-        auto aligned_frames = align_to_color_.process(frames);
-        auto color_frame = aligned_frames.get_color_frame();
-        auto depth_frame = aligned_frames.get_depth_frame();
-
-        if (!color_frame || !depth_frame) {
-            if (loop_iteration % 30 == 0) {
-                writeDebugLog("Engine::run() - Missing color or depth frame, skipping...");
-            }
-            continue;
-        }
-
-        if (loop_iteration % 30 == 0) {
-            writeDebugLog("Engine::run() - Creating cv::Mat from frames...");
-        }
-        cv::Mat color_image(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void*)color_frame.get_data(), cv::Mat::AUTO_STEP);
-        cv::Mat depth_image(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
-        last_depth_frame_ = depth_image.clone();
+        
+        // Cache frames for calibration
         last_color_frame_ = color_image.clone();
+        if (!depth_image.empty()) {
+            last_depth_frame_ = depth_image.clone();
+        }
         
         // This block will be updated later to include detections
         
@@ -171,6 +214,28 @@ void Engine::run() {
         frame_data.set_timestamp_us(std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count());
         frame_data.set_frame_number(frame_counter_++);
+
+        // Populate SystemStatus with mode and playback information
+        auto* status = frame_data.mutable_status();
+        status->set_camera_connected(camera_running_);
+        status->set_engine_running(running_);
+        status->set_frame_count(frame_counter_);
+        status->set_timestamp_us(std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
+        
+        // Set mode based on current state
+        if (playback_mode_ && playback_manager_->isLoaded()) {
+            status->set_mode("playback");
+            status->set_playback_mode(true);
+            status->set_playback_directory(playback_manager_->getRecordingDirectory());
+            status->set_playback_current_frame(playback_manager_->getCurrentFrameNumber());
+            status->set_playback_total_frames(playback_manager_->getTotalFrames());
+            status->set_playback_paused(playback_manager_->isPaused());
+            status->set_playback_speed(playback_manager_->getSpeed());
+        } else {
+            status->set_mode("live");
+            status->set_playback_mode(false);
+        }
 
         // Only encode JPG if video feed is enabled (FPS optimization)
         if (video_feed_enabled_) {
@@ -699,6 +764,56 @@ void Engine::processCommands() {
                         response.set_message("Color profile reload only supported for New3D tracker (current: " + current_tracker_type_ + ")");
                     }
                     break;
+                case juggler::v1::CommandRequest::PLAYBACK_START:
+                    writeDebugLog("processCommands() - PLAYBACK_START command received");
+                    startPlayback(command.playback_directory());
+                    if (command.playback_speed() > 0.0f) {
+                        setPlaybackSpeed(command.playback_speed());
+                    }
+                    response.set_message("Playback started");
+                    break;
+
+                case juggler::v1::CommandRequest::PLAYBACK_STOP:
+                    writeDebugLog("processCommands() - PLAYBACK_STOP command received");
+                    stopPlayback();
+                    response.set_message("Playback stopped");
+                    break;
+
+                case juggler::v1::CommandRequest::PLAYBACK_STEP_FORWARD:
+                    writeDebugLog("processCommands() - PLAYBACK_STEP_FORWARD command received");
+                    stepPlaybackForward();
+                    response.set_message("Stepped forward one frame");
+                    break;
+
+                case juggler::v1::CommandRequest::PLAYBACK_STEP_BACKWARD:
+                    writeDebugLog("processCommands() - PLAYBACK_STEP_BACKWARD command received");
+                    stepPlaybackBackward();
+                    response.set_message("Stepped backward one frame");
+                    break;
+
+                case juggler::v1::CommandRequest::PLAYBACK_SET_SPEED:
+                    writeDebugLog("processCommands() - PLAYBACK_SET_SPEED command received");
+                    if (command.playback_speed() > 0.0f) {
+                        setPlaybackSpeed(command.playback_speed());
+                        response.set_message("Playback speed set to " + std::to_string(command.playback_speed()) + "x");
+                    } else {
+                        response.set_success(false);
+                        response.set_message("Missing playback_speed parameter");
+                    }
+                    break;
+
+                case juggler::v1::CommandRequest::PLAYBACK_PAUSE:
+                    writeDebugLog("processCommands() - PLAYBACK_PAUSE command received");
+                    pausePlayback();
+                    response.set_message("Playback paused");
+                    break;
+
+                case juggler::v1::CommandRequest::PLAYBACK_RESUME:
+                    writeDebugLog("processCommands() - PLAYBACK_RESUME command received");
+                    resumePlayback();
+                    response.set_message("Playback resumed");
+                    break;
+
                 default:
                     response.set_success(false);
                     response.set_message("Unknown command");
@@ -2295,4 +2410,102 @@ void Engine::setTrackerType(const std::string& tracker_type) {
     }
     
     INFO_LOG("Tracker switched to: ", tracker_type);
+}
+
+void Engine::startPlayback(const std::string& recording_dir) {
+    writeDebugLog("startPlayback() - Starting playback from: " + recording_dir);
+    
+    // Stop camera if running
+    if (camera_running_) {
+        writeDebugLog("startPlayback() - Stopping camera first");
+        stopCamera();
+    }
+    
+    // Load recording
+    if (!playback_manager_->loadRecording(recording_dir)) {
+        ERROR_LOG("Failed to load recording: ", recording_dir);
+        return;
+    }
+    
+    // Enter playback mode
+    playback_mode_ = true;
+    last_playback_frame_time_ = std::chrono::steady_clock::now();
+    
+    INFO_LOG("✅ Playback started: ", playback_manager_->getSessionName(),
+             " (", playback_manager_->getTotalFrames(), " frames)");
+}
+
+void Engine::stopPlayback() {
+    writeDebugLog("stopPlayback() - Stopping playback");
+    
+    if (!playback_mode_) {
+        writeDebugLog("stopPlayback() - Not in playback mode");
+        return;
+    }
+    
+    // Exit playback mode
+    playback_mode_ = false;
+    playback_manager_->unload();
+    
+    INFO_LOG("✅ Playback stopped");
+}
+
+void Engine::stepPlaybackForward() {
+    if (!playback_mode_ || !playback_manager_->isLoaded()) {
+        WARN_LOG("stepPlaybackForward() - Not in playback mode or no recording loaded");
+        return;
+    }
+    
+    // Pause automatic playback
+    playback_manager_->setPaused(true);
+    
+    // This will be handled in the main loop by getting the next frame
+    writeDebugLog("stepPlaybackForward() - Stepping forward");
+}
+
+void Engine::stepPlaybackBackward() {
+    if (!playback_mode_ || !playback_manager_->isLoaded()) {
+        WARN_LOG("stepPlaybackBackward() - Not in playback mode or no recording loaded");
+        return;
+    }
+    
+    // Pause automatic playback
+    playback_manager_->setPaused(true);
+    
+    // Get previous frame
+    cv::Mat rgb_frame, depth_frame;
+    if (playback_manager_->getPreviousFrame(rgb_frame, depth_frame)) {
+        writeDebugLog("stepPlaybackBackward() - Stepped to frame " +
+                     std::to_string(playback_manager_->getCurrentFrameNumber()));
+    } else {
+        WARN_LOG("stepPlaybackBackward() - Already at beginning");
+    }
+}
+
+void Engine::setPlaybackSpeed(float speed) {
+    if (!playback_manager_) {
+        return;
+    }
+    
+    playback_manager_->setSpeed(speed);
+    INFO_LOG("Playback speed set to ", speed, "x");
+}
+
+void Engine::pausePlayback() {
+    if (!playback_mode_ || !playback_manager_->isLoaded()) {
+        return;
+    }
+    
+    playback_manager_->setPaused(true);
+    INFO_LOG("Playback paused at frame ", playback_manager_->getCurrentFrameNumber());
+}
+
+void Engine::resumePlayback() {
+    if (!playback_mode_ || !playback_manager_->isLoaded()) {
+        return;
+    }
+    
+    playback_manager_->setPaused(false);
+    last_playback_frame_time_ = std::chrono::steady_clock::now();
+    INFO_LOG("Playback resumed from frame ", playback_manager_->getCurrentFrameNumber());
 }

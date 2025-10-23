@@ -238,11 +238,17 @@ PROTOBUF_CONSTEXPR SystemStatus::SystemStatus(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.mode_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.error_message_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.playback_directory_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.fps_)*/0
+  , /*decltype(_impl_.frame_count_)*/0u
   , /*decltype(_impl_.camera_connected_)*/false
   , /*decltype(_impl_.engine_running_)*/false
-  , /*decltype(_impl_.frame_count_)*/0u
-  , /*decltype(_impl_.fps_)*/0
+  , /*decltype(_impl_.playback_mode_)*/false
+  , /*decltype(_impl_.playback_paused_)*/false
   , /*decltype(_impl_.timestamp_us_)*/uint64_t{0u}
+  , /*decltype(_impl_.playback_current_frame_)*/0
+  , /*decltype(_impl_.playback_total_frames_)*/0
+  , /*decltype(_impl_.playback_speed_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct SystemStatusDefaultTypeInternal {
   PROTOBUF_CONSTEXPR SystemStatusDefaultTypeInternal()
@@ -441,6 +447,7 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.color_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.feature_name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.tracker_type_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.playback_directory_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.color_command_)*/nullptr
   , /*decltype(_impl_.calibration_pixel_pos_)*/nullptr
   , /*decltype(_impl_.visualization_states_)*/nullptr
@@ -456,6 +463,8 @@ PROTOBUF_CONSTEXPR CommandRequest::CommandRequest(
   , /*decltype(_impl_.pose_model_enabled_)*/false
   , /*decltype(_impl_.video_feed_enabled_)*/false
   , /*decltype(_impl_.depth_sensor_enabled_)*/false
+  , /*decltype(_impl_.playback_speed_)*/0
+  , /*decltype(_impl_.playback_frame_number_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct CommandRequestDefaultTypeInternal {
   PROTOBUF_CONSTEXPR CommandRequestDefaultTypeInternal()
@@ -683,6 +692,12 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.mode_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.error_message_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.timestamp_us_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.playback_mode_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.playback_directory_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.playback_current_frame_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.playback_total_frames_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.playback_paused_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::SystemStatus, _impl_.playback_speed_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::TrajectoryPrediction, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -835,6 +850,9 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.video_feed_enabled_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.tracker_type_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.depth_sensor_enabled_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.playback_directory_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.playback_speed_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::CommandRequest, _impl_.playback_frame_number_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -889,20 +907,20 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 117, -1, -1, sizeof(::juggler::v1::ThrowCatchEvent)},
   { 129, -1, -1, sizeof(::juggler::v1::CameraIntrinsics)},
   { 140, -1, -1, sizeof(::juggler::v1::SystemStatus)},
-  { 153, -1, -1, sizeof(::juggler::v1::TrajectoryPrediction)},
-  { 163, -1, -1, sizeof(::juggler::v1::FilteredDetection)},
-  { 172, -1, -1, sizeof(::juggler::v1::TrackerAssociation)},
-  { 183, -1, -1, sizeof(::juggler::v1::NewTracker)},
-  { 193, -1, -1, sizeof(::juggler::v1::TrajectoryPoint)},
-  { 203, -1, -1, sizeof(::juggler::v1::BallState)},
-  { 216, -1, -1, sizeof(::juggler::v1::OcclusionState)},
-  { 226, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
-  { 239, -1, -1, sizeof(::juggler::v1::FrameData)},
-  { 268, 276, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
-  { 278, -1, -1, sizeof(::juggler::v1::CommandRequest)},
-  { 305, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
-  { 327, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 335, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 159, -1, -1, sizeof(::juggler::v1::TrajectoryPrediction)},
+  { 169, -1, -1, sizeof(::juggler::v1::FilteredDetection)},
+  { 178, -1, -1, sizeof(::juggler::v1::TrackerAssociation)},
+  { 189, -1, -1, sizeof(::juggler::v1::NewTracker)},
+  { 199, -1, -1, sizeof(::juggler::v1::TrajectoryPoint)},
+  { 209, -1, -1, sizeof(::juggler::v1::BallState)},
+  { 222, -1, -1, sizeof(::juggler::v1::OcclusionState)},
+  { 232, -1, -1, sizeof(::juggler::v1::ColorSearchRegion)},
+  { 245, -1, -1, sizeof(::juggler::v1::FrameData)},
+  { 274, 282, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
+  { 284, -1, -1, sizeof(::juggler::v1::CommandRequest)},
+  { 314, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
+  { 336, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 344, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -986,119 +1004,129 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "tor3\022\022\n\nconfidence\030\006 \001(\002\"!\n\tEventType\022\t\n"
   "\005THROW\020\000\022\t\n\005CATCH\020\001\"Y\n\020CameraIntrinsics\022"
   "\n\n\002fx\030\001 \001(\001\022\n\n\002fy\030\002 \001(\001\022\013\n\003ppx\030\003 \001(\001\022\013\n\003"
-  "ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001\"\235\001\n\014Syste"
+  "ppy\030\004 \001(\001\022\023\n\013depth_scale\030\005 \001(\001\"\300\002\n\014Syste"
   "mStatus\022\030\n\020camera_connected\030\001 \001(\010\022\026\n\016eng"
   "ine_running\030\002 \001(\010\022\013\n\003fps\030\003 \001(\001\022\023\n\013frame_"
   "count\030\004 \001(\r\022\014\n\004mode\030\005 \001(\t\022\025\n\rerror_messa"
-  "ge\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001(\004\"\235\001\n\024Traje"
-  "ctoryPrediction\022\022\n\nlogical_id\030\001 \001(\005\022*\n\rp"
-  "redicted_pos\030\002 \001(\0132\023.juggler.v1.Vector3\022"
-  "-\n\020predicted_pos_2d\030\003 \001(\0132\023.juggler.v1.V"
-  "ector2\022\026\n\016is_in_freefall\030\004 \001(\010\"`\n\021Filter"
-  "edDetection\022&\n\003box\030\001 \001(\0132\031.juggler.v1.Bo"
-  "undingBox2D\022\016\n\006reason\030\002 \001(\t\022\023\n\013depth_val"
-  "ue\030\003 \001(\002\"\254\001\n\022TrackerAssociation\022\022\n\ntrack"
-  "er_id\030\001 \001(\005\022\027\n\017detection_index\030\002 \001(\005\022\023\n\013"
-  "distance_3d\030\003 \001(\002\022(\n\013tracker_pos\030\004 \001(\0132\023"
-  ".juggler.v1.Vector3\022*\n\rdetection_pos\030\005 \001"
-  "(\0132\023.juggler.v1.Vector3\"\220\001\n\nNewTracker\022\022"
-  "\n\nlogical_id\030\001 \001(\005\022(\n\013initial_pos\030\002 \001(\0132"
-  "\023.juggler.v1.Vector3\022+\n\016initial_pos_2d\030\003"
-  " \001(\0132\023.juggler.v1.Vector2\022\027\n\017detection_i"
-  "ndex\030\004 \001(\005\"t\n\017TrajectoryPoint\022%\n\010positio"
-  "n\030\001 \001(\0132\023.juggler.v1.Vector3\022\024\n\014timestam"
-  "p_us\030\002 \001(\004\022\020\n\010verified\030\003 \001(\010\022\022\n\nconfiden"
-  "ce\030\004 \001(\002\"\237\002\n\tBallState\022\022\n\nlogical_id\030\001 \001"
-  "(\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1.BallState"
-  ".State\022\032\n\022associated_hand_id\030\003 \001(\005\022\022\n\nco"
-  "nfidence\030\004 \001(\002\022\027\n\017frames_in_state\030\005 \001(\005\022"
-  "6\n\021trajectory_points\030\006 \003(\0132\033.juggler.v1."
-  "TrajectoryPoint\022\034\n\024verified_point_count\030"
-  "\007 \001(\005\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRANSIT"
-  "IONING\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022\022\n\n"
-  "logical_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010\022\031\n"
-  "\021occluding_hand_id\030\003 \001(\005\022\030\n\020distance_to_"
-  "hand\030\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nlogi"
-  "cal_id\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rsear"
-  "ch_center\030\003 \001(\0132\023.juggler.v1.Vector2\022\025\n\r"
-  "search_radius\030\004 \001(\002\022(\n\013blob_center\030\005 \001(\013"
-  "2\023.juggler.v1.Vector2\022\021\n\tblob_area\030\006 \001(\002"
-  "\022\r\n\005found\030\007 \001(\010\"\337\007\n\tFrameData\022\024\n\014timesta"
-  "mp_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler.v1."
-  "Ball\022\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand\022%\n"
-  "\010imu_data\030\004 \003(\0132\023.juggler.v1.IMUData\0220\n\n"
-  "intrinsics\030\005 \001(\0132\034.juggler.v1.CameraIntr"
-  "insics\022(\n\006status\030\006 \001(\0132\030.juggler.v1.Syst"
-  "emStatus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014frame_h"
-  "eight\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016raw"
-  "_detections\030\n \003(\0132\031.juggler.v1.BoundingB"
-  "ox2D\0227\n\024unmatched_detections\030\020 \003(\0132\031.jug"
-  "gler.v1.BoundingBox2D\022\027\n\017color_image_b64"
-  "\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir_pr"
-  "ojector_active\030\r \001(\010\0229\n\023color_tracked_ba"
-  "lls\030\016 \003(\0132\034.juggler.v1.ColorTrackedBall\022"
-  "7\n\022throw_catch_events\030\017 \003(\0132\033.juggler.v1"
-  ".ThrowCatchEvent\022@\n\026trajectory_predictio"
-  "ns\030\021 \003(\0132 .juggler.v1.TrajectoryPredicti"
-  "on\022:\n\023filtered_detections\030\022 \003(\0132\035.juggle"
-  "r.v1.FilteredDetection\022<\n\024tracker_associ"
-  "ations\030\023 \003(\0132\036.juggler.v1.TrackerAssocia"
-  "tion\022,\n\014new_trackers\030\024 \003(\0132\026.juggler.v1."
-  "NewTracker\022*\n\013ball_states\030\025 \003(\0132\025.juggle"
-  "r.v1.BallState\0224\n\020occlusion_states\030\026 \003(\013"
-  "2\032.juggler.v1.OcclusionState\022;\n\024color_se"
-  "arch_regions\030\027 \003(\0132\035.juggler.v1.ColorSea"
-  "rchRegion\"\273\t\n\016CommandRequest\0224\n\004type\030\001 \001"
-  "(\0162&.juggler.v1.CommandRequest.CommandTy"
-  "pe\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestamp_us\030"
-  "\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.juggler.v"
-  "1.ColorCommand\022\?\n\013module_args\030\005 \003(\0132*.ju"
-  "ggler.v1.CommandRequest.ModuleArgsEntry\022"
-  "\034\n\024camera_settings_file\030\006 \001(\t\022\024\n\014camera_"
-  "width\030\007 \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n\nca"
-  "mera_fps\030\t \001(\r\022\037\n\027logical_id_to_calibrat"
-  "e\030\n \001(\005\0222\n\025calibration_pixel_pos\030\013 \001(\0132\023"
-  ".juggler.v1.Vector2\022\036\n\026record_with_yolo_"
-  "boxes\030\014 \001(\010\022\032\n\022pose_model_enabled\030\016 \001(\010\022"
-  "=\n\024visualization_states\030\023 \001(\0132\037.juggler."
-  "v1.VisualizationStates\022\022\n\ncolor_name\030\017 \001"
-  "(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022\024\n\014"
-  "feature_name\030\022 \001(\t\022\032\n\022video_feed_enabled"
-  "\030\024 \001(\010\022\024\n\014tracker_type\030\025 \001(\t\022\034\n\024depth_se"
-  "nsor_enabled\030\026 \001(\010\0321\n\017ModuleArgsEntry\022\013\n"
-  "\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\327\003\n\013Comman"
-  "dType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE\020\001\022\021\n\rU"
-  "NLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMMAND\020\003\022\024"
-  "\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_START\020\005\022\033"
-  "\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026RECORD_CO"
-  "NTINUOUS_STOP\020\007\022 \n\034RESTART_WITH_CAMERA_S"
-  "ETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CAMERA_STA"
-  "RT\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026SET_POSE_M"
-  "ODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COLOR\020\r\022\022\n\016E"
-  "NABLE_FEATURE\020\016\022\023\n\017DISABLE_FEATURE\020\017\022\032\n\026"
-  "SET_VIDEO_FEED_ENABLED\020\020\022\024\n\020SET_TRACKER_"
-  "TYPE\020\021\022\034\n\030SET_DEPTH_SENSOR_ENABLED\020\022\022\031\n\025"
-  "RELOAD_COLOR_PROFILES\020\023\"\330\003\n\023Visualizatio"
-  "nStates\022#\n\033show_trajectory_predictions\030\001"
-  " \001(\010\022\033\n\023show_raw_detections\030\002 \001(\010\022 \n\030sho"
-  "w_filtered_detections\030\003 \001(\010\022\031\n\021show_asso"
-  "ciations\030\004 \001(\010\022\031\n\021show_new_trackers\030\005 \001("
-  "\010\022\032\n\022show_hand_tracking\030\006 \001(\010\022\030\n\020show_ba"
-  "ll_states\030\007 \001(\010\022\026\n\016show_occlusion\030\010 \001(\010\022"
-  "\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021show_color_sea"
-  "rch\030\n \001(\010\022\032\n\022show_color_tracker\030\013 \001(\010\022\032\n"
-  "\022show_tracked_boxes\030\014 \001(\010\022!\n\031show_unmatc"
-  "hed_detections\030\r \001(\010\022\022\n\nshow_tails\030\016 \001(\010"
-  "\022\027\n\017show_trajectory\030\017 \001(\010\022\037\n\027show_hand_v"
-  "elocity_zone\030\020 \001(\010\"A\n\014ColorCommand\022\017\n\007ba"
-  "ll_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v1."
-  "Color\"I\n\017CommandResponse\022\017\n\007success\030\001 \001("
-  "\010\022\017\n\007message\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001(\004"
-  "b\006proto3"
+  "ge\030\006 \001(\t\022\024\n\014timestamp_us\030\007 \001(\004\022\025\n\rplayba"
+  "ck_mode\030\010 \001(\010\022\032\n\022playback_directory\030\t \001("
+  "\t\022\036\n\026playback_current_frame\030\n \001(\005\022\035\n\025pla"
+  "yback_total_frames\030\013 \001(\005\022\027\n\017playback_pau"
+  "sed\030\014 \001(\010\022\026\n\016playback_speed\030\r \001(\002\"\235\001\n\024Tr"
+  "ajectoryPrediction\022\022\n\nlogical_id\030\001 \001(\005\022*"
+  "\n\rpredicted_pos\030\002 \001(\0132\023.juggler.v1.Vecto"
+  "r3\022-\n\020predicted_pos_2d\030\003 \001(\0132\023.juggler.v"
+  "1.Vector2\022\026\n\016is_in_freefall\030\004 \001(\010\"`\n\021Fil"
+  "teredDetection\022&\n\003box\030\001 \001(\0132\031.juggler.v1"
+  ".BoundingBox2D\022\016\n\006reason\030\002 \001(\t\022\023\n\013depth_"
+  "value\030\003 \001(\002\"\254\001\n\022TrackerAssociation\022\022\n\ntr"
+  "acker_id\030\001 \001(\005\022\027\n\017detection_index\030\002 \001(\005\022"
+  "\023\n\013distance_3d\030\003 \001(\002\022(\n\013tracker_pos\030\004 \001("
+  "\0132\023.juggler.v1.Vector3\022*\n\rdetection_pos\030"
+  "\005 \001(\0132\023.juggler.v1.Vector3\"\220\001\n\nNewTracke"
+  "r\022\022\n\nlogical_id\030\001 \001(\005\022(\n\013initial_pos\030\002 \001"
+  "(\0132\023.juggler.v1.Vector3\022+\n\016initial_pos_2"
+  "d\030\003 \001(\0132\023.juggler.v1.Vector2\022\027\n\017detectio"
+  "n_index\030\004 \001(\005\"t\n\017TrajectoryPoint\022%\n\010posi"
+  "tion\030\001 \001(\0132\023.juggler.v1.Vector3\022\024\n\014times"
+  "tamp_us\030\002 \001(\004\022\020\n\010verified\030\003 \001(\010\022\022\n\nconfi"
+  "dence\030\004 \001(\002\"\237\002\n\tBallState\022\022\n\nlogical_id\030"
+  "\001 \001(\005\022*\n\005state\030\002 \001(\0162\033.juggler.v1.BallSt"
+  "ate.State\022\032\n\022associated_hand_id\030\003 \001(\005\022\022\n"
+  "\nconfidence\030\004 \001(\002\022\027\n\017frames_in_state\030\005 \001"
+  "(\005\0226\n\021trajectory_points\030\006 \003(\0132\033.juggler."
+  "v1.TrajectoryPoint\022\034\n\024verified_point_cou"
+  "nt\030\007 \001(\005\"3\n\005State\022\r\n\tIN_FLIGHT\020\000\022\021\n\rTRAN"
+  "SITIONING\020\001\022\010\n\004HELD\020\002\"n\n\016OcclusionState\022"
+  "\022\n\nlogical_id\030\001 \001(\005\022\023\n\013is_occluded\030\002 \001(\010"
+  "\022\031\n\021occluding_hand_id\030\003 \001(\005\022\030\n\020distance_"
+  "to_hand\030\004 \001(\002\"\312\001\n\021ColorSearchRegion\022\022\n\nl"
+  "ogical_id\030\001 \001(\005\022\022\n\ncolor_name\030\002 \001(\t\022*\n\rs"
+  "earch_center\030\003 \001(\0132\023.juggler.v1.Vector2\022"
+  "\025\n\rsearch_radius\030\004 \001(\002\022(\n\013blob_center\030\005 "
+  "\001(\0132\023.juggler.v1.Vector2\022\021\n\tblob_area\030\006 "
+  "\001(\002\022\r\n\005found\030\007 \001(\010\"\337\007\n\tFrameData\022\024\n\014time"
+  "stamp_us\030\001 \001(\004\022\037\n\005balls\030\002 \003(\0132\020.juggler."
+  "v1.Ball\022\037\n\005hands\030\003 \003(\0132\020.juggler.v1.Hand"
+  "\022%\n\010imu_data\030\004 \003(\0132\023.juggler.v1.IMUData\022"
+  "0\n\nintrinsics\030\005 \001(\0132\034.juggler.v1.CameraI"
+  "ntrinsics\022(\n\006status\030\006 \001(\0132\030.juggler.v1.S"
+  "ystemStatus\022\023\n\013frame_width\030\007 \001(\r\022\024\n\014fram"
+  "e_height\030\010 \001(\r\022\024\n\014frame_number\030\t \001(\r\0221\n\016"
+  "raw_detections\030\n \003(\0132\031.juggler.v1.Boundi"
+  "ngBox2D\0227\n\024unmatched_detections\030\020 \003(\0132\031."
+  "juggler.v1.BoundingBox2D\022\027\n\017color_image_"
+  "b64\030\013 \001(\014\022\027\n\017depth_image_b64\030\014 \001(\014\022\033\n\023ir"
+  "_projector_active\030\r \001(\010\0229\n\023color_tracked"
+  "_balls\030\016 \003(\0132\034.juggler.v1.ColorTrackedBa"
+  "ll\0227\n\022throw_catch_events\030\017 \003(\0132\033.juggler"
+  ".v1.ThrowCatchEvent\022@\n\026trajectory_predic"
+  "tions\030\021 \003(\0132 .juggler.v1.TrajectoryPredi"
+  "ction\022:\n\023filtered_detections\030\022 \003(\0132\035.jug"
+  "gler.v1.FilteredDetection\022<\n\024tracker_ass"
+  "ociations\030\023 \003(\0132\036.juggler.v1.TrackerAsso"
+  "ciation\022,\n\014new_trackers\030\024 \003(\0132\026.juggler."
+  "v1.NewTracker\022*\n\013ball_states\030\025 \003(\0132\025.jug"
+  "gler.v1.BallState\0224\n\020occlusion_states\030\026 "
+  "\003(\0132\032.juggler.v1.OcclusionState\022;\n\024color"
+  "_search_regions\030\027 \003(\0132\035.juggler.v1.Color"
+  "SearchRegion\"\255\013\n\016CommandRequest\0224\n\004type\030"
+  "\001 \001(\0162&.juggler.v1.CommandRequest.Comman"
+  "dType\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestamp_"
+  "us\030\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.juggle"
+  "r.v1.ColorCommand\022\?\n\013module_args\030\005 \003(\0132*"
+  ".juggler.v1.CommandRequest.ModuleArgsEnt"
+  "ry\022\034\n\024camera_settings_file\030\006 \001(\t\022\024\n\014came"
+  "ra_width\030\007 \001(\r\022\025\n\rcamera_height\030\010 \001(\r\022\022\n"
+  "\ncamera_fps\030\t \001(\r\022\037\n\027logical_id_to_calib"
+  "rate\030\n \001(\005\0222\n\025calibration_pixel_pos\030\013 \001("
+  "\0132\023.juggler.v1.Vector2\022\036\n\026record_with_yo"
+  "lo_boxes\030\014 \001(\010\022\032\n\022pose_model_enabled\030\016 \001"
+  "(\010\022=\n\024visualization_states\030\023 \001(\0132\037.juggl"
+  "er.v1.VisualizationStates\022\022\n\ncolor_name\030"
+  "\017 \001(\t\022\017\n\007click_x\030\020 \001(\005\022\017\n\007click_y\030\021 \001(\005\022"
+  "\024\n\014feature_name\030\022 \001(\t\022\032\n\022video_feed_enab"
+  "led\030\024 \001(\010\022\024\n\014tracker_type\030\025 \001(\t\022\034\n\024depth"
+  "_sensor_enabled\030\026 \001(\010\022\032\n\022playback_direct"
+  "ory\030\036 \001(\t\022\026\n\016playback_speed\030\037 \001(\002\022\035\n\025pla"
+  "yback_frame_number\030  \001(\005\0321\n\017ModuleArgsEn"
+  "try\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\366\004\n\013"
+  "CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE\020"
+  "\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMMA"
+  "ND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_STA"
+  "RT\020\005\022\033\n\027RECORD_CONTINUOUS_START\020\006\022\032\n\026REC"
+  "ORD_CONTINUOUS_STOP\020\007\022 \n\034RESTART_WITH_CA"
+  "MERA_SETTINGS\020\010\022\017\n\013CAMERA_STOP\020\t\022\020\n\014CAME"
+  "RA_START\020\n\022\024\n\020CALIBRATE_OBJECT\020\013\022\032\n\026SET_"
+  "POSE_MODEL_ENABLED\020\014\022\023\n\017CALIBRATE_COLOR\020"
+  "\r\022\022\n\016ENABLE_FEATURE\020\016\022\023\n\017DISABLE_FEATURE"
+  "\020\017\022\032\n\026SET_VIDEO_FEED_ENABLED\020\020\022\024\n\020SET_TR"
+  "ACKER_TYPE\020\021\022\034\n\030SET_DEPTH_SENSOR_ENABLED"
+  "\020\022\022\031\n\025RELOAD_COLOR_PROFILES\020\023\022\022\n\016PLAYBAC"
+  "K_START\020\027\022\021\n\rPLAYBACK_STOP\020\030\022\031\n\025PLAYBACK"
+  "_STEP_FORWARD\020\031\022\032\n\026PLAYBACK_STEP_BACKWAR"
+  "D\020\032\022\026\n\022PLAYBACK_SET_SPEED\020\033\022\022\n\016PLAYBACK_"
+  "PAUSE\020\034\022\023\n\017PLAYBACK_RESUME\020\035\"\330\003\n\023Visuali"
+  "zationStates\022#\n\033show_trajectory_predicti"
+  "ons\030\001 \001(\010\022\033\n\023show_raw_detections\030\002 \001(\010\022 "
+  "\n\030show_filtered_detections\030\003 \001(\010\022\031\n\021show"
+  "_associations\030\004 \001(\010\022\031\n\021show_new_trackers"
+  "\030\005 \001(\010\022\032\n\022show_hand_tracking\030\006 \001(\010\022\030\n\020sh"
+  "ow_ball_states\030\007 \001(\010\022\026\n\016show_occlusion\030\010"
+  " \001(\010\022\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021show_colo"
+  "r_search\030\n \001(\010\022\032\n\022show_color_tracker\030\013 \001"
+  "(\010\022\032\n\022show_tracked_boxes\030\014 \001(\010\022!\n\031show_u"
+  "nmatched_detections\030\r \001(\010\022\022\n\nshow_tails\030"
+  "\016 \001(\010\022\027\n\017show_trajectory\030\017 \001(\010\022\037\n\027show_h"
+  "and_velocity_zone\030\020 \001(\010\"A\n\014ColorCommand\022"
+  "\017\n\007ball_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.juggle"
+  "r.v1.Color\"I\n\017CommandResponse\022\017\n\007success"
+  "\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014timestamp_us\030"
+  "\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 6328, descriptor_table_protodef_juggler_2eproto,
+    false, false, 6733, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 27,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -1206,6 +1234,13 @@ bool CommandRequest_CommandType_IsValid(int value) {
     case 17:
     case 18:
     case 19:
+    case 23:
+    case 24:
+    case 25:
+    case 26:
+    case 27:
+    case 28:
+    case 29:
       return true;
     default:
       return false;
@@ -1233,6 +1268,13 @@ constexpr CommandRequest_CommandType CommandRequest::SET_VIDEO_FEED_ENABLED;
 constexpr CommandRequest_CommandType CommandRequest::SET_TRACKER_TYPE;
 constexpr CommandRequest_CommandType CommandRequest::SET_DEPTH_SENSOR_ENABLED;
 constexpr CommandRequest_CommandType CommandRequest::RELOAD_COLOR_PROFILES;
+constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_START;
+constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_STOP;
+constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_STEP_FORWARD;
+constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_STEP_BACKWARD;
+constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_SET_SPEED;
+constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_PAUSE;
+constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_RESUME;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MIN;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MAX;
 constexpr int CommandRequest::CommandType_ARRAYSIZE;
@@ -5603,11 +5645,17 @@ SystemStatus::SystemStatus(const SystemStatus& from)
   new (&_impl_) Impl_{
       decltype(_impl_.mode_){}
     , decltype(_impl_.error_message_){}
+    , decltype(_impl_.playback_directory_){}
+    , decltype(_impl_.fps_){}
+    , decltype(_impl_.frame_count_){}
     , decltype(_impl_.camera_connected_){}
     , decltype(_impl_.engine_running_){}
-    , decltype(_impl_.frame_count_){}
-    , decltype(_impl_.fps_){}
+    , decltype(_impl_.playback_mode_){}
+    , decltype(_impl_.playback_paused_){}
     , decltype(_impl_.timestamp_us_){}
+    , decltype(_impl_.playback_current_frame_){}
+    , decltype(_impl_.playback_total_frames_){}
+    , decltype(_impl_.playback_speed_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -5627,9 +5675,17 @@ SystemStatus::SystemStatus(const SystemStatus& from)
     _this->_impl_.error_message_.Set(from._internal_error_message(), 
       _this->GetArenaForAllocation());
   }
-  ::memcpy(&_impl_.camera_connected_, &from._impl_.camera_connected_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.timestamp_us_) -
-    reinterpret_cast<char*>(&_impl_.camera_connected_)) + sizeof(_impl_.timestamp_us_));
+  _impl_.playback_directory_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.playback_directory_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_playback_directory().empty()) {
+    _this->_impl_.playback_directory_.Set(from._internal_playback_directory(), 
+      _this->GetArenaForAllocation());
+  }
+  ::memcpy(&_impl_.fps_, &from._impl_.fps_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.playback_speed_) -
+    reinterpret_cast<char*>(&_impl_.fps_)) + sizeof(_impl_.playback_speed_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.SystemStatus)
 }
 
@@ -5640,11 +5696,17 @@ inline void SystemStatus::SharedCtor(
   new (&_impl_) Impl_{
       decltype(_impl_.mode_){}
     , decltype(_impl_.error_message_){}
+    , decltype(_impl_.playback_directory_){}
+    , decltype(_impl_.fps_){0}
+    , decltype(_impl_.frame_count_){0u}
     , decltype(_impl_.camera_connected_){false}
     , decltype(_impl_.engine_running_){false}
-    , decltype(_impl_.frame_count_){0u}
-    , decltype(_impl_.fps_){0}
+    , decltype(_impl_.playback_mode_){false}
+    , decltype(_impl_.playback_paused_){false}
     , decltype(_impl_.timestamp_us_){uint64_t{0u}}
+    , decltype(_impl_.playback_current_frame_){0}
+    , decltype(_impl_.playback_total_frames_){0}
+    , decltype(_impl_.playback_speed_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.mode_.InitDefault();
@@ -5654,6 +5716,10 @@ inline void SystemStatus::SharedCtor(
   _impl_.error_message_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.error_message_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.playback_directory_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.playback_directory_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
@@ -5670,6 +5736,7 @@ inline void SystemStatus::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
   _impl_.mode_.Destroy();
   _impl_.error_message_.Destroy();
+  _impl_.playback_directory_.Destroy();
 }
 
 void SystemStatus::SetCachedSize(int size) const {
@@ -5684,9 +5751,10 @@ void SystemStatus::Clear() {
 
   _impl_.mode_.ClearToEmpty();
   _impl_.error_message_.ClearToEmpty();
-  ::memset(&_impl_.camera_connected_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.timestamp_us_) -
-      reinterpret_cast<char*>(&_impl_.camera_connected_)) + sizeof(_impl_.timestamp_us_));
+  _impl_.playback_directory_.ClearToEmpty();
+  ::memset(&_impl_.fps_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.playback_speed_) -
+      reinterpret_cast<char*>(&_impl_.fps_)) + sizeof(_impl_.playback_speed_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -5753,6 +5821,56 @@ const char* SystemStatus::_InternalParse(const char* ptr, ::_pbi::ParseContext* 
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 56)) {
           _impl_.timestamp_us_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool playback_mode = 8;
+      case 8:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 64)) {
+          _impl_.playback_mode_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string playback_directory = 9;
+      case 9:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 74)) {
+          auto str = _internal_mutable_playback_directory();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.SystemStatus.playback_directory"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 playback_current_frame = 10;
+      case 10:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 80)) {
+          _impl_.playback_current_frame_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 playback_total_frames = 11;
+      case 11:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 88)) {
+          _impl_.playback_total_frames_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool playback_paused = 12;
+      case 12:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 96)) {
+          _impl_.playback_paused_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float playback_speed = 13;
+      case 13:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 109)) {
+          _impl_.playback_speed_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
         } else
           goto handle_unusual;
         continue;
@@ -5839,6 +5957,50 @@ uint8_t* SystemStatus::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteUInt64ToArray(7, this->_internal_timestamp_us(), target);
   }
 
+  // bool playback_mode = 8;
+  if (this->_internal_playback_mode() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(8, this->_internal_playback_mode(), target);
+  }
+
+  // string playback_directory = 9;
+  if (!this->_internal_playback_directory().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_playback_directory().data(), static_cast<int>(this->_internal_playback_directory().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "juggler.v1.SystemStatus.playback_directory");
+    target = stream->WriteStringMaybeAliased(
+        9, this->_internal_playback_directory(), target);
+  }
+
+  // int32 playback_current_frame = 10;
+  if (this->_internal_playback_current_frame() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(10, this->_internal_playback_current_frame(), target);
+  }
+
+  // int32 playback_total_frames = 11;
+  if (this->_internal_playback_total_frames() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(11, this->_internal_playback_total_frames(), target);
+  }
+
+  // bool playback_paused = 12;
+  if (this->_internal_playback_paused() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(12, this->_internal_playback_paused(), target);
+  }
+
+  // float playback_speed = 13;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_playback_speed = this->_internal_playback_speed();
+  uint32_t raw_playback_speed;
+  memcpy(&raw_playback_speed, &tmp_playback_speed, sizeof(tmp_playback_speed));
+  if (raw_playback_speed != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(13, this->_internal_playback_speed(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -5869,19 +6031,11 @@ size_t SystemStatus::ByteSizeLong() const {
         this->_internal_error_message());
   }
 
-  // bool camera_connected = 1;
-  if (this->_internal_camera_connected() != 0) {
-    total_size += 1 + 1;
-  }
-
-  // bool engine_running = 2;
-  if (this->_internal_engine_running() != 0) {
-    total_size += 1 + 1;
-  }
-
-  // uint32 frame_count = 4;
-  if (this->_internal_frame_count() != 0) {
-    total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(this->_internal_frame_count());
+  // string playback_directory = 9;
+  if (!this->_internal_playback_directory().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_playback_directory());
   }
 
   // double fps = 3;
@@ -5893,9 +6047,53 @@ size_t SystemStatus::ByteSizeLong() const {
     total_size += 1 + 8;
   }
 
+  // uint32 frame_count = 4;
+  if (this->_internal_frame_count() != 0) {
+    total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(this->_internal_frame_count());
+  }
+
+  // bool camera_connected = 1;
+  if (this->_internal_camera_connected() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool engine_running = 2;
+  if (this->_internal_engine_running() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool playback_mode = 8;
+  if (this->_internal_playback_mode() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool playback_paused = 12;
+  if (this->_internal_playback_paused() != 0) {
+    total_size += 1 + 1;
+  }
+
   // uint64 timestamp_us = 7;
   if (this->_internal_timestamp_us() != 0) {
     total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(this->_internal_timestamp_us());
+  }
+
+  // int32 playback_current_frame = 10;
+  if (this->_internal_playback_current_frame() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_playback_current_frame());
+  }
+
+  // int32 playback_total_frames = 11;
+  if (this->_internal_playback_total_frames() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_playback_total_frames());
+  }
+
+  // float playback_speed = 13;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_playback_speed = this->_internal_playback_speed();
+  uint32_t raw_playback_speed;
+  memcpy(&raw_playback_speed, &tmp_playback_speed, sizeof(tmp_playback_speed));
+  if (raw_playback_speed != 0) {
+    total_size += 1 + 4;
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -5922,14 +6120,8 @@ void SystemStatus::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::P
   if (!from._internal_error_message().empty()) {
     _this->_internal_set_error_message(from._internal_error_message());
   }
-  if (from._internal_camera_connected() != 0) {
-    _this->_internal_set_camera_connected(from._internal_camera_connected());
-  }
-  if (from._internal_engine_running() != 0) {
-    _this->_internal_set_engine_running(from._internal_engine_running());
-  }
-  if (from._internal_frame_count() != 0) {
-    _this->_internal_set_frame_count(from._internal_frame_count());
+  if (!from._internal_playback_directory().empty()) {
+    _this->_internal_set_playback_directory(from._internal_playback_directory());
   }
   static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
   double tmp_fps = from._internal_fps();
@@ -5938,8 +6130,36 @@ void SystemStatus::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::P
   if (raw_fps != 0) {
     _this->_internal_set_fps(from._internal_fps());
   }
+  if (from._internal_frame_count() != 0) {
+    _this->_internal_set_frame_count(from._internal_frame_count());
+  }
+  if (from._internal_camera_connected() != 0) {
+    _this->_internal_set_camera_connected(from._internal_camera_connected());
+  }
+  if (from._internal_engine_running() != 0) {
+    _this->_internal_set_engine_running(from._internal_engine_running());
+  }
+  if (from._internal_playback_mode() != 0) {
+    _this->_internal_set_playback_mode(from._internal_playback_mode());
+  }
+  if (from._internal_playback_paused() != 0) {
+    _this->_internal_set_playback_paused(from._internal_playback_paused());
+  }
   if (from._internal_timestamp_us() != 0) {
     _this->_internal_set_timestamp_us(from._internal_timestamp_us());
+  }
+  if (from._internal_playback_current_frame() != 0) {
+    _this->_internal_set_playback_current_frame(from._internal_playback_current_frame());
+  }
+  if (from._internal_playback_total_frames() != 0) {
+    _this->_internal_set_playback_total_frames(from._internal_playback_total_frames());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_playback_speed = from._internal_playback_speed();
+  uint32_t raw_playback_speed;
+  memcpy(&raw_playback_speed, &tmp_playback_speed, sizeof(tmp_playback_speed));
+  if (raw_playback_speed != 0) {
+    _this->_internal_set_playback_speed(from._internal_playback_speed());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -5968,12 +6188,16 @@ void SystemStatus::InternalSwap(SystemStatus* other) {
       &_impl_.error_message_, lhs_arena,
       &other->_impl_.error_message_, rhs_arena
   );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.playback_directory_, lhs_arena,
+      &other->_impl_.playback_directory_, rhs_arena
+  );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SystemStatus, _impl_.timestamp_us_)
-      + sizeof(SystemStatus::_impl_.timestamp_us_)
-      - PROTOBUF_FIELD_OFFSET(SystemStatus, _impl_.camera_connected_)>(
-          reinterpret_cast<char*>(&_impl_.camera_connected_),
-          reinterpret_cast<char*>(&other->_impl_.camera_connected_));
+      PROTOBUF_FIELD_OFFSET(SystemStatus, _impl_.playback_speed_)
+      + sizeof(SystemStatus::_impl_.playback_speed_)
+      - PROTOBUF_FIELD_OFFSET(SystemStatus, _impl_.fps_)>(
+          reinterpret_cast<char*>(&_impl_.fps_),
+          reinterpret_cast<char*>(&other->_impl_.fps_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata SystemStatus::GetMetadata() const {
@@ -9504,6 +9728,7 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.color_name_){}
     , decltype(_impl_.feature_name_){}
     , decltype(_impl_.tracker_type_){}
+    , decltype(_impl_.playback_directory_){}
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.calibration_pixel_pos_){nullptr}
     , decltype(_impl_.visualization_states_){nullptr}
@@ -9519,6 +9744,8 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     , decltype(_impl_.pose_model_enabled_){}
     , decltype(_impl_.video_feed_enabled_){}
     , decltype(_impl_.depth_sensor_enabled_){}
+    , decltype(_impl_.playback_speed_){}
+    , decltype(_impl_.playback_frame_number_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -9563,6 +9790,14 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     _this->_impl_.tracker_type_.Set(from._internal_tracker_type(), 
       _this->GetArenaForAllocation());
   }
+  _impl_.playback_directory_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.playback_directory_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_playback_directory().empty()) {
+    _this->_impl_.playback_directory_.Set(from._internal_playback_directory(), 
+      _this->GetArenaForAllocation());
+  }
   if (from._internal_has_color_command()) {
     _this->_impl_.color_command_ = new ::juggler::v1::ColorCommand(*from._impl_.color_command_);
   }
@@ -9573,8 +9808,8 @@ CommandRequest::CommandRequest(const CommandRequest& from)
     _this->_impl_.visualization_states_ = new ::juggler::v1::VisualizationStates(*from._impl_.visualization_states_);
   }
   ::memcpy(&_impl_.timestamp_us_, &from._impl_.timestamp_us_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.depth_sensor_enabled_) -
-    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.depth_sensor_enabled_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.playback_frame_number_) -
+    reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.playback_frame_number_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.CommandRequest)
 }
 
@@ -9589,6 +9824,7 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.color_name_){}
     , decltype(_impl_.feature_name_){}
     , decltype(_impl_.tracker_type_){}
+    , decltype(_impl_.playback_directory_){}
     , decltype(_impl_.color_command_){nullptr}
     , decltype(_impl_.calibration_pixel_pos_){nullptr}
     , decltype(_impl_.visualization_states_){nullptr}
@@ -9604,6 +9840,8 @@ inline void CommandRequest::SharedCtor(
     , decltype(_impl_.pose_model_enabled_){false}
     , decltype(_impl_.video_feed_enabled_){false}
     , decltype(_impl_.depth_sensor_enabled_){false}
+    , decltype(_impl_.playback_speed_){0}
+    , decltype(_impl_.playback_frame_number_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.module_name_.InitDefault();
@@ -9626,6 +9864,10 @@ inline void CommandRequest::SharedCtor(
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.tracker_type_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.playback_directory_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.playback_directory_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 CommandRequest::~CommandRequest() {
@@ -9647,6 +9889,7 @@ inline void CommandRequest::SharedDtor() {
   _impl_.color_name_.Destroy();
   _impl_.feature_name_.Destroy();
   _impl_.tracker_type_.Destroy();
+  _impl_.playback_directory_.Destroy();
   if (this != internal_default_instance()) delete _impl_.color_command_;
   if (this != internal_default_instance()) delete _impl_.calibration_pixel_pos_;
   if (this != internal_default_instance()) delete _impl_.visualization_states_;
@@ -9672,6 +9915,7 @@ void CommandRequest::Clear() {
   _impl_.color_name_.ClearToEmpty();
   _impl_.feature_name_.ClearToEmpty();
   _impl_.tracker_type_.ClearToEmpty();
+  _impl_.playback_directory_.ClearToEmpty();
   if (GetArenaForAllocation() == nullptr && _impl_.color_command_ != nullptr) {
     delete _impl_.color_command_;
   }
@@ -9685,8 +9929,8 @@ void CommandRequest::Clear() {
   }
   _impl_.visualization_states_ = nullptr;
   ::memset(&_impl_.timestamp_us_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.depth_sensor_enabled_) -
-      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.depth_sensor_enabled_));
+      reinterpret_cast<char*>(&_impl_.playback_frame_number_) -
+      reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.playback_frame_number_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -9876,6 +10120,32 @@ const char* CommandRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext
       case 22:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 176)) {
           _impl_.depth_sensor_enabled_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string playback_directory = 30;
+      case 30:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 242)) {
+          auto str = _internal_mutable_playback_directory();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "juggler.v1.CommandRequest.playback_directory"));
+        } else
+          goto handle_unusual;
+        continue;
+      // float playback_speed = 31;
+      case 31:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 253)) {
+          _impl_.playback_speed_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 playback_frame_number = 32;
+      case 32:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 0)) {
+          _impl_.playback_frame_number_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -10083,6 +10353,32 @@ uint8_t* CommandRequest::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(22, this->_internal_depth_sensor_enabled(), target);
   }
 
+  // string playback_directory = 30;
+  if (!this->_internal_playback_directory().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_playback_directory().data(), static_cast<int>(this->_internal_playback_directory().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "juggler.v1.CommandRequest.playback_directory");
+    target = stream->WriteStringMaybeAliased(
+        30, this->_internal_playback_directory(), target);
+  }
+
+  // float playback_speed = 31;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_playback_speed = this->_internal_playback_speed();
+  uint32_t raw_playback_speed;
+  memcpy(&raw_playback_speed, &tmp_playback_speed, sizeof(tmp_playback_speed));
+  if (raw_playback_speed != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(31, this->_internal_playback_speed(), target);
+  }
+
+  // int32 playback_frame_number = 32;
+  if (this->_internal_playback_frame_number() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(32, this->_internal_playback_frame_number(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -10141,6 +10437,13 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += 2 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
         this->_internal_tracker_type());
+  }
+
+  // string playback_directory = 30;
+  if (!this->_internal_playback_directory().empty()) {
+    total_size += 2 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_playback_directory());
   }
 
   // .juggler.v1.ColorCommand color_command = 4;
@@ -10229,6 +10532,22 @@ size_t CommandRequest::ByteSizeLong() const {
     total_size += 2 + 1;
   }
 
+  // float playback_speed = 31;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_playback_speed = this->_internal_playback_speed();
+  uint32_t raw_playback_speed;
+  memcpy(&raw_playback_speed, &tmp_playback_speed, sizeof(tmp_playback_speed));
+  if (raw_playback_speed != 0) {
+    total_size += 2 + 4;
+  }
+
+  // int32 playback_frame_number = 32;
+  if (this->_internal_playback_frame_number() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_playback_frame_number());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -10262,6 +10581,9 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   }
   if (!from._internal_tracker_type().empty()) {
     _this->_internal_set_tracker_type(from._internal_tracker_type());
+  }
+  if (!from._internal_playback_directory().empty()) {
+    _this->_internal_set_playback_directory(from._internal_playback_directory());
   }
   if (from._internal_has_color_command()) {
     _this->_internal_mutable_color_command()->::juggler::v1::ColorCommand::MergeFrom(
@@ -10311,6 +10633,16 @@ void CommandRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (from._internal_depth_sensor_enabled() != 0) {
     _this->_internal_set_depth_sensor_enabled(from._internal_depth_sensor_enabled());
   }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_playback_speed = from._internal_playback_speed();
+  uint32_t raw_playback_speed;
+  memcpy(&raw_playback_speed, &tmp_playback_speed, sizeof(tmp_playback_speed));
+  if (raw_playback_speed != 0) {
+    _this->_internal_set_playback_speed(from._internal_playback_speed());
+  }
+  if (from._internal_playback_frame_number() != 0) {
+    _this->_internal_set_playback_frame_number(from._internal_playback_frame_number());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -10351,9 +10683,13 @@ void CommandRequest::InternalSwap(CommandRequest* other) {
       &_impl_.tracker_type_, lhs_arena,
       &other->_impl_.tracker_type_, rhs_arena
   );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.playback_directory_, lhs_arena,
+      &other->_impl_.playback_directory_, rhs_arena
+  );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.depth_sensor_enabled_)
-      + sizeof(CommandRequest::_impl_.depth_sensor_enabled_)
+      PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.playback_frame_number_)
+      + sizeof(CommandRequest::_impl_.playback_frame_number_)
       - PROTOBUF_FIELD_OFFSET(CommandRequest, _impl_.color_command_)>(
           reinterpret_cast<char*>(&_impl_.color_command_),
           reinterpret_cast<char*>(&other->_impl_.color_command_));

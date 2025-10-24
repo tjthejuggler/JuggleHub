@@ -352,6 +352,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("pose_processing_density")) {
             settings_.pose_processing_density = j["pose_processing_density"];
         }
+        if (j.contains("ball_processing_density")) {
+            settings_.ball_processing_density = j["ball_processing_density"];
+        }
         if (j.contains("use_color_tracking")) {
             settings_.use_color_tracking = j["use_color_tracking"];
         }
@@ -447,6 +450,7 @@ void New3DTracker::saveSettings() {
         j["enable_ball_detection"] = settings_.enable_ball_detection;
         j["enable_pose_estimation"] = settings_.enable_pose_estimation;
         j["pose_processing_density"] = settings_.pose_processing_density;
+        j["ball_processing_density"] = settings_.ball_processing_density;
         j["use_color_tracking"] = settings_.use_color_tracking;
         j["color_match_threshold"] = settings_.color_match_threshold;
         j["color_sample_radius"] = settings_.color_sample_radius;
@@ -1725,12 +1729,45 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
         preprocessed = preprocess(color_frame, scale_x, scale_y);
     }
     
-    // Run YOLO ball detection (conditionally)
+    // Run YOLO ball detection (conditionally, based on processing density)
     std::vector<Detection> detections;
+    ball_frame_counter_++;
+    
     if (settings_.enable_ball_detection) {
-        detections = runBallDetection(
-            preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
-        logDebug("--- BALL DETECTION: ENABLED (", detections.size(), " detections) ---");
+        // Determine if we should process this frame based on density percentage
+        bool should_process = false;
+        int density = settings_.ball_processing_density;
+        
+        // Edge cases
+        if (density >= 100) {
+            should_process = true;  // Process every frame
+        } else if (density <= 0) {
+            should_process = false;  // Process no frames
+        } else if (density < 50) {
+            // Process 1 out of N frames
+            int N = static_cast<int>(std::round(100.0f / density));
+            should_process = (ball_frame_counter_ % N == 0);
+        } else {
+            // Skip 1 out of N frames
+            int skip_percentage = 100 - density;
+            int N = static_cast<int>(std::round(100.0f / skip_percentage));
+            should_process = (ball_frame_counter_ % N != 0);
+        }
+        
+        if (should_process) {
+            // Run ball detection
+            detections = runBallDetection(
+                preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
+            
+            logDebug("--- BALL DETECTION: RUNNING (frame ", ball_frame_counter_,
+                     ", density ", density, "%) ---");
+        } else {
+            // Skip ball detection - use empty detections list
+            detections.clear();
+            
+            logDebug("--- BALL DETECTION: SKIPPED (frame ", ball_frame_counter_,
+                     ", density ", density, "%) ---");
+        }
     } else {
         logDebug("--- BALL DETECTION: DISABLED ---");
     }
@@ -2130,6 +2167,8 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.enable_pose_estimation = (value == "true" || value == "1");
         } else if (key == "pose_processing_density") {
             settings_.pose_processing_density = std::stoi(value);
+        } else if (key == "ball_processing_density") {
+            settings_.ball_processing_density = std::stoi(value);
         } else if (key == "use_color_tracking") {
             settings_.use_color_tracking = (value == "true" || value == "1");
         } else if (key == "color_match_threshold") {

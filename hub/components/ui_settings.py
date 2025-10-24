@@ -328,8 +328,10 @@ if PYQT_AVAILABLE:
                 'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0 if hasattr(self, 'ball_held_confidence_slider') else 0.25,
                 'nms_threshold': self.nms_slider.value() / 100.0 if hasattr(self, 'nms_slider') else 0.50,
                 'show_raw_yolo_detections': self.show_raw_yolo_toggle.isChecked() if hasattr(self, 'show_raw_yolo_toggle') else False,
+                'ball_processing_density': self.ball_density_slider.value() if hasattr(self, 'ball_density_slider') else 50,
                 'pose_model_enabled': self.pose_model_toggle.isChecked() if hasattr(self, 'pose_model_toggle') else True,
                 'enable_pose_estimation': self.pose_model_toggle.isChecked() if hasattr(self, 'pose_model_toggle') else True,
+                'pose_processing_density': self.pose_density_slider.value() if hasattr(self, 'pose_density_slider') else 50,
             }
             
             # Add 3D-specific settings if current tracker is 3D
@@ -514,10 +516,14 @@ if PYQT_AVAILABLE:
                 self.nms_slider.setValue(int(settings['nms_threshold'] * 100))
             if 'show_raw_yolo_detections' in settings and hasattr(self, 'show_raw_yolo_toggle'):
                 self.show_raw_yolo_toggle.setChecked(settings['show_raw_yolo_detections'])
+            if 'ball_processing_density' in settings and hasattr(self, 'ball_density_slider'):
+                self.ball_density_slider.setValue(settings['ball_processing_density'])
             
             # Pose model
             if 'pose_model_enabled' in settings:
                 self.pose_model_toggle.setChecked(settings['pose_model_enabled'])
+            if 'pose_processing_density' in settings and hasattr(self, 'pose_density_slider'):
+                self.pose_density_slider.setValue(settings['pose_processing_density'])
             if 'enable_pose_estimation' in settings and hasattr(self, 'pose_model_toggle'):
                 is_enabled = settings['enable_pose_estimation']
                 self.pose_model_toggle.setChecked(is_enabled)
@@ -1218,6 +1224,10 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('nms_threshold', settings['nms_threshold'])
             if 'show_raw_yolo_detections' in settings:
                 self.udp_client.send_setting('show_raw_yolo_detections', 1 if settings['show_raw_yolo_detections'] else 0)
+            if 'ball_processing_density' in settings:
+                self.udp_client.send_setting('ball_processing_density', settings['ball_processing_density'])
+            if 'pose_processing_density' in settings:
+                self.udp_client.send_setting('pose_processing_density', settings['pose_processing_density'])
             
             # Send tracker-specific settings based on active tracker
             if tracker_type == "depth_based":

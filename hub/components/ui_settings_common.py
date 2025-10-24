@@ -409,6 +409,35 @@ class CommonSettingsSections:
         )
         row += 1
         
+        # Ball Processing Density Slider (same as pose processing density)
+        self.parent.ball_density_slider, self.parent.ball_density_label = self.parent._create_slider_widget(
+            parent_layout=dnn_layout,
+            row=row,
+            label_text="Processing Density (%)",
+            tooltip_text="Percentage of frames to process with ball detection model.\n"
+                         "100% = Every frame (real-time)\n"
+                         "50% = Every 2nd frame (default, balanced)\n"
+                         "33% = Every 3rd frame (power saver)\n"
+                         "25% = Every 4th frame (low)\n"
+                         "Range: 10-100%. Default: 50%.\n"
+                         "Lower values save CPU/GPU but reduce ball detection smoothness.",
+            range_min=10,
+            range_max=100,
+            initial_value=50,
+            update_func=lambda v: self.parent.update_setting('ball_processing_density', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Density description label
+        self.parent.ball_density_desc = QLabel("Balanced (Every 2nd frame)")
+        self.parent.ball_density_desc.setStyleSheet("color: #4CAF50; font-size: 9px; font-style: italic;")
+        dnn_layout.addWidget(self.parent.ball_density_desc, row, 1, 1, 2)
+        row += 1
+        
+        # Connect slider to update description
+        self.parent.ball_density_slider.valueChanged.connect(self._update_ball_density_description)
+        
         # Visualization toggle for raw detections
         self.parent.show_raw_yolo_toggle = QPushButton("Show Raw YOLO Detections")
         self.parent.show_raw_yolo_toggle.setCheckable(True)
@@ -527,3 +556,33 @@ class CommonSettingsSections:
         
         self.parent.pose_density_desc.setText(desc)
         self.parent.pose_density_desc.setStyleSheet(f"color: {color}; font-size: 9px; font-style: italic;")
+    
+    def _update_ball_density_description(self, value):
+        """Update the ball density description label based on slider value"""
+        if value >= 100:
+            desc = "Real-time (Every frame)"
+            color = "#FF9800"  # Orange
+        elif value >= 90:
+            desc = "Near Real-time (9/10 frames)"
+            color = "#8BC34A"  # Light green
+        elif value >= 75:
+            desc = "High Quality (3/4 frames)"
+            color = "#4CAF50"  # Green
+        elif value >= 67:
+            desc = "Balanced (2/3 frames)"
+            color = "#4CAF50"  # Green
+        elif value == 50:
+            desc = "Balanced (Every 2nd frame)"
+            color = "#4CAF50"  # Green
+        elif value >= 33:
+            desc = "Medium (Every 3rd frame)"
+            color = "#2196F3"  # Blue
+        elif value >= 25:
+            desc = "Power Saver (Every 4th frame)"
+            color = "#2196F3"  # Blue
+        else:
+            desc = f"Low ({value}% of frames)"
+            color = "#9E9E9E"  # Gray
+        
+        self.parent.ball_density_desc.setText(desc)
+        self.parent.ball_density_desc.setStyleSheet(f"color: {color}; font-size: 9px; font-style: italic;")

@@ -192,6 +192,7 @@ struct New3DTrackerSettings {
     // === YOLO INTEGRATION ===
     bool enable_ball_detection = true;              // Enable/disable YOLO ball detection
     bool enable_pose_estimation = true;             // Enable/disable YOLO pose estimation
+    int ball_processing_density = 50;               // Percentage of frames to process ball detection (10-100%)
     int pose_processing_density = 50;               // Percentage of frames to process pose (10-100%)
     float ball_confidence_threshold = 0.25f;        // Min confidence for 'ball' class
     float ball_held_confidence_threshold = 0.25f;   // Min confidence for 'ball_held' class
@@ -703,6 +704,7 @@ private:
     
     std::chrono::steady_clock::time_point last_update_time_;  // Last update timestamp
     int frame_counter_ = 0;                                   // Frame counter for debug logging
+    int ball_frame_counter_ = 0;                              // Frame counter for ball detection skipping
     int pose_frame_counter_ = 0;                              // Frame counter for pose detection skipping
     
     // ========================================================================

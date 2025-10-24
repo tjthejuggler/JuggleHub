@@ -566,6 +566,12 @@ bool SimpleBallTracker::updateSetting(const std::string& key, const std::string&
             pose_processing_density_ = std::max(0, std::min(100, val));
             return true;
         }
+        else if (key == "ball_processing_density") {
+            int val = std::stoi(value);
+            // Clamp value to 0-100 range
+            ball_processing_density_ = std::max(0, std::min(100, val));
+            return true;
+        }
     } catch (const std::exception& e) {
         return false;
     }
@@ -1010,10 +1016,42 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> SimpleBallTracker::up
     float preprocess_scale_x, preprocess_scale_y;
     cv::Mat preprocessed_frame = preprocess(color_frame, preprocess_scale_x, preprocess_scale_y);
     
-    // Run YOLO detection
-    std::cout << "[FRAME " << frame_counter_ << "] Running YOLO detection..." << std::endl;
-    std::vector<Detection> yolo_detections = runBallDetection(preprocessed_frame, preprocess_scale_x, preprocess_scale_y, color_frame, depth_frame, intrinsics);
-    std::cout << "[FRAME " << frame_counter_ << "] YOLO detection complete: " << yolo_detections.size() << " detections" << std::endl;
+    // Run YOLO ball detection with density-based frame skipping
+    std::vector<Detection> yolo_detections;
+    
+    // Increment frame counter
+    ball_frame_counter_++;
+    
+    // Determine if we should process ball detection this frame based on density setting
+    bool should_process_ball = false;
+    
+    if (ball_processing_density_ >= 100) {
+        // 100%: Process every frame
+        should_process_ball = true;
+    } else if (ball_processing_density_ <= 0) {
+        // 0% or less: Never process (edge case)
+        should_process_ball = false;
+    } else if (ball_processing_density_ >= 50) {
+        // 50-99%: Skip 1 out of N frames
+        // Example: 75% = skip 1 out of 4 frames (process 3, skip 1)
+        int skip_interval = static_cast<int>(100.0f / (100.0f - ball_processing_density_));
+        should_process_ball = (ball_frame_counter_ % skip_interval != 0);
+    } else {
+        // 1-49%: Process 1 out of N frames
+        // Example: 25% = process 1 out of 4 frames
+        int process_interval = static_cast<int>(100.0f / ball_processing_density_);
+        should_process_ball = (ball_frame_counter_ % process_interval == 1);
+    }
+    
+    if (should_process_ball) {
+        std::cout << "[FRAME " << frame_counter_ << "] Running YOLO ball detection (density: " << ball_processing_density_ << "%)..." << std::endl;
+        yolo_detections = runBallDetection(preprocessed_frame, preprocess_scale_x, preprocess_scale_y, color_frame, depth_frame, intrinsics);
+        std::cout << "[FRAME " << frame_counter_ << "] YOLO ball detection complete: " << yolo_detections.size() << " detections" << std::endl;
+    } else {
+        std::cout << "[FRAME " << frame_counter_ << "] Skipping YOLO ball detection (density: " << ball_processing_density_ << "%)" << std::endl;
+        // Return empty detections vector when skipping
+        yolo_detections = std::vector<Detection>();
+    }
     
     // PERFORMANCE FIX: Only evaluate override criteria for recording/debugging
     // During normal operation, we evaluate lazily per-ball (much faster)

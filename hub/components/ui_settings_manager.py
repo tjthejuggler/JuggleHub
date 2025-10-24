@@ -168,9 +168,11 @@ class SettingsManager:
             'ball_held_confidence_threshold',
             'nms_threshold',
             'show_raw_yolo_detections',
+            'ball_processing_density',
             
             # Pose model
             'pose_model_enabled',
+            'pose_processing_density',
             
             # UI state
             'collapsed_camera',
@@ -217,7 +219,9 @@ class SettingsManager:
             'ball_held_confidence_threshold': 0.25,
             'nms_threshold': 0.50,
             'show_raw_yolo_detections': False,
+            'ball_processing_density': 50,
             'pose_model_enabled': True,
+            'pose_processing_density': 50,
             'collapsed_camera': False,
             'collapsed_yolo': False,
             'collapsed_pose': False,

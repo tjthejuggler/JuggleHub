@@ -70,6 +70,24 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> Simple2DBallTracker::
     std::vector<Detection> ball_detections;
     std::vector<SimpleHand> hands;
     
+    // Determine if we should process ball detection this frame based on density setting
+    bool should_process_ball = false;
+    if (enable_ball_detection_) {
+        ball_frame_counter_++;
+        
+        if (ball_processing_density_ >= 100) {
+            should_process_ball = true;
+        } else if (ball_processing_density_ <= 0) {
+            should_process_ball = false;
+        } else if (ball_processing_density_ >= 50) {
+            int skip_interval = static_cast<int>(100.0f / (100.0f - ball_processing_density_));
+            should_process_ball = (ball_frame_counter_ % skip_interval != 0);
+        } else {
+            int process_interval = static_cast<int>(100.0f / ball_processing_density_);
+            should_process_ball = (ball_frame_counter_ % process_interval == 1);
+        }
+    }
+    
     // Determine if we should process pose this frame based on density setting
     bool should_process_pose = false;
     if (enable_pose_detection_) {
@@ -92,8 +110,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> Simple2DBallTracker::
         // OPTIMIZED PATH: Asynchronous inference with overlapping execution
         // This allows the GPU to pipeline both model executions
         
-        // 1. Start ball detection inference (non-blocking)
-        if (enable_ball_detection_) {
+        // 1. Start ball detection inference (non-blocking) with density-based skipping
+        if (should_process_ball) {
             ov::Tensor ball_input_tensor(ball_model_.input().get_element_type(),
                                          ball_model_.input().get_shape(),
                                          preprocessed.data);
@@ -111,12 +129,14 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> Simple2DBallTracker::
         }
         
         // 3. Wait for ball detection to complete
-        if (enable_ball_detection_) {
+        if (should_process_ball) {
             ball_infer_.wait();
             
             // 4. Process ball detection results while pose may still be running
             ball_detections = runBallDetection(preprocessed, scale_x, scale_y);
-            std::cout << "[Simple2DBallTracker] Ball detections: " << ball_detections.size() << std::endl;
+            std::cout << "[Simple2DBallTracker] Ball detections: " << ball_detections.size() << " (density: " << ball_processing_density_ << "%)" << std::endl;
+        } else if (enable_ball_detection_) {
+            std::cout << "[Simple2DBallTracker] Skipping ball detection (density: " << ball_processing_density_ << "%)" << std::endl;
         }
         
         // 5. Wait for pose estimation to complete
@@ -131,13 +151,17 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> Simple2DBallTracker::
         }
     } else {
         // FALLBACK PATH: Synchronous inference (original behavior)
-        ball_detections = runBallDetection(preprocessed, scale_x, scale_y);
-        std::cout << "[Simple2DBallTracker] Ball detections: " << ball_detections.size() << std::endl;
+        if (should_process_ball) {
+            ball_detections = runBallDetection(preprocessed, scale_x, scale_y);
+            std::cout << "[Simple2DBallTracker] Ball detections: " << ball_detections.size() << " (density: " << ball_processing_density_ << "%)" << std::endl;
+        } else if (enable_ball_detection_) {
+            std::cout << "[Simple2DBallTracker] Skipping ball detection (density: " << ball_processing_density_ << "%)" << std::endl;
+        }
         
         if (should_process_pose) {
             hands = runPoseEstimation(preprocessed, scale_x, scale_y);
             std::cout << "[Simple2DBallTracker] Hands detected: " << hands.size() << " (density: " << pose_processing_density_ << "%)" << std::endl;
-        } else {
+        } else if (enable_pose_detection_) {
             std::cout << "[Simple2DBallTracker] Skipping pose estimation (density: " << pose_processing_density_ << "%)" << std::endl;
         }
     }
@@ -528,6 +552,14 @@ bool Simple2DBallTracker::updateSetting(const std::string& key, const std::strin
         pose_processing_density_ = std::max(0, std::min(100, val));
         std::cout << "[Simple2DBallTracker] Pose processing density set to "
                   << pose_processing_density_ << "%" << std::endl;
+        return true;
+    }
+    else if (key == "ball_processing_density") {
+        int val = std::stoi(value);
+        // Clamp value to 0-100 range
+        ball_processing_density_ = std::max(0, std::min(100, val));
+        std::cout << "[Simple2DBallTracker] Ball processing density set to "
+                  << ball_processing_density_ << "%" << std::endl;
         return true;
     }
     

@@ -264,6 +264,8 @@ private:
     float nms_threshold_;                       // Non-maximum suppression threshold
     bool enable_ball_detection_;                // Enable/disable YOLO ball detection
     bool enable_pose_detection_;                // Enable/disable YOLO pose detection
+    int ball_processing_density_;               // Percentage of frames to process ball detection (10-100%)
+    int ball_frame_counter_;                    // Frame counter for ball detection skipping
     int pose_processing_density_;               // Percentage of frames to process pose (10-100%)
     int pose_frame_counter_;                    // Frame counter for pose detection skipping
     

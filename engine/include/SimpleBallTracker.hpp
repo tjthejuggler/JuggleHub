@@ -514,6 +514,8 @@ private:
     bool show_raw_yolo_detections_ = false;        // Toggle for showing raw YOLO detections in visualization
     bool enable_ball_detection_ = true;            // Toggle for enabling/disabling YOLO ball detection
     bool enable_pose_detection_ = true;            // Toggle for enabling/disabling YOLO pose detection
+    int ball_processing_density_ = 50;             // Percentage of frames to process ball detection (10-100%)
+    int ball_frame_counter_ = 0;                   // Frame counter for ball detection skipping
     int pose_processing_density_ = 50;             // Percentage of frames to process pose (10-100%)
     int pose_frame_counter_ = 0;                   // Frame counter for pose detection skipping
     const int num_classes_ = 2;  // ball, ball_held

@@ -348,6 +348,7 @@ message VisualizationStates {
   bool show_tails = 14;
   bool show_trajectory = 15;  // Show trajectory path for in-flight balls
   bool show_hand_velocity_zone = 16;  // Show hand velocity detection zones
+  bool show_yolo_color_calibration = 17;  // Show 8x8 colored squares for YOLO color calibration
 }
 
 message ColorCommand {

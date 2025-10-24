@@ -423,6 +423,13 @@ if PYQT_AVAILABLE:
             self.hide_video_feed_toggle.setToolTip("Hide the video feed but keep overlays visible (FPS boost)")
             toggle_buttons.append(self.hide_video_feed_toggle)
             
+            self.show_yolo_color_calibration_toggle = QPushButton("yolo_color_calibration")
+            self.show_yolo_color_calibration_toggle.setCheckable(True)
+            self.show_yolo_color_calibration_toggle.setChecked(False)
+            self.show_yolo_color_calibration_toggle.clicked.connect(self.toggle_overlays)
+            self.show_yolo_color_calibration_toggle.setToolTip("Show 8x8 colored squares indicating YOLO-detected color for each detection")
+            toggle_buttons.append(self.show_yolo_color_calibration_toggle)
+            
             # Add buttons to grid layout - they will wrap automatically
             # Use 5 columns for better packing
             max_columns = 5
@@ -1105,6 +1112,110 @@ if PYQT_AVAILABLE:
                     class_label = "ball" if det.class_id == 0 else "ball_held" if det.class_id == 1 else f"class_{det.class_id}"
                     painter.drawText(int(det.x) + 5, int(det.y) + 15, class_label)
             
+            # --- Draw YOLO Color Calibration Squares (8x8 colored squares) ---
+            # Shows the detected color for each YOLO detection as a small square
+            # IMPORTANT: We match detections to tracked balls to show the ACTUAL color determined by the tracker
+            if self.show_yolo_color_calibration_toggle.isChecked():
+                # Get color map from profile manager
+                color_name_map = self.color_profile_manager.get_color_map()
+                
+                # Build a map of detection positions to ball colors
+                # Match each raw detection to a tracked ball by finding the closest ball
+                for det in frame_data.raw_detections:
+                    det_center_x = det.x + det.width / 2
+                    det_center_y = det.y + det.height / 2
+                    
+                    # Find the closest tracked ball to this detection
+                    closest_ball = None
+                    min_dist = float('inf')
+                    
+                    for ball in frame_data.color_tracked_balls:
+                        # Calculate distance between detection center and ball pixel position
+                        dx = ball.pixel_pos.x - det_center_x
+                        dy = ball.pixel_pos.y - det_center_y
+                        dist = (dx * dx + dy * dy) ** 0.5
+                        
+                        if dist < min_dist and dist < 50:  # Within 50 pixels
+                            min_dist = dist
+                            closest_ball = ball
+                    
+                    # Determine color to show
+                    if closest_ball and closest_ball.color_name:
+                        # Use the tracker's determined color
+                        color_name = closest_ball.color_name
+                        print(f"🎨 Detection at ({det_center_x:.0f}, {det_center_y:.0f}) matched to ball with color: {color_name}")
+                    else:
+                        # No ball matched - sample the image color as fallback
+                        center_x = int(det_center_x)
+                        center_y = int(det_center_y)
+                        
+                        if center_x >= 0 and center_x < image.width() and center_y >= 0 and center_y < image.height():
+                            # Get the pixel color from the original image
+                            pixel_color = image.pixelColor(center_x, center_y)
+                            
+                            # Extract RGB values directly from QColor
+                            r = pixel_color.red()
+                            g = pixel_color.green()
+                            b = pixel_color.blue()
+                            
+                            # Create numpy array with BGR format for OpenCV
+                            bgr = np.array([[[b, g, r]]], dtype=np.uint8)
+                            
+                            # Convert BGR to HSV
+                            hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+                            
+                            # Find closest color profile
+                            color_name = "white"  # Default
+                            min_distance = float('inf')
+                            
+                            # Load color profiles to find closest match
+                            try:
+                                import json
+                                with open('hub/color_profiles.json', 'r') as f:
+                                    color_profiles = json.load(f)
+                                    
+                                    det_hue = float(hsv[0, 0, 0])
+                                    det_sat = float(hsv[0, 0, 1])
+                                    
+                                    print(f"🔍 Sampled HSV at ({center_x}, {center_y}): H={det_hue:.1f}, S={det_sat:.1f}")
+                                    
+                                    for profile in color_profiles:
+                                        if profile.get('enabled', False):
+                                            profile_hue = profile.get('avg_hue', 0)
+                                            profile_sat = profile.get('avg_saturation', 0)
+                                            
+                                            # Calculate euclidean distance in HS space
+                                            hue_diff = abs(det_hue - profile_hue)
+                                            if hue_diff > 90.0:
+                                                hue_diff = 180.0 - hue_diff
+                                            
+                                            sat_diff = det_sat - profile_sat
+                                            distance = (hue_diff ** 2 + sat_diff ** 2) ** 0.5
+                                            
+                                            if distance < min_distance:
+                                                min_distance = distance
+                                                color_name = profile['name']
+                                    
+                                    print(f"🎯 Closest color: {color_name} (distance: {min_distance:.1f})")
+                            except Exception as e:
+                                print(f"❌ Error loading color profiles: {e}")
+                        else:
+                            color_name = "white"
+                            print(f"⚠️ Detection center out of bounds: ({center_x}, {center_y})")
+                    
+                    # Get the QColor for this profile
+                    qcolor = color_name_map.get(color_name.lower(), QColor(255, 255, 255))
+                    
+                    # Draw 8x8 solid square at upper left corner of detection bbox
+                    square_x = int(det.x)
+                    square_y = int(det.y)
+                    square_size = 8
+                    
+                    # Draw the solid colored square
+                    painter.setBrush(QBrush(qcolor))
+                    painter.setPen(QPen(QColor(0, 0, 0), 1))  # Black border
+                    painter.drawRect(square_x, square_y, square_size, square_size)
+            
             # NOTE: tracker_associations and new_trackers visualization removed (not populated by engine)
             
             # --- Draw Unmatched Detections (Step 13) ---
@@ -1649,6 +1760,7 @@ if PYQT_AVAILABLE:
             viz_states.show_tails = self.show_tails_toggle.isChecked()
             viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
             viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
+            viz_states.show_yolo_color_calibration = self.show_yolo_color_calibration_toggle.isChecked()
             
             command = juggler_pb2.CommandRequest(
                 type=juggler_pb2.CommandRequest.CommandType.RECORD_START,
@@ -1687,6 +1799,7 @@ if PYQT_AVAILABLE:
                 viz_states.show_tails = self.show_tails_toggle.isChecked()
                 viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
                 viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
+                viz_states.show_yolo_color_calibration = self.show_yolo_color_calibration_toggle.isChecked()
                 command.visualization_states.CopyFrom(viz_states)
             
             try:

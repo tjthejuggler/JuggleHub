@@ -6161,6 +6161,7 @@ class VisualizationStates final :
     kShowTailsFieldNumber = 14,
     kShowTrajectoryFieldNumber = 15,
     kShowHandVelocityZoneFieldNumber = 16,
+    kShowYoloColorCalibrationFieldNumber = 17,
   };
   // bool show_trajectory_predictions = 1;
   void clear_show_trajectory_predictions();
@@ -6306,6 +6307,15 @@ class VisualizationStates final :
   void _internal_set_show_hand_velocity_zone(bool value);
   public:
 
+  // bool show_yolo_color_calibration = 17;
+  void clear_show_yolo_color_calibration();
+  bool show_yolo_color_calibration() const;
+  void set_show_yolo_color_calibration(bool value);
+  private:
+  bool _internal_show_yolo_color_calibration() const;
+  void _internal_set_show_yolo_color_calibration(bool value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.VisualizationStates)
  private:
   class _Internal;
@@ -6330,6 +6340,7 @@ class VisualizationStates final :
     bool show_tails_;
     bool show_trajectory_;
     bool show_hand_velocity_zone_;
+    bool show_yolo_color_calibration_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -13585,6 +13596,26 @@ inline void VisualizationStates::_internal_set_show_hand_velocity_zone(bool valu
 inline void VisualizationStates::set_show_hand_velocity_zone(bool value) {
   _internal_set_show_hand_velocity_zone(value);
   // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_hand_velocity_zone)
+}
+
+// bool show_yolo_color_calibration = 17;
+inline void VisualizationStates::clear_show_yolo_color_calibration() {
+  _impl_.show_yolo_color_calibration_ = false;
+}
+inline bool VisualizationStates::_internal_show_yolo_color_calibration() const {
+  return _impl_.show_yolo_color_calibration_;
+}
+inline bool VisualizationStates::show_yolo_color_calibration() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_yolo_color_calibration)
+  return _internal_show_yolo_color_calibration();
+}
+inline void VisualizationStates::_internal_set_show_yolo_color_calibration(bool value) {
+  
+  _impl_.show_yolo_color_calibration_ = value;
+}
+inline void VisualizationStates::set_show_yolo_color_calibration(bool value) {
+  _internal_set_show_yolo_color_calibration(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_yolo_color_calibration)
 }
 
 // -------------------------------------------------------------------

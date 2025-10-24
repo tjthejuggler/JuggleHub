@@ -957,7 +957,8 @@ void Engine::saveRecording() {
                                  visualization_states_.show_unmatched_detections() ||
                                  visualization_states_.show_tails() ||
                                  visualization_states_.show_trajectory() ||
-                                 visualization_states_.show_hand_velocity_zone();
+                                 visualization_states_.show_hand_velocity_zone() ||
+                                 visualization_states_.show_yolo_color_calibration();
 
         if (has_visualizations) {
             writeDebugLog("saveRecording() - Visualizations enabled, rendering frames...");
@@ -1116,7 +1117,8 @@ void Engine::stopContinuousRecording() {
                                  visualization_states_.show_unmatched_detections() ||
                                  visualization_states_.show_tails() ||
                                  visualization_states_.show_trajectory() ||
-                                 visualization_states_.show_hand_velocity_zone();
+                                 visualization_states_.show_hand_velocity_zone() ||
+                                 visualization_states_.show_yolo_color_calibration();
 
         if (has_visualizations) {
             fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
@@ -1509,6 +1511,99 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
             }
             
             det_num++;
+        }
+    }
+    
+    // Draw YOLO Color Calibration Squares (8x8 colored squares)
+    // Shows the detected color for each YOLO detection as a small square
+    if (viz.show_yolo_color_calibration()) {
+        // Load color profiles for color matching
+        std::vector<ColorProfile> color_profiles;
+        std::map<std::string, cv::Scalar> color_map;
+        try {
+            std::ifstream color_file("hub/color_profiles.json");
+            if (color_file.is_open()) {
+                nlohmann::json color_profiles_json;
+                color_file >> color_profiles_json;
+                
+                for (const auto& profile : color_profiles_json) {
+                    if (profile["enabled"]) {
+                        ColorProfile cp;
+                        cp.name = profile["name"];
+                        cp.enabled = true;
+                        cp.avg_hue = profile["avg_hue"];
+                        cp.avg_saturation = profile["avg_saturation"];
+                        color_profiles.push_back(cp);
+                        
+                        // Also build color map for BGR colors
+                        std::vector<int> rgb = profile["rgb"];
+                        // Convert RGB to BGR for OpenCV
+                        color_map[cp.name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
+                    }
+                }
+            }
+        } catch (...) {
+            // If loading fails, continue without color calibration visualization
+        }
+        
+        if (!color_profiles.empty()) {
+            for (const auto& det : rec_frame.raw_detections) {
+                // Sample color at detection center
+                int center_x = static_cast<int>(det.box.x + det.box.width / 2);
+                int center_y = static_cast<int>(det.box.y + det.box.height / 2);
+                
+                if (center_x >= 0 && center_x < frame.cols && center_y >= 0 && center_y < frame.rows) {
+                    // Convert BGR to HSV for the detection center
+                    cv::Mat roi = frame(cv::Rect(center_x, center_y, 1, 1));
+                    cv::Mat hsv_roi;
+                    cv::cvtColor(roi, hsv_roi, cv::COLOR_BGR2HSV);
+                    cv::Vec3b hsv_pixel = hsv_roi.at<cv::Vec3b>(0, 0);
+                    float det_hue = hsv_pixel[0];
+                    float det_sat = hsv_pixel[1];
+                    
+                    // Find closest color profile
+                    std::string closest_color = "white";
+                    float min_distance = 999.0f;
+                    
+                    for (const auto& profile : color_profiles) {
+                        // Handle hue wrap-around (0-180 scale)
+                        float hue_diff = std::abs(det_hue - profile.avg_hue);
+                        if (hue_diff > 90.0f) {
+                            hue_diff = 180.0f - hue_diff;
+                        }
+                        
+                        float sat_diff = det_sat - profile.avg_saturation;
+                        float distance = std::sqrt(hue_diff * hue_diff + sat_diff * sat_diff);
+                        
+                        if (distance < min_distance) {
+                            min_distance = distance;
+                            closest_color = profile.name;
+                        }
+                    }
+                    
+                    // Get the BGR color for this profile
+                    cv::Scalar square_color = cv::Scalar(255, 255, 255);  // Default white
+                    auto it = color_map.find(closest_color);
+                    if (it != color_map.end()) {
+                        square_color = it->second;
+                    }
+                    
+                    // Draw 8x8 solid square at upper left corner of detection bbox
+                    int square_x = static_cast<int>(det.box.x);
+                    int square_y = static_cast<int>(det.box.y);
+                    int square_size = 8;
+                    
+                    // Draw the solid colored square
+                    cv::rectangle(temp_result,
+                                cv::Rect(square_x, square_y, square_size, square_size),
+                                square_color, -1);  // -1 for filled rectangle
+                    
+                    // Draw black border around square for visibility
+                    cv::rectangle(temp_result,
+                                cv::Rect(square_x, square_y, square_size, square_size),
+                                cv::Scalar(0, 0, 0), 1);  // 1px black border
+                }
+            }
         }
     }
     

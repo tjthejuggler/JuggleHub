@@ -245,6 +245,40 @@ void Engine::run() {
 
         // Only encode JPG if video feed is enabled (FPS optimization)
         if (video_feed_enabled_) {
+            // Clone the color image so we can draw visualizations on it without affecting the original
+            cv::Mat display_image = color_image.clone();
+            
+            // Draw YOLO Color Calibration Squares on real-time feed if enabled
+            // This shows the ACTUAL detected color from each YOLO detection
+            if (visualization_states_.show_yolo_color_calibration() && !last_raw_detections_.empty()) {
+                for (const auto& det : last_raw_detections_) {
+                    // Sample color at detection center
+                    int center_x = static_cast<int>(det.box.x + det.box.width / 2);
+                    int center_y = static_cast<int>(det.box.y + det.box.height / 2);
+                    
+                    if (center_x >= 0 && center_x < color_image.cols && center_y >= 0 && center_y < color_image.rows) {
+                        // Get the ACTUAL BGR color from the pixel at detection center
+                        cv::Vec3b bgr_pixel = color_image.at<cv::Vec3b>(center_y, center_x);
+                        cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
+                        
+                        // Draw 8x8 solid square at upper left corner of detection bbox
+                        int square_x = static_cast<int>(det.box.x);
+                        int square_y = static_cast<int>(det.box.y);
+                        int square_size = 8;
+                        
+                        // Draw the solid colored square with ACTUAL detected color
+                        cv::rectangle(display_image,
+                                    cv::Rect(square_x, square_y, square_size, square_size),
+                                    actual_color, -1);  // -1 for filled rectangle
+                        
+                        // Draw black border around square for visibility
+                        cv::rectangle(display_image,
+                                    cv::Rect(square_x, square_y, square_size, square_size),
+                                    cv::Scalar(0, 0, 0), 1);  // 1px black border
+                    }
+                }
+            }
+            
             std::vector<uchar> buf;
             // FPS OPTIMIZATION: Use lower JPEG quality (70 instead of default 95)
             // This reduces encoding time by ~30-40% with minimal visual quality loss
@@ -252,7 +286,7 @@ void Engine::run() {
             std::vector<int> compression_params;
             compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
             compression_params.push_back(70);  // 70% quality for faster encoding
-            cv::imencode(".jpg", color_image, buf, compression_params);
+            cv::imencode(".jpg", display_image, buf, compression_params);
             frame_data.set_color_image_b64(buf.data(), buf.size());
         } else {
         }
@@ -1518,92 +1552,31 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     }
     
     // Draw YOLO Color Calibration Squares (8x8 colored squares)
-    // Shows the detected color for each YOLO detection as a small square
+    // CRITICAL: Shows the ACTUAL detected color from the pixel, NOT the matched color profile
+    // This allows us to see what YOLO actually detected and understand why it may not match
     if (viz.show_yolo_color_calibration()) {
-        // Load color profiles for color matching
-        std::vector<ColorProfile> color_profiles;
-        std::map<std::string, cv::Scalar> color_map;
-        try {
-            std::ifstream color_file("hub/config/color_profiles.json");
-            if (color_file.is_open()) {
-                nlohmann::json color_profiles_json;
-                color_file >> color_profiles_json;
-                
-                // Access the "profiles" array from the JSON structure
-                if (color_profiles_json.contains("profiles") && color_profiles_json["profiles"].is_array()) {
-                    for (const auto& profile : color_profiles_json["profiles"]) {
-                    if (profile["enabled"]) {
-                        ColorProfile cp;
-                        cp.name = profile["name"];
-                        cp.enabled = true;
-                        cp.avg_hue = profile["avg_hue"];
-                        cp.avg_saturation = profile["avg_saturation"];
-                        color_profiles.push_back(cp);
-                        
-                        // Also build color map for BGR colors
-                        std::vector<int> rgb = profile["rgb"];
-                        // Convert RGB to BGR for OpenCV
-                        color_map[cp.name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
-                    }
-                }
-                }
-            }
-        } catch (...) {
-            // If loading fails, continue without color calibration visualization
-        }
-        
-        // Only draw squares if we have both color profiles AND detections
-        if (!color_profiles.empty() && !rec_frame.raw_detections.empty()) {
+        // Only draw squares if we have detections
+        if (!rec_frame.raw_detections.empty()) {
             for (const auto& det : rec_frame.raw_detections) {
                 // Sample color at detection center
                 int center_x = static_cast<int>(det.box.x + det.box.width / 2);
                 int center_y = static_cast<int>(det.box.y + det.box.height / 2);
                 
                 if (center_x >= 0 && center_x < frame.cols && center_y >= 0 && center_y < frame.rows) {
-                    // Convert BGR to HSV for the detection center
-                    cv::Mat roi = frame(cv::Rect(center_x, center_y, 1, 1));
-                    cv::Mat hsv_roi;
-                    cv::cvtColor(roi, hsv_roi, cv::COLOR_BGR2HSV);
-                    cv::Vec3b hsv_pixel = hsv_roi.at<cv::Vec3b>(0, 0);
-                    float det_hue = hsv_pixel[0];
-                    float det_sat = hsv_pixel[1];
-                    
-                    // Find closest color profile
-                    std::string closest_color = "white";
-                    float min_distance = 999.0f;
-                    
-                    for (const auto& profile : color_profiles) {
-                        // Handle hue wrap-around (0-180 scale)
-                        float hue_diff = std::abs(det_hue - profile.avg_hue);
-                        if (hue_diff > 90.0f) {
-                            hue_diff = 180.0f - hue_diff;
-                        }
-                        
-                        float sat_diff = det_sat - profile.avg_saturation;
-                        float distance = std::sqrt(hue_diff * hue_diff + sat_diff * sat_diff);
-                        
-                        if (distance < min_distance) {
-                            min_distance = distance;
-                            closest_color = profile.name;
-                        }
-                    }
-                    
-                    // Get the BGR color for this profile
-                    cv::Scalar square_color = cv::Scalar(255, 255, 255);  // Default white
-                    auto it = color_map.find(closest_color);
-                    if (it != color_map.end()) {
-                        square_color = it->second;
-                    }
+                    // Get the ACTUAL BGR color from the pixel at detection center
+                    cv::Vec3b bgr_pixel = frame.at<cv::Vec3b>(center_y, center_x);
+                    cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
                     
                     // Draw 8x8 solid square at upper left corner of detection bbox
+                    // This shows the ACTUAL detected color, not the matched profile color
                     int square_x = static_cast<int>(det.box.x);
                     int square_y = static_cast<int>(det.box.y);
                     int square_size = 8;
                     
-                    // Draw the solid colored square
+                    // Draw the solid colored square with ACTUAL detected color
                     cv::rectangle(temp_result,
                                 cv::Rect(square_x, square_y, square_size, square_size),
-                                square_color, -1);  // -1 for filled rectangle
+                                actual_color, -1);  // -1 for filled rectangle
                     
                     // Draw black border around square for visibility
                     cv::rectangle(temp_result,

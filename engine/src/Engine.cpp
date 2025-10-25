@@ -251,7 +251,10 @@ void Engine::run() {
             // Draw YOLO Color Calibration Squares on real-time feed if enabled
             // This shows the ACTUAL detected color from each YOLO detection
             if (visualization_states_.show_yolo_color_calibration() && !last_raw_detections_.empty()) {
+                INFO_LOG("=== YOLO Color Squares - Frame ", frame_counter_, " ===");
+                int det_num = 0;
                 for (const auto& det : last_raw_detections_) {
+                    det_num++;
                     // Sample color at detection center
                     int center_x = static_cast<int>(det.box.x + det.box.width / 2);
                     int center_y = static_cast<int>(det.box.y + det.box.height / 2);
@@ -260,6 +263,11 @@ void Engine::run() {
                         // Get the ACTUAL BGR color from the pixel at detection center
                         cv::Vec3b bgr_pixel = color_image.at<cv::Vec3b>(center_y, center_x);
                         cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
+                        
+                        // LOG THE EXACT COLOR VALUES
+                        INFO_LOG("  Detection #", det_num, " at (", center_x, ",", center_y,
+                                ") - BGR: (", (int)bgr_pixel[0], ",", (int)bgr_pixel[1], ",", (int)bgr_pixel[2],
+                                ") - Square drawn at (", (int)det.box.x, ",", (int)det.box.y, ")");
                         
                         // Draw 8x8 solid square at upper left corner of detection bbox
                         int square_x = static_cast<int>(det.box.x);
@@ -275,6 +283,9 @@ void Engine::run() {
                         cv::rectangle(display_image,
                                     cv::Rect(square_x, square_y, square_size, square_size),
                                     cv::Scalar(0, 0, 0), 1);  // 1px black border
+                    } else {
+                        INFO_LOG("  Detection #", det_num, " SKIPPED - center (", center_x, ",", center_y,
+                                ") out of bounds (image size: ", color_image.cols, "x", color_image.rows, ")");
                     }
                 }
             }
@@ -1557,7 +1568,10 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     if (viz.show_yolo_color_calibration()) {
         // Only draw squares if we have detections
         if (!rec_frame.raw_detections.empty()) {
+            writeDebugLog("=== RECORDING: YOLO Color Squares ===");
+            int det_num = 0;
             for (const auto& det : rec_frame.raw_detections) {
+                det_num++;
                 // Sample color at detection center
                 int center_x = static_cast<int>(det.box.x + det.box.width / 2);
                 int center_y = static_cast<int>(det.box.y + det.box.height / 2);
@@ -1566,6 +1580,15 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                     // Get the ACTUAL BGR color from the pixel at detection center
                     cv::Vec3b bgr_pixel = frame.at<cv::Vec3b>(center_y, center_x);
                     cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
+                    
+                    // LOG THE EXACT COLOR VALUES FOR RECORDING
+                    writeDebugLog("  REC Detection #" + std::to_string(det_num) +
+                                 " at (" + std::to_string(center_x) + "," + std::to_string(center_y) +
+                                 ") - BGR: (" + std::to_string((int)bgr_pixel[0]) + "," +
+                                 std::to_string((int)bgr_pixel[1]) + "," +
+                                 std::to_string((int)bgr_pixel[2]) +
+                                 ") - Square at (" + std::to_string((int)det.box.x) + "," +
+                                 std::to_string((int)det.box.y) + ")");
                     
                     // Draw 8x8 solid square at upper left corner of detection bbox
                     // This shows the ACTUAL detected color, not the matched profile color
@@ -1582,6 +1605,10 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                     cv::rectangle(temp_result,
                                 cv::Rect(square_x, square_y, square_size, square_size),
                                 cv::Scalar(0, 0, 0), 1);  // 1px black border
+                } else {
+                    writeDebugLog("  REC Detection #" + std::to_string(det_num) +
+                                 " SKIPPED - center (" + std::to_string(center_x) + "," +
+                                 std::to_string(center_y) + ") out of bounds");
                 }
             }
         }

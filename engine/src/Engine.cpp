@@ -1406,12 +1406,14 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         // Load color profiles for distance calculation
         std::vector<ColorProfile> color_profiles;
         try {
-            std::ifstream color_file("hub/color_profiles.json");
+            std::ifstream color_file("hub/config/color_profiles.json");
             if (color_file.is_open()) {
                 nlohmann::json color_profiles_json;
                 color_file >> color_profiles_json;
                 
-                for (const auto& profile : color_profiles_json) {
+                // Access the "profiles" array from the JSON structure
+                if (color_profiles_json.contains("profiles") && color_profiles_json["profiles"].is_array()) {
+                    for (const auto& profile : color_profiles_json["profiles"]) {
                     if (profile["enabled"]) {
                         ColorProfile cp;
                         cp.name = profile["name"];
@@ -1420,6 +1422,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                         cp.avg_saturation = profile["avg_saturation"];
                         color_profiles.push_back(cp);
                     }
+                }
                 }
             }
         } catch (...) {
@@ -1521,12 +1524,14 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         std::vector<ColorProfile> color_profiles;
         std::map<std::string, cv::Scalar> color_map;
         try {
-            std::ifstream color_file("hub/color_profiles.json");
+            std::ifstream color_file("hub/config/color_profiles.json");
             if (color_file.is_open()) {
                 nlohmann::json color_profiles_json;
                 color_file >> color_profiles_json;
                 
-                for (const auto& profile : color_profiles_json) {
+                // Access the "profiles" array from the JSON structure
+                if (color_profiles_json.contains("profiles") && color_profiles_json["profiles"].is_array()) {
+                    for (const auto& profile : color_profiles_json["profiles"]) {
                     if (profile["enabled"]) {
                         ColorProfile cp;
                         cp.name = profile["name"];
@@ -1541,12 +1546,14 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                         color_map[cp.name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
                     }
                 }
+                }
             }
         } catch (...) {
             // If loading fails, continue without color calibration visualization
         }
         
-        if (!color_profiles.empty()) {
+        // Only draw squares if we have both color profiles AND detections
+        if (!color_profiles.empty() && !rec_frame.raw_detections.empty()) {
             for (const auto& det : rec_frame.raw_detections) {
                 // Sample color at detection center
                 int center_x = static_cast<int>(det.box.x + det.box.width / 2);
@@ -1612,12 +1619,14 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         // Load color profiles for distance calculation
         std::vector<ColorProfile> color_profiles;
         try {
-            std::ifstream color_file("hub/color_profiles.json");
+            std::ifstream color_file("hub/config/color_profiles.json");
             if (color_file.is_open()) {
                 nlohmann::json color_profiles_json;
                 color_file >> color_profiles_json;
                 
-                for (const auto& profile : color_profiles_json) {
+                // Access the "profiles" array from the JSON structure
+                if (color_profiles_json.contains("profiles") && color_profiles_json["profiles"].is_array()) {
+                    for (const auto& profile : color_profiles_json["profiles"]) {
                     if (profile["enabled"]) {
                         ColorProfile cp;
                         cp.name = profile["name"];
@@ -1626,6 +1635,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                         cp.avg_saturation = profile["avg_saturation"];
                         color_profiles.push_back(cp);
                     }
+                }
                 }
             }
         } catch (...) {
@@ -1751,16 +1761,19 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         // Load color profiles to get RGB colors for each ball
         std::map<std::string, cv::Scalar> color_map;
         try {
-            std::ifstream color_file("hub/color_profiles.json");
+            std::ifstream color_file("hub/config/color_profiles.json");
             if (color_file.is_open()) {
                 nlohmann::json color_profiles;
                 color_file >> color_profiles;
                 
-                for (const auto& profile : color_profiles) {
-                    std::string name = profile["name"];
-                    std::vector<int> rgb = profile["rgb"];
-                    // Convert RGB to BGR for OpenCV
-                    color_map[name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
+                // Access the "profiles" array from the JSON structure
+                if (color_profiles.contains("profiles") && color_profiles["profiles"].is_array()) {
+                    for (const auto& profile : color_profiles["profiles"]) {
+                        std::string name = profile["name"];
+                        std::vector<int> rgb = profile["rgb"];
+                        // Convert RGB to BGR for OpenCV
+                        color_map[name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
+                    }
                 }
             }
         } catch (...) {
@@ -1885,16 +1898,19 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
         // Load color profiles to get RGB colors for each ball
         std::map<std::string, cv::Scalar> color_map;
         try {
-            std::ifstream color_file("hub/color_profiles.json");
+            std::ifstream color_file("hub/config/color_profiles.json");
             if (color_file.is_open()) {
                 nlohmann::json color_profiles;
                 color_file >> color_profiles;
                 
-                for (const auto& profile : color_profiles) {
-                    std::string name = profile["name"];
-                    std::vector<int> rgb = profile["rgb"];
-                    // Convert RGB to BGR for OpenCV
-                    color_map[name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
+                // Access the "profiles" array from the JSON structure
+                if (color_profiles.contains("profiles") && color_profiles["profiles"].is_array()) {
+                    for (const auto& profile : color_profiles["profiles"]) {
+                        std::string name = profile["name"];
+                        std::vector<int> rgb = profile["rgb"];
+                        // Convert RGB to BGR for OpenCV
+                        color_map[name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
+                    }
                 }
             }
         } catch (...) {
@@ -2135,7 +2151,8 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     
     // Draw hand threshold circles (throw/catch distance thresholds)
     // Shows orange circle for throw threshold and green circle for catch threshold around each hand
-    if (tracker_) {
+    // Only draw if ball_states visualization is enabled (shows held/in-flight state info)
+    if (viz.show_ball_states() && tracker_) {
         tracker_->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics_);
     }
     

@@ -1171,8 +1171,9 @@ if PYQT_AVAILABLE:
                             # Load color profiles to find closest match
                             try:
                                 import json
-                                with open('hub/color_profiles.json', 'r') as f:
-                                    color_profiles = json.load(f)
+                                with open('hub/config/color_profiles.json', 'r') as f:
+                                    color_profiles_data = json.load(f)
+                                    color_profiles = color_profiles_data.get('profiles', [])
                                     
                                     det_hue = float(hsv[0, 0, 0])
                                     det_sat = float(hsv[0, 0, 1])

@@ -2,7 +2,16 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-23 10:05 CEST
+**Last Updated:** 2025-10-25 11:25 CEST
+
+**Recent Changes (2025-10-25):**
+- **🐛 YOLO COLOR CALIBRATION VISUALIZATION FIX**
+  - **Issue Fixed**: Color calibration squares were not appearing in recorded images
+  - **Root Cause**: Code was checking for non-existent `show_yolo_color_calibration_PLACEHOLDER()` function
+  - **Solution**: Fixed function name to correct `show_yolo_color_calibration()` in Engine.cpp
+  - **Impact**: Color squares now properly display in both live feed AND recorded images
+  - **Files Modified**: [`engine/src/Engine.cpp`](engine/src/Engine.cpp:1520)
+  - **Status**: Fixed and rebuilt successfully
 
 **Recent Changes (2025-10-23):**
 - **🎬 RECORDING PLAYBACK FEATURE - COMPLETE ✅**

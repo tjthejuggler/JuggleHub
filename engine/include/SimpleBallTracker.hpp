@@ -159,6 +159,9 @@ struct SimpleBall {
     // Debug info for visualization
     std::string tracking_reason;     // Why this position was chosen (for debugging)
     
+    // YOLO detected color (for logging and visualization)
+    cv::Vec3b detected_bgr_color;    // Actual BGR color detected by YOLO at detection center
+    
     // Hand velocity visualization (for debugging)
     bool hand_velocity_active;       // True if hand velocity detection is active this frame
     cv::Point3f hand_velocity_center; // Center of velocity detection zone
@@ -182,6 +185,7 @@ struct SimpleBall {
                    matched_detection_confidence(0.0f),
                    matched_detection_color_score(0.0f),
                    tracking_reason(""),
+                   detected_bgr_color(0, 0, 0),
                    hand_velocity_active(false),
                    hand_velocity_center(0, 0, 0),
                    hand_velocity_direction(0, 0, 0),

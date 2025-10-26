@@ -146,7 +146,9 @@ public:
     void logFrame(const std::vector<SimpleBall>& balls,
                   const std::vector<SimpleHand>& hands,
                   const CameraIntrinsics& intrinsics [[maybe_unused]],
-                  const juggler::v1::VisualizationStates& viz_states = juggler::v1::VisualizationStates()) {
+                  const juggler::v1::VisualizationStates& viz_states = juggler::v1::VisualizationStates(),
+                  const std::vector<Detection>& raw_detections = std::vector<Detection>(),
+                  const cv::Mat& color_frame = cv::Mat()) {
         if (!is_active_) return;
         
         // ALWAYS log: Frame header, frame number, hand positions, ball locations and state
@@ -155,7 +157,28 @@ public:
         log_file_ << "================================================================================\n";
         log_file_ << "Timestamp: " << getCurrentTimestamp() << "\n";
         log_file_ << "Number of tracked balls: " << balls.size() << "\n";
-        log_file_ << "Number of detected hands: " << hands.size() << "\n\n";
+        log_file_ << "Number of detected hands: " << hands.size() << "\n";
+        
+        // CONDITIONAL: Log YOLO detections with detected colors (only if show_yolo_color_calibration enabled)
+        if (viz_states.show_yolo_color_calibration() && !raw_detections.empty() && !color_frame.empty()) {
+            log_file_ << "\n--- YOLO DETECTED COLORS ---\n";
+            log_file_ << "Number of YOLO detections: " << raw_detections.size() << "\n";
+            for (size_t i = 0; i < raw_detections.size(); ++i) {
+                const auto& det = raw_detections[i];
+                int center_x = static_cast<int>(det.box.x + det.box.width / 2);
+                int center_y = static_cast<int>(det.box.y + det.box.height / 2);
+                
+                if (center_x >= 0 && center_x < color_frame.cols &&
+                    center_y >= 0 && center_y < color_frame.rows) {
+                    cv::Vec3b bgr = color_frame.at<cv::Vec3b>(center_y, center_x);
+                    log_file_ << "  Detection " << i << " at (" << center_x << ", " << center_y << "):\n";
+                    log_file_ << "    Class: " << (det.class_id == 0 ? "ball" : "ball_held") << "\n";
+                    log_file_ << "    Confidence: " << std::setprecision(3) << det.confidence << "\n";
+                    log_file_ << "    Detected BGR color: (" << (int)bgr[0] << ", " << (int)bgr[1] << ", " << (int)bgr[2] << ")\n";
+                }
+            }
+        }
+        log_file_ << "\n";
         
         // ALWAYS log hand positions
         if (!hands.empty()) {
@@ -266,6 +289,14 @@ public:
                 log_file_ << "    YOLO class: " << (ball.yolo_class_id == 0 ? "ball" : "ball_held") << "\n";
                 log_file_ << "    Color match score: " << std::setprecision(3) << ball.color_match_score << "\n";
                 log_file_ << "    Tracking reason: " << ball.tracking_reason << "\n";
+            }
+            
+            // CONDITIONAL: YOLO detected color (only if show_yolo_color_calibration enabled)
+            if (viz_states.show_yolo_color_calibration() && ball.has_yolo_detection) {
+                log_file_ << "    YOLO detected color (BGR): ("
+                         << ball.detected_bgr_color[0] << ", "
+                         << ball.detected_bgr_color[1] << ", "
+                         << ball.detected_bgr_color[2] << ")\n";
             }
             log_file_ << "\n";
             

@@ -248,6 +248,24 @@ void Engine::run() {
             // Clone the color image so we can draw visualizations on it without affecting the original
             cv::Mat display_image = color_image.clone();
             
+            // ALWAYS log YOLO detected colors to engine_debug.log (regardless of visualization toggle)
+            if (!last_raw_detections_.empty()) {
+                INFO_LOG("=== YOLO DETECTED COLORS - Frame ", frame_counter_, " ===");
+                int det_num = 0;
+                for (const auto& det : last_raw_detections_) {
+                    det_num++;
+                    int center_x = static_cast<int>(det.box.x + det.box.width / 2);
+                    int center_y = static_cast<int>(det.box.y + det.box.height / 2);
+                    
+                    if (center_x >= 0 && center_x < color_image.cols && center_y >= 0 && center_y < color_image.rows) {
+                        cv::Vec3b bgr_pixel = color_image.at<cv::Vec3b>(center_y, center_x);
+                        INFO_LOG("  Detection #", det_num, " at (", center_x, ",", center_y,
+                                ") - Class: ", (det.class_id == 0 ? "ball" : "ball_held"),
+                                " - BGR: (", (int)bgr_pixel[0], ",", (int)bgr_pixel[1], ",", (int)bgr_pixel[2], ")");
+                    }
+                }
+            }
+            
             // Draw YOLO Color Calibration Squares on real-time feed if enabled
             // This shows the ACTUAL detected color from each YOLO detection
             if (visualization_states_.show_yolo_color_calibration() && !last_raw_detections_.empty()) {
@@ -264,7 +282,7 @@ void Engine::run() {
                         cv::Vec3b bgr_pixel = color_image.at<cv::Vec3b>(center_y, center_x);
                         cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
                         
-                        // LOG THE EXACT COLOR VALUES
+                        // LOG THE EXACT COLOR VALUES TO engine_debug.log (ALWAYS)
                         INFO_LOG("  Detection #", det_num, " at (", center_x, ",", center_y,
                                 ") - BGR: (", (int)bgr_pixel[0], ",", (int)bgr_pixel[1], ",", (int)bgr_pixel[2],
                                 ") - Square drawn at (", (int)det.box.x, ",", (int)det.box.y, ")");
@@ -496,9 +514,35 @@ void Engine::run() {
             }
         }
         
-        // Populate balls from SimpleBall
-        for (const auto& ball : tracked_balls) {
+        // Populate balls from SimpleBall and sample detected colors
+        for (auto& ball : tracked_balls) {
             if (ball.position.z <= 0) continue;  // Skip invalid depth
+            
+            // Sample the detected BGR color if ball has a YOLO detection
+            if (ball.has_yolo_detection && !color_image.empty()) {
+                // Find the detection that matches this ball's position
+                for (const auto& det : last_raw_detections_) {
+                    float det_center_x = det.box.x + det.box.width / 2;
+                    float det_center_y = det.box.y + det.box.height / 2;
+                    
+                    // Check if detection is close to ball's pixel position
+                    float dx = ball.pixel_pos.x - det_center_x;
+                    float dy = ball.pixel_pos.y - det_center_y;
+                    float dist = std::sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < 50.0f) {  // Within 50 pixels
+                        // Sample the color at detection center
+                        int center_x = static_cast<int>(det_center_x);
+                        int center_y = static_cast<int>(det_center_y);
+                        
+                        if (center_x >= 0 && center_x < color_image.cols &&
+                            center_y >= 0 && center_y < color_image.rows) {
+                            ball.detected_bgr_color = color_image.at<cv::Vec3b>(center_y, center_x);
+                        }
+                        break;
+                    }
+                }
+            }
 
             auto* ball_pb = frame_data.add_balls();
             ball_pb->set_id(ball.id);
@@ -515,7 +559,7 @@ void Engine::run() {
             bbox->set_y(ball.bbox.y);
             bbox->set_width(ball.bbox.width);
             bbox->set_height(ball.bbox.height);
-ball_pb->set_class_name(ball.is_held ? "ball_held" : "ball");
+ ball_pb->set_class_name(ball.is_held ? "ball_held" : "ball");
 
             
             cv::Point2f projected_pos = SimpleBallTracker::project_3d_to_2d(ball.position, camera_intrinsics_);
@@ -972,11 +1016,13 @@ void Engine::saveRecording() {
             if (recording_logger_.isActive()) {
                 // Log events first
                 recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls, rec_frame.tracked_hands_simple);
-                // Then log frame data with visualization states
+                // Then log frame data with visualization states, raw detections, and color frame
                 recording_logger_.logFrame(rec_frame.tracked_balls,
                                           rec_frame.tracked_hands_simple,
                                           camera_intrinsics_,
-                                          visualization_states_);
+                                          visualization_states_,
+                                          rec_frame.raw_detections,
+                                          rec_frame.frame);
             }
         }
         
@@ -1132,11 +1178,13 @@ void Engine::stopContinuousRecording() {
             if (recording_logger_.isActive()) {
                 // Log events first
                 recording_logger_.logEvents(rec_frame.ball_events, rec_frame.tracked_balls, rec_frame.tracked_hands_simple);
-                // Then log frame data with visualization states
+                // Then log frame data with visualization states, raw detections, and color frame
                 recording_logger_.logFrame(rec_frame.tracked_balls,
                                           rec_frame.tracked_hands_simple,
                                           camera_intrinsics_,
-                                          visualization_states_);
+                                          visualization_states_,
+                                          rec_frame.raw_detections,
+                                          rec_frame.frame);
             }
         }
         

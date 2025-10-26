@@ -188,6 +188,7 @@ struct New3DTrackerSettings {
     bool use_color_tracking = true;                 // Enable color-based identification
     float color_match_threshold = 0.50f;            // Min color match score
     int color_sample_radius = 1;                    // Pixel radius for color sampling
+    int min_saturation_threshold = 50;              // Min saturation to include pixel in color sampling (0-255)
     
     // === YOLO INTEGRATION ===
     bool enable_ball_detection = true;              // Enable/disable YOLO ball detection
@@ -548,6 +549,14 @@ private:
     std::string determineColor(const Detection& det, const cv::Mat& color_frame);
     
     /**
+     * @brief Sample detected BGR color at detection center using configured sampling parameters
+     * @param det Detection to sample color from
+     * @param color_frame Color image to sample from
+     * @return BGR color vector (median-filtered, saturation-thresholded)
+     */
+    cv::Vec3b sampleDetectedColor(const Detection& det, const cv::Mat& color_frame);
+    
+    /**
      * @brief Create Pose3D from current hands
      * @param hands Current hand detections
      * @return Pose3D structure
@@ -674,6 +683,7 @@ private:
     std::unordered_set<std::string> active_track_colors_;  // Colors currently being tracked
     long long next_track_id_ = 0;                   // Next available track ID
     int recording_frame_number_ = -1;               // Current recording frame (-1 if not recording)
+    cv::Mat current_color_image_;                   // Current frame color image for color sampling
     
     // ========================================================================
     // SETTINGS

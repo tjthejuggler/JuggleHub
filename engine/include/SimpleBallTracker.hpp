@@ -59,6 +59,7 @@ struct Detection {
     float confidence;
     int class_id;
     int index;  // Index in detection array
+    cv::Vec3b detected_bgr_color;  // Sampled BGR color (median-filtered, saturation-thresholded)
     
     // Override evaluation (calculated per-ball during tracking)
     struct OverrideEval {

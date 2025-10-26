@@ -173,6 +173,44 @@ class New3DSettingsSections:
         )
         row += 1
         
+        # Color Sample Radius
+        self.parent.new3d_color_sample_radius_slider, self.parent.new3d_color_sample_radius_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Color Sample Radius (pixels)",
+            tooltip_text="Pixel radius for color sampling around detection center.\n"
+                         "Range: 0-5 pixels. Default: 1 pixel (3x3 region).\n"
+                         "0 = center pixel only, 1 = 3x3, 2 = 5x5, 3 = 7x7, etc.\n"
+                         "Larger = more stable but may include edges/background.\n"
+                         "Smaller = more precise but sensitive to noise.",
+            range_min=0,
+            range_max=5,
+            initial_value=1,
+            update_func=lambda v: self.parent.update_setting('color_sample_radius', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Min Saturation Threshold
+        self.parent.new3d_min_saturation_threshold_slider, self.parent.new3d_min_saturation_threshold_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Saturation Threshold",
+            tooltip_text="Minimum saturation value to include pixel in color sampling.\n"
+                         "Range: 0-255. Default: 50.\n"
+                         "Filters out low-saturation pixels (grays/whites) that vary with lighting.\n"
+                         "0 = include all pixels (no filtering)\n"
+                         "50 = exclude very desaturated colors (recommended)\n"
+                         "100+ = only use highly saturated colors\n"
+                         "Higher = more stable but may reject valid ball colors.",
+            range_min=0,
+            range_max=255,
+            initial_value=50,
+            update_func=lambda v: self.parent.update_setting('min_saturation_threshold', v),
+            is_float=False
+        )
+        row += 1
+        
         return section
     
     def create_hand_velocity_section(self):

@@ -423,6 +423,7 @@ if PYQT_AVAILABLE:
                 'use_color_tracking': self.new3d_use_color_tracking_toggle.isChecked() if hasattr(self, 'new3d_use_color_tracking_toggle') else True,
                 'color_match_threshold': self.new3d_color_match_threshold_slider.value() / 100.0 if hasattr(self, 'new3d_color_match_threshold_slider') else 0.50,
                 'color_sample_radius': self.new3d_color_sample_radius_slider.value() if hasattr(self, 'new3d_color_sample_radius_slider') else 1,
+                'min_saturation_threshold': self.new3d_min_saturation_threshold_slider.value() if hasattr(self, 'new3d_min_saturation_threshold_slider') else 50,
                 
                 # === YOLO INTEGRATION ===
                 'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0 if hasattr(self, 'ball_confidence_slider') else 0.25,
@@ -684,6 +685,8 @@ if PYQT_AVAILABLE:
                 self.new3d_color_match_threshold_slider.setValue(int(settings['color_match_threshold'] * 100))
             if 'color_sample_radius' in settings and hasattr(self, 'new3d_color_sample_radius_slider'):
                 self.new3d_color_sample_radius_slider.setValue(settings['color_sample_radius'])
+            if 'min_saturation_threshold' in settings and hasattr(self, 'new3d_min_saturation_threshold_slider'):
+                self.new3d_min_saturation_threshold_slider.setValue(settings['min_saturation_threshold'])
             
             # === YOLO INTEGRATION ===
             if 'ignore_class' in settings and hasattr(self, 'new3d_ignore_class_toggle'):
@@ -1373,6 +1376,8 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('color_match_threshold', settings['color_match_threshold'])
             if 'color_sample_radius' in settings:
                 self.udp_client.send_setting('color_sample_radius', settings['color_sample_radius'])
+            if 'min_saturation_threshold' in settings:
+                self.udp_client.send_setting('min_saturation_threshold', settings['min_saturation_threshold'])
             
             # === YOLO INTEGRATION ===
             if 'ignore_class' in settings:

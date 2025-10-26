@@ -273,38 +273,32 @@ void Engine::run() {
                 int det_num = 0;
                 for (const auto& det : last_raw_detections_) {
                     det_num++;
-                    // Sample color at detection center
+                    // Use the sampled BGR color from the detection (median-filtered, saturation-thresholded)
+                    cv::Vec3b bgr_pixel = det.detected_bgr_color;
+                    cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
+                    
                     int center_x = static_cast<int>(det.box.x + det.box.width / 2);
                     int center_y = static_cast<int>(det.box.y + det.box.height / 2);
                     
-                    if (center_x >= 0 && center_x < color_image.cols && center_y >= 0 && center_y < color_image.rows) {
-                        // Get the ACTUAL BGR color from the pixel at detection center
-                        cv::Vec3b bgr_pixel = color_image.at<cv::Vec3b>(center_y, center_x);
-                        cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
-                        
-                        // LOG THE EXACT COLOR VALUES TO engine_debug.log (ALWAYS)
-                        INFO_LOG("  Detection #", det_num, " at (", center_x, ",", center_y,
-                                ") - BGR: (", (int)bgr_pixel[0], ",", (int)bgr_pixel[1], ",", (int)bgr_pixel[2],
-                                ") - Square drawn at (", (int)det.box.x, ",", (int)det.box.y, ")");
-                        
-                        // Draw 8x8 solid square at upper left corner of detection bbox
-                        int square_x = static_cast<int>(det.box.x);
-                        int square_y = static_cast<int>(det.box.y);
-                        int square_size = 8;
-                        
-                        // Draw the solid colored square with ACTUAL detected color
-                        cv::rectangle(display_image,
-                                    cv::Rect(square_x, square_y, square_size, square_size),
-                                    actual_color, -1);  // -1 for filled rectangle
-                        
-                        // Draw black border around square for visibility
-                        cv::rectangle(display_image,
-                                    cv::Rect(square_x, square_y, square_size, square_size),
-                                    cv::Scalar(0, 0, 0), 1);  // 1px black border
-                    } else {
-                        INFO_LOG("  Detection #", det_num, " SKIPPED - center (", center_x, ",", center_y,
-                                ") out of bounds (image size: ", color_image.cols, "x", color_image.rows, ")");
-                    }
+                    // LOG THE EXACT COLOR VALUES TO engine_debug.log (ALWAYS)
+                    INFO_LOG("  Detection #", det_num, " at (", center_x, ",", center_y,
+                            ") - Sampled BGR: (", (int)bgr_pixel[0], ",", (int)bgr_pixel[1], ",", (int)bgr_pixel[2],
+                            ") - Square drawn at (", (int)det.box.x, ",", (int)det.box.y, ")");
+                    
+                    // Draw 8x8 solid square at upper left corner of detection bbox
+                    int square_x = static_cast<int>(det.box.x);
+                    int square_y = static_cast<int>(det.box.y);
+                    int square_size = 8;
+                    
+                    // Draw the solid colored square with sampled detected color
+                    cv::rectangle(display_image,
+                                cv::Rect(square_x, square_y, square_size, square_size),
+                                actual_color, -1);  // -1 for filled rectangle
+                    
+                    // Draw black border around square for visibility
+                    cv::rectangle(display_image,
+                                cv::Rect(square_x, square_y, square_size, square_size),
+                                cv::Scalar(0, 0, 0), 1);  // 1px black border
                 }
             }
             
@@ -1625,8 +1619,9 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
                 int center_y = static_cast<int>(det.box.y + det.box.height / 2);
                 
                 if (center_x >= 0 && center_x < frame.cols && center_y >= 0 && center_y < frame.rows) {
-                    // Get the ACTUAL BGR color from the pixel at detection center
-                    cv::Vec3b bgr_pixel = frame.at<cv::Vec3b>(center_y, center_x);
+                    // Use the SAMPLED BGR color from detection (median-filtered, saturation-thresholded)
+                    // This respects the configured color_sample_radius and min_saturation_threshold settings
+                    cv::Vec3b bgr_pixel = det.detected_bgr_color;
                     cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
                     
                     // LOG THE EXACT COLOR VALUES FOR RECORDING

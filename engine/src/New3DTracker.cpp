@@ -364,6 +364,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("color_sample_radius")) {
             settings_.color_sample_radius = j["color_sample_radius"];
         }
+        if (j.contains("min_saturation_threshold")) {
+            settings_.min_saturation_threshold = j["min_saturation_threshold"];
+        }
         if (j.contains("ball_confidence_threshold")) {
             settings_.ball_confidence_threshold = j["ball_confidence_threshold"];
         }
@@ -454,6 +457,7 @@ void New3DTracker::saveSettings() {
         j["use_color_tracking"] = settings_.use_color_tracking;
         j["color_match_threshold"] = settings_.color_match_threshold;
         j["color_sample_radius"] = settings_.color_sample_radius;
+        j["min_saturation_threshold"] = settings_.min_saturation_threshold;
         j["ball_confidence_threshold"] = settings_.ball_confidence_threshold;
         j["ball_held_confidence_threshold"] = settings_.ball_held_confidence_threshold;
         j["ignore_class"] = settings_.ignore_class;
@@ -1332,21 +1336,29 @@ float New3DTracker::matchColor(const Detection& det, const ColorProfile& profile
                 
                 if (x >= 0 && x < hsv_roi.cols && y >= 0 && y < hsv_roi.rows) {
                     cv::Vec3b hsv = hsv_roi.at<cv::Vec3b>(y, x);
-                    hue_samples.push_back(static_cast<float>(hsv[0]));
-                    sat_samples.push_back(static_cast<float>(hsv[1]));
+                    // Filter out low-saturation pixels (grays/whites) that vary most with lighting
+                    // Only use pixels with saturation above threshold for more stable color detection
+                    if (hsv[1] > settings_.min_saturation_threshold) {
+                        hue_samples.push_back(static_cast<float>(hsv[0]));
+                        sat_samples.push_back(static_cast<float>(hsv[1]));
+                    }
                 }
             }
         }
         
         if (hue_samples.empty()) return 0.0f;
         
-        // Calculate average hue and saturation
-        float avg_hue = 0.0f;
-        float avg_sat = 0.0f;
-        for (float h : hue_samples) avg_hue += h;
-        for (float s : sat_samples) avg_sat += s;
-        avg_hue /= hue_samples.size();
-        avg_sat /= sat_samples.size();
+        // Use median instead of mean for robustness against outliers
+        // (specular highlights, shadows, motion blur, edge contamination)
+        std::nth_element(hue_samples.begin(),
+                         hue_samples.begin() + hue_samples.size()/2,
+                         hue_samples.end());
+        float avg_hue = hue_samples[hue_samples.size()/2];
+        
+        std::nth_element(sat_samples.begin(),
+                         sat_samples.begin() + sat_samples.size()/2,
+                         sat_samples.end());
+        float avg_sat = sat_samples[sat_samples.size()/2];
         
         // Calculate euclidean distance in hue-saturation space
         float hue_diff = (avg_hue / 180.0f) - (profile.avg_hue / 180.0f);
@@ -1393,6 +1405,81 @@ float New3DTracker::matchColor(const Detection& det, const ColorProfile& profile
     }
     
     return total_count > 0 ? static_cast<float>(match_count) / total_count : 0.0f;
+}
+
+cv::Vec3b New3DTracker::sampleDetectedColor(const Detection& det, const cv::Mat& color_frame) {
+    // Sample color at detection center using the same robust method as matchColor()
+    // This ensures the visualization color matches what the tracker actually uses
+    
+    static int sample_count = 0;
+    if (sample_count++ % 30 == 0) {  // Log every 30th sample to avoid spam
+        std::cout << "[sampleDetectedColor] Using min_saturation_threshold=" << settings_.min_saturation_threshold << std::endl;
+    }
+    
+    cv::Point2f center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
+    int sample_radius = settings_.color_sample_radius;
+    
+    // Define ROI for sampling
+    int roi_x = std::max(0, static_cast<int>(center.x) - sample_radius);
+    int roi_y = std::max(0, static_cast<int>(center.y) - sample_radius);
+    int roi_width = std::min(color_frame.cols - roi_x, 2 * sample_radius + 1);
+    int roi_height = std::min(color_frame.rows - roi_y, 2 * sample_radius + 1);
+    
+    if (roi_width <= 0 || roi_height <= 0) {
+        // Fallback to center pixel if ROI is invalid
+        int cx = std::clamp(static_cast<int>(center.x), 0, color_frame.cols - 1);
+        int cy = std::clamp(static_cast<int>(center.y), 0, color_frame.rows - 1);
+        return color_frame.at<cv::Vec3b>(cy, cx);
+    }
+    
+    cv::Rect roi(roi_x, roi_y, roi_width, roi_height);
+    cv::Mat color_roi = color_frame(roi);
+    
+    // Convert to HSV for saturation filtering
+    cv::Mat hsv_roi;
+    cv::cvtColor(color_roi, hsv_roi, cv::COLOR_BGR2HSV);
+    
+    // Collect BGR samples that pass saturation threshold
+    std::vector<cv::Vec3b> bgr_samples;
+    
+    for (int dy = -sample_radius; dy <= sample_radius; dy++) {
+        for (int dx = -sample_radius; dx <= sample_radius; dx++) {
+            int x = static_cast<int>(center.x) + dx - roi_x;
+            int y = static_cast<int>(center.y) + dy - roi_y;
+            
+            if (x >= 0 && x < hsv_roi.cols && y >= 0 && y < hsv_roi.rows) {
+                cv::Vec3b hsv = hsv_roi.at<cv::Vec3b>(y, x);
+                // Filter out low-saturation pixels using configured threshold
+                if (hsv[1] > settings_.min_saturation_threshold) {
+                    bgr_samples.push_back(color_roi.at<cv::Vec3b>(y, x));
+                }
+            }
+        }
+    }
+    
+    if (bgr_samples.empty()) {
+        // No fallback - return black to show that no pixels passed the saturation filter
+        // This makes it obvious when the threshold is too high
+        return cv::Vec3b(0, 0, 0);  // Black
+    }
+    
+    // Use median of each channel for robustness
+    std::vector<uchar> b_values, g_values, r_values;
+    for (const auto& bgr : bgr_samples) {
+        b_values.push_back(bgr[0]);
+        g_values.push_back(bgr[1]);
+        r_values.push_back(bgr[2]);
+    }
+    
+    std::nth_element(b_values.begin(), b_values.begin() + b_values.size()/2, b_values.end());
+    std::nth_element(g_values.begin(), g_values.begin() + g_values.size()/2, g_values.end());
+    std::nth_element(r_values.begin(), r_values.begin() + r_values.size()/2, r_values.end());
+    
+    return cv::Vec3b(
+        b_values[b_values.size()/2],
+        g_values[g_values.size()/2],
+        r_values[r_values.size()/2]
+    );
 }
 
 // ============================================================================
@@ -1564,6 +1651,8 @@ std::vector<Detection> New3DTracker::runBallDetection(
             det.world_pos = world_pos;
             det.confidence = confidence;
             det.class_id = class_id;
+            // Sample detected BGR color using configured sampling parameters
+            det.detected_bgr_color = sampleDetectedColor(det, color_frame);
             raw_detections.push_back(det);
         }
     }
@@ -1935,6 +2024,9 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> New3DTracker::update(
     const cv::Mat& depth_image,
     const CameraIntrinsics& intrinsics) {
     
+    // Store current color image for color sampling in convertToSimpleBall
+    current_color_image_ = color_image;
+    
     // Call the main update function
     auto [new_balls, events] = updateNew3D(color_image, depth_image, intrinsics);
     
@@ -1973,6 +2065,14 @@ SimpleBall New3DTracker::convertToSimpleBall(const New3DBall& new_ball) {
     simple.yolo_confidence = new_ball.yolo_confidence;
     simple.color_match_score = new_ball.color_match_score;
     simple.tracking_reason = new_ball.tracking_reason;
+    
+    // Sample detected BGR color using configured sampling parameters
+    if (!current_color_image_.empty()) {
+        Detection det;
+        det.box = new_ball.bbox;
+        simple.detected_bgr_color = sampleDetectedColor(det, current_color_image_);
+    }
+    
     return simple;
 }
 
@@ -2175,6 +2275,9 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.color_match_threshold = std::stof(value);
         } else if (key == "color_sample_radius") {
             settings_.color_sample_radius = std::stoi(value);
+        } else if (key == "min_saturation_threshold") {
+            settings_.min_saturation_threshold = std::stoi(value);
+            std::cout << "[New3DTracker] ⚙️ min_saturation_threshold updated to: " << settings_.min_saturation_threshold << std::endl;
         } else if (key == "ball_confidence_threshold") {
             settings_.ball_confidence_threshold = std::stof(value);
         } else if (key == "ball_held_confidence_threshold") {

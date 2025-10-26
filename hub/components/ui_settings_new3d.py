@@ -173,6 +173,24 @@ class New3DSettingsSections:
         )
         row += 1
         
+        # Color Mismatch Penalty
+        self.parent.new3d_color_mismatch_penalty_slider, self.parent.new3d_color_mismatch_penalty_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Color Mismatch Penalty (m)",
+            tooltip_text="Penalty distance added when detection color doesn't match ball color.\n"
+                         "Range: 0.0-5.0 m. Default: 0.5 m.\n"
+                         "Higher values = stronger preference for color-matched detections.\n"
+                         "Set to 2.0+ to prevent wrong-color associations.\n"
+                         "Set to 0.0 to disable color-based association entirely.",
+            range_min=0,
+            range_max=500,
+            initial_value=50,
+            update_func=lambda v: self.parent.update_setting('color_mismatch_penalty_m', v / 100.0),
+            is_float=True
+        )
+        row += 1
+        
         # Color Sample Radius
         self.parent.new3d_color_sample_radius_slider, self.parent.new3d_color_sample_radius_label = self.parent._create_slider_widget(
             parent_layout=layout,

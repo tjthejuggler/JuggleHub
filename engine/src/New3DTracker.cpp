@@ -1154,43 +1154,15 @@ void New3DTracker::createNewTracks(
         ball->last_known_position = detection->world_pos;
         ball->predicted_position = detection->world_pos;
         
-        // Determine state based on proximity to hands
-        bool near_hand = false;
-        int closest_hand_id = -1;
-        float min_distance = settings_.held_radius_m;
-        
-        for (const auto& hand : hands_) {
-            float dx = detection->world_pos.x - hand.wrist_pos_3d.x;
-            float dy = detection->world_pos.y - hand.wrist_pos_3d.y;
-            float dz = detection->world_pos.z - hand.wrist_pos_3d.z;
-            float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
-            
-            // Hands can hold multiple balls simultaneously
-            if (distance < min_distance) {
-                near_hand = true;
-                min_distance = distance;
-                closest_hand_id = hand.id;
-            }
-        }
-        
-        // Update state - CRITICAL FIX: Set to HELD if ball is within held_radius of any hand
-        // This ensures balls are properly detected as HELD when re-acquired near a hand
-        if (near_hand) {
-            // Ball is within held_radius of a hand - set to HELD
-            ball->state = HELD;
-            ball->associated_hand_id = closest_hand_id;
-            ball->tracking_reason = "Re-acquired (HELD, distance=" +
-                                   std::to_string(min_distance) + "m)";
-            logDebug("  Re-acquired ball ", ball->id, " as HELD by hand ", closest_hand_id,
-                     " (distance: ", min_distance, "m)");
-        } else {
-            // Ball is not near any hand - set as IN_FLIGHT
-            ball->state = IN_FLIGHT;
-            ball->associated_hand_id = -1;
-            ball->tracking_reason = "Re-acquired (IN_FLIGHT, no hand nearby)";
-            logDebug("  Re-acquired ball ", ball->id, " as IN_FLIGHT (no hand within ",
-                     settings_.held_radius_m, "m)");
-        }
+        // CRITICAL FIX: Always re-acquire as IN_FLIGHT
+        // Let the normal catch detection logic in handleInFlightStateUpdate() handle
+        // state transitions. This prevents the tracker from incorrectly locking to
+        // a hand when re-acquiring with a detection that happens to be near a hand
+        // but is actually a different ball (e.g., a thrown ball vs. a held ball).
+        ball->state = IN_FLIGHT;
+        ball->associated_hand_id = -1;
+        ball->tracking_reason = "Re-acquired (IN_FLIGHT)";
+        logDebug("  Re-acquired ball ", ball->id, " as IN_FLIGHT - will detect catch in next frame if near hand");
         
         // Update visualization data
         ball->pixel_pos = cv::Point2f(

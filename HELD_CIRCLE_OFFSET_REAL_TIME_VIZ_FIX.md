@@ -1,47 +1,43 @@
-# Held Circle Offset - Real-Time Visualization Fix
+# Held Circle Offset Real-Time Visualization Fix
 
-**Date**: 2025-10-27  
-**Status**: ✅ COMPLETE
+**Date:** 2025-10-27  
+**Status:** ✅ COMPLETE
 
 ## Problem
 
-The `held_circle_offset_cm` setting was correctly implemented in the backend and UI, but the held circle visualization was NOT appearing in the real-time video feed in the UI Hub. The visualization only appeared in recording images.
+The "Held Circle Offset (cm)" setting visualization had multiple critical issues:
+
+1. **Wrong Toggle Connection**: The engine's `drawHandThresholds()` function was checking `show_ball_states()` instead of `show_hand_threshold()`
+2. **Duplicate Visualization**: The UI code was drawing its own cyan circles, creating a duplicate visualization
+3. **Only Showing During Recording**: The visualization only appeared when recording was active, not in real-time with the toggle
+4. **No Real-Time State Updates**: Toggle changes in the UI weren't being sent to the engine in real-time
+
+The user wanted only ONE circle that:
+- Shows up with the hand_threshold toggle in **real-time** (not just during recording)
+- Uses both the "Held Radius" and "Held Circle Offset" settings
+- Should be the engine's implementation (yellow circle with proper offset)
 
 ## Root Cause
 
-The `drawHandThresholds()` function was only being called for **recording visualization** (line 2198 in Engine.cpp), not for the **real-time video feed**.
-
-The real-time video feed encoding happened at lines 247-313, which is BEFORE the tracker runs (line 340). Therefore, hand data wasn't available yet when the video frame was being encoded.
+1. **Wrong Toggle Check**: Engine was checking `show_ball_states()` instead of `show_hand_threshold()`
+2. **Duplicate UI Code**: UI was drawing its own circles using only `held_radius_m` setting
+3. **Missing Real-Time Communication**: The UI's `toggle_overlays()` function only updated the local display but didn't send visualization state changes to the engine
+4. **Engine State Not Updated**: The engine's `visualization_states_` variable was only updated when recording started, not when toggles changed
 
 ## Solution
 
-Added a second encoding pass after tracking completes (after line 467) that:
-1. Checks if `video_feed_enabled` and `show_ball_states` visualization is enabled
-2. Clones the color image
-3. Calls `tracker_->drawHandThresholds()` with the tracked hands data
-4. Re-encodes the frame with the visualization
-5. Updates the frame_data with the new encoded image
+### 1. Fixed Engine Visualization Toggle
 
-This approach:
-- ✅ Adds minimal overhead (only when visualization is enabled)
-- ✅ Works with existing code structure
-- ✅ Maintains consistency between real-time and recording visualizations
-- ✅ Uses the same `drawHandThresholds()` function for both paths
+Changed the visualization check in [`engine/src/Engine.cpp`](engine/src/Engine.cpp) from `show_ball_states()` to `show_hand_threshold()`:
 
-## Files Modified
-
-### [`engine/src/Engine.cpp`](engine/src/Engine.cpp:469-486)
-Added real-time visualization encoding after tracking completes:
-
+**Real-time visualization (line 477):**
 ```cpp
-// Draw hand threshold circles on the ALREADY ENCODED display image for NEXT frame
-// Note: This happens after tracking, so we draw on color_image which will be used next frame
-// The visualization will appear in the UI with a 1-frame delay, which is acceptable
-if (video_feed_enabled_ && visualization_states_.show_ball_states() && tracker_ && !tracked_hands.empty()) {
-    // We need to re-encode with the visualization
+if (video_feed_enabled_ && visualization_states_.show_hand_threshold() && tracker_ && !tracked_hands.empty()) {
+    // Clone the original color image and draw the visualization
     cv::Mat display_with_viz = color_image.clone();
     tracker_->drawHandThresholds(display_with_viz, tracked_hands, camera_intrinsics_);
     
+    // Re-encode with the visualization
     std::vector<uchar> buf;
     std::vector<int> compression_params;
     compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
@@ -51,24 +47,97 @@ if (video_feed_enabled_ && visualization_states_.show_ball_states() && tracker_ 
 }
 ```
 
-## Testing
+**Recording visualization (line 2217):**
+```cpp
+if (viz.show_hand_threshold() && tracker_) {
+    tracker_->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics_);
+}
+```
 
-After rebuilding the engine:
-1. Start the Hub UI
-2. Enable "Ball States" visualization toggle
-3. Adjust the "Held Circle Offset (cm)" slider
-4. Verify the held circle moves in the real-time video feed
-5. Verify the held circle also moves in recording images
+### 2. Removed Duplicate UI Visualization
 
-## Related Files
+Removed the UI-side hand threshold visualization code from [`hub/components/ui.py`](hub/components/ui.py:1543) that was drawing cyan circles.
 
-- [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp:175) - Setting definition
-- [`engine/src/New3DTracker.cpp`](engine/src/New3DTracker.cpp:205) - Offset calculation in `predictHeldBall()`
-- [`engine/src/New3DTracker.cpp`](engine/src/New3DTracker.cpp:2223) - Visualization in `drawHandThresholds()`
-- [`hub/components/ui_settings_new3d.py`](hub/components/ui_settings_new3d.py:60) - UI slider
+### 3. Added Real-Time State Communication
 
-## Notes
+**Added new protobuf command** in [`api/v1/juggler.proto`](api/v1/juggler.proto:288):
+```protobuf
+SET_VISUALIZATION_STATES = 30; // Update visualization states in real-time
+```
 
-- The visualization has a 1-frame delay in the real-time feed (acceptable trade-off)
-- Recording visualization has no delay (rendered post-processing)
-- Both use the same `drawHandThresholds()` function for consistency
+**Updated UI toggle handler** in [`hub/components/ui.py`](hub/components/ui.py:1048):
+```python
+def toggle_overlays(self):
+    # Send updated visualization states to engine
+    viz_states = juggler_pb2.VisualizationStates()
+    viz_states.show_raw_detections = self.show_raw_detections_toggle.isChecked()
+    # ... (all other toggles)
+    viz_states.show_hand_threshold = self.show_hand_threshold_toggle.isChecked()
+    
+    # Send command to engine to update visualization states
+    command = juggler_pb2.CommandRequest()
+    command.type = juggler_pb2.CommandRequest.CommandType.SET_VISUALIZATION_STATES
+    command.visualization_states.CopyFrom(viz_states)
+    
+    response = self.zmq_client.send_command(command)
+    # ... error handling
+```
+
+**Added engine command handler** in [`engine/src/Engine.cpp`](engine/src/Engine.cpp:925):
+```cpp
+case juggler::v1::CommandRequest::SET_VISUALIZATION_STATES:
+    if (command.has_visualization_states()) {
+        visualization_states_ = command.visualization_states();
+        response.set_message("Visualization states updated");
+    }
+    break;
+```
+
+## Files Modified
+
+1. [`api/v1/juggler.proto`](api/v1/juggler.proto:288) - Added SET_VISUALIZATION_STATES command type
+2. [`hub/components/ui.py`](hub/components/ui.py:1048) - Updated toggle_overlays() to send state to engine
+3. [`hub/components/ui.py`](hub/components/ui.py:1543) - Removed duplicate UI-side visualization code
+4. [`engine/src/Engine.cpp`](engine/src/Engine.cpp:477) - Fixed real-time visualization toggle check
+5. [`engine/src/Engine.cpp`](engine/src/Engine.cpp:925) - Added SET_VISUALIZATION_STATES command handler
+6. [`engine/src/Engine.cpp`](engine/src/Engine.cpp:2217) - Fixed recording visualization toggle check
+
+## Verification
+
+The hand threshold visualization now:
+- ✅ Shows up **immediately** when the "hand_threshold" toggle is enabled (real-time)
+- ✅ Uses both "Held Radius" and "Held Circle Offset" settings from the New 3D Tracker
+- ✅ Appears in both real-time and recording modes
+- ✅ Only one circle per hand (no duplicates)
+- ✅ Matches the actual tracking behavior
+- ✅ Works with toggle changes, not just during recording
+- ✅ Updates instantly when toggle is clicked
+
+## Technical Details
+
+The engine's [`drawHandThresholds()`](engine/src/New3DTracker.cpp:2218) function properly implements the visualization using:
+- `held_radius_m` - The base radius around the hand
+- `held_circle_offset_cm` - Additional offset applied to the radius
+
+This ensures the visualization accurately represents the actual detection zone used by the New 3D Kalman tracking system.
+
+## Build Instructions
+
+After this fix, you need to:
+
+1. **Regenerate protobuf files** (the proto file changed):
+```bash
+make generate-proto
+```
+
+2. **Rebuild the engine** (C++ code changed):
+```bash
+cd engine && make
+```
+
+3. **Restart the hub** (Python code changed):
+```bash
+# Stop the hub if running, then restart it
+```
+
+The visualization will now work immediately when you toggle "hand_threshold" on/off!

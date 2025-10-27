@@ -270,12 +270,13 @@ enum CommandRequest_CommandType : int {
   CommandRequest_CommandType_PLAYBACK_SET_SPEED = 27,
   CommandRequest_CommandType_PLAYBACK_PAUSE = 28,
   CommandRequest_CommandType_PLAYBACK_RESUME = 29,
+  CommandRequest_CommandType_SET_VISUALIZATION_STATES = 30,
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   CommandRequest_CommandType_CommandRequest_CommandType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool CommandRequest_CommandType_IsValid(int value);
 constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MIN = CommandRequest_CommandType_UNKNOWN;
-constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_PLAYBACK_RESUME;
+constexpr CommandRequest_CommandType CommandRequest_CommandType_CommandType_MAX = CommandRequest_CommandType_SET_VISUALIZATION_STATES;
 constexpr int CommandRequest_CommandType_CommandType_ARRAYSIZE = CommandRequest_CommandType_CommandType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* CommandRequest_CommandType_descriptor();
@@ -5647,6 +5648,8 @@ class CommandRequest final :
     CommandRequest_CommandType_PLAYBACK_PAUSE;
   static constexpr CommandType PLAYBACK_RESUME =
     CommandRequest_CommandType_PLAYBACK_RESUME;
+  static constexpr CommandType SET_VISUALIZATION_STATES =
+    CommandRequest_CommandType_SET_VISUALIZATION_STATES;
   static inline bool CommandType_IsValid(int value) {
     return CommandRequest_CommandType_IsValid(value);
   }
@@ -6162,6 +6165,7 @@ class VisualizationStates final :
     kShowTrajectoryFieldNumber = 15,
     kShowHandVelocityZoneFieldNumber = 16,
     kShowYoloColorCalibrationFieldNumber = 17,
+    kShowHandThresholdFieldNumber = 18,
   };
   // bool show_trajectory_predictions = 1;
   void clear_show_trajectory_predictions();
@@ -6316,6 +6320,15 @@ class VisualizationStates final :
   void _internal_set_show_yolo_color_calibration(bool value);
   public:
 
+  // bool show_hand_threshold = 18;
+  void clear_show_hand_threshold();
+  bool show_hand_threshold() const;
+  void set_show_hand_threshold(bool value);
+  private:
+  bool _internal_show_hand_threshold() const;
+  void _internal_set_show_hand_threshold(bool value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.VisualizationStates)
  private:
   class _Internal;
@@ -6341,6 +6354,7 @@ class VisualizationStates final :
     bool show_trajectory_;
     bool show_hand_velocity_zone_;
     bool show_yolo_color_calibration_;
+    bool show_hand_threshold_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -13616,6 +13630,26 @@ inline void VisualizationStates::_internal_set_show_yolo_color_calibration(bool 
 inline void VisualizationStates::set_show_yolo_color_calibration(bool value) {
   _internal_set_show_yolo_color_calibration(value);
   // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_yolo_color_calibration)
+}
+
+// bool show_hand_threshold = 18;
+inline void VisualizationStates::clear_show_hand_threshold() {
+  _impl_.show_hand_threshold_ = false;
+}
+inline bool VisualizationStates::_internal_show_hand_threshold() const {
+  return _impl_.show_hand_threshold_;
+}
+inline bool VisualizationStates::show_hand_threshold() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_hand_threshold)
+  return _internal_show_hand_threshold();
+}
+inline void VisualizationStates::_internal_set_show_hand_threshold(bool value) {
+  
+  _impl_.show_hand_threshold_ = value;
+}
+inline void VisualizationStates::set_show_hand_threshold(bool value) {
+  _internal_set_show_hand_threshold(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_hand_threshold)
 }
 
 // -------------------------------------------------------------------

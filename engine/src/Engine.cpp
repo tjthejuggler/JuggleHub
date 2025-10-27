@@ -302,10 +302,6 @@ void Engine::run() {
                 }
             }
             
-            // Draw hand threshold circles on real-time feed if ball_states visualization is enabled
-            // This must be done AFTER tracking completes (but we're before tracking here, so skip for now)
-            // TODO: Move video encoding after tracking to enable this visualization
-            
             std::vector<uchar> buf;
             // FPS OPTIMIZATION: Use lower JPEG quality (70 instead of default 95)
             // This reduces encoding time by ~30-40% with minimal visual quality loss
@@ -471,14 +467,15 @@ void Engine::run() {
  
         }
         
-        // Draw hand threshold circles on the ALREADY ENCODED display image for NEXT frame
-        // Note: This happens after tracking, so we draw on color_image which will be used next frame
-        // The visualization will appear in the UI with a 1-frame delay, which is acceptable
-        if (video_feed_enabled_ && visualization_states_.show_ball_states() && tracker_ && !tracked_hands.empty()) {
-            // We need to re-encode with the visualization
+        // Draw hand threshold circles on real-time feed if enabled
+        // This happens after tracking, so we have the hand data available
+        // We need to re-encode the frame with the visualization overlay
+        if (video_feed_enabled_ && visualization_states_.show_hand_threshold() && tracker_ && !tracked_hands.empty()) {
+            // Clone the original color image and draw the visualization
             cv::Mat display_with_viz = color_image.clone();
             tracker_->drawHandThresholds(display_with_viz, tracked_hands, camera_intrinsics_);
             
+            // Re-encode with the visualization
             std::vector<uchar> buf;
             std::vector<int> compression_params;
             compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
@@ -920,6 +917,18 @@ void Engine::processCommands() {
                     writeDebugLog("processCommands() - PLAYBACK_RESUME command received");
                     resumePlayback();
                     response.set_message("Playback resumed");
+                    break;
+
+                case juggler::v1::CommandRequest::SET_VISUALIZATION_STATES:
+                    writeDebugLog("processCommands() - SET_VISUALIZATION_STATES command received");
+                    if (command.has_visualization_states()) {
+                        visualization_states_ = command.visualization_states();
+                        response.set_message("Visualization states updated");
+                        writeDebugLog("processCommands() - Visualization states updated successfully");
+                    } else {
+                        response.set_success(false);
+                        response.set_message("Missing visualization_states parameter");
+                    }
                     break;
 
                 default:
@@ -2214,7 +2223,7 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     // Draw hand threshold circles (throw/catch distance thresholds)
     // Shows orange circle for throw threshold and green circle for catch threshold around each hand
     // Only draw if ball_states visualization is enabled (shows held/in-flight state info)
-    if (viz.show_ball_states() && tracker_) {
+    if (viz.show_hand_threshold() && tracker_) {
         tracker_->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics_);
     }
     

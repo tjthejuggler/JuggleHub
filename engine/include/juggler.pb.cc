@@ -494,6 +494,7 @@ PROTOBUF_CONSTEXPR VisualizationStates::VisualizationStates(
   , /*decltype(_impl_.show_trajectory_)*/false
   , /*decltype(_impl_.show_hand_velocity_zone_)*/false
   , /*decltype(_impl_.show_yolo_color_calibration_)*/false
+  , /*decltype(_impl_.show_hand_threshold_)*/false
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct VisualizationStatesDefaultTypeInternal {
   PROTOBUF_CONSTEXPR VisualizationStatesDefaultTypeInternal()
@@ -877,6 +878,7 @@ const uint32_t TableStruct_juggler_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_trajectory_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_hand_velocity_zone_),
   PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_yolo_color_calibration_),
+  PROTOBUF_FIELD_OFFSET(::juggler::v1::VisualizationStates, _impl_.show_hand_threshold_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::juggler::v1::ColorCommand, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -921,8 +923,8 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 274, 282, -1, sizeof(::juggler::v1::CommandRequest_ModuleArgsEntry_DoNotUse)},
   { 284, -1, -1, sizeof(::juggler::v1::CommandRequest)},
   { 314, -1, -1, sizeof(::juggler::v1::VisualizationStates)},
-  { 337, -1, -1, sizeof(::juggler::v1::ColorCommand)},
-  { 345, -1, -1, sizeof(::juggler::v1::CommandResponse)},
+  { 338, -1, -1, sizeof(::juggler::v1::ColorCommand)},
+  { 346, -1, -1, sizeof(::juggler::v1::CommandResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -1072,7 +1074,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "gler.v1.BallState\0224\n\020occlusion_states\030\026 "
   "\003(\0132\032.juggler.v1.OcclusionState\022;\n\024color"
   "_search_regions\030\027 \003(\0132\035.juggler.v1.Color"
-  "SearchRegion\"\255\013\n\016CommandRequest\0224\n\004type\030"
+  "SearchRegion\"\313\013\n\016CommandRequest\0224\n\004type\030"
   "\001 \001(\0162&.juggler.v1.CommandRequest.Comman"
   "dType\022\023\n\013module_name\030\002 \001(\t\022\024\n\014timestamp_"
   "us\030\003 \001(\004\022/\n\rcolor_command\030\004 \001(\0132\030.juggle"
@@ -1092,7 +1094,7 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "_sensor_enabled\030\026 \001(\010\022\032\n\022playback_direct"
   "ory\030\036 \001(\t\022\026\n\016playback_speed\030\037 \001(\002\022\035\n\025pla"
   "yback_frame_number\030  \001(\005\0321\n\017ModuleArgsEn"
-  "try\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\366\004\n\013"
+  "try\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\224\005\n\013"
   "CommandType\022\013\n\007UNKNOWN\020\000\022\017\n\013LOAD_MODULE\020"
   "\001\022\021\n\rUNLOAD_MODULE\020\002\022\026\n\022SEND_COLOR_COMMA"
   "ND\020\003\022\024\n\020CONFIGURE_MODULE\020\004\022\020\n\014RECORD_STA"
@@ -1108,28 +1110,29 @@ const char descriptor_table_protodef_juggler_2eproto[] PROTOBUF_SECTION_VARIABLE
   "K_START\020\027\022\021\n\rPLAYBACK_STOP\020\030\022\031\n\025PLAYBACK"
   "_STEP_FORWARD\020\031\022\032\n\026PLAYBACK_STEP_BACKWAR"
   "D\020\032\022\026\n\022PLAYBACK_SET_SPEED\020\033\022\022\n\016PLAYBACK_"
-  "PAUSE\020\034\022\023\n\017PLAYBACK_RESUME\020\035\"\375\003\n\023Visuali"
-  "zationStates\022#\n\033show_trajectory_predicti"
-  "ons\030\001 \001(\010\022\033\n\023show_raw_detections\030\002 \001(\010\022 "
-  "\n\030show_filtered_detections\030\003 \001(\010\022\031\n\021show"
-  "_associations\030\004 \001(\010\022\031\n\021show_new_trackers"
-  "\030\005 \001(\010\022\032\n\022show_hand_tracking\030\006 \001(\010\022\030\n\020sh"
-  "ow_ball_states\030\007 \001(\010\022\026\n\016show_occlusion\030\010"
-  " \001(\010\022\025\n\rshow_skeleton\030\t \001(\010\022\031\n\021show_colo"
-  "r_search\030\n \001(\010\022\032\n\022show_color_tracker\030\013 \001"
-  "(\010\022\032\n\022show_tracked_boxes\030\014 \001(\010\022!\n\031show_u"
-  "nmatched_detections\030\r \001(\010\022\022\n\nshow_tails\030"
-  "\016 \001(\010\022\027\n\017show_trajectory\030\017 \001(\010\022\037\n\027show_h"
-  "and_velocity_zone\030\020 \001(\010\022#\n\033show_yolo_col"
-  "or_calibration\030\021 \001(\010\"A\n\014ColorCommand\022\017\n\007"
-  "ball_id\030\001 \001(\t\022 \n\005color\030\002 \001(\0132\021.juggler.v"
-  "1.Color\"I\n\017CommandResponse\022\017\n\007success\030\001 "
-  "\001(\010\022\017\n\007message\030\002 \001(\t\022\024\n\014timestamp_us\030\003 \001"
-  "(\004b\006proto3"
+  "PAUSE\020\034\022\023\n\017PLAYBACK_RESUME\020\035\022\034\n\030SET_VISU"
+  "ALIZATION_STATES\020\036\"\232\004\n\023VisualizationStat"
+  "es\022#\n\033show_trajectory_predictions\030\001 \001(\010\022"
+  "\033\n\023show_raw_detections\030\002 \001(\010\022 \n\030show_fil"
+  "tered_detections\030\003 \001(\010\022\031\n\021show_associati"
+  "ons\030\004 \001(\010\022\031\n\021show_new_trackers\030\005 \001(\010\022\032\n\022"
+  "show_hand_tracking\030\006 \001(\010\022\030\n\020show_ball_st"
+  "ates\030\007 \001(\010\022\026\n\016show_occlusion\030\010 \001(\010\022\025\n\rsh"
+  "ow_skeleton\030\t \001(\010\022\031\n\021show_color_search\030\n"
+  " \001(\010\022\032\n\022show_color_tracker\030\013 \001(\010\022\032\n\022show"
+  "_tracked_boxes\030\014 \001(\010\022!\n\031show_unmatched_d"
+  "etections\030\r \001(\010\022\022\n\nshow_tails\030\016 \001(\010\022\027\n\017s"
+  "how_trajectory\030\017 \001(\010\022\037\n\027show_hand_veloci"
+  "ty_zone\030\020 \001(\010\022#\n\033show_yolo_color_calibra"
+  "tion\030\021 \001(\010\022\033\n\023show_hand_threshold\030\022 \001(\010\""
+  "A\n\014ColorCommand\022\017\n\007ball_id\030\001 \001(\t\022 \n\005colo"
+  "r\030\002 \001(\0132\021.juggler.v1.Color\"I\n\017CommandRes"
+  "ponse\022\017\n\007success\030\001 \001(\010\022\017\n\007message\030\002 \001(\t\022"
+  "\024\n\014timestamp_us\030\003 \001(\004b\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_juggler_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_juggler_2eproto = {
-    false, false, 6770, descriptor_table_protodef_juggler_2eproto,
+    false, false, 6829, descriptor_table_protodef_juggler_2eproto,
     "juggler.proto",
     &descriptor_table_juggler_2eproto_once, nullptr, 0, 27,
     schemas, file_default_instances, TableStruct_juggler_2eproto::offsets,
@@ -1244,6 +1247,7 @@ bool CommandRequest_CommandType_IsValid(int value) {
     case 27:
     case 28:
     case 29:
+    case 30:
       return true;
     default:
       return false;
@@ -1278,6 +1282,7 @@ constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_STEP_BACKWARD;
 constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_SET_SPEED;
 constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_PAUSE;
 constexpr CommandRequest_CommandType CommandRequest::PLAYBACK_RESUME;
+constexpr CommandRequest_CommandType CommandRequest::SET_VISUALIZATION_STATES;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MIN;
 constexpr CommandRequest_CommandType CommandRequest::CommandType_MAX;
 constexpr int CommandRequest::CommandType_ARRAYSIZE;
@@ -10737,12 +10742,13 @@ VisualizationStates::VisualizationStates(const VisualizationStates& from)
     , decltype(_impl_.show_trajectory_){}
     , decltype(_impl_.show_hand_velocity_zone_){}
     , decltype(_impl_.show_yolo_color_calibration_){}
+    , decltype(_impl_.show_hand_threshold_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   ::memcpy(&_impl_.show_trajectory_predictions_, &from._impl_.show_trajectory_predictions_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.show_yolo_color_calibration_) -
-    reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_)) + sizeof(_impl_.show_yolo_color_calibration_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.show_hand_threshold_) -
+    reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_)) + sizeof(_impl_.show_hand_threshold_));
   // @@protoc_insertion_point(copy_constructor:juggler.v1.VisualizationStates)
 }
 
@@ -10768,6 +10774,7 @@ inline void VisualizationStates::SharedCtor(
     , decltype(_impl_.show_trajectory_){false}
     , decltype(_impl_.show_hand_velocity_zone_){false}
     , decltype(_impl_.show_yolo_color_calibration_){false}
+    , decltype(_impl_.show_hand_threshold_){false}
     , /*decltype(_impl_._cached_size_)*/{}
   };
 }
@@ -10796,8 +10803,8 @@ void VisualizationStates::Clear() {
   (void) cached_has_bits;
 
   ::memset(&_impl_.show_trajectory_predictions_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.show_yolo_color_calibration_) -
-      reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_)) + sizeof(_impl_.show_yolo_color_calibration_));
+      reinterpret_cast<char*>(&_impl_.show_hand_threshold_) -
+      reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_)) + sizeof(_impl_.show_hand_threshold_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -10943,6 +10950,14 @@ const char* VisualizationStates::_InternalParse(const char* ptr, ::_pbi::ParseCo
         } else
           goto handle_unusual;
         continue;
+      // bool show_hand_threshold = 18;
+      case 18:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 144)) {
+          _impl_.show_hand_threshold_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
       default:
         goto handle_unusual;
     }  // switch
@@ -11074,6 +11089,12 @@ uint8_t* VisualizationStates::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(17, this->_internal_show_yolo_color_calibration(), target);
   }
 
+  // bool show_hand_threshold = 18;
+  if (this->_internal_show_hand_threshold() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(18, this->_internal_show_hand_threshold(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -11175,6 +11196,11 @@ size_t VisualizationStates::ByteSizeLong() const {
     total_size += 2 + 1;
   }
 
+  // bool show_hand_threshold = 18;
+  if (this->_internal_show_hand_threshold() != 0) {
+    total_size += 2 + 1;
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -11244,6 +11270,9 @@ void VisualizationStates::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, co
   if (from._internal_show_yolo_color_calibration() != 0) {
     _this->_internal_set_show_yolo_color_calibration(from._internal_show_yolo_color_calibration());
   }
+  if (from._internal_show_hand_threshold() != 0) {
+    _this->_internal_set_show_hand_threshold(from._internal_show_hand_threshold());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -11262,8 +11291,8 @@ void VisualizationStates::InternalSwap(VisualizationStates* other) {
   using std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_yolo_color_calibration_)
-      + sizeof(VisualizationStates::_impl_.show_yolo_color_calibration_)
+      PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_hand_threshold_)
+      + sizeof(VisualizationStates::_impl_.show_hand_threshold_)
       - PROTOBUF_FIELD_OFFSET(VisualizationStates, _impl_.show_trajectory_predictions_)>(
           reinterpret_cast<char*>(&_impl_.show_trajectory_predictions_),
           reinterpret_cast<char*>(&other->_impl_.show_trajectory_predictions_));

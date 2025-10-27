@@ -1046,6 +1046,35 @@ if PYQT_AVAILABLE:
         # Calibration mode is now always on - no toggle needed
 
         def toggle_overlays(self):
+            # Send updated visualization states to engine
+            viz_states = juggler_pb2.VisualizationStates()
+            viz_states.show_raw_detections = self.show_raw_detections_toggle.isChecked()
+            viz_states.show_hand_tracking = self.show_hand_tracking_toggle.isChecked()
+            viz_states.show_ball_states = self.show_ball_states_toggle.isChecked()
+            viz_states.show_skeleton = self.show_skeleton_toggle.isChecked()
+            viz_states.show_color_search = self.show_color_search_toggle.isChecked()
+            viz_states.show_color_tracker = self.show_color_tracker_toggle.isChecked()
+            viz_states.show_tracked_boxes = self.show_tracked_boxes_toggle.isChecked()
+            viz_states.show_unmatched_detections = self.show_unmatched_detections_toggle.isChecked()
+            viz_states.show_tails = self.show_tails_toggle.isChecked()
+            viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
+            viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
+            viz_states.show_yolo_color_calibration = self.show_yolo_color_calibration_toggle.isChecked()
+            viz_states.show_hand_threshold = self.show_hand_threshold_toggle.isChecked()
+            
+            # Send command to engine to update visualization states
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.SET_VISUALIZATION_STATES
+            command.visualization_states.CopyFrom(viz_states)
+            
+            try:
+                response = self.zmq_client.send_command(command)
+                if not response.success:
+                    print(f"⚠️ Failed to update visualization states: {response.message}")
+            except Exception as e:
+                print(f"⚠️ Error updating visualization states: {e}")
+            
+            # Update local display
             if self.last_frame_data: self.update_video_feed(self.last_frame_data)
         
         def toggle_video_feed(self):
@@ -1541,46 +1570,9 @@ if PYQT_AVAILABLE:
                                     )
 
             # --- Draw Hand Threshold (Held Radius) Visualization ---
-            if self.show_hand_threshold_toggle.isChecked():
-                # Get camera intrinsics for 3D-to-2D projection
-                fx = frame_data.intrinsics.fx if frame_data.HasField('intrinsics') else 385.0
-                fy = frame_data.intrinsics.fy if frame_data.HasField('intrinsics') else 385.0
-                ppx = frame_data.intrinsics.ppx if frame_data.HasField('intrinsics') else 320.0
-                ppy = frame_data.intrinsics.ppy if frame_data.HasField('intrinsics') else 240.0
-                
-                # Get held_radius_m from settings widget
-                held_radius_m = 0.12  # Default 12cm
-                if hasattr(self, 'settings_widget') and self.settings_widget:
-                    if hasattr(self.settings_widget, 'new3d_held_radius_slider'):
-                        held_radius_m = self.settings_widget.new3d_held_radius_slider.value() / 100.0
-                
-                painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                
-                for hand in frame_data.hands:
-                    # Project hand wrist position to 2D
-                    if hand.wrist_pos_3d.z <= 0:
-                        continue
-                    
-                    center_x = int((hand.wrist_pos_3d.x * fx) / hand.wrist_pos_3d.z + ppx)
-                    center_y = int((hand.wrist_pos_3d.y * fy) / hand.wrist_pos_3d.z + ppy)
-                    
-                    # Check if on-screen
-                    if center_x < 0 or center_x >= pixmap.width() or center_y < 0 or center_y >= pixmap.height():
-                        continue
-                    
-                    # Calculate radius in pixels (scale with depth)
-                    radius_pixels = int((held_radius_m * fx) / hand.wrist_pos_3d.z)
-                    
-                    # Draw yellow circle showing held radius threshold
-                    painter.setPen(QPen(QColor(0, 255, 255, 200), 2))  # Cyan/Yellow
-                    painter.setBrush(Qt.BrushStyle.NoBrush)
-                    painter.drawEllipse(center_x - radius_pixels, center_y - radius_pixels,
-                                      radius_pixels * 2, radius_pixels * 2)
-                    
-                    # Draw hand label (L/R)
-                    painter.setPen(QPen(QColor(0, 255, 255)))
-                    side_label = "L" if hand.side == "left" else "R"
-                    painter.drawText(center_x - 5, center_y + 5, side_label)
+            # NOTE: This visualization is now handled by the engine's drawHandThresholds() function
+            # The engine draws the circles using both held_radius_m and held_circle_offset_cm settings
+            # This ensures the visualization matches the actual tracking behavior
             
             # --- Draw Hand Velocity Zone Visualization ---
             if self.show_hand_velocity_zone_toggle.isChecked():
@@ -1741,6 +1733,7 @@ if PYQT_AVAILABLE:
             viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
             viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
             viz_states.show_yolo_color_calibration = self.show_yolo_color_calibration_toggle.isChecked()
+            viz_states.show_hand_threshold = self.show_hand_threshold_toggle.isChecked()
             
             command = juggler_pb2.CommandRequest(
                 type=juggler_pb2.CommandRequest.CommandType.RECORD_START,
@@ -1780,6 +1773,7 @@ if PYQT_AVAILABLE:
                 viz_states.show_trajectory = self.show_trajectory_toggle.isChecked()
                 viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
                 viz_states.show_yolo_color_calibration = self.show_yolo_color_calibration_toggle.isChecked()
+                viz_states.show_hand_threshold = self.show_hand_threshold_toggle.isChecked()
                 command.visualization_states.CopyFrom(viz_states)
             
             try:

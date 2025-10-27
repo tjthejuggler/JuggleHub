@@ -302,6 +302,10 @@ void Engine::run() {
                 }
             }
             
+            // Draw hand threshold circles on real-time feed if ball_states visualization is enabled
+            // This must be done AFTER tracking completes (but we're before tracking here, so skip for now)
+            // TODO: Move video encoding after tracking to enable this visualization
+            
             std::vector<uchar> buf;
             // FPS OPTIMIZATION: Use lower JPEG quality (70 instead of default 95)
             // This reduces encoding time by ~30-40% with minimal visual quality loss
@@ -465,6 +469,22 @@ void Engine::run() {
                 continuous_frame_buffer_.push_back(rec_frame);
             }
  
+        }
+        
+        // Draw hand threshold circles on the ALREADY ENCODED display image for NEXT frame
+        // Note: This happens after tracking, so we draw on color_image which will be used next frame
+        // The visualization will appear in the UI with a 1-frame delay, which is acceptable
+        if (video_feed_enabled_ && visualization_states_.show_ball_states() && tracker_ && !tracked_hands.empty()) {
+            // We need to re-encode with the visualization
+            cv::Mat display_with_viz = color_image.clone();
+            tracker_->drawHandThresholds(display_with_viz, tracked_hands, camera_intrinsics_);
+            
+            std::vector<uchar> buf;
+            std::vector<int> compression_params;
+            compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
+            compression_params.push_back(70);
+            cv::imencode(".jpg", display_with_viz, buf, compression_params);
+            frame_data.set_color_image_b64(buf.data(), buf.size());
         }
         
         // Populate trajectory-based predictions for visualization

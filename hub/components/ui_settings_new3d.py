@@ -56,6 +56,23 @@ class New3DSettingsSections:
         )
         row += 1
         
+        # Held Circle Offset
+        self.parent.new3d_held_circle_offset_slider, self.parent.new3d_held_circle_offset_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Held Circle Offset (cm)",
+            tooltip_text="Distance from wrist towards hand center for held ball position.\n"
+                         "Uses forearm skeleton direction to offset the held circle center.\n"
+                         "Range: 0-15cm. Default: 5cm.\n"
+                         "0cm = at wrist (old behavior), 5cm = towards palm, 10cm+ = in hand center.",
+            range_min=0,
+            range_max=15,
+            initial_value=5,
+            update_func=lambda v: self.parent.update_setting('held_circle_offset_cm', v),
+            is_float=False
+        )
+        row += 1
+        
         # Throw Velocity Threshold
         self.parent.new3d_throw_velocity_slider, self.parent.new3d_throw_velocity_label = self.parent._create_slider_widget(
             parent_layout=layout,

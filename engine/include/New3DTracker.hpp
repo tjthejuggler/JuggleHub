@@ -172,6 +172,7 @@ struct New3DBall {
 struct New3DTrackerSettings {
     // === GEOMETRY & DISTANCE (meters) ===
     float held_radius_m = 0.12f;                    // 12cm radius for "held" detection
+    float held_circle_offset_cm = 5.0f;             // Offset distance from wrist towards hand center (cm)
     float association_max_distance_m = 0.50f;       // Max distance for detection matching
     float color_mismatch_penalty_m = 1.0f;          // Distance penalty for color mismatch (meters)
     

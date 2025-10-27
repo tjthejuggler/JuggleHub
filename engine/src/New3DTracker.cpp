@@ -204,8 +204,48 @@ void New3DTracker::predictAllBalls(float dt) {
 
 void New3DTracker::predictHeldBall(New3DBall& ball, const SimpleHand& hand, float dt) {
     // For held balls, the Kalman filter tracks the hand's position
-    // The predicted position is simply the hand's wrist position
-    ball.predicted_position = hand.wrist_pos_3d;
+    // The predicted position is offset from the wrist towards the hand center
+    
+    // Start with wrist position
+    cv::Point3f held_position = hand.wrist_pos_3d;
+    
+    // Calculate offset direction from forearm skeleton if available
+    if (!hand.keypoints.empty() && hand.keypoints.size() > 10) {
+        // COCO keypoint indices: 7=left_elbow, 8=right_elbow, 9=left_wrist, 10=right_wrist
+        int elbow_idx = (hand.id == 0) ? 7 : 8;   // 0=left hand, 1=right hand
+        int wrist_idx = (hand.id == 0) ? 9 : 10;
+        
+        // Check if both elbow and wrist keypoints are valid
+        if (elbow_idx < hand.keypoints.size() && wrist_idx < hand.keypoints.size()) {
+            const cv::Point3f& elbow_pos = hand.keypoints[elbow_idx];
+            const cv::Point3f& wrist_pos = hand.keypoints[wrist_idx];
+            
+            // Verify keypoints have valid depth (z > 0)
+            if (elbow_pos.z > 0.1f && wrist_pos.z > 0.1f) {
+                // Calculate forearm direction (from elbow to wrist)
+                cv::Point3f forearm_dir = wrist_pos - elbow_pos;
+                float forearm_length = std::sqrt(
+                    forearm_dir.x * forearm_dir.x +
+                    forearm_dir.y * forearm_dir.y +
+                    forearm_dir.z * forearm_dir.z
+                );
+                
+                // Normalize direction and apply offset
+                if (forearm_length > 0.01f) {  // Avoid division by zero
+                    forearm_dir = forearm_dir / forearm_length;
+                    
+                    // Convert offset from cm to meters and apply
+                    float offset_m = settings_.held_circle_offset_cm / 100.0f;
+                    held_position = wrist_pos + forearm_dir * offset_m;
+                    
+                    logDebug("  Ball ", ball.id, " held position offset by ", settings_.held_circle_offset_cm,
+                             "cm along forearm direction");
+                }
+            }
+        }
+    }
+    
+    ball.predicted_position = held_position;
     
     // Update Kalman filter to track hand movement
     // This allows us to estimate velocity when the ball is thrown
@@ -320,6 +360,9 @@ bool New3DTracker::loadSettings() {
         // Load New3DTrackerSettings
         if (j.contains("held_radius_m")) {
             settings_.held_radius_m = j["held_radius_m"];
+        }
+        if (j.contains("held_circle_offset_cm")) {
+            settings_.held_circle_offset_cm = j["held_circle_offset_cm"];
         }
         if (j.contains("association_max_distance_m")) {
             settings_.association_max_distance_m = j["association_max_distance_m"];
@@ -439,6 +482,7 @@ void New3DTracker::saveSettings() {
         
         // Save New3DTrackerSettings
         j["held_radius_m"] = settings_.held_radius_m;
+        j["held_circle_offset_cm"] = settings_.held_circle_offset_cm;
         j["association_max_distance_m"] = settings_.association_max_distance_m;
         j["color_mismatch_penalty_m"] = settings_.color_mismatch_penalty_m;
         j["throw_velocity_threshold_mps"] = settings_.throw_velocity_threshold_mps;
@@ -2184,29 +2228,94 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
     }
     
     for (const auto& hand : hands) {
-        // Project wrist position to 2D
-        cv::Point2f wrist_2d = project3DTo2D(hand.wrist_pos_3d, intrinsics);
+        // Calculate the held circle center (with offset from wrist)
+        cv::Point3f held_center_3d = hand.wrist_pos_3d;
+        
+        // DEBUG: Log offset setting value
+        static int log_counter = 0;
+        if (log_counter++ % 30 == 0) {  // Log every 30 frames
+            logDebug("drawHandThresholds: held_circle_offset_cm = ", settings_.held_circle_offset_cm);
+            logDebug("drawHandThresholds: hand.keypoints.size() = ", hand.keypoints.size());
+        }
+        
+        // Apply offset along forearm direction if skeleton data is available
+        if (!hand.keypoints.empty() && hand.keypoints.size() > 10) {
+            // COCO keypoint indices: 7=left_elbow, 8=right_elbow, 9=left_wrist, 10=right_wrist
+            int elbow_idx = (hand.id == 0) ? 7 : 8;
+            int wrist_idx = (hand.id == 0) ? 9 : 10;
+            
+            if (elbow_idx < hand.keypoints.size() && wrist_idx < hand.keypoints.size()) {
+                const cv::Point3f& elbow_pos = hand.keypoints[elbow_idx];
+                const cv::Point3f& wrist_pos = hand.keypoints[wrist_idx];
+                
+                // DEBUG: Log keypoint positions
+                if (log_counter % 30 == 1) {
+                    logDebug("  Hand ", hand.id, " elbow: (", elbow_pos.x, ", ", elbow_pos.y, ", ", elbow_pos.z, ")");
+                    logDebug("  Hand ", hand.id, " wrist: (", wrist_pos.x, ", ", wrist_pos.y, ", ", wrist_pos.z, ")");
+                }
+                
+                // Verify keypoints have valid depth
+                if (elbow_pos.z > 0.1f && wrist_pos.z > 0.1f) {
+                    // Calculate forearm direction
+                    cv::Point3f forearm_dir = wrist_pos - elbow_pos;
+                    float forearm_length = std::sqrt(
+                        forearm_dir.x * forearm_dir.x +
+                        forearm_dir.y * forearm_dir.y +
+                        forearm_dir.z * forearm_dir.z
+                    );
+                    
+                    if (forearm_length > 0.01f) {
+                        forearm_dir = forearm_dir / forearm_length;
+                        float offset_m = settings_.held_circle_offset_cm / 100.0f;
+                        held_center_3d = wrist_pos + forearm_dir * offset_m;
+                        
+                        // DEBUG: Log offset calculation
+                        if (log_counter % 30 == 1) {
+                            logDebug("  Offset applied: ", offset_m, "m along forearm direction");
+                            logDebug("  New held_center: (", held_center_3d.x, ", ", held_center_3d.y, ", ", held_center_3d.z, ")");
+                        }
+                    }
+                } else {
+                    if (log_counter % 30 == 1) {
+                        logDebug("  Keypoints have invalid depth, using wrist position");
+                    }
+                }
+            }
+        } else {
+            if (log_counter % 30 == 1) {
+                logDebug("  No skeleton data available, using wrist position");
+            }
+        }
+        
+        // Project held center to 2D
+        cv::Point2f held_center_2d = project3DTo2D(held_center_3d, intrinsics);
         
         // Check if projection is valid
-        if (wrist_2d.x < 0 || wrist_2d.y < 0) {
+        if (held_center_2d.x < 0 || held_center_2d.y < 0) {
             continue;
         }
         
         // Calculate radius in pixels (scale with depth)
-        float depth = hand.wrist_pos_3d.z;
+        float depth = held_center_3d.z;
         if (depth <= 0) {
             continue;
         }
         
         float radius_pixels = (settings_.held_radius_m / depth) * intrinsics.fx;
         
-        // Draw yellow circle around wrist
-        cv::circle(frame, wrist_2d, static_cast<int>(radius_pixels),
+        // Draw yellow circle around held center
+        cv::circle(frame, held_center_2d, static_cast<int>(radius_pixels),
                   cv::Scalar(0, 255, 255), 2);
         
-        // Label hand (L/R)
+        // Also draw wrist position as a small dot for reference
+        cv::Point2f wrist_2d = project3DTo2D(hand.wrist_pos_3d, intrinsics);
+        if (wrist_2d.x >= 0 && wrist_2d.y >= 0) {
+            cv::circle(frame, wrist_2d, 3, cv::Scalar(0, 255, 255), -1);
+        }
+        
+        // Label hand (L/R) at held center
         std::string label = (hand.id == 0) ? "L" : "R";
-        cv::putText(frame, label, wrist_2d, cv::FONT_HERSHEY_SIMPLEX, 0.7,
+        cv::putText(frame, label, held_center_2d, cv::FONT_HERSHEY_SIMPLEX, 0.7,
                    cv::Scalar(0, 255, 255), 2);
     }
 }
@@ -2223,6 +2332,8 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
         // Parse and update the setting
         if (key == "held_radius_m") {
             settings_.held_radius_m = std::stof(value);
+        } else if (key == "held_circle_offset_cm") {
+            settings_.held_circle_offset_cm = std::stof(value);
         } else if (key == "association_max_distance_m") {
             settings_.association_max_distance_m = std::stof(value);
         } else if (key == "color_mismatch_penalty_m") {

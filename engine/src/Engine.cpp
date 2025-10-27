@@ -2221,8 +2221,8 @@ cv::Mat Engine::renderVisualizationsOnFrame(const cv::Mat& frame, const Recordin
     }
     
     // Draw hand threshold circles (throw/catch distance thresholds)
-    // Shows orange circle for throw threshold and green circle for catch threshold around each hand
-    // Only draw if ball_states visualization is enabled (shows held/in-flight state info)
+    // Shows yellow circles around hands using held_radius_m and held_circle_offset_cm settings
+    // Only draw if hand_threshold visualization is enabled
     if (viz.show_hand_threshold() && tracker_) {
         tracker_->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics_);
     }

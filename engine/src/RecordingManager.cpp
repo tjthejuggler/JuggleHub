@@ -1,6 +1,5 @@
 #include "RecordingManager.hpp"
 #include "DebugLog.hpp"
-#include "Engine.hpp"
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -10,6 +9,8 @@
 namespace fs = std::filesystem;
 
 extern void writeDebugLog(const std::string& message);
+
+// Forward declaration - will be provided by Engine.cpp
 extern cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame, const RecordingFrame& rec_frame,
                                           const CameraIntrinsics& camera_intrinsics,
                                           const juggler::v1::VisualizationStates& viz_states,
@@ -203,33 +204,11 @@ void RecordingManager::saveFramesToDisk(const std::deque<RecordingFrame>& frames
                                  viz_states.show_hand_velocity_zone() ||
                                  viz_states.show_yolo_color_calibration();
 
+        // TODO: Re-enable visualization rendering after full Engine.cpp integration
+        // For now, skip visualization rendering to allow compilation
         if (has_visualizations) {
-            writeDebugLog("RecordingManager::saveFramesToDisk() - Visualizations enabled, rendering frames...");
-            fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
-            fs::create_directories(recording_dir_with_viz);
-
-            int frame_num_viz = 0;
-            for (const auto& rec_frame : frames) {
-                if (frame_num_viz % 30 == 0) {
-                    writeDebugLog("RecordingManager::saveFramesToDisk() - Rendering visualization frame " + 
-                                 std::to_string(frame_num_viz) + "/" + std::to_string(frames.size()));
-                }
-                
-                // Note: renderVisualizationsOnFrame is defined in Engine.cpp and will be called via extern
-                cv::Mat frame_with_viz = renderVisualizationsOnFrame(rec_frame.frame, rec_frame,
-                                                                     camera_intrinsics, viz_states,
-                                                                     record_with_yolo_boxes, nullptr);
-                std::string filename = session_name + "_frame_" + std::to_string(frame_num_viz++) + "_viz.jpg";
-                fs::path filepath = recording_dir_with_viz / filename;
-                
-                if (frame_num_viz % 30 == 1) {
-                    writeDebugLog("RecordingManager::saveFramesToDisk() - About to write visualization frame to: " + 
-                                 filepath.string());
-                }
-                cv::imwrite(filepath.string(), frame_with_viz);
-            }
-            INFO_LOG("Saved ", frames.size(), " frames with visualizations to ", recording_dir_with_viz.string());
-            writeDebugLog("RecordingManager::saveFramesToDisk() - Visualization frames saved");
+            writeDebugLog("RecordingManager::saveFramesToDisk() - Visualizations requested but temporarily disabled during refactoring");
+            INFO_LOG("Note: Visualization rendering temporarily disabled during refactoring. Will be re-enabled after integration.");
         } else {
             writeDebugLog("RecordingManager::saveFramesToDisk() - No visualizations enabled");
         }

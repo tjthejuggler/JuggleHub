@@ -13,11 +13,8 @@
 
 using json = nlohmann::json;
 
-// Simple struct to hold camera intrinsics
-struct CameraIntrinsics {
-    float fx, fy;
-    float ppx, ppy;
-};
+// Use shared CameraIntrinsics definition
+#include "CameraIntrinsics.hpp"
 
 // Color profile for ball identification
 struct ColorProfile {

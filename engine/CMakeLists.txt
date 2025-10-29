@@ -52,6 +52,11 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ../api/v1/juggler.proto)
 add_executable(juggle_engine
     src/main.cpp
     src/Engine.cpp
+    src/CameraManager.cpp
+    src/RecordingManager.cpp
+    src/PlaybackController.cpp
+    src/CommandProcessor.cpp
+    src/VisualizationRenderer.cpp
     src/SimpleBallTracker.cpp
     src/Simple2DBallTracker.cpp
     src/New3DTracker.cpp

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CameraIntrinsics.hpp"
 #include "IBallTracker.hpp"
 #include "RecordingLogger.hpp"
 #include "juggler.pb.h"
@@ -11,9 +12,29 @@
 #include <vector>
 
 // Forward declarations for legacy compatibility
-enum class TrackerStatus;
-struct TrackedObject;
-struct TrackedHand;
+enum class TrackerStatus {
+    TRACKED,
+    LOST,
+    REMOVED
+};
+
+struct TrackedObject {
+    cv::Rect_<float> box;
+    cv::Point3f world_pos;
+    int id;
+    int class_id;
+    std::string class_name;
+    TrackerStatus status;
+    int logical_id;
+    bool is_left;
+};
+
+struct TrackedHand {
+    cv::Point3f wrist_pos_3d;
+    float confidence;
+    int id;
+    std::vector<cv::Point3f> keypoints;
+};
 
 struct RecordingFrame {
     cv::Mat frame;

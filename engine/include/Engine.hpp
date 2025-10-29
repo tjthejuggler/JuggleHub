@@ -4,46 +4,19 @@
 #include "../src/modules/ModuleBase.hpp"
 #include "../src/modules/UdpBallColorModule.hpp"
 #include "../src/modules/UdpBallSettingsModule.hpp"
-#include "IBallTracker.hpp" // Include the tracker interface
-#include "SimpleBallTracker.hpp" // Include the simplified ball tracker
-#include "Simple2DBallTracker.hpp" // Include the 2D-only ball tracker
-#include "New3DTracker.hpp" // Include the new 3D tracker
-#include "PlaybackManager.hpp" // Include playback manager
-#include "RecordingLogger.hpp" // Include recording logger
-#include "json.hpp" // Include nlohmann/json
+#include "IBallTracker.hpp"
+#include "SimpleBallTracker.hpp"
+#include "Simple2DBallTracker.hpp"
+#include "New3DTracker.hpp"
+#include "CameraManager.hpp"
+#include "RecordingManager.hpp"
+#include "PlaybackController.hpp"
+#include "CommandProcessor.hpp"
+#include "VisualizationRenderer.hpp"
 #include <memory>
-#include <queue>
-#include <mutex>
 #include <string>
-#include <deque>
 #include <atomic>
 #include <zmq.hpp>
-#include <librealsense2/rs.hpp>
-
-// Legacy types for recording compatibility
-enum class TrackerStatus {
-    TRACKED,
-    LOST,
-    REMOVED
-};
-
-struct TrackedObject {
-    cv::Rect_<float> box;
-    cv::Point3f world_pos;
-    int id;
-    int class_id;
-    std::string class_name;
-    TrackerStatus status;
-    int logical_id;
-    bool is_left;
-};
-
-struct TrackedHand {
-    cv::Point3f wrist_pos_3d;
-    float confidence;
-    int id;
-    std::vector<cv::Point3f> keypoints;
-};
 
 class Engine {
 public:
@@ -64,109 +37,42 @@ public:
     std::string getTrackerType() const { return current_tracker_type_; }
 
 private:
-    void processCommands();
-    void sendCommand(const juggler::v1::CommandRequest& command);
-    void saveRecording();
-    void startContinuousRecording();
-    void stopContinuousRecording();
-    void initializeCamera();
-    void applyCameraSettings();
-    void loadCameraSettingsFromJson(const std::string& json_path);
-    void stopCamera();
-    void startCamera();
-    void startCameraWithSettings(const std::string& settings_file);
-    void startCameraWithSettings(const std::string& settings_file, uint32_t width, uint32_t height, uint32_t fps);
-    std::unique_ptr<ModuleBase> create_module(const juggler::v1::CommandRequest& command);
+    // New refactored components
+    std::unique_ptr<CameraManager> camera_manager_;
+    std::unique_ptr<RecordingManager> recording_manager_;
+    std::unique_ptr<PlaybackController> playback_controller_;
+    std::unique_ptr<CommandProcessor> command_processor_;
+    std::unique_ptr<VisualizationRenderer> visualization_renderer_;
 
-    std::string camera_settings_path_;
-    std::string json_content_;
     OutputFormat output_format_;
-
-    // Thread-safe queue for commands
-    std::queue<juggler::v1::CommandRequest> command_queue_;
-    std::mutex command_queue_mutex_;
-
     std::atomic<bool> running_;
-    std::unique_ptr<ModuleBase> active_module_;
-    std::unique_ptr<UdpBallColorModule> color_module_;
-    std::unique_ptr<juggler::modules::UdpBallSettingsModule> settings_module_;
     
     // Tracker system (polymorphic - can be any IBallTracker implementation)
     std::shared_ptr<IBallTracker> tracker_;
     std::string current_tracker_type_;  // "depth_based", "simple_2d", or "new_3d"
     
-    // Legacy compatibility
-    std::shared_ptr<SimpleBallTracker> simple_tracker_;  // Keep for backward compatibility during transition
-    std::shared_ptr<Simple2DBallTracker> simple_2d_tracker_;  // 2D-only tracker (no depth)
-    std::shared_ptr<New3DTracker> new_3d_tracker_;  // New 3D tracker with stereo vision
-    bool use_dnn_tracker_; // Flag to switch between old/new tracker (kept for compatibility)
+    // Tracker instances
+    std::shared_ptr<SimpleBallTracker> simple_tracker_;
+    std::shared_ptr<Simple2DBallTracker> simple_2d_tracker_;
+    std::shared_ptr<New3DTracker> new_3d_tracker_;
+    bool use_dnn_tracker_;
     bool verbose_;
 
     // ZMQ
     zmq::context_t zmq_context_;
     zmq::socket_t zmq_publisher_;
-    zmq::socket_t zmq_commander_;
 
-    // RealSense
-    rs2::pipeline pipe_;
-    rs2::config rs_config_;
-    rs2::align align_to_color_;
-    std::atomic<bool> camera_running_;
-    std::atomic<bool> ir_projector_active_;
-    CameraIntrinsics camera_intrinsics_; // Store camera intrinsics
-    cv::Mat last_depth_frame_; // Cache for calibration
-    cv::Mat last_color_frame_; // Cache for color calibration
+    // Module system
+    std::unique_ptr<UdpBallColorModule> color_module_;
+    std::unique_ptr<juggler::modules::UdpBallSettingsModule> settings_module_;
     
-    // Camera configuration parameters
-    uint32_t camera_width_;
-    uint32_t camera_height_;
-    uint32_t camera_fps_;
-
-    // Frame buffer for recording
-    struct RecordingFrame {
-        cv::Mat frame;
-        cv::Mat depth_frame;  // Store depth data for recording
-        std::vector<Detection> raw_detections;
-        std::vector<TrackedObject> tracked_objects;
-        std::vector<TrackedHand> tracked_hands;
-        std::vector<SimpleBall> tracked_balls;  // Store SimpleBall data for color visualization
-        std::vector<SimpleHand> tracked_hands_simple;  // Store SimpleHand data for logging
-        std::vector<BallEvent> ball_events;  // Store throw/catch events for this frame
-        juggler::v1::VisualizationStates viz_states;  // Store visualization states
-    };
-    std::deque<RecordingFrame> frame_buffer_;
-    std::mutex frame_buffer_mutex_;
+    // Frame tracking
     uint32_t frame_counter_;
-    
-    // Continuous recording state
-    std::atomic<bool> continuous_recording_;
-    std::deque<RecordingFrame> continuous_frame_buffer_;
-    std::mutex continuous_frame_buffer_mutex_;
-    std::string continuous_recording_session_;
-
-    // Recording with bounding boxes state
     std::atomic<bool> record_with_yolo_boxes_;
-    std::atomic<bool> video_feed_enabled_;  // Whether to encode JPG for video feed
-    juggler::v1::VisualizationStates visualization_states_;  // Store current visualization states
-    std::vector<Detection> last_raw_detections_; // Keep for calibration
-    std::vector<TrackedObject> last_tracked_objects_; // Keep for calibration
-    
-    // Recording logger for detailed frame-by-frame tracking data
-    RecordingLogger recording_logger_;
-    
-    // Playback mode
-    std::unique_ptr<PlaybackManager> playback_manager_;
-    std::atomic<bool> playback_mode_;
-    std::chrono::steady_clock::time_point last_playback_frame_time_;
-    
-    // Playback control methods
-    void startPlayback(const std::string& recording_dir);
-    void stopPlayback();
-    void stepPlaybackForward();
-    void stepPlaybackBackward();
-    void setPlaybackSpeed(float speed);
-    void pausePlayback();
-    void resumePlayback();
+    std::atomic<bool> video_feed_enabled_;
+    juggler::v1::VisualizationStates visualization_states_;
+    std::vector<Detection> last_raw_detections_;
+    std::vector<TrackedObject> last_tracked_objects_;
     
     // Helper function to render visualizations on a frame
     cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame, const RecordingFrame& rec_frame);

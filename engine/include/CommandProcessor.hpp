@@ -46,6 +46,40 @@ public:
     void setVideoFeedEnabled(std::atomic<bool>* flag) { video_feed_enabled_ = flag; }
     void setCurrentTrackerType(std::string* tracker_type) { current_tracker_type_ = tracker_type; }
     
+    // Convenience methods for bulk dependency injection
+    void setDependencies(CameraManager* camera_mgr, RecordingManager* rec_mgr,
+                        PlaybackController* playback_ctrl, UdpBallColorModule* color_module,
+                        juggler::v1::VisualizationStates* viz_states, std::atomic<bool>* record_with_yolo,
+                        std::atomic<bool>* video_feed, std::string* tracker_type) {
+        camera_manager_ = camera_mgr;
+        recording_manager_ = rec_mgr;
+        playback_controller_ = playback_ctrl;
+        color_module_ = color_module;
+        visualization_states_ = viz_states;
+        record_with_yolo_boxes_ = record_with_yolo;
+        video_feed_enabled_ = video_feed;
+        current_tracker_type_ = tracker_type;
+    }
+    
+    void setTrackerReferences(std::shared_ptr<IBallTracker> tracker,
+                             std::shared_ptr<IBallTracker> simple_tracker,
+                             std::shared_ptr<IBallTracker> simple_2d_tracker,
+                             std::shared_ptr<IBallTracker> new_3d_tracker) {
+        tracker_ = tracker;
+        simple_tracker_ = simple_tracker;
+        simple_2d_tracker_ = simple_2d_tracker;
+        new_3d_tracker_ = new_3d_tracker;
+    }
+    
+    // Module management
+    bool hasActiveModule() const { return active_module_ != nullptr; }
+    void updateActiveModule(juggler::v1::FrameData& frame_data,
+                           std::function<void(const juggler::v1::CommandRequest&)> send_command_callback) {
+        if (active_module_) {
+            active_module_->update(frame_data, send_command_callback);
+        }
+    }
+    
     // Callbacks for operations that need Engine context
     using TrackerSwitchCallback = std::function<void(const std::string&)>;
     void setTrackerSwitchCallback(TrackerSwitchCallback callback) { tracker_switch_callback_ = callback; }

@@ -64,6 +64,10 @@ public:
                                  const juggler::v1::VisualizationStates& viz_states,
                                  bool record_with_yolo_boxes);
     bool isContinuousRecording() const { return continuous_recording_; }
+    size_t getContinuousBufferSize() const {
+        std::lock_guard<std::mutex> lock(continuous_frame_buffer_mutex_);
+        return continuous_frame_buffer_.size();
+    }
     
     // Save recording from buffer
     void saveRecording(const CameraIntrinsics& camera_intrinsics,

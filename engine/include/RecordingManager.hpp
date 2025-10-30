@@ -53,6 +53,11 @@ public:
     RecordingManager();
     ~RecordingManager();
 
+    // Set dependencies
+    void setTracker(IBallTracker* tracker) {
+        tracker_ = tracker;
+    }
+
     // Frame buffer management
     void addFrame(const RecordingFrame& frame);
     void clearBuffer();
@@ -97,4 +102,7 @@ private:
     
     // Recording logger
     RecordingLogger recording_logger_;
+    
+    // Dependency for visualization rendering
+    IBallTracker* tracker_ = nullptr;
 };

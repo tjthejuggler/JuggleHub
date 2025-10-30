@@ -11,17 +11,19 @@ VisualizationRenderer::VisualizationRenderer() {
 VisualizationRenderer::~VisualizationRenderer() {
 }
 
+// NOTE: The actual renderVisualizationsOnFrame implementation is in Engine.cpp
+// This class currently serves as a placeholder for future refactoring
+// The RecordingManager calls the Engine.cpp version via external linkage
+
 cv::Mat VisualizationRenderer::renderVisualizationsOnFrame(const cv::Mat& frame,
                                                           const RecordingFrame& rec_frame,
                                                           const CameraIntrinsics& camera_intrinsics,
                                                           const juggler::v1::VisualizationStates& viz_states,
                                                           bool record_with_yolo_boxes,
                                                           IBallTracker* tracker) {
-    // For now, just return the original frame
-    // The actual visualization rendering is still in Engine.cpp's renderVisualizationsOnFrame()
-    // This stub allows compilation to succeed
-    // TODO: Extract the full visualization logic from Engine.cpp into this class
-    (void)rec_frame;  // Suppress unused parameter warning
+    // This should not be called - RecordingManager uses the Engine.cpp version
+    writeDebugLog("ERROR: VisualizationRenderer::renderVisualizationsOnFrame stub called!");
+    (void)rec_frame;
     (void)camera_intrinsics;
     (void)viz_states;
     (void)record_with_yolo_boxes;

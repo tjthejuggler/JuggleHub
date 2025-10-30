@@ -57,6 +57,7 @@ add_executable(juggle_engine
     src/PlaybackController.cpp
     src/CommandProcessor.cpp
     src/VisualizationRenderer.cpp
+    src/RenderVisualizations.cpp
     src/SimpleBallTracker.cpp
     src/Simple2DBallTracker.cpp
     src/New3DTracker.cpp

@@ -270,6 +270,7 @@ void Engine::run() {
             }
             
             // Apply depth blob filter visualization if enabled (New3DTracker only)
+            // CRITICAL: This must be done BEFORE encoding the image
             if (current_tracker_type_ == "new_3d" && new_3d_tracker_) {
                 const auto& settings = new_3d_tracker_->getSettings();
                 if (settings.enable_depth_blob_detection && settings.show_depth_filtered_pixels) {
@@ -287,11 +288,15 @@ void Engine::run() {
                 }
             }
             
+            // CRITICAL FIX: Store the display_image for later use by hand threshold visualization
+            // This prevents the hand threshold code from overwriting the depth blob filter
+            cv::Mat final_display_image = display_image.clone();
+            
             std::vector<uchar> buf;
             std::vector<int> compression_params;
             compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
             compression_params.push_back(70);  // 70% quality for faster encoding
-            cv::imencode(".jpg", display_image, buf, compression_params);
+            cv::imencode(".jpg", final_display_image, buf, compression_params);
             frame_data.set_color_image_b64(buf.data(), buf.size());
         }
         frame_data.set_ir_projector_active(camera_manager_->isIRProjectorActive());
@@ -428,16 +433,24 @@ void Engine::run() {
         }
         
         // Draw hand threshold circles on real-time feed if enabled
+        // CRITICAL FIX: Use the already-filtered display_image instead of starting from color_image
         if (video_feed_enabled_ && visualization_states_.show_hand_threshold() && tracker_ && !tracked_hands.empty()) {
-            cv::Mat display_with_viz = color_image.clone();
-            tracker_->drawHandThresholds(display_with_viz, tracked_hands, camera_manager_->getIntrinsics());
+            // Get the current display image from frame_data (which already has depth blob filter applied)
+            // We need to decode it, draw on it, then re-encode it
+            std::string current_jpg = frame_data.color_image_b64();
+            std::vector<uchar> jpg_data(current_jpg.begin(), current_jpg.end());
+            cv::Mat display_with_viz = cv::imdecode(jpg_data, cv::IMREAD_COLOR);
             
-            std::vector<uchar> buf;
-            std::vector<int> compression_params;
-            compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
-            compression_params.push_back(70);
-            cv::imencode(".jpg", display_with_viz, buf, compression_params);
-            frame_data.set_color_image_b64(buf.data(), buf.size());
+            if (!display_with_viz.empty()) {
+                tracker_->drawHandThresholds(display_with_viz, tracked_hands, camera_manager_->getIntrinsics());
+                
+                std::vector<uchar> buf;
+                std::vector<int> compression_params;
+                compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
+                compression_params.push_back(70);
+                cv::imencode(".jpg", display_with_viz, buf, compression_params);
+                frame_data.set_color_image_b64(buf.data(), buf.size());
+            }
         }
         
         // Populate trajectory-based predictions for visualization

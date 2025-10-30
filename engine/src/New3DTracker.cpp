@@ -1679,65 +1679,146 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
     
     std::vector<Detection> detections;
     
-    // Create a binary mask for pixels within depth range
-    cv::Mat depth_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
-    
     const float min_dist_m = settings_.depth_blob_min_distance_m;
     const float max_dist_m = settings_.depth_blob_max_distance_m;
     
-    // Filter depth pixels by distance range
+    std::cout << "[DepthBlob] === STEP 1: DEPTH FILTERING ===" << std::endl;
+    std::cout << "[DepthBlob] Filtering pixels by depth range: " << min_dist_m << "m - " << max_dist_m << "m" << std::endl;
+    
+    // STEP 1: Filter pixels by depth range and group by depth layers
+    // We'll use 10cm depth bins to separate objects at different distances
+    const float depth_bin_size = 0.10f;  // 10cm bins
+    std::map<int, std::vector<cv::Point>> depth_bins;
+    
     for (int y = 0; y < depth_frame.rows; y++) {
         for (int x = 0; x < depth_frame.cols; x++) {
             uint16_t depth_mm = depth_frame.at<uint16_t>(y, x);
             float depth_m = depth_mm / 1000.0f;
             
             if (depth_m >= min_dist_m && depth_m <= max_dist_m) {
-                depth_mask.at<uchar>(y, x) = 255;
+                // Assign pixel to a depth bin
+                int bin_index = static_cast<int>(depth_m / depth_bin_size);
+                depth_bins[bin_index].push_back(cv::Point(x, y));
             }
         }
     }
     
-    // Store mask for visualization
-    depth_filtered_mask_ = depth_mask.clone();
+    std::cout << "[DepthBlob] Found " << depth_bins.size() << " depth layers" << std::endl;
     
-    // Find contours in the depth mask
-    std::vector<std::vector<cv::Point>> contours;
-    std::vector<cv::Vec4i> hierarchy;
-    cv::findContours(depth_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    // STEP 2: For each depth layer, find connected components (blobs)
+    std::cout << "[DepthBlob] === STEP 2: SEPARATING BLOBS BY DEPTH ===" << std::endl;
     
-    // Filter contours by area and create detections
-    for (const auto& contour : contours) {
-        double area = cv::contourArea(contour);
+    struct DepthBlob {
+        std::vector<cv::Point> pixels;
+        float avg_depth;
+        cv::Rect bbox;
+    };
+    
+    std::vector<DepthBlob> depth_separated_blobs;
+    
+    for (const auto& [bin_index, pixels] : depth_bins) {
+        if (pixels.empty()) continue;
         
-        if (area >= settings_.depth_blob_min_area_px && area <= settings_.depth_blob_max_area_px) {
-            // Get bounding box
-            cv::Rect bbox = cv::boundingRect(contour);
+        // Create a binary mask for this depth layer
+        cv::Mat layer_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
+        for (const auto& pt : pixels) {
+            layer_mask.at<uchar>(pt.y, pt.x) = 255;
+        }
+        
+        // Find connected components in this depth layer
+        std::vector<std::vector<cv::Point>> contours;
+        std::vector<cv::Vec4i> hierarchy;
+        cv::findContours(layer_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+        
+        // Each contour is a separate blob at this depth
+        for (const auto& contour : contours) {
+            if (contour.size() < 3) continue;  // Skip tiny contours
             
-            // Calculate center point
-            cv::Point2f center(bbox.x + bbox.width / 2.0f, bbox.y + bbox.height / 2.0f);
+            DepthBlob blob;
+            blob.pixels = contour;
+            blob.bbox = cv::boundingRect(contour);
             
-            // Get depth at center
-            float depth_value_m = getDepthAtPoint(depth_frame, center);
+            // Calculate average depth for this blob
+            float depth_sum = 0.0f;
+            int valid_count = 0;
+            for (const auto& pt : contour) {
+                uint16_t depth_mm = depth_frame.at<uint16_t>(pt.y, pt.x);
+                float depth_m = depth_mm / 1000.0f;
+                if (depth_m > 0.1f) {
+                    depth_sum += depth_m;
+                    valid_count++;
+                }
+            }
+            blob.avg_depth = (valid_count > 0) ? (depth_sum / valid_count) : 0.0f;
             
-            if (depth_value_m > 0.1f && depth_value_m < 3.0f) {
-                // Deproject to 3D
-                cv::Point3f world_pos = deprojectToWorld(center, depth_value_m, intrinsics);
-                
-                // Create detection
-                Detection det;
-                det.box = cv::Rect_<float>(bbox.x, bbox.y, bbox.width, bbox.height);
-                det.world_pos = world_pos;
-                det.confidence = 1.0f;  // Depth blobs have full confidence
-                det.class_id = 0;  // Treat as 'ball' class
-                det.detected_bgr_color = sampleDetectedColor(det, color_frame);
-                
-                detections.push_back(det);
+            if (blob.avg_depth > 0.1f) {
+                depth_separated_blobs.push_back(blob);
             }
         }
     }
     
-    std::cout << "[New3DTracker] Depth blob detection found " << detections.size()
-              << " blobs (from " << contours.size() << " contours)" << std::endl;
+    std::cout << "[DepthBlob] Separated into " << depth_separated_blobs.size() << " depth-distinct blobs" << std::endl;
+    
+    // STEP 3: Calculate physical surface area for each depth-separated blob and filter
+    std::cout << "[DepthBlob] === STEP 3: SURFACE AREA FILTERING ===" << std::endl;
+    std::cout << "[DepthBlob] Settings: min_area=" << settings_.depth_blob_min_area_px << "cm², "
+              << "max_area=" << settings_.depth_blob_max_area_px << "cm²" << std::endl;
+    
+    cv::Mat filtered_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
+    
+    for (const auto& blob : depth_separated_blobs) {
+        // Calculate pixel area
+        double pixel_area = cv::contourArea(blob.pixels);
+        
+        // Calculate physical surface area using the blob's average depth
+        float depth_squared = blob.avg_depth * blob.avg_depth;
+        float focal_product = intrinsics.fx * intrinsics.fy;
+        float physical_area_m2 = (pixel_area * depth_squared) / focal_product;
+        float physical_area_cm2 = physical_area_m2 * 10000.0f;  // Convert to cm²
+        
+        float min_area_cm2 = static_cast<float>(settings_.depth_blob_min_area_px);
+        float max_area_cm2 = static_cast<float>(settings_.depth_blob_max_area_px);
+        
+        if (physical_area_cm2 >= min_area_cm2 && physical_area_cm2 <= max_area_cm2) {
+            // Calculate center point
+            cv::Point2f center(blob.bbox.x + blob.bbox.width / 2.0f,
+                             blob.bbox.y + blob.bbox.height / 2.0f);
+            
+            // Deproject to 3D using average depth
+            cv::Point3f world_pos = deprojectToWorld(center, blob.avg_depth, intrinsics);
+            
+            // Create detection
+            Detection det;
+            det.box = cv::Rect_<float>(blob.bbox.x, blob.bbox.y, blob.bbox.width, blob.bbox.height);
+            det.world_pos = world_pos;
+            det.confidence = 1.0f;
+            det.class_id = 0;
+            det.detected_bgr_color = sampleDetectedColor(det, color_frame);
+            
+            detections.push_back(det);
+            
+            // Add this blob's pixels to the visualization mask
+            cv::drawContours(filtered_mask, std::vector<std::vector<cv::Point>>{blob.pixels},
+                            0, cv::Scalar(255), cv::FILLED);
+            
+            std::cout << "[DepthBlob] ✓ ACCEPTED: pixel_area=" << pixel_area << "px², "
+                      << "avg_depth=" << blob.avg_depth << "m, "
+                      << "physical_area=" << physical_area_cm2 << "cm² "
+                      << "(range: " << min_area_cm2 << "-" << max_area_cm2 << "cm²)" << std::endl;
+        } else {
+            std::cout << "[DepthBlob] ✗ REJECTED: pixel_area=" << pixel_area << "px², "
+                      << "avg_depth=" << blob.avg_depth << "m, "
+                      << "physical_area=" << physical_area_cm2 << "cm² "
+                      << "(outside range: " << min_area_cm2 << "-" << max_area_cm2 << "cm²)" << std::endl;
+        }
+    }
+    
+    // Store the filtered mask for visualization
+    depth_filtered_mask_ = filtered_mask;
+    
+    std::cout << "[New3DTracker] === FINAL RESULT ===" << std::endl;
+    std::cout << "[New3DTracker] Accepted " << detections.size() << " blobs out of "
+              << depth_separated_blobs.size() << " depth-separated blobs" << std::endl;
     
     return detections;
 }

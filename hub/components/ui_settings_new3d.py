@@ -679,12 +679,15 @@ class New3DSettingsSections:
         self.parent.new3d_depth_min_area_slider, self.parent.new3d_depth_min_area_label = self.parent._create_slider_widget(
             parent_layout=layout,
             row=row,
-            label_text="Min Surface Area (pixels²)",
-            tooltip_text="Minimum blob surface area in pixels.\n"
-                         "Range: 10-1000 pixels². Default: 50 pixels².\n"
-                         "Smaller blobs will be filtered out.",
-            range_min=10,
-            range_max=1000,
+            label_text="Min Surface Area (cm²)",
+            tooltip_text="Minimum blob physical surface area in cm².\n"
+                         "Range: 0-200 cm². Default: 50 cm².\n"
+                         "This is DEPTH-AWARE: filters by actual 3D size, not pixel size.\n"
+                         "Blobs are separated by depth FIRST, then filtered by surface area.\n"
+                         "A small ball close to camera = same physical area as small ball far away.\n"
+                         "Use this to filter out tiny noise while keeping balls at any distance.",
+            range_min=0,
+            range_max=200,
             initial_value=50,
             update_func=lambda v: self.parent.update_setting('depth_blob_min_area_px', v),
             is_float=False
@@ -695,13 +698,16 @@ class New3DSettingsSections:
         self.parent.new3d_depth_max_area_slider, self.parent.new3d_depth_max_area_label = self.parent._create_slider_widget(
             parent_layout=layout,
             row=row,
-            label_text="Max Surface Area (pixels²)",
-            tooltip_text="Maximum blob surface area in pixels.\n"
-                         "Range: 100-5000 pixels². Default: 2000 pixels².\n"
-                         "Larger blobs will be filtered out.",
-            range_min=100,
-            range_max=5000,
-            initial_value=2000,
+            label_text="Max Surface Area (cm²)",
+            tooltip_text="Maximum blob physical surface area in cm².\n"
+                         "Range: 0-200 cm². Default: 200 cm².\n"
+                         "This is DEPTH-AWARE: filters by actual 3D size, not pixel size.\n"
+                         "Blobs are separated by depth FIRST, then filtered by surface area.\n"
+                         "A large person far away = same physical area as large person close.\n"
+                         "Use this to filter out large objects (juggler, furniture) while keeping balls.",
+            range_min=0,
+            range_max=200,
+            initial_value=200,
             update_func=lambda v: self.parent.update_setting('depth_blob_max_area_px', v),
             is_float=False
         )

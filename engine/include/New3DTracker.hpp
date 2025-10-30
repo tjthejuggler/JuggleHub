@@ -204,8 +204,8 @@ struct New3DTrackerSettings {
     bool enable_depth_blob_detection = false;       // Enable depth-based blob detection
     float depth_blob_min_distance_m = 0.30f;        // Min depth distance (meters)
     float depth_blob_max_distance_m = 1.50f;        // Max depth distance (meters)
-    int depth_blob_min_area_px = 50;                // Min blob surface area (pixels²)
-    int depth_blob_max_area_px = 2000;              // Max blob surface area (pixels²)
+    int depth_blob_min_area_px = 50;                // Min blob physical surface area (cm²) - DEPTH-AWARE
+    int depth_blob_max_area_px = 2000;              // Max blob physical surface area (cm²) - DEPTH-AWARE
     bool show_depth_filtered_pixels = true;         // Show filtered depth pixels in visualization
     
     // === HAND VELOCITY (for throw prediction) ===

@@ -269,6 +269,24 @@ void Engine::run() {
                 }
             }
             
+            // Apply depth blob filter visualization if enabled (New3DTracker only)
+            if (current_tracker_type_ == "new_3d" && new_3d_tracker_) {
+                const auto& settings = new_3d_tracker_->getSettings();
+                if (settings.enable_depth_blob_detection && settings.show_depth_filtered_pixels) {
+                    cv::Mat depth_mask = new_3d_tracker_->getDepthFilteredMask();
+                    if (!depth_mask.empty() && depth_mask.size() == display_image.size()) {
+                        // Create a black image
+                        cv::Mat filtered_display = cv::Mat::zeros(display_image.size(), display_image.type());
+                        
+                        // Copy only the pixels that pass the depth filter (where mask is 255)
+                        display_image.copyTo(filtered_display, depth_mask);
+                        
+                        // Replace display_image with the filtered version
+                        display_image = filtered_display;
+                    }
+                }
+            }
+            
             std::vector<uchar> buf;
             std::vector<int> compression_params;
             compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);

@@ -435,6 +435,26 @@ bool New3DTracker::loadSettings() {
             settings_.show_association_lines = j["show_association_lines"];
         }
         
+        // Load depth blob detection settings
+        if (j.contains("enable_depth_blob_detection")) {
+            settings_.enable_depth_blob_detection = j["enable_depth_blob_detection"];
+        }
+        if (j.contains("depth_blob_min_distance_cm")) {
+            settings_.depth_blob_min_distance_m = j["depth_blob_min_distance_cm"].get<float>() / 100.0f;
+        }
+        if (j.contains("depth_blob_max_distance_cm")) {
+            settings_.depth_blob_max_distance_m = j["depth_blob_max_distance_cm"].get<float>() / 100.0f;
+        }
+        if (j.contains("depth_blob_min_area_px")) {
+            settings_.depth_blob_min_area_px = j["depth_blob_min_area_px"];
+        }
+        if (j.contains("depth_blob_max_area_px")) {
+            settings_.depth_blob_max_area_px = j["depth_blob_max_area_px"];
+        }
+        if (j.contains("show_depth_filtered_pixels")) {
+            settings_.show_depth_filtered_pixels = j["show_depth_filtered_pixels"];
+        }
+        
         // Load color profiles
         if (j.contains("color_profiles")) {
             color_profiles_.clear();
@@ -510,6 +530,14 @@ void New3DTracker::saveSettings() {
         j["show_kalman_prediction"] = settings_.show_kalman_prediction;
         j["show_held_radius"] = settings_.show_held_radius;
         j["show_association_lines"] = settings_.show_association_lines;
+        
+        // Save depth blob detection settings
+        j["enable_depth_blob_detection"] = settings_.enable_depth_blob_detection;
+        j["depth_blob_min_distance_cm"] = settings_.depth_blob_min_distance_m * 100.0f;
+        j["depth_blob_max_distance_cm"] = settings_.depth_blob_max_distance_m * 100.0f;
+        j["depth_blob_min_area_px"] = settings_.depth_blob_min_area_px;
+        j["depth_blob_max_area_px"] = settings_.depth_blob_max_area_px;
+        j["show_depth_filtered_pixels"] = settings_.show_depth_filtered_pixels;
         
         // Save color profiles
         json profiles_json = json::array();
@@ -1644,6 +1672,75 @@ float New3DTracker::getDepthAtPoint(const cv::Mat& depth_frame, const cv::Point2
     std::nth_element(samples.begin(), samples.begin() + mid, samples.end());
     return samples[mid];
 }
+std::vector<Detection> New3DTracker::runDepthBlobDetection(
+    const cv::Mat& color_frame,
+    const cv::Mat& depth_frame,
+    const CameraIntrinsics& intrinsics) {
+    
+    std::vector<Detection> detections;
+    
+    // Create a binary mask for pixels within depth range
+    cv::Mat depth_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
+    
+    const float min_dist_m = settings_.depth_blob_min_distance_m;
+    const float max_dist_m = settings_.depth_blob_max_distance_m;
+    
+    // Filter depth pixels by distance range
+    for (int y = 0; y < depth_frame.rows; y++) {
+        for (int x = 0; x < depth_frame.cols; x++) {
+            uint16_t depth_mm = depth_frame.at<uint16_t>(y, x);
+            float depth_m = depth_mm / 1000.0f;
+            
+            if (depth_m >= min_dist_m && depth_m <= max_dist_m) {
+                depth_mask.at<uchar>(y, x) = 255;
+            }
+        }
+    }
+    
+    // Store mask for visualization
+    depth_filtered_mask_ = depth_mask.clone();
+    
+    // Find contours in the depth mask
+    std::vector<std::vector<cv::Point>> contours;
+    std::vector<cv::Vec4i> hierarchy;
+    cv::findContours(depth_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    
+    // Filter contours by area and create detections
+    for (const auto& contour : contours) {
+        double area = cv::contourArea(contour);
+        
+        if (area >= settings_.depth_blob_min_area_px && area <= settings_.depth_blob_max_area_px) {
+            // Get bounding box
+            cv::Rect bbox = cv::boundingRect(contour);
+            
+            // Calculate center point
+            cv::Point2f center(bbox.x + bbox.width / 2.0f, bbox.y + bbox.height / 2.0f);
+            
+            // Get depth at center
+            float depth_value_m = getDepthAtPoint(depth_frame, center);
+            
+            if (depth_value_m > 0.1f && depth_value_m < 3.0f) {
+                // Deproject to 3D
+                cv::Point3f world_pos = deprojectToWorld(center, depth_value_m, intrinsics);
+                
+                // Create detection
+                Detection det;
+                det.box = cv::Rect_<float>(bbox.x, bbox.y, bbox.width, bbox.height);
+                det.world_pos = world_pos;
+                det.confidence = 1.0f;  // Depth blobs have full confidence
+                det.class_id = 0;  // Treat as 'ball' class
+                det.detected_bgr_color = sampleDetectedColor(det, color_frame);
+                
+                detections.push_back(det);
+            }
+        }
+    }
+    
+    std::cout << "[New3DTracker] Depth blob detection found " << detections.size()
+              << " blobs (from " << contours.size() << " contours)" << std::endl;
+    
+    return detections;
+}
 
 cv::Point3f New3DTracker::deprojectToWorld(const cv::Point2f& pixel, float depth,
                                            const CameraIntrinsics& intrinsics) {
@@ -1910,11 +2007,16 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
         preprocessed = preprocess(color_frame, scale_x, scale_y);
     }
     
-    // Run YOLO ball detection (conditionally, based on processing density)
+    // Run ball detection (YOLO or depth blob, conditionally based on settings)
     std::vector<Detection> detections;
     ball_frame_counter_++;
     
-    if (settings_.enable_ball_detection) {
+    if (settings_.enable_depth_blob_detection) {
+        // Use depth-based blob detection instead of YOLO
+        detections = runDepthBlobDetection(color_frame, depth_frame, intrinsics);
+        logDebug("--- DEPTH BLOB DETECTION: RUNNING ---");
+        logDebug("Found ", detections.size(), " depth blobs");
+    } else if (settings_.enable_ball_detection) {
         // Determine if we should process this frame based on density percentage
         bool should_process = false;
         int density = settings_.ball_processing_density;
@@ -2459,6 +2561,19 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.gravity_mps2.y = std::stof(value);
         } else if (key == "gravity_z") {
             settings_.gravity_mps2.z = std::stof(value);
+        } else if (key == "enable_depth_blob_detection") {
+            settings_.enable_depth_blob_detection = (value == "true" || value == "1");
+            std::cout << "[New3DTracker] ⚙️ Depth blob detection " << (settings_.enable_depth_blob_detection ? "ENABLED" : "DISABLED") << std::endl;
+        } else if (key == "depth_blob_min_distance_cm") {
+            settings_.depth_blob_min_distance_m = std::stof(value) / 100.0f;
+        } else if (key == "depth_blob_max_distance_cm") {
+            settings_.depth_blob_max_distance_m = std::stof(value) / 100.0f;
+        } else if (key == "depth_blob_min_area_px") {
+            settings_.depth_blob_min_area_px = std::stoi(value);
+        } else if (key == "depth_blob_max_area_px") {
+            settings_.depth_blob_max_area_px = std::stoi(value);
+        } else if (key == "show_depth_filtered_pixels") {
+            settings_.show_depth_filtered_pixels = (value == "true" || value == "1");
         } else {
             std::cerr << "[New3DTracker] Unknown setting key: " << key << std::endl;
             return false;

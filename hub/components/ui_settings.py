@@ -224,6 +224,11 @@ if PYQT_AVAILABLE:
             # Add Color Calibration section
             self.new3d_color_calibration_section = self.tracker_new3d_sections.create_color_calibration_section()
             container_layout.addWidget(self.new3d_color_calibration_section)
+            
+            # Add Depth Blob Detection section
+            self.new3d_depth_blob_section = self.tracker_new3d_sections.create_depth_blob_detection_section()
+            container_layout.addWidget(self.new3d_depth_blob_section)
+            self.tracker_new3d_section_widgets.append(self.new3d_depth_blob_section)
             self.tracker_new3d_section_widgets.append(self.new3d_color_calibration_section)
             
             # Add 2D tracker sections (currently none, but ready for future)
@@ -444,6 +449,14 @@ if PYQT_AVAILABLE:
                 'tc_sound_on_throw': self.new3d_sound_on_throw_toggle.isChecked() if hasattr(self, 'new3d_sound_on_throw_toggle') else False,
                 'tc_name_on_catch': self.new3d_name_on_catch_toggle.isChecked() if hasattr(self, 'new3d_name_on_catch_toggle') else False,
                 'tc_name_on_throw': self.new3d_name_on_throw_toggle.isChecked() if hasattr(self, 'new3d_name_on_throw_toggle') else False,
+                
+                # === DEPTH BLOB DETECTION ===
+                'enable_depth_blob_detection': self.new3d_depth_blob_enabled_toggle.isChecked() if hasattr(self, 'new3d_depth_blob_enabled_toggle') else False,
+                'depth_blob_min_distance_cm': self.new3d_depth_min_distance_slider.value() if hasattr(self, 'new3d_depth_min_distance_slider') else 30,
+                'depth_blob_max_distance_cm': self.new3d_depth_max_distance_slider.value() if hasattr(self, 'new3d_depth_max_distance_slider') else 150,
+                'depth_blob_min_area_px': self.new3d_depth_min_area_slider.value() if hasattr(self, 'new3d_depth_min_area_slider') else 50,
+                'depth_blob_max_area_px': self.new3d_depth_max_area_slider.value() if hasattr(self, 'new3d_depth_max_area_slider') else 2000,
+                'show_depth_filtered_pixels': self.new3d_show_depth_filtered_toggle.isChecked() if hasattr(self, 'new3d_show_depth_filtered_toggle') else True,
             }
 
         def _get_2d_tracker_settings(self) -> dict:
@@ -715,6 +728,24 @@ if PYQT_AVAILABLE:
                 self.new3d_name_on_catch_toggle.setChecked(settings['tc_name_on_catch'])
             if 'tc_name_on_throw' in settings and hasattr(self, 'new3d_name_on_throw_toggle'):
                 self.new3d_name_on_throw_toggle.setChecked(settings['tc_name_on_throw'])
+            
+            # === DEPTH BLOB DETECTION ===
+            if 'enable_depth_blob_detection' in settings and hasattr(self, 'new3d_depth_blob_enabled_toggle'):
+                is_enabled = settings['enable_depth_blob_detection']
+                self.new3d_depth_blob_enabled_toggle.setChecked(is_enabled)
+                self.new3d_depth_blob_enabled_toggle.setText(
+                    "Depth Blob Detection ACTIVE" if is_enabled else "Use Depth Blob Detection"
+                )
+            if 'depth_blob_min_distance_cm' in settings and hasattr(self, 'new3d_depth_min_distance_slider'):
+                self.new3d_depth_min_distance_slider.setValue(settings['depth_blob_min_distance_cm'])
+            if 'depth_blob_max_distance_cm' in settings and hasattr(self, 'new3d_depth_max_distance_slider'):
+                self.new3d_depth_max_distance_slider.setValue(settings['depth_blob_max_distance_cm'])
+            if 'depth_blob_min_area_px' in settings and hasattr(self, 'new3d_depth_min_area_slider'):
+                self.new3d_depth_min_area_slider.setValue(settings['depth_blob_min_area_px'])
+            if 'depth_blob_max_area_px' in settings and hasattr(self, 'new3d_depth_max_area_slider'):
+                self.new3d_depth_max_area_slider.setValue(settings['depth_blob_max_area_px'])
+            if 'show_depth_filtered_pixels' in settings and hasattr(self, 'new3d_show_depth_filtered_toggle'):
+                self.new3d_show_depth_filtered_toggle.setChecked(settings['show_depth_filtered_pixels'])
 
         def _apply_2d_tracker_settings(self, settings: dict):
             """Apply 2D tracker-specific settings"""
@@ -1406,6 +1437,20 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('tc_name_on_catch', 1 if settings['tc_name_on_catch'] else 0)
             if 'tc_name_on_throw' in settings:
                 self.udp_client.send_setting('tc_name_on_throw', 1 if settings['tc_name_on_throw'] else 0)
+            
+            # === DEPTH BLOB DETECTION ===
+            if 'enable_depth_blob_detection' in settings:
+                self.udp_client.send_setting('enable_depth_blob_detection', 1 if settings['enable_depth_blob_detection'] else 0)
+            if 'depth_blob_min_distance_cm' in settings:
+                self.udp_client.send_setting('depth_blob_min_distance_cm', settings['depth_blob_min_distance_cm'])
+            if 'depth_blob_max_distance_cm' in settings:
+                self.udp_client.send_setting('depth_blob_max_distance_cm', settings['depth_blob_max_distance_cm'])
+            if 'depth_blob_min_area_px' in settings:
+                self.udp_client.send_setting('depth_blob_min_area_px', settings['depth_blob_min_area_px'])
+            if 'depth_blob_max_area_px' in settings:
+                self.udp_client.send_setting('depth_blob_max_area_px', settings['depth_blob_max_area_px'])
+            if 'show_depth_filtered_pixels' in settings:
+                self.udp_client.send_setting('show_depth_filtered_pixels', 1 if settings['show_depth_filtered_pixels'] else 0)
         
         
         def _send_2d_tracker_settings(self, settings: dict):

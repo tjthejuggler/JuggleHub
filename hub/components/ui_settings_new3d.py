@@ -593,6 +593,151 @@ class New3DSettingsSections:
         
         return section
     
+    def create_depth_blob_detection_section(self):
+        """Create the Depth-Based Blob Detection settings section"""
+        section = CollapsibleGroupBox("🔍 Depth-Based Blob Detection", collapsed=False)
+        layout = QGridLayout()
+        section.get_content_layout().addLayout(layout)
+        
+        row = 0
+        
+        # Info label
+        info_label = QLabel("ℹ️ Alternative to YOLO: Detect balls using depth-based blob filtering")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label, row, 0, 1, 3)
+        row += 1
+        
+        # Enable Depth Blob Detection Toggle
+        label = QLabel("Enable Depth Blob Detection")
+        label.setToolTip("Enable depth-based blob detection as an alternative to YOLO.\n"
+                        "When enabled, balls are detected using depth filtering instead of YOLO model.")
+        layout.addWidget(label, row, 0)
+        
+        self.parent.new3d_depth_blob_enabled_toggle = QPushButton("Use Depth Blob Detection")
+        self.parent.new3d_depth_blob_enabled_toggle.setCheckable(True)
+        self.parent.new3d_depth_blob_enabled_toggle.setChecked(False)
+        self.parent.new3d_depth_blob_enabled_toggle.clicked.connect(
+            lambda: self._toggle_depth_blob_detection()
+        )
+        self.parent.new3d_depth_blob_enabled_toggle.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #d32f2f; }
+            QPushButton:pressed { background-color: #b71c1c; }
+            QPushButton:checked { 
+                background-color: #4CAF50;
+            }
+            QPushButton:checked:hover { 
+                background-color: #45a049;
+            }
+            QPushButton:!checked { 
+                background-color: #f44336;
+            }
+        """)
+        layout.addWidget(self.parent.new3d_depth_blob_enabled_toggle, row, 1, 1, 2)
+        row += 1
+        
+        # Min Distance Slider
+        self.parent.new3d_depth_min_distance_slider, self.parent.new3d_depth_min_distance_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Distance (cm)",
+            tooltip_text="Minimum depth distance for blob detection.\n"
+                         "Range: 10-200cm. Default: 30cm.\n"
+                         "Blobs closer than this will be filtered out.",
+            range_min=10,
+            range_max=200,
+            initial_value=30,
+            update_func=lambda v: self.parent.update_setting('depth_blob_min_distance_cm', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Max Distance Slider
+        self.parent.new3d_depth_max_distance_slider, self.parent.new3d_depth_max_distance_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Max Distance (cm)",
+            tooltip_text="Maximum depth distance for blob detection.\n"
+                         "Range: 20-300cm. Default: 150cm.\n"
+                         "Blobs farther than this will be filtered out.",
+            range_min=20,
+            range_max=300,
+            initial_value=150,
+            update_func=lambda v: self.parent.update_setting('depth_blob_max_distance_cm', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Min Surface Area Slider
+        self.parent.new3d_depth_min_area_slider, self.parent.new3d_depth_min_area_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Surface Area (pixels²)",
+            tooltip_text="Minimum blob surface area in pixels.\n"
+                         "Range: 10-1000 pixels². Default: 50 pixels².\n"
+                         "Smaller blobs will be filtered out.",
+            range_min=10,
+            range_max=1000,
+            initial_value=50,
+            update_func=lambda v: self.parent.update_setting('depth_blob_min_area_px', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Max Surface Area Slider
+        self.parent.new3d_depth_max_area_slider, self.parent.new3d_depth_max_area_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Max Surface Area (pixels²)",
+            tooltip_text="Maximum blob surface area in pixels.\n"
+                         "Range: 100-5000 pixels². Default: 2000 pixels².\n"
+                         "Larger blobs will be filtered out.",
+            range_min=100,
+            range_max=5000,
+            initial_value=2000,
+            update_func=lambda v: self.parent.update_setting('depth_blob_max_area_px', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Show Filtered Pixels Toggle
+        label = QLabel("Show Filtered Pixels")
+        label.setToolTip("Display RGB data for pixels that pass depth blob filters.\n"
+                        "Useful for debugging and tuning filter parameters.")
+        layout.addWidget(label, row, 0)
+        
+        self.parent.new3d_show_depth_filtered_toggle = QCheckBox()
+        self.parent.new3d_show_depth_filtered_toggle.setChecked(True)
+        self.parent.new3d_show_depth_filtered_toggle.stateChanged.connect(
+            lambda state: self.parent.update_setting('show_depth_filtered_pixels', 1 if state == Qt.CheckState.Checked.value else 0)
+        )
+        layout.addWidget(self.parent.new3d_show_depth_filtered_toggle, row, 1, 1, 2)
+        row += 1
+        
+        return section
+    
+    def _toggle_depth_blob_detection(self):
+        """Toggle depth blob detection on/off"""
+        is_enabled = self.parent.new3d_depth_blob_enabled_toggle.isChecked()
+        self.parent.new3d_depth_blob_enabled_toggle.setText(
+            "Depth Blob Detection ACTIVE" if is_enabled else "Use Depth Blob Detection"
+        )
+        self.parent.update_setting('enable_depth_blob_detection', 1 if is_enabled else 0)
+        
+        # Also toggle YOLO ball detection off when depth blob is enabled
+        if is_enabled:
+            print("⚠️ Depth blob detection enabled - YOLO ball detection will be disabled")
+            self.parent.update_setting('enable_ball_detection', 0)
+        else:
+            print("ℹ️ Depth blob detection disabled - YOLO ball detection can be re-enabled")
+    
     def create_color_calibration_section(self):
         """Create the Color Calibration section for New 3D Tracker"""
         section = CollapsibleGroupBox("🎨 Color Calibration", collapsed=False)

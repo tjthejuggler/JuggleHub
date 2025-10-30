@@ -200,6 +200,14 @@ struct New3DTrackerSettings {
     float ball_held_confidence_threshold = 0.25f;   // Min confidence for 'ball_held' class
     bool ignore_class = false;                      // Treat ball/ball_held same
     
+    // === DEPTH BLOB DETECTION (alternative to YOLO) ===
+    bool enable_depth_blob_detection = false;       // Enable depth-based blob detection
+    float depth_blob_min_distance_m = 0.30f;        // Min depth distance (meters)
+    float depth_blob_max_distance_m = 1.50f;        // Max depth distance (meters)
+    int depth_blob_min_area_px = 50;                // Min blob surface area (pixels²)
+    int depth_blob_max_area_px = 2000;              // Max blob surface area (pixels²)
+    bool show_depth_filtered_pixels = true;         // Show filtered depth pixels in visualization
+    
     // === HAND VELOCITY (for throw prediction) ===
     bool hand_velocity_enabled = true;              // Enable velocity-based throw detection
     float hand_velocity_threshold = 1.0f;           // Min hand speed (m/s) for enhanced detection
@@ -596,6 +604,19 @@ private:
     );
     
     /**
+     * @brief Run depth-based blob detection (alternative to YOLO)
+     * @param color_frame Original color frame
+     * @param depth_frame Depth frame
+     * @param intrinsics Camera intrinsics
+     * @return Vector of ball detections from depth blobs
+     */
+    std::vector<Detection> runDepthBlobDetection(
+        const cv::Mat& color_frame,
+        const cv::Mat& depth_frame,
+        const CameraIntrinsics& intrinsics
+    );
+    
+    /**
      * @brief Run pose estimation with YOLO
      * @param preprocessed Preprocessed frame
      * @param scale_x X scale factor
@@ -685,7 +706,16 @@ private:
     long long next_track_id_ = 0;                   // Next available track ID
     int recording_frame_number_ = -1;               // Current recording frame (-1 if not recording)
     cv::Mat current_color_image_;                   // Current frame color image for color sampling
+    cv::Mat depth_filtered_mask_;                   // Mask of filtered depth pixels for visualization
     
+public:
+    // Get the depth filtered mask for visualization
+    cv::Mat getDepthFilteredMask() const { return depth_filtered_mask_; }
+    
+    // Get current tracker settings
+    const New3DTrackerSettings& getSettings() const { return settings_; }
+    
+private:
     // ========================================================================
     // SETTINGS
     // ========================================================================

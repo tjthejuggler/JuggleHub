@@ -451,6 +451,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("depth_blob_max_area_px")) {
             settings_.depth_blob_max_area_px = j["depth_blob_max_area_px"];
         }
+        if (j.contains("depth_blob_min_circularity")) {
+            settings_.depth_blob_min_circularity = j["depth_blob_min_circularity"];
+        }
         if (j.contains("show_depth_filtered_pixels")) {
             settings_.show_depth_filtered_pixels = j["show_depth_filtered_pixels"];
         }
@@ -537,6 +540,7 @@ void New3DTracker::saveSettings() {
         j["depth_blob_max_distance_cm"] = settings_.depth_blob_max_distance_m * 100.0f;
         j["depth_blob_min_area_px"] = settings_.depth_blob_min_area_px;
         j["depth_blob_max_area_px"] = settings_.depth_blob_max_area_px;
+        j["depth_blob_min_circularity"] = settings_.depth_blob_min_circularity;
         j["show_depth_filtered_pixels"] = settings_.show_depth_filtered_pixels;
         
         // Save color profiles
@@ -1764,7 +1768,8 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
     std::cout << "[DepthBlob] Settings: min_area=" << settings_.depth_blob_min_area_px << "cm², "
               << "max_area=" << settings_.depth_blob_max_area_px << "cm²" << std::endl;
     
-    cv::Mat filtered_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
+    // Store blobs that pass area filtering for circularity check
+    std::vector<DepthBlob> area_filtered_blobs;
     
     for (const auto& blob : depth_separated_blobs) {
         // Calculate pixel area
@@ -1780,6 +1785,41 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
         float max_area_cm2 = static_cast<float>(settings_.depth_blob_max_area_px);
         
         if (physical_area_cm2 >= min_area_cm2 && physical_area_cm2 <= max_area_cm2) {
+            area_filtered_blobs.push_back(blob);
+            std::cout << "[DepthBlob] ✓ AREA PASS: pixel_area=" << pixel_area << "px², "
+                      << "avg_depth=" << blob.avg_depth << "m, "
+                      << "physical_area=" << physical_area_cm2 << "cm² "
+                      << "(range: " << min_area_cm2 << "-" << max_area_cm2 << "cm²)" << std::endl;
+        } else {
+            std::cout << "[DepthBlob] ✗ AREA REJECT: pixel_area=" << pixel_area << "px², "
+                      << "avg_depth=" << blob.avg_depth << "m, "
+                      << "physical_area=" << physical_area_cm2 << "cm² "
+                      << "(outside range: " << min_area_cm2 << "-" << max_area_cm2 << "cm²)" << std::endl;
+        }
+    }
+    
+    // STEP 4: Circularity filtering to remove irregular shapes
+    std::cout << "[DepthBlob] === STEP 4: CIRCULARITY FILTERING ===" << std::endl;
+    std::cout << "[DepthBlob] Settings: min_circularity=" << settings_.depth_blob_min_circularity
+              << " (1.0=perfect circle)" << std::endl;
+    
+    cv::Mat filtered_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
+    
+    for (const auto& blob : area_filtered_blobs) {
+        // Calculate circularity: (4 * π * Area) / (Perimeter²)
+        double perimeter = cv::arcLength(blob.pixels, true);
+        double area = cv::contourArea(blob.pixels);
+        
+        // Avoid division by zero
+        if (perimeter < 0.01) {
+            std::cout << "[DepthBlob] ✗ CIRCULARITY REJECT: perimeter too small (" << perimeter << ")" << std::endl;
+            continue;
+        }
+        
+        double circularity = (4.0 * CV_PI * area) / (perimeter * perimeter);
+        
+        // Filter by circularity threshold
+        if (circularity >= settings_.depth_blob_min_circularity) {
             // Calculate center point
             cv::Point2f center(blob.bbox.x + blob.bbox.width / 2.0f,
                              blob.bbox.y + blob.bbox.height / 2.0f);
@@ -1801,15 +1841,11 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
             cv::drawContours(filtered_mask, std::vector<std::vector<cv::Point>>{blob.pixels},
                             0, cv::Scalar(255), cv::FILLED);
             
-            std::cout << "[DepthBlob] ✓ ACCEPTED: pixel_area=" << pixel_area << "px², "
-                      << "avg_depth=" << blob.avg_depth << "m, "
-                      << "physical_area=" << physical_area_cm2 << "cm² "
-                      << "(range: " << min_area_cm2 << "-" << max_area_cm2 << "cm²)" << std::endl;
+            std::cout << "[DepthBlob] ✓ CIRCULARITY PASS: circularity=" << circularity
+                      << " (threshold: " << settings_.depth_blob_min_circularity << ")" << std::endl;
         } else {
-            std::cout << "[DepthBlob] ✗ REJECTED: pixel_area=" << pixel_area << "px², "
-                      << "avg_depth=" << blob.avg_depth << "m, "
-                      << "physical_area=" << physical_area_cm2 << "cm² "
-                      << "(outside range: " << min_area_cm2 << "-" << max_area_cm2 << "cm²)" << std::endl;
+            std::cout << "[DepthBlob] ✗ CIRCULARITY REJECT: circularity=" << circularity
+                      << " (threshold: " << settings_.depth_blob_min_circularity << ")" << std::endl;
         }
     }
     
@@ -2653,6 +2689,8 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.depth_blob_min_area_px = std::stoi(value);
         } else if (key == "depth_blob_max_area_px") {
             settings_.depth_blob_max_area_px = std::stoi(value);
+        } else if (key == "depth_blob_min_circularity") {
+            settings_.depth_blob_min_circularity = std::stof(value);
         } else if (key == "show_depth_filtered_pixels") {
             settings_.show_depth_filtered_pixels = (value == "true" || value == "1");
         } else {

@@ -713,6 +713,27 @@ class New3DSettingsSections:
         )
         row += 1
         
+        # Min Circularity Slider
+        self.parent.new3d_depth_min_circularity_slider, self.parent.new3d_depth_min_circularity_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Circularity",
+            tooltip_text="Minimum circularity for blob shape filtering (0.0-1.0).\n"
+                         "Range: 0.0-1.0. Default: 0.65.\n"
+                         "Circularity = (4 × π × Area) / (Perimeter²)\n"
+                         "1.0 = perfect circle, 0.785 = square, <0.7 = irregular shapes.\n"
+                         "This filters out non-circular shapes like hands, fingers, and irregular objects.\n"
+                         "Higher values = stricter (only very round shapes)\n"
+                         "Lower values = more permissive (allows slightly irregular shapes)\n"
+                         "Recommended: 0.6-0.7 for juggling balls (allows slight occlusion/motion blur)",
+            range_min=0,
+            range_max=100,
+            initial_value=65,
+            update_func=lambda v: self.parent.update_setting('depth_blob_min_circularity', v / 100.0),
+            is_float=True
+        )
+        row += 1
+        
         # Show Filtered Pixels Toggle
         label = QLabel("Show Filtered Pixels")
         label.setToolTip("Display RGB data for pixels that pass depth blob filters.\n"

@@ -2,7 +2,18 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-10-25 11:25 CEST
+**Last Updated:** 2025-11-01 18:36 CET
+
+**Recent Changes (2025-11-01):**
+- **🎨 COLOR SEARCH REGION VISUALIZATION**
+  - **New Feature**: Visual representation of the search area for each tracked ball color
+  - **Color-Coded Circles**: Each ball's search region is drawn in its corresponding color (red, blue, green, etc.)
+  - **Max Association Distance**: Circle size represents the `association_max_distance_m` setting
+  - **Previous Frame Position**: Circles are centered on the ball's last known position
+  - **Real-Time & Recording**: Visualization appears in both live feed and recorded videos
+  - **Toggle Control**: Enable/disable via `show_color_search_region` setting
+  - **Implementation**: [`engine/src/New3DTracker.cpp`](engine/src/New3DTracker.cpp:2525-2580)
+  - **Use Case**: Helps understand where the tracker is looking for each ball and why detections may be rejected
 
 **Recent Changes (2025-10-25):**
 - **🐛 YOLO COLOR CALIBRATION VISUALIZATION FIX**

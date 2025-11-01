@@ -202,6 +202,7 @@ void RecordingManager::saveFramesToDisk(const std::deque<RecordingFrame>& frames
                                  viz_states.show_tails() ||
                                  viz_states.show_trajectory() ||
                                  viz_states.show_hand_velocity_zone() ||
+                                 viz_states.show_hand_threshold() ||
                                  viz_states.show_yolo_color_calibration();
 
         // Render visualizations if enabled and tracker is available

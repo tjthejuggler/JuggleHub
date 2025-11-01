@@ -498,9 +498,9 @@ void Engine::run() {
             }
         }
         
-        // Draw hand threshold circles on real-time feed if enabled
+        // Draw hand threshold circles and/or color search regions on real-time feed if enabled
         // CRITICAL FIX: Use the already-filtered display_image instead of starting from color_image
-        if (video_feed_enabled_ && visualization_states_.show_hand_threshold() && tracker_ && !tracked_hands.empty()) {
+        if (video_feed_enabled_ && (visualization_states_.show_hand_threshold() || visualization_states_.show_color_search()) && tracker_) {
             // Get the current display image from frame_data (which already has depth blob filter applied)
             // We need to decode it, draw on it, then re-encode it
             std::string current_jpg = frame_data.color_image_b64();

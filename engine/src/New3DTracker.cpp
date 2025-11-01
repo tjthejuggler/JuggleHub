@@ -437,6 +437,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("show_depth_globs")) {
             settings_.show_depth_globs = j["show_depth_globs"];
         }
+        if (j.contains("show_color_search_region")) {
+            settings_.show_color_search_region = j["show_color_search_region"];
+        }
         
         // Load depth blob detection settings
         if (j.contains("enable_depth_blob_detection")) {
@@ -537,6 +540,7 @@ void New3DTracker::saveSettings() {
         j["show_held_radius"] = settings_.show_held_radius;
         j["show_association_lines"] = settings_.show_association_lines;
         j["show_depth_globs"] = settings_.show_depth_globs;
+        j["show_color_search_region"] = settings_.show_color_search_region;
         
         // Save depth blob detection settings
         j["enable_depth_blob_detection"] = settings_.enable_depth_blob_detection;
@@ -2526,8 +2530,62 @@ void New3DTracker::drawAssociations(cv::Mat& frame,
 void New3DTracker::drawHandThresholds(cv::Mat& frame,
                                      const std::vector<SimpleHand>& hands,
                                      const CameraIntrinsics& intrinsics) {
+    // Draw color search regions for each tracked ball
+    if (settings_.show_color_search_region) {
+        // Helper function to get BGR color for a color name
+        auto getColorForName = [](const std::string& color_name) -> cv::Scalar {
+            // Standard color mappings (BGR format for OpenCV)
+            if (color_name == "red") return cv::Scalar(0, 0, 255);
+            if (color_name == "green") return cv::Scalar(0, 255, 0);
+            if (color_name == "blue") return cv::Scalar(255, 0, 0);
+            if (color_name == "yellow") return cv::Scalar(0, 255, 255);
+            if (color_name == "orange") return cv::Scalar(0, 165, 255);
+            if (color_name == "purple") return cv::Scalar(255, 0, 255);
+            if (color_name == "pink") return cv::Scalar(203, 192, 255);
+            if (color_name == "white") return cv::Scalar(255, 255, 255);
+            return cv::Scalar(128, 128, 128);  // Default gray
+        };
+        
+        for (const auto& ball : tracked_balls_) {
+            // Only draw search region if ball has been seen at least once
+            if (ball.frames_since_seen < 999999 && ball.last_known_position.z > 0) {
+                // Project the last known position to 2D
+                cv::Point2f ball_center_2d = project3DTo2D(ball.last_known_position, intrinsics);
+                
+                // Check if projection is valid and within frame bounds
+                if (ball_center_2d.x >= 0 && ball_center_2d.x < frame.cols &&
+                    ball_center_2d.y >= 0 && ball_center_2d.y < frame.rows) {
+                    
+                    // Calculate radius in pixels based on association_max_distance_m
+                    float depth = ball.last_known_position.z;
+                    if (depth > 0) {
+                        float radius_pixels = (settings_.association_max_distance_m / depth) * intrinsics.fx;
+                        
+                        // Get the color for this ball
+                        cv::Scalar ball_color = getColorForName(ball.color_name);
+                        
+                        // Draw the search region circle
+                        cv::circle(frame, ball_center_2d, static_cast<int>(radius_pixels),
+                                 ball_color, 2);
+                        
+                        // Draw a small dot at the center
+                        cv::circle(frame, ball_center_2d, 3, ball_color, -1);
+                        
+                        // Add label with color name
+                        std::string label = ball.color_name + " search";
+                        cv::Point label_pos(static_cast<int>(ball_center_2d.x) + 10,
+                                          static_cast<int>(ball_center_2d.y) - 10);
+                        cv::putText(frame, label, label_pos, cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                                  ball_color, 1);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Draw held radius circles for hands (independent of color search regions)
     if (!settings_.show_held_radius) {
-        return;
+        return;  // Only return if held radius is disabled
     }
     
     for (const auto& hand : hands) {
@@ -2680,6 +2738,8 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.show_held_radius = (value == "true" || value == "1");
         } else if (key == "show_association_lines") {
             settings_.show_association_lines = (value == "true" || value == "1");
+        } else if (key == "show_color_search_region") {
+            settings_.show_color_search_region = (value == "true" || value == "1");
         } else if (key == "gravity_x") {
             settings_.gravity_mps2.x = std::stof(value);
         } else if (key == "gravity_y") {

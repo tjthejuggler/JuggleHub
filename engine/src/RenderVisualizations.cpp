@@ -545,8 +545,8 @@ cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame,
         }
     }
     
-    // Draw hand thresholds (catch/throw zones)
-    if (viz.show_hand_threshold() && tracker) {
+    // Draw hand thresholds (catch/throw zones) and/or color search regions
+    if ((viz.show_hand_threshold() || viz.show_color_search()) && tracker) {
         tracker->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics);
     }
     
@@ -554,12 +554,6 @@ cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame,
     if (viz.show_unmatched_detections()) {
         // This would show YOLO detections that weren't matched to tracked balls
         // For now, we'll skip this as it requires tracking state
-    }
-    
-    // Draw color search regions
-    if (viz.show_color_search()) {
-        // This would show the regions where color-based tracking is searching
-        // For now, we'll skip this as it requires internal tracker state
     }
     
     // Create info panel if we have info lines

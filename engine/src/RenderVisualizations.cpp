@@ -188,6 +188,40 @@ cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame,
         info_colors.push_back(cv::Scalar(0, 0, 139));
     }
     
+    // Draw depth glob detections - cyan boxes with confidence scores
+    // Note: When depth blob detection is enabled, raw_detections contains depth globs
+    // The toggle controls whether to visualize them
+    if (viz.show_depth_globs() && !rec_frame.raw_detections.empty()) {
+        for (const auto& det : rec_frame.raw_detections) {
+            // Draw cyan bounding box
+            cv::rectangle(temp_result, det.box, cv::Scalar(255, 255, 0), 2);
+            
+            // Draw center point
+            cv::Point2f center(det.box.x + det.box.width / 2.0f,
+                              det.box.y + det.box.height / 2.0f);
+            cv::circle(temp_result, center, 3, cv::Scalar(255, 255, 0), -1);
+            
+            // Create label with confidence
+            std::string label = cv::format("Glob %.2f", det.confidence);
+            
+            // Draw label background
+            int baseline = 0;
+            cv::Size text_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 2, &baseline);
+            cv::rectangle(temp_result,
+                         cv::Point(det.box.x, det.box.y - text_size.height - 5),
+                         cv::Point(det.box.x + text_size.width, det.box.y),
+                         cv::Scalar(255, 255, 0), -1);
+            
+            // Draw label text
+            cv::putText(temp_result, label,
+                       cv::Point(det.box.x, det.box.y - 5),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 2);
+        }
+        
+        info_lines.push_back("Depth Globs: " + std::to_string(rec_frame.raw_detections.size()));
+        info_colors.push_back(cv::Scalar(255, 255, 0));
+    }
+    
     // Draw filtered detections (after filtering) - bright red, normal boxes
     if (viz.show_filtered_detections()) {
         // This would show detections after filtering logic

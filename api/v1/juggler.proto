@@ -351,6 +351,7 @@ message VisualizationStates {
   bool show_hand_velocity_zone = 16;  // Show hand velocity detection zones
   bool show_yolo_color_calibration = 17;  // Show 8x8 colored squares for YOLO color calibration
   bool show_hand_threshold = 18;  // Show held radius circles around hands (held circle offset visualization)
+  bool show_depth_globs = 19;  // Show depth glob detections (New3D tracker depth-based ball detection)
 }
 
 message ColorCommand {

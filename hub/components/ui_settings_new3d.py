@@ -415,13 +415,14 @@ class New3DSettingsSections:
         
         # Info label
         info_label = QLabel("ℹ️ Configure visual debugging overlays")
-        info_label.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
         info_label.setWordWrap(True)
-        layout.addWidget(info_label, row, 0, 1, 3)
+        layout.addWidget(info_label, row, 0, 1, 4)
         row += 1
         
-        # Show Kalman Prediction
-        label = QLabel("Show Kalman Prediction")
+        # Column 1: Kalman Prediction
+        label = QLabel("Kalman Prediction")
+        label.setStyleSheet("font-size: 10px;")
         label.setToolTip("Display predicted ball positions from Kalman filter.\n"
                         "Shows where the tracker expects the ball to be.")
         layout.addWidget(label, row, 0)
@@ -431,25 +432,26 @@ class New3DSettingsSections:
         self.parent.new3d_show_kalman_prediction_toggle.stateChanged.connect(
             lambda state: self.parent.update_setting('show_kalman_prediction', 1 if state == Qt.CheckState.Checked.value else 0)
         )
-        layout.addWidget(self.parent.new3d_show_kalman_prediction_toggle, row, 1, 1, 2)
-        row += 1
+        layout.addWidget(self.parent.new3d_show_kalman_prediction_toggle, row, 1)
         
-        # Show Held Radius
-        label = QLabel("Show Held Radius")
+        # Column 2: Held Radius
+        label = QLabel("Held Radius")
+        label.setStyleSheet("font-size: 10px;")
         label.setToolTip("Display the held detection radius around wrists.\n"
                         "Shows the zone where balls are considered held.")
-        layout.addWidget(label, row, 0)
+        layout.addWidget(label, row, 2)
         
         self.parent.new3d_show_held_radius_toggle = QCheckBox()
         self.parent.new3d_show_held_radius_toggle.setChecked(True)
         self.parent.new3d_show_held_radius_toggle.stateChanged.connect(
             lambda state: self.parent.update_setting('show_held_radius', 1 if state == Qt.CheckState.Checked.value else 0)
         )
-        layout.addWidget(self.parent.new3d_show_held_radius_toggle, row, 1, 1, 2)
+        layout.addWidget(self.parent.new3d_show_held_radius_toggle, row, 3)
         row += 1
         
-        # Show Association Lines
-        label = QLabel("Show Association Lines")
+        # Column 1: Association Lines
+        label = QLabel("Association Lines")
+        label.setStyleSheet("font-size: 10px;")
         label.setToolTip("Display lines connecting detections to tracked balls.\n"
                         "Useful for debugging detection-to-track matching.")
         layout.addWidget(label, row, 0)
@@ -459,7 +461,22 @@ class New3DSettingsSections:
         self.parent.new3d_show_association_lines_toggle.stateChanged.connect(
             lambda state: self.parent.update_setting('show_association_lines', 1 if state == Qt.CheckState.Checked.value else 0)
         )
-        layout.addWidget(self.parent.new3d_show_association_lines_toggle, row, 1, 1, 2)
+        layout.addWidget(self.parent.new3d_show_association_lines_toggle, row, 1)
+        
+        # Column 2: Depth Globs
+        label = QLabel("Depth Globs")
+        label.setStyleSheet("font-size: 10px;")
+        label.setToolTip("Display depth glob detections when depth blob detection is enabled.\n"
+                        "Shows where depth-based ball detection found potential balls.\n"
+                        "Only visible when 'Enable Depth Blob Detection' is active.")
+        layout.addWidget(label, row, 2)
+        
+        self.parent.new3d_show_depth_globs_toggle = QCheckBox()
+        self.parent.new3d_show_depth_globs_toggle.setChecked(True)
+        self.parent.new3d_show_depth_globs_toggle.stateChanged.connect(
+            lambda state: self.parent.update_setting('show_depth_globs', 1 if state == Qt.CheckState.Checked.value else 0)
+        )
+        layout.addWidget(self.parent.new3d_show_depth_globs_toggle, row, 3)
         row += 1
         
         return section

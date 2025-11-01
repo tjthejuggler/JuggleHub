@@ -430,6 +430,13 @@ if PYQT_AVAILABLE:
             self.show_yolo_color_calibration_toggle.setToolTip("Show 8x8 colored squares indicating YOLO-detected color for each detection")
             toggle_buttons.append(self.show_yolo_color_calibration_toggle)
             
+            self.show_depth_globs_toggle = QPushButton("depth_globs")
+            self.show_depth_globs_toggle.setCheckable(True)
+            self.show_depth_globs_toggle.setChecked(False)
+            self.show_depth_globs_toggle.clicked.connect(self.toggle_overlays)
+            self.show_depth_globs_toggle.setToolTip("New3D Tracker - Depth-based ball detection using depth filtering and circularity checks")
+            toggle_buttons.append(self.show_depth_globs_toggle)
+            
             # Add buttons to grid layout - they will wrap automatically
             # Use 5 columns for better packing
             max_columns = 5
@@ -1061,6 +1068,7 @@ if PYQT_AVAILABLE:
             viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
             viz_states.show_yolo_color_calibration = self.show_yolo_color_calibration_toggle.isChecked()
             viz_states.show_hand_threshold = self.show_hand_threshold_toggle.isChecked()
+            viz_states.show_depth_globs = self.show_depth_globs_toggle.isChecked()
             
             # Send command to engine to update visualization states
             command = juggler_pb2.CommandRequest()
@@ -1734,6 +1742,7 @@ if PYQT_AVAILABLE:
             viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
             viz_states.show_yolo_color_calibration = self.show_yolo_color_calibration_toggle.isChecked()
             viz_states.show_hand_threshold = self.show_hand_threshold_toggle.isChecked()
+            viz_states.show_depth_globs = self.show_depth_globs_toggle.isChecked()
             
             command = juggler_pb2.CommandRequest(
                 type=juggler_pb2.CommandRequest.CommandType.RECORD_START,
@@ -1774,6 +1783,7 @@ if PYQT_AVAILABLE:
                 viz_states.show_hand_velocity_zone = self.show_hand_velocity_zone_toggle.isChecked()
                 viz_states.show_yolo_color_calibration = self.show_yolo_color_calibration_toggle.isChecked()
                 viz_states.show_hand_threshold = self.show_hand_threshold_toggle.isChecked()
+                viz_states.show_depth_globs = self.show_depth_globs_toggle.isChecked()
                 command.visualization_states.CopyFrom(viz_states)
             
             try:

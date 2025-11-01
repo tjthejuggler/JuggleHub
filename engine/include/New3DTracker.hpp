@@ -217,6 +217,7 @@ struct New3DTrackerSettings {
     bool show_kalman_prediction = true;             // Show predicted position
     bool show_held_radius = true;                   // Show held detection radius
     bool show_association_lines = true;             // Show detection-to-track associations
+    bool show_depth_globs = true;                   // Show depth glob detections
 };
 
 /**

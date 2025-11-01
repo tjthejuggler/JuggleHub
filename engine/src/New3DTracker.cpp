@@ -434,6 +434,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("show_association_lines")) {
             settings_.show_association_lines = j["show_association_lines"];
         }
+        if (j.contains("show_depth_globs")) {
+            settings_.show_depth_globs = j["show_depth_globs"];
+        }
         
         // Load depth blob detection settings
         if (j.contains("enable_depth_blob_detection")) {
@@ -533,6 +536,7 @@ void New3DTracker::saveSettings() {
         j["show_kalman_prediction"] = settings_.show_kalman_prediction;
         j["show_held_radius"] = settings_.show_held_radius;
         j["show_association_lines"] = settings_.show_association_lines;
+        j["show_depth_globs"] = settings_.show_depth_globs;
         
         // Save depth blob detection settings
         j["enable_depth_blob_detection"] = settings_.enable_depth_blob_detection;
@@ -876,10 +880,12 @@ void New3DTracker::handleHeldStateUpdate(
     }
     
     // Detect throw: ball moves beyond held_radius AND has sufficient relative velocity
+    // For depth blob detection (noisier), we require distance + ONE velocity condition
+    // instead of ALL THREE conditions to avoid false negatives
     logDebug("      Throw detection: distance_exceeded=", distance_exceeded,
               ", velocity_exceeded=", velocity_exceeded, ", hand_velocity_check=", hand_velocity_check);
     
-    if (distance_exceeded && velocity_exceeded && hand_velocity_check) {
+    if (distance_exceeded && (velocity_exceeded || hand_velocity_check)) {
         logDebug("      >>> THROW DETECTED! Ball ", ball.id, " thrown from Hand ", ball.associated_hand_id);
         
         // Transition to IN_FLIGHT state
@@ -960,8 +966,10 @@ void New3DTracker::handleInFlightStateUpdate(
                   distance_to_hand, "m");
         
         // Detect catch: ball comes within held_radius of any hand
-        // Hands can hold multiple balls simultaneously
-        if (distance_to_hand < settings_.held_radius_m) {
+        // Use a tighter threshold for catches to avoid false positives with depth blob noise
+        // Catch threshold is 70% of held_radius to require the ball to be clearly in the hand
+        float catch_threshold = settings_.held_radius_m * 0.7f;
+        if (distance_to_hand < catch_threshold) {
             logDebug("        >>> CATCH DETECTED! Ball ", ball.id, " caught by Hand ", hand.id);
             
             // Transition to HELD state

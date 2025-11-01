@@ -443,6 +443,8 @@ if PYQT_AVAILABLE:
                 'show_kalman_prediction': self.new3d_show_kalman_prediction_toggle.isChecked() if hasattr(self, 'new3d_show_kalman_prediction_toggle') else True,
                 'show_held_radius': self.new3d_show_held_radius_toggle.isChecked() if hasattr(self, 'new3d_show_held_radius_toggle') else True,
                 'show_association_lines': self.new3d_show_association_lines_toggle.isChecked() if hasattr(self, 'new3d_show_association_lines_toggle') else True,
+                'show_depth_globs': self.new3d_show_depth_globs_toggle.isChecked() if hasattr(self, 'new3d_show_depth_globs_toggle') else True,
+                'show_depth_globs': self.new3d_show_depth_globs_toggle.isChecked() if hasattr(self, 'new3d_show_depth_globs_toggle') else True,
                 
                 # === AUDIO INDICATORS ===
                 'tc_sound_on_catch': self.new3d_sound_on_catch_toggle.isChecked() if hasattr(self, 'new3d_sound_on_catch_toggle') else False,
@@ -718,6 +720,10 @@ if PYQT_AVAILABLE:
                 self.new3d_show_held_radius_toggle.setChecked(settings['show_held_radius'])
             if 'show_association_lines' in settings and hasattr(self, 'new3d_show_association_lines_toggle'):
                 self.new3d_show_association_lines_toggle.setChecked(settings['show_association_lines'])
+            if 'show_depth_globs' in settings and hasattr(self, 'new3d_show_depth_globs_toggle'):
+                self.new3d_show_depth_globs_toggle.setChecked(settings['show_depth_globs'])
+            if 'show_depth_globs' in settings and hasattr(self, 'new3d_show_depth_globs_toggle'):
+                self.new3d_show_depth_globs_toggle.setChecked(settings['show_depth_globs'])
             
             # === AUDIO INDICATORS ===
             if 'tc_sound_on_catch' in settings and hasattr(self, 'new3d_sound_on_catch_toggle'):
@@ -1427,6 +1433,10 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('show_held_radius', 1 if settings['show_held_radius'] else 0)
             if 'show_association_lines' in settings:
                 self.udp_client.send_setting('show_association_lines', 1 if settings['show_association_lines'] else 0)
+            if 'show_depth_globs' in settings:
+                self.udp_client.send_setting('show_depth_globs', 1 if settings['show_depth_globs'] else 0)
+            if 'show_depth_globs' in settings:
+                self.udp_client.send_setting('show_depth_globs', 1 if settings['show_depth_globs'] else 0)
             
             # === AUDIO INDICATORS ===
             if 'tc_sound_on_catch' in settings:

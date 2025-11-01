@@ -6166,6 +6166,7 @@ class VisualizationStates final :
     kShowHandVelocityZoneFieldNumber = 16,
     kShowYoloColorCalibrationFieldNumber = 17,
     kShowHandThresholdFieldNumber = 18,
+    kShowDepthGlobsFieldNumber = 19,
   };
   // bool show_trajectory_predictions = 1;
   void clear_show_trajectory_predictions();
@@ -6329,6 +6330,15 @@ class VisualizationStates final :
   void _internal_set_show_hand_threshold(bool value);
   public:
 
+  // bool show_depth_globs = 19;
+  void clear_show_depth_globs();
+  bool show_depth_globs() const;
+  void set_show_depth_globs(bool value);
+  private:
+  bool _internal_show_depth_globs() const;
+  void _internal_set_show_depth_globs(bool value);
+  public:
+
   // @@protoc_insertion_point(class_scope:juggler.v1.VisualizationStates)
  private:
   class _Internal;
@@ -6355,6 +6365,7 @@ class VisualizationStates final :
     bool show_hand_velocity_zone_;
     bool show_yolo_color_calibration_;
     bool show_hand_threshold_;
+    bool show_depth_globs_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -13650,6 +13661,26 @@ inline void VisualizationStates::_internal_set_show_hand_threshold(bool value) {
 inline void VisualizationStates::set_show_hand_threshold(bool value) {
   _internal_set_show_hand_threshold(value);
   // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_hand_threshold)
+}
+
+// bool show_depth_globs = 19;
+inline void VisualizationStates::clear_show_depth_globs() {
+  _impl_.show_depth_globs_ = false;
+}
+inline bool VisualizationStates::_internal_show_depth_globs() const {
+  return _impl_.show_depth_globs_;
+}
+inline bool VisualizationStates::show_depth_globs() const {
+  // @@protoc_insertion_point(field_get:juggler.v1.VisualizationStates.show_depth_globs)
+  return _internal_show_depth_globs();
+}
+inline void VisualizationStates::_internal_set_show_depth_globs(bool value) {
+  
+  _impl_.show_depth_globs_ = value;
+}
+inline void VisualizationStates::set_show_depth_globs(bool value) {
+  _internal_set_show_depth_globs(value);
+  // @@protoc_insertion_point(field_set:juggler.v1.VisualizationStates.show_depth_globs)
 }
 
 // -------------------------------------------------------------------

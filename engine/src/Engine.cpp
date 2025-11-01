@@ -286,6 +286,37 @@ void Engine::run() {
                         display_image = filtered_display;
                     }
                 }
+                
+                // Draw depth glob detections if enabled by visualization toggle
+                if (visualization_states_.show_depth_globs() && !last_raw_detections_.empty()) {
+                    for (const auto& det : last_raw_detections_) {
+                        // Draw bounding box in cyan color
+                        cv::rectangle(display_image, det.box, cv::Scalar(255, 255, 0), 2);
+                        
+                        // Draw center point
+                        cv::Point2f center(det.box.x + det.box.width / 2.0f,
+                                         det.box.y + det.box.height / 2.0f);
+                        cv::circle(display_image, center, 3, cv::Scalar(255, 255, 0), -1);
+                        
+                        // Draw label with confidence
+                        std::string label = cv::format("Glob %.2f", det.confidence);
+                        int baseline = 0;
+                        cv::Size text_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.4, 1, &baseline);
+                        cv::Point label_pos(static_cast<int>(det.box.x),
+                                          static_cast<int>(det.box.y) - 5);
+                        if (label_pos.y < 0) label_pos.y = 10;
+                        
+                        // Draw text background
+                        cv::rectangle(display_image,
+                                    cv::Point(label_pos.x, label_pos.y - text_size.height - 2),
+                                    cv::Point(label_pos.x + text_size.width, label_pos.y + 2),
+                                    cv::Scalar(0, 0, 0), -1);
+                        
+                        // Draw text
+                        cv::putText(display_image, label, label_pos,
+                                  cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 0), 1);
+                    }
+                }
             }
             
             // CRITICAL FIX: Store the display_image for later use by hand threshold visualization

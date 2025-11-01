@@ -287,16 +287,51 @@ void Engine::run() {
                     }
                 }
                 
+                // Draw color calibration squares for depth blobs if enabled
+                // CRITICAL: Draw these BEFORE the cyan bounding boxes to ensure they're visible
+                // CRITICAL FIX: Sample color directly from the ORIGINAL color_image here, not from det.detected_bgr_color
+                if (visualization_states_.show_yolo_color_calibration() && !last_raw_detections_.empty()) {
+                    INFO_LOG("=== DEPTH BLOB Color Squares - Frame ", frame_counter_, " ===");
+                    int det_num = 0;
+                    for (const auto& det : last_raw_detections_) {
+                        det_num++;
+                        
+                        int center_x = static_cast<int>(det.box.x + det.box.width / 2);
+                        int center_y = static_cast<int>(det.box.y + det.box.height / 2);
+                        
+                        // Sample color directly from the ORIGINAL color_image at the detection center
+                        // This ensures we get the actual blob color, not any visualization artifacts
+                        cv::Vec3b bgr_pixel(0, 0, 0);
+                        if (center_x >= 0 && center_x < color_image.cols && center_y >= 0 && center_y < color_image.rows) {
+                            bgr_pixel = color_image.at<cv::Vec3b>(center_y, center_x);
+                        }
+                        cv::Scalar actual_color(bgr_pixel[0], bgr_pixel[1], bgr_pixel[2]);
+                        
+                        INFO_LOG("  Detection #", det_num, " at (", center_x, ",", center_y, ")");
+                        INFO_LOG("    Sampled BGR from original color_image: (", (int)bgr_pixel[0], ",", (int)bgr_pixel[1], ",", (int)bgr_pixel[2], ")");
+                        INFO_LOG("    Square drawn at (", (int)det.box.x, ",", (int)det.box.y, ")");
+                        
+                        int square_x = static_cast<int>(det.box.x);
+                        int square_y = static_cast<int>(det.box.y);
+                        int square_size = 8;
+                        
+                        cv::rectangle(display_image,
+                                    cv::Rect(square_x, square_y, square_size, square_size),
+                                    actual_color, -1);
+                        
+                        cv::rectangle(display_image,
+                                    cv::Rect(square_x, square_y, square_size, square_size),
+                                    cv::Scalar(0, 0, 0), 1);
+                    }
+                }
+                
                 // Draw depth glob detections if enabled by visualization toggle
                 if (visualization_states_.show_depth_globs() && !last_raw_detections_.empty()) {
                     for (const auto& det : last_raw_detections_) {
                         // Draw bounding box in cyan color
                         cv::rectangle(display_image, det.box, cv::Scalar(255, 255, 0), 2);
                         
-                        // Draw center point
-                        cv::Point2f center(det.box.x + det.box.width / 2.0f,
-                                         det.box.y + det.box.height / 2.0f);
-                        cv::circle(display_image, center, 3, cv::Scalar(255, 255, 0), -1);
+                        // NOTE: Center dot removed - it was interfering with color sampling
                         
                         // Draw label with confidence
                         std::string label = cv::format("Glob %.2f", det.confidence);

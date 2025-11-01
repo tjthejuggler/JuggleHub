@@ -71,6 +71,14 @@ New3DTracker::New3DTracker(const std::string& ball_model_path,
 void New3DTracker::initializePersistentBalls() {
     std::cout << "[New3DTracker] Initializing persistent balls..." << std::endl;
     
+    // CRITICAL: All balls start HELD in the left hand (hand_id=0)
+    // They will transition to IN_FLIGHT when detected leaving the hand
+    // This ensures the color search region is always accessible from the start
+    
+    // Default left hand position (will be updated when hand is first detected)
+    // Position in front of camera at comfortable juggling height
+    cv::Point3f default_left_hand_pos(0.3f, 0.0f, 0.8f);  // 30cm right, center height, 80cm away
+    
     // Create one permanent ball for each enabled color profile
     for (const auto& profile : color_profiles_) {
         if (!profile.enabled) {
@@ -85,36 +93,35 @@ void New3DTracker::initializePersistentBalls() {
         ball.color_name = profile.name;
         ball.color_profile = profile;
         
-        // Initialize at origin with zero velocity (will be updated when first detected)
-        cv::Point3f initial_pos(0.0f, 0.0f, 1.0f);  // 1m away to avoid division by zero
-        ball.kf = createKalmanFilter(initial_pos);
-        ball.last_known_position = initial_pos;
-        ball.predicted_position = initial_pos;
+        // Initialize at default left hand position
+        ball.kf = createKalmanFilter(default_left_hand_pos);
+        ball.last_known_position = default_left_hand_pos;
+        ball.predicted_position = default_left_hand_pos;
         
-        // Start in IN_FLIGHT state with high frames_since_seen
-        // This indicates the ball exists but hasn't been seen yet
-        ball.state = IN_FLIGHT;
-        ball.associated_hand_id = -1;
-        ball.frames_since_seen = 999999;  // Very high number to indicate "never seen"
+        // CRITICAL: Start in HELD state, associated with left hand (id=0)
+        // This assumes all balls start in the left hand until detected leaving
+        ball.state = HELD;
+        ball.associated_hand_id = 0;  // Left hand
+        ball.frames_since_seen = 0;  // Consider it "seen" since we know where it is
         ball.consecutive_frames_seen = 0;
         ball.color_locked = true;  // Color is locked from the start since we know it
         
         // Visualization data
-        ball.pixel_pos = cv::Point2f(-1, -1);  // Invalid position
+        ball.pixel_pos = cv::Point2f(-1, -1);  // Will be updated when hand is detected
         ball.bbox = cv::Rect_<float>(0, 0, 0, 0);
         ball.yolo_confidence = 0.0f;
         ball.color_match_score = 0.0f;
-        ball.tracking_reason = "Persistent (not yet detected)";
+        ball.tracking_reason = "Initialized (held in left hand)";
         
         tracked_balls_.push_back(ball);
         active_track_colors_.insert(profile.name);
         
         std::cout << "[New3DTracker] Created persistent ball ID=" << ball.id
-                  << " for color=" << profile.name << std::endl;
+                  << " for color=" << profile.name << " (HELD in left hand)" << std::endl;
     }
     
     std::cout << "[New3DTracker] Initialized " << tracked_balls_.size()
-              << " persistent balls" << std::endl;
+              << " persistent balls (all HELD in left hand)" << std::endl;
 }
 
 // ============================================================================
@@ -189,11 +196,15 @@ void New3DTracker::predictAllBalls(float dt) {
                 predictHeldBall(ball, *holding_hand, dt);
             } else {
                 // Hand not found, but ball is marked as held
-                // This can happen if hand detection temporarily fails
-                // Keep last known position (which should be the wrist from previous frame)
+                // This can happen if:
+                // 1. Hand detection temporarily fails
+                // 2. Ball was initialized as HELD but hand hasn't been detected yet
+                // Keep last known position (default left hand position or previous wrist position)
                 ball.predicted_position = ball.last_known_position;
                 logDebug("  Ball ", ball.id, " (", ball.color_name, ") is HELD but hand ",
-                         ball.associated_hand_id, " not detected - keeping last position");
+                         ball.associated_hand_id, " not detected - keeping last position at (",
+                         ball.last_known_position.x, ", ", ball.last_known_position.y, ", ",
+                         ball.last_known_position.z, ")");
             }
         } else {
             // Ball is in flight
@@ -276,22 +287,77 @@ void New3DTracker::predictInFlightBall(New3DBall& ball, float dt) {
     ball.kf.transitionMatrix.at<float>(1, 4) = dt;
     ball.kf.transitionMatrix.at<float>(2, 5) = dt;
     
-    // Apply gravity to velocity states before prediction
-    // Gravity affects velocity: v_new = v_old + g*dt
-    // We add this as a control input to the state
-    ball.kf.statePost.at<float>(3) += settings_.gravity_mps2.x * dt;  // vx
-    ball.kf.statePost.at<float>(4) += settings_.gravity_mps2.y * dt;  // vy
-    ball.kf.statePost.at<float>(5) += settings_.gravity_mps2.z * dt;  // vz
-    
-    // Run Kalman prediction
-    cv::Mat prediction = ball.kf.predict();
-    
-    // Store predicted position
-    ball.predicted_position = cv::Point3f(
-        prediction.at<float>(0),
-        prediction.at<float>(1),
-        prediction.at<float>(2)
-    );
+    // CRITICAL: Only apply gravity and prediction if ball was recently seen
+    // If ball hasn't been seen for a while, move it back to the hand it was associated with
+    // This allows easy re-acquisition when the ball comes back into view
+    if (ball.frames_since_seen < 30) {  // Only predict for 30 frames (~1 second)
+        // Apply gravity to velocity states before prediction
+        // Gravity affects velocity: v_new = v_old + g*dt
+        // We add this as a control input to the state
+        ball.kf.statePost.at<float>(3) += settings_.gravity_mps2.x * dt;  // vx
+        ball.kf.statePost.at<float>(4) += settings_.gravity_mps2.y * dt;  // vy
+        ball.kf.statePost.at<float>(5) += settings_.gravity_mps2.z * dt;  // vz
+        
+        // Run Kalman prediction
+        cv::Mat prediction = ball.kf.predict();
+        
+        // Store predicted position
+        ball.predicted_position = cv::Point3f(
+            prediction.at<float>(0),
+            prediction.at<float>(1),
+            prediction.at<float>(2)
+        );
+    } else {
+        // Ball hasn't been seen for a while - move it back to left hand for easy re-acquisition
+        // Find left hand (id=0) and position ball there
+        bool found_hand = false;
+        for (const auto& hand : hands_) {
+            if (hand.id == 0) {  // Left hand
+                // Position at left hand with offset
+                cv::Point3f held_position = hand.wrist_pos_3d;
+                
+                // Apply offset along forearm if skeleton data available
+                if (!hand.keypoints.empty() && hand.keypoints.size() > 10) {
+                    int elbow_idx = 7;  // Left elbow
+                    int wrist_idx = 9;  // Left wrist
+                    
+                    if (elbow_idx < hand.keypoints.size() && wrist_idx < hand.keypoints.size()) {
+                        const cv::Point3f& elbow_pos = hand.keypoints[elbow_idx];
+                        const cv::Point3f& wrist_pos = hand.keypoints[wrist_idx];
+                        
+                        if (elbow_pos.z > 0.1f && wrist_pos.z > 0.1f) {
+                            cv::Point3f forearm_dir = wrist_pos - elbow_pos;
+                            float forearm_length = std::sqrt(
+                                forearm_dir.x * forearm_dir.x +
+                                forearm_dir.y * forearm_dir.y +
+                                forearm_dir.z * forearm_dir.z
+                            );
+                            
+                            if (forearm_length > 0.01f) {
+                                forearm_dir = forearm_dir / forearm_length;
+                                float offset_m = settings_.held_circle_offset_cm / 100.0f;
+                                held_position = wrist_pos + forearm_dir * offset_m;
+                            }
+                        }
+                    }
+                }
+                
+                ball.predicted_position = held_position;
+                found_hand = true;
+                break;
+            }
+        }
+        
+        if (!found_hand) {
+            // No hand found - keep at last known position
+            ball.predicted_position = ball.last_known_position;
+        }
+        
+        // Zero out velocities in Kalman filter to stop further prediction
+        ball.kf.statePost.at<float>(3) = 0.0f;  // vx
+        ball.kf.statePost.at<float>(4) = 0.0f;  // vy
+        ball.kf.statePost.at<float>(5) = 0.0f;  // vz
+    }
 }
 
 // ============================================================================
@@ -1212,6 +1278,7 @@ void New3DTracker::createNewTracks(
     std::vector<bool> ball_used(unmatched_balls.size(), false);
     
     // Greedy matching: repeatedly find the best detection-ball pair by color match score
+    // CRITICAL: Also check distance to respect association_max_distance_m (color search region)
     while (true) {
         float best_score = settings_.color_match_threshold;
         int best_detection_idx = -1;
@@ -1232,6 +1299,20 @@ void New3DTracker::createNewTracks(
                 if (ball_used[b]) continue;
                 
                 New3DBall* ball = reacquirable_balls[b];
+                
+                // CRITICAL FIX: Check distance first - detection must be within color search region
+                const cv::Point3f& pred_pos = ball->predicted_position;
+                const cv::Point3f& det_pos = detection->world_pos;
+                
+                float dx = pred_pos.x - det_pos.x;
+                float dy = pred_pos.y - det_pos.y;
+                float dz = pred_pos.z - det_pos.z;
+                float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+                
+                // Skip if detection is outside the color search region (association_max_distance_m)
+                if (distance >= settings_.association_max_distance_m) {
+                    continue;
+                }
                 
                 // Match detection color to ball's color profile
                 float score = matchColor(*detection, ball->color_profile, color_frame);
@@ -1892,6 +1973,37 @@ cv::Point2f New3DTracker::project3DTo2D(const cv::Point3f& world_pos,
     return cv::Point2f(-1, -1);
 }
 
+cv::Point3f New3DTracker::clampToFieldOfView(const cv::Point3f& world_pos,
+                                              const CameraIntrinsics& intrinsics,
+                                              int frame_width,
+                                              int frame_height) {
+    // If depth is invalid, return as-is
+    if (world_pos.z <= 0.1f) {
+        return world_pos;
+    }
+    
+    // Project to 2D to check bounds
+    cv::Point2f projected = project3DTo2D(world_pos, intrinsics);
+    
+    // If already within bounds, return as-is
+    if (projected.x >= 0 && projected.x < frame_width &&
+        projected.y >= 0 && projected.y < frame_height) {
+        return world_pos;
+    }
+    
+    // Clamp the 2D projection to frame bounds with a small margin
+    const float margin = 10.0f;  // 10 pixel margin from edge
+    float clamped_x = std::max(margin, std::min(projected.x, frame_width - margin));
+    float clamped_y = std::max(margin, std::min(projected.y, frame_height - margin));
+    
+    // Back-project the clamped 2D point to 3D at the same depth
+    // This keeps the ball at the edge of the frame instead of going off-screen
+    float x_3d = (clamped_x - intrinsics.ppx) * world_pos.z / intrinsics.fx;
+    float y_3d = (clamped_y - intrinsics.ppy) * world_pos.z / intrinsics.fy;
+    
+    return cv::Point3f(x_3d, y_3d, world_pos.z);
+}
+
 // ============================================================================
 // YOLO DETECTION METHODS
 // ============================================================================
@@ -2531,7 +2643,8 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                                      const std::vector<SimpleHand>& hands,
                                      const CameraIntrinsics& intrinsics) {
     // Draw color search regions for each tracked ball
-    if (settings_.show_color_search_region) {
+    if (settings_.show_color_search_region && !tracked_balls_.empty()) {
+        logDebug("[drawHandThresholds] Drawing color search regions for ", tracked_balls_.size(), " balls");
         // Helper function to get BGR color for a color name
         auto getColorForName = [](const std::string& color_name) -> cv::Scalar {
             // Standard color mappings (BGR format for OpenCV)
@@ -2552,12 +2665,18 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                 // Project the last known position to 2D
                 cv::Point2f ball_center_2d = project3DTo2D(ball.last_known_position, intrinsics);
                 
-                // Check if projection is valid and within frame bounds
-                if (ball_center_2d.x >= 0 && ball_center_2d.x < frame.cols &&
-                    ball_center_2d.y >= 0 && ball_center_2d.y < frame.rows) {
+                // CRITICAL FIX: Clamp visualization position to frame bounds
+                // This ensures the color search region is always visible even when ball goes off-screen
+                cv::Point3f clamped_pos = clampToFieldOfView(ball.last_known_position, intrinsics,
+                                                             frame.cols, frame.rows);
+                cv::Point2f clamped_center_2d = project3DTo2D(clamped_pos, intrinsics);
+                
+                // Use clamped position for visualization
+                if (clamped_center_2d.x >= 0 && clamped_center_2d.x < frame.cols &&
+                    clamped_center_2d.y >= 0 && clamped_center_2d.y < frame.rows) {
                     
                     // Calculate radius in pixels based on association_max_distance_m
-                    float depth = ball.last_known_position.z;
+                    float depth = clamped_pos.z;
                     if (depth > 0) {
                         float radius_pixels = (settings_.association_max_distance_m / depth) * intrinsics.fx;
                         
@@ -2565,16 +2684,20 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                         cv::Scalar ball_color = getColorForName(ball.color_name);
                         
                         // Draw the search region circle
-                        cv::circle(frame, ball_center_2d, static_cast<int>(radius_pixels),
+                        cv::circle(frame, clamped_center_2d, static_cast<int>(radius_pixels),
                                  ball_color, 2);
                         
                         // Draw a small dot at the center
-                        cv::circle(frame, ball_center_2d, 3, ball_color, -1);
+                        cv::circle(frame, clamped_center_2d, 3, ball_color, -1);
                         
-                        // Add label with color name
+                        // Add label with color name and off-screen indicator
                         std::string label = ball.color_name + " search";
-                        cv::Point label_pos(static_cast<int>(ball_center_2d.x) + 10,
-                                          static_cast<int>(ball_center_2d.y) - 10);
+                        if (ball_center_2d.x != clamped_center_2d.x ||
+                            ball_center_2d.y != clamped_center_2d.y) {
+                            label += " (OFF-SCREEN)";
+                        }
+                        cv::Point label_pos(static_cast<int>(clamped_center_2d.x) + 10,
+                                          static_cast<int>(clamped_center_2d.y) - 10);
                         cv::putText(frame, label, label_pos, cv::FONT_HERSHEY_SIMPLEX, 0.4,
                                   ball_color, 1);
                     }

@@ -690,6 +690,19 @@ private:
                                      const CameraIntrinsics& intrinsics);
     
     /**
+     * @brief Clamp 3D position to stay within camera field of view
+     * @param world_pos 3D world position to clamp
+     * @param intrinsics Camera intrinsics
+     * @param frame_width Frame width in pixels
+     * @param frame_height Frame height in pixels
+     * @return Clamped 3D position that projects within frame bounds
+     */
+    cv::Point3f clampToFieldOfView(const cv::Point3f& world_pos,
+                                    const CameraIntrinsics& intrinsics,
+                                    int frame_width,
+                                    int frame_height);
+    
+    /**
      * @brief Convert New3DBall to SimpleBall for interface compatibility
      * @param new_ball New3DBall to convert
      * @return SimpleBall structure

@@ -724,17 +724,10 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
             
             const New3DBall& track = balls[i];
             
-            // CRITICAL FIX: Use adaptive max distance based on how long ball has been unseen
-            // If ball hasn't been seen for a while, expand search radius to allow re-acquisition
-            float adaptive_max_distance = max_distance;
-            if (track.frames_since_seen > 10) {
-                // Expand search radius by 50% for every 10 frames unseen (up to 3x)
-                float expansion_factor = 1.0f + (track.frames_since_seen / 10) * 0.5f;
-                expansion_factor = std::min(expansion_factor, 3.0f);  // Cap at 3x
-                adaptive_max_distance = max_distance * expansion_factor;
-                logDebug("  Ball ", track.id, " unseen for ", track.frames_since_seen,
-                         " frames - expanding search radius to ", adaptive_max_distance, "m");
-            }
+            // CRITICAL: ALWAYS use fixed max_distance (color search radius)
+            // NEVER expand the search radius, no matter how long the ball has been unseen
+            // The color search region defines the ONLY area where we look for the ball
+            float search_radius = max_distance;  // This is association_max_distance_m
             
             for (size_t j = 0; j < detections.size(); ++j) {
                 if (detection_matched[j]) continue;
@@ -750,8 +743,9 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
                 float dz = pred_pos.z - det_pos.z;
                 float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
                 
-                // Use adaptive max distance for this ball
-                if (distance >= adaptive_max_distance) {
+                // CRITICAL: Detection MUST be within the fixed search radius
+                // This is the color search region - detections outside are NEVER matched
+                if (distance >= search_radius) {
                     continue;
                 }
                 
@@ -788,9 +782,7 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
                         reason << " (colors match: " << detection_color << ")";
                     }
                     reason << " = total_cost=" << total_cost << "m";
-                    if (track.frames_since_seen > 10) {
-                        reason << " [EXPANDED SEARCH: " << adaptive_max_distance << "m]";
-                    }
+                    reason << " [SEARCH RADIUS: " << search_radius << "m]";
                     best_match_reason = reason.str();
                 }
             }
@@ -802,13 +794,11 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
             break;
         }
         
-        // Validate that the best match is within reasonable bounds
-        // Even with expanded search, we don't want to match balls that are too far apart
-        const New3DBall& best_ball = balls[best_ball_idx];
-        float max_reasonable_distance = max_distance * 3.0f;  // Never exceed 3x base distance
-        if (min_cost > max_reasonable_distance) {
+        // Validate that the best match is within the fixed search radius
+        // This should always be true due to the distance check above, but double-check
+        if (min_cost > max_distance) {
             logDebug("  Iteration ", iteration, ": Best match cost ", min_cost,
-                     "m exceeds max reasonable distance ", max_reasonable_distance, "m - stopping");
+                     "m exceeds search radius ", max_distance, "m - stopping");
             break;
         }
         
@@ -1315,27 +1305,23 @@ void New3DTracker::createNewTracks(
                 
                 New3DBall* ball = reacquirable_balls[b];
                 
-                // CRITICAL FIX: Use adaptive max distance for re-acquisition
-                // If ball has been unseen for a while, expand search radius significantly
-                float adaptive_max_distance = settings_.association_max_distance_m;
-                if (ball->frames_since_seen > 5) {
-                    // For balls lost >5 frames, use color matching ONLY (no distance limit)
-                    // This allows re-acquisition anywhere in the frame based on color
-                    adaptive_max_distance = std::numeric_limits<float>::max();
-                    logDebug("  Ball ", ball->id, " unseen for ", ball->frames_since_seen,
-                             " frames - using color-only re-acquisition (no distance limit)");
-                }
+                // CRITICAL: ALWAYS use the color search radius as the distance limit
+                // The search is centered on last_detection_position, not predicted_position
+                // Detections outside this radius are NEVER matched, regardless of frames_since_seen
+                float search_radius = settings_.association_max_distance_m;
                 
-                const cv::Point3f& pred_pos = ball->predicted_position;
+                const cv::Point3f& search_center = ball->last_detection_position;
                 const cv::Point3f& det_pos = detection->world_pos;
                 
-                float dx = pred_pos.x - det_pos.x;
-                float dy = pred_pos.y - det_pos.y;
-                float dz = pred_pos.z - det_pos.z;
+                // Calculate distance from last_detection_position (color search region center)
+                float dx = search_center.x - det_pos.x;
+                float dy = search_center.y - det_pos.y;
+                float dz = search_center.z - det_pos.z;
                 float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
                 
-                // Skip if detection is outside the adaptive search region
-                if (distance >= adaptive_max_distance) {
+                // CRITICAL: Detection MUST be within the color search radius
+                // This is a HARD LIMIT - detections outside are NEVER matched
+                if (distance >= search_radius) {
                     continue;
                 }
                 

@@ -546,7 +546,8 @@ cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame,
     }
     
     // Draw hand thresholds (catch/throw zones) and/or color search regions
-    if ((viz.show_hand_threshold() || viz.show_color_search()) && tracker) {
+    // Check if either visualization is enabled before calling drawHandThresholds
+    if (tracker && (viz.show_hand_threshold() || viz.show_color_search())) {
         tracker->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics);
     }
     

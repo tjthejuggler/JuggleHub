@@ -369,6 +369,22 @@ void CommandProcessor::handleExternalCommand(const juggler::v1::CommandRequest& 
             writeDebugLog("CommandProcessor - SET_VISUALIZATION_STATES command received");
             if (command.has_visualization_states() && visualization_states_) {
                 *visualization_states_ = command.visualization_states();
+                
+                // Synchronize visualization states with tracker's internal settings
+                if (tracker_) {
+                    const auto& viz = command.visualization_states();
+                    
+                    // Map UI toggle 'hand_threshold' to tracker's 'show_held_radius'
+                    tracker_->updateSetting("show_held_radius",
+                                          viz.show_hand_threshold() ? "true" : "false");
+                    
+                    // Map UI toggle 'color_search' to tracker's 'show_color_search_region'
+                    tracker_->updateSetting("show_color_search_region",
+                                          viz.show_color_search() ? "true" : "false");
+                    
+                    writeDebugLog("CommandProcessor - Synchronized visualization toggles with tracker settings");
+                }
+                
                 response.set_message("Visualization states updated");
                 writeDebugLog("CommandProcessor - Visualization states updated successfully");
             } else {

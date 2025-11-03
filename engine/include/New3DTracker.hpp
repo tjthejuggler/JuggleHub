@@ -39,6 +39,7 @@ struct New3DBall {
     cv::KalmanFilter kf;             // 6-state [x,y,z,vx,vy,vz]
     cv::Point3f last_known_position; // Official position from previous frame
     cv::Point3f predicted_position;  // Kalman prediction for this frame
+    cv::Point3f last_detection_position; // Last ACTUAL detection (for color search region)
     
     // === TRACKING QUALITY ===
     int frames_since_seen;           // Counter for deletion
@@ -60,7 +61,8 @@ struct New3DBall {
     New3DBall() : id(-1), state(HELD), associated_hand_id(-1),
                   frames_since_seen(0), consecutive_frames_seen(0),
                   color_locked(false), yolo_confidence(0.0f),
-                  color_match_score(0.0f) {
+                  color_match_score(0.0f),
+                  last_detection_position(0.0f, 0.0f, 0.0f) {
         std::cout << "[New3DBall] Default constructor called" << std::endl;
     }
     
@@ -74,6 +76,7 @@ struct New3DBall {
         : id(other.id), color_name(other.color_name), color_profile(other.color_profile),
           state(other.state), associated_hand_id(other.associated_hand_id),
           last_known_position(other.last_known_position), predicted_position(other.predicted_position),
+          last_detection_position(other.last_detection_position),
           frames_since_seen(other.frames_since_seen), consecutive_frames_seen(other.consecutive_frames_seen),
           color_locked(other.color_locked), pixel_pos(other.pixel_pos), bbox(other.bbox),
           yolo_confidence(other.yolo_confidence), color_match_score(other.color_match_score),
@@ -108,6 +111,7 @@ struct New3DBall {
           state(other.state), associated_hand_id(other.associated_hand_id),
           kf(std::move(other.kf)),  // Move the Kalman filter
           last_known_position(other.last_known_position), predicted_position(other.predicted_position),
+          last_detection_position(other.last_detection_position),
           frames_since_seen(other.frames_since_seen), consecutive_frames_seen(other.consecutive_frames_seen),
           color_locked(other.color_locked), pixel_pos(other.pixel_pos), bbox(other.bbox),
           yolo_confidence(other.yolo_confidence), color_match_score(other.color_match_score),
@@ -127,6 +131,7 @@ struct New3DBall {
             associated_hand_id = other.associated_hand_id;
             last_known_position = other.last_known_position;
             predicted_position = other.predicted_position;
+            last_detection_position = other.last_detection_position;
             frames_since_seen = other.frames_since_seen;
             consecutive_frames_seen = other.consecutive_frames_seen;
             color_locked = other.color_locked;

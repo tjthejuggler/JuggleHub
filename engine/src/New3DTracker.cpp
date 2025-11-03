@@ -97,6 +97,7 @@ void New3DTracker::initializePersistentBalls() {
         ball.kf = createKalmanFilter(default_left_hand_pos);
         ball.last_known_position = default_left_hand_pos;
         ball.predicted_position = default_left_hand_pos;
+        ball.last_detection_position = default_left_hand_pos;
         
         // CRITICAL: Start in HELD state, associated with left hand (id=0)
         // This assumes all balls start in the left hand until detected leaving
@@ -712,7 +713,7 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
     int iteration = 0;
     while (true) {
         iteration++;
-        float min_cost = max_distance;
+        float min_cost = std::numeric_limits<float>::max();  // Start with infinite cost
         int best_ball_idx = -1;
         int best_detection_idx = -1;
         std::string best_match_reason;
@@ -722,6 +723,18 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
             if (ball_matched[i]) continue;
             
             const New3DBall& track = balls[i];
+            
+            // CRITICAL FIX: Use adaptive max distance based on how long ball has been unseen
+            // If ball hasn't been seen for a while, expand search radius to allow re-acquisition
+            float adaptive_max_distance = max_distance;
+            if (track.frames_since_seen > 10) {
+                // Expand search radius by 50% for every 10 frames unseen (up to 3x)
+                float expansion_factor = 1.0f + (track.frames_since_seen / 10) * 0.5f;
+                expansion_factor = std::min(expansion_factor, 3.0f);  // Cap at 3x
+                adaptive_max_distance = max_distance * expansion_factor;
+                logDebug("  Ball ", track.id, " unseen for ", track.frames_since_seen,
+                         " frames - expanding search radius to ", adaptive_max_distance, "m");
+            }
             
             for (size_t j = 0; j < detections.size(); ++j) {
                 if (detection_matched[j]) continue;
@@ -737,8 +750,8 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
                 float dz = pred_pos.z - det_pos.z;
                 float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
                 
-                // If it's too far, it's not a candidate at all
-                if (distance >= max_distance) {
+                // Use adaptive max distance for this ball
+                if (distance >= adaptive_max_distance) {
                     continue;
                 }
                 
@@ -775,6 +788,9 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
                         reason << " (colors match: " << detection_color << ")";
                     }
                     reason << " = total_cost=" << total_cost << "m";
+                    if (track.frames_since_seen > 10) {
+                        reason << " [EXPANDED SEARCH: " << adaptive_max_distance << "m]";
+                    }
                     best_match_reason = reason.str();
                 }
             }
@@ -783,6 +799,16 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
         // If no valid match found, we're done
         if (best_ball_idx == -1 || best_detection_idx == -1) {
             logDebug("  Iteration ", iteration, ": No more valid matches found");
+            break;
+        }
+        
+        // Validate that the best match is within reasonable bounds
+        // Even with expanded search, we don't want to match balls that are too far apart
+        const New3DBall& best_ball = balls[best_ball_idx];
+        float max_reasonable_distance = max_distance * 3.0f;  // Never exceed 3x base distance
+        if (min_cost > max_reasonable_distance) {
+            logDebug("  Iteration ", iteration, ": Best match cost ", min_cost,
+                     "m exceeds max reasonable distance ", max_reasonable_distance, "m - stopping");
             break;
         }
         
@@ -869,19 +895,6 @@ void New3DTracker::handleHeldStateUpdate(
     logDebug("      Detection at: (", detection.world_pos.x, ", ", detection.world_pos.y, ", ",
               detection.world_pos.z, ") m");
     
-    // For a HELD ball, we trust the hand position entirely. The Kalman filter
-    // has already been updated to track the hand's wrist in predictHeldBall().
-    // We do NOT correct with the ball's detection, as that would pull the
-    // tracker away from the wrist. The detection only serves to confirm the
-    // ball is still present and to check for a throw.
-    
-    // Extract current velocity from Kalman state
-    cv::Point3f ball_velocity(
-        ball.kf.statePost.at<float>(3),
-        ball.kf.statePost.at<float>(4),
-        ball.kf.statePost.at<float>(5)
-    );
-    
     // Find the hand that should be holding this ball
     const SimpleHand* holding_hand = nullptr;
     for (const auto& hand : current_hands) {
@@ -908,7 +921,6 @@ void New3DTracker::handleHeldStateUpdate(
         throw_event.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()
         ).count();
-        // Note: BallEvent doesn't have velocity field, velocity is tracked in ball state
         events.push_back(throw_event);
         
         return;
@@ -924,38 +936,15 @@ void New3DTracker::handleHeldStateUpdate(
     logDebug("      Distance to holding hand: ", distance_to_hand, "m (threshold: ",
               settings_.held_radius_m, "m)");
     
-    // Calculate hand velocity
-    cv::Point3f hand_velocity = calculateHandVelocity(*holding_hand, previous_pose, dt);
-    
-    // Calculate relative velocity between ball and hand
-    cv::Point3f relative_velocity = ball_velocity - hand_velocity;
-    float relative_speed = std::sqrt(
-        relative_velocity.x * relative_velocity.x +
-        relative_velocity.y * relative_velocity.y +
-        relative_velocity.z * relative_velocity.z
-    );
-    
-    // Check for throw conditions
+    // CRITICAL FIX: For throw detection with depth blob detection, we use a simpler approach
+    // Since depth blobs are noisy and the Kalman filter tracks the hand (not the ball),
+    // we can't rely on velocity checks. Instead, we just check if the ball detection
+    // is beyond the held_radius threshold.
     bool distance_exceeded = distance_to_hand > settings_.held_radius_m;
-    bool velocity_exceeded = relative_speed > settings_.throw_velocity_threshold_mps;
-    bool hand_velocity_check = true;
     
-    if (settings_.hand_velocity_enabled) {
-        float hand_speed = std::sqrt(
-            hand_velocity.x * hand_velocity.x +
-            hand_velocity.y * hand_velocity.y +
-            hand_velocity.z * hand_velocity.z
-        );
-        hand_velocity_check = hand_speed > settings_.hand_velocity_threshold;
-    }
+    logDebug("      Throw detection: distance_exceeded=", distance_exceeded);
     
-    // Detect throw: ball moves beyond held_radius AND has sufficient relative velocity
-    // For depth blob detection (noisier), we require distance + ONE velocity condition
-    // instead of ALL THREE conditions to avoid false negatives
-    logDebug("      Throw detection: distance_exceeded=", distance_exceeded,
-              ", velocity_exceeded=", velocity_exceeded, ", hand_velocity_check=", hand_velocity_check);
-    
-    if (distance_exceeded && (velocity_exceeded || hand_velocity_check)) {
+    if (distance_exceeded) {
         logDebug("      >>> THROW DETECTED! Ball ", ball.id, " thrown from Hand ", ball.associated_hand_id);
         
         // Transition to IN_FLIGHT state
@@ -1014,6 +1003,8 @@ void New3DTracker::handleInFlightStateUpdate(
     logDebug("    handleInFlightStateUpdate for Ball ", ball.id, " (", ball.color_name, ")");
     logDebug("      Detection at: (", detection.world_pos.x, ", ", detection.world_pos.y, ", ",
               detection.world_pos.z, ") m");
+    logDebug("      BEFORE UPDATE: last_known_position = (", ball.last_known_position.x, ", ",
+              ball.last_known_position.y, ", ", ball.last_known_position.z, ") m");
     
     // Update Kalman filter with detection measurement
     cv::Mat measurement = (cv::Mat_<float>(3, 1) <<
@@ -1068,8 +1059,14 @@ void New3DTracker::handleInFlightStateUpdate(
     
     // Update last known position
     ball.last_known_position = detection.world_pos;
-    logDebug("      Ball position updated to: (", ball.last_known_position.x, ", ",
+    // CRITICAL FIX: Also update last_detection_position since this is an ACTUAL detection
+    // This ensures the color search region stays centered on real detections, not predictions
+    ball.last_detection_position = detection.world_pos;
+    logDebug("      AFTER UPDATE: last_known_position = (", ball.last_known_position.x, ", ",
               ball.last_known_position.y, ", ", ball.last_known_position.z, ") m");
+    logDebug("      AFTER UPDATE: last_detection_position = (", ball.last_detection_position.x, ", ",
+              ball.last_detection_position.y, ", ", ball.last_detection_position.z, ") m");
+    logDebug("      *** COLOR_SEARCH_REGION will be centered at last_detection_position ***");
 }
 
 // REMOVED: isHandAvailable() function
@@ -1278,7 +1275,7 @@ void New3DTracker::createNewTracks(
     std::vector<bool> ball_used(unmatched_balls.size(), false);
     
     // Greedy matching: repeatedly find the best detection-ball pair by color match score
-    // CRITICAL: Also check distance to respect association_max_distance_m (color search region)
+    // CRITICAL FIX: Use adaptive distance based on frames_since_seen for re-acquisition
     while (true) {
         float best_score = settings_.color_match_threshold;
         int best_detection_idx = -1;
@@ -1300,7 +1297,17 @@ void New3DTracker::createNewTracks(
                 
                 New3DBall* ball = reacquirable_balls[b];
                 
-                // CRITICAL FIX: Check distance first - detection must be within color search region
+                // CRITICAL FIX: Use adaptive max distance for re-acquisition
+                // If ball has been unseen for a while, expand search radius significantly
+                float adaptive_max_distance = settings_.association_max_distance_m;
+                if (ball->frames_since_seen > 5) {
+                    // For balls lost >5 frames, use color matching ONLY (no distance limit)
+                    // This allows re-acquisition anywhere in the frame based on color
+                    adaptive_max_distance = std::numeric_limits<float>::max();
+                    logDebug("  Ball ", ball->id, " unseen for ", ball->frames_since_seen,
+                             " frames - using color-only re-acquisition (no distance limit)");
+                }
+                
                 const cv::Point3f& pred_pos = ball->predicted_position;
                 const cv::Point3f& det_pos = detection->world_pos;
                 
@@ -1309,8 +1316,8 @@ void New3DTracker::createNewTracks(
                 float dz = pred_pos.z - det_pos.z;
                 float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
                 
-                // Skip if detection is outside the color search region (association_max_distance_m)
-                if (distance >= settings_.association_max_distance_m) {
+                // Skip if detection is outside the adaptive search region
+                if (distance >= adaptive_max_distance) {
                     continue;
                 }
                 
@@ -1343,7 +1350,19 @@ void New3DTracker::createNewTracks(
         ball->frames_since_seen = 0;
         ball->consecutive_frames_seen = 1;
         
-        // Update Kalman filter with new measurement
+        // CRITICAL FIX: Reset Kalman filter on re-acquisition
+        // The old velocity estimates are stale and cause immediate divergence after re-acquisition
+        logDebug("  Resetting Kalman filter for re-acquired ball ", ball->id);
+        
+        // Zero out velocities to start fresh
+        ball->kf.statePost.at<float>(3) = 0.0f;  // vx
+        ball->kf.statePost.at<float>(4) = 0.0f;  // vy
+        ball->kf.statePost.at<float>(5) = 0.0f;  // vz
+        
+        // Reset error covariance to initial uncertainty
+        cv::setIdentity(ball->kf.errorCovPost, cv::Scalar::all(1));
+        
+        // Now update with new measurement
         cv::Mat measurement = (cv::Mat_<float>(3, 1) <<
             detection->world_pos.x,
             detection->world_pos.y,
@@ -1351,9 +1370,12 @@ void New3DTracker::createNewTracks(
         );
         ball->kf.correct(measurement);
         
+        logDebug("  Kalman filter reset complete - velocities zeroed, covariance reset");
+        
         // Update positions
         ball->last_known_position = detection->world_pos;
         ball->predicted_position = detection->world_pos;
+        ball->last_detection_position = detection->world_pos;
         
         // CRITICAL FIX: Always re-acquire as IN_FLIGHT
         // Let the normal catch detection logic in handleInFlightStateUpdate() handle
@@ -1457,11 +1479,20 @@ void New3DTracker::finalizeBallPositions(const std::vector<SimpleHand>& hands,
                          ball.associated_hand_id, " not found - using predicted position");
             }
         } else {
-            // For IN_FLIGHT balls: Use Kalman prediction as final position
+            // For IN_FLIGHT balls: Use Kalman prediction for tracking
             ball.last_known_position = ball.predicted_position;
+            
+            // CRITICAL FIX: Do NOT update last_detection_position here!
+            // last_detection_position should ONLY be updated when we get an actual detection
+            // (in handleInFlightStateUpdate). This ensures the color search region stays
+            // anchored to where the ball was actually seen, not where predictions think it might be.
+            
             logDebug("  Ball ", ball.id, " (", ball.color_name, ") IN_FLIGHT, using predicted position: (",
                      ball.predicted_position.x, ", ", ball.predicted_position.y, ", ",
                      ball.predicted_position.z, ") m");
+            logDebug("  last_detection_position remains at: (",
+                     ball.last_detection_position.x, ", ", ball.last_detection_position.y, ", ",
+                     ball.last_detection_position.z, ") m (for color search region)");
         }
         
         // Lock color after sufficient frames
@@ -1919,6 +1950,9 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
             
             // Deproject to 3D using average depth
             cv::Point3f world_pos = deprojectToWorld(center, blob.avg_depth, intrinsics);
+            
+            std::cout << "[DepthBlob] ✓ DETECTION CREATED: 2D center=(" << center.x << ", " << center.y
+                      << "), 3D world_pos=(" << world_pos.x << ", " << world_pos.y << ", " << world_pos.z << ")m" << std::endl;
             
             // Create detection
             Detection det;
@@ -2660,16 +2694,28 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
         };
         
         for (const auto& ball : tracked_balls_) {
-            // Only draw search region if ball has been seen at least once
-            if (ball.frames_since_seen < 999999 && ball.last_known_position.z > 0) {
-                // Project the last known position to 2D
-                cv::Point2f ball_center_2d = project3DTo2D(ball.last_known_position, intrinsics);
+            // CRITICAL FIX: Always show search region for IN_FLIGHT balls, regardless of frames_since_seen
+            // Use different color when ball has been lost for a while
+            if (ball.state == IN_FLIGHT && ball.last_detection_position.z > 0) {
+                // Use last_detection_position - this is where the ball was ACTUALLY detected
+                cv::Point3f search_position = ball.last_detection_position;
+                
+                logDebug("[COLOR_SEARCH_REGION] Ball ", ball.id, " (", ball.color_name, "):");
+                logDebug("  frames_since_seen: ", ball.frames_since_seen);
+                logDebug("  state: ", (ball.state == HELD ? "HELD" : "IN_FLIGHT"));
+                logDebug("  last_detection_position (3D): (", search_position.x, ", ", search_position.y, ", ", search_position.z, ")m");
+                
+                // Project the search position to 2D
+                cv::Point2f ball_center_2d = project3DTo2D(search_position, intrinsics);
+                logDebug("  projected to 2D: (", ball_center_2d.x, ", ", ball_center_2d.y, ")px");
                 
                 // CRITICAL FIX: Clamp visualization position to frame bounds
                 // This ensures the color search region is always visible even when ball goes off-screen
-                cv::Point3f clamped_pos = clampToFieldOfView(ball.last_known_position, intrinsics,
+                cv::Point3f clamped_pos = clampToFieldOfView(search_position, intrinsics,
                                                              frame.cols, frame.rows);
                 cv::Point2f clamped_center_2d = project3DTo2D(clamped_pos, intrinsics);
+                logDebug("  clamped 3D: (", clamped_pos.x, ", ", clamped_pos.y, ", ", clamped_pos.z, ")m");
+                logDebug("  clamped 2D: (", clamped_center_2d.x, ", ", clamped_center_2d.y, ")px");
                 
                 // Use clamped position for visualization
                 if (clamped_center_2d.x >= 0 && clamped_center_2d.x < frame.cols &&
@@ -2679,9 +2725,15 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                     float depth = clamped_pos.z;
                     if (depth > 0) {
                         float radius_pixels = (settings_.association_max_distance_m / depth) * intrinsics.fx;
+                        logDebug("  search_radius: ", radius_pixels, "px (", settings_.association_max_distance_m, "m at depth ", depth, "m)");
                         
-                        // Get the color for this ball
-                        cv::Scalar ball_color = getColorForName(ball.color_name);
+                        // Determine color based on how long ball has been lost
+                        cv::Scalar ball_color;
+                        if (ball.frames_since_seen < 5) {
+                            ball_color = getColorForName(ball.color_name);  // Normal color
+                        } else {
+                            ball_color = cv::Scalar(0, 0, 255);  // RED when lost >= 5 frames
+                        }
                         
                         // Draw the search region circle
                         cv::circle(frame, clamped_center_2d, static_cast<int>(radius_pixels),
@@ -2700,7 +2752,13 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                                           static_cast<int>(clamped_center_2d.y) - 10);
                         cv::putText(frame, label, label_pos, cv::FONT_HERSHEY_SIMPLEX, 0.4,
                                   ball_color, 1);
+                        
+                        logDebug("  ✓ COLOR_SEARCH_REGION DRAWN at (", clamped_center_2d.x, ", ", clamped_center_2d.y, ")px");
+                    } else {
+                        logDebug("  ✗ SKIPPED: invalid depth");
                     }
+                } else {
+                    logDebug("  ✗ SKIPPED: clamped position out of bounds");
                 }
             }
         }

@@ -2681,12 +2681,24 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                                      const std::vector<SimpleHand>& hands,
                                      const CameraIntrinsics& intrinsics,
                                      const std::vector<SimpleBall>* balls_override) {
-    // Note: balls_override parameter is for compatibility with SimpleBallTracker
-    // New3DTracker doesn't use color search visualization, so we ignore it
-    (void)balls_override;  // Suppress unused parameter warning
+    // CRITICAL FIX: Use balls_override when provided (for recording visualization)
+    // This ensures color search regions are drawn at the correct recorded positions
+    // instead of using the current tracker state
+    
     // Draw color search regions for each tracked ball
-    if (settings_.show_color_search_region && !tracked_balls_.empty()) {
-        logDebug("[drawHandThresholds] Drawing color search regions for ", tracked_balls_.size(), " balls");
+    if (settings_.show_color_search_region) {
+        // Determine which ball list to use
+        bool use_override = (balls_override != nullptr && !balls_override->empty());
+        
+        if (use_override) {
+            logDebug("[drawHandThresholds] Drawing color search regions for ", balls_override->size(), " balls (using override)");
+        } else if (!tracked_balls_.empty()) {
+            logDebug("[drawHandThresholds] Drawing color search regions for ", tracked_balls_.size(), " balls (using tracker state)");
+        } else {
+            logDebug("[drawHandThresholds] No balls to draw color search regions for");
+        }
+        
+        if (use_override || !tracked_balls_.empty()) {
         // Helper function to get BGR color for a color name
         auto getColorForName = [](const std::string& color_name) -> cv::Scalar {
             // Standard color mappings (BGR format for OpenCV)
@@ -2701,72 +2713,142 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
             return cv::Scalar(128, 128, 128);  // Default gray
         };
         
-        for (const auto& ball : tracked_balls_) {
-            // CRITICAL: Color search region should ALWAYS be centered on last_detection_position
-            // This is where the ball was actually SEEN, not where predictions think it might be
-            // Show search region for ALL balls that have ever been detected (no frame limit)
-            if (ball.last_detection_position.z > 0) {
-                // Use last_detection_position - this is where color tracking should search
-                cv::Point3f search_position = ball.last_detection_position;
-                
-                logDebug("[COLOR_SEARCH_REGION] Ball ", ball.id, " (", ball.color_name, "):");
-                logDebug("  state: ", (ball.state == HELD ? "HELD" : "IN_FLIGHT"));
-                logDebug("  last_detection_position (3D): (", search_position.x, ", ", search_position.y, ", ", search_position.z, ")m");
-                logDebug("  NOTE: Color search region is ALWAYS centered on last_detection_position, never on predictions");
-                
-                // Project the search position to 2D
-                cv::Point2f ball_center_2d = project3DTo2D(search_position, intrinsics);
-                logDebug("  projected to 2D: (", ball_center_2d.x, ", ", ball_center_2d.y, ")px");
-                
-                // CRITICAL FIX: Clamp visualization position to frame bounds
-                // This ensures the color search region is always visible even when ball goes off-screen
-                cv::Point3f clamped_pos = clampToFieldOfView(search_position, intrinsics,
-                                                             frame.cols, frame.rows);
-                cv::Point2f clamped_center_2d = project3DTo2D(clamped_pos, intrinsics);
-                logDebug("  clamped 3D: (", clamped_pos.x, ", ", clamped_pos.y, ", ", clamped_pos.z, ")m");
-                logDebug("  clamped 2D: (", clamped_center_2d.x, ", ", clamped_center_2d.y, ")px");
-                
-                // Use clamped position for visualization
-                if (clamped_center_2d.x >= 0 && clamped_center_2d.x < frame.cols &&
-                    clamped_center_2d.y >= 0 && clamped_center_2d.y < frame.rows) {
+        // Iterate over the appropriate ball list
+        if (use_override) {
+            // Use SimpleBall from override (recording visualization)
+            for (const auto& simple_ball : *balls_override) {
+                // CRITICAL: For recordings, use the ball's actual position as the search center
+                // SimpleBall.position is the recorded position at this frame
+                if (simple_ball.position.z > 0) {
+                    cv::Point3f search_position = simple_ball.position;
                     
-                    // Calculate radius in pixels based on association_max_distance_m
-                    float depth = clamped_pos.z;
-                    if (depth > 0) {
-                        float radius_pixels = (settings_.association_max_distance_m / depth) * intrinsics.fx;
-                        logDebug("  search_radius: ", radius_pixels, "px (", settings_.association_max_distance_m, "m at depth ", depth, "m)");
+                    logDebug("[COLOR_SEARCH_REGION] Ball ", simple_ball.id, " (", simple_ball.color_name, ") [RECORDING]:");
+                    logDebug("  state: ", (simple_ball.is_held ? "HELD" : "IN_FLIGHT"));
+                    logDebug("  position (3D): (", search_position.x, ", ", search_position.y, ", ", search_position.z, ")m");
+                    logDebug("  NOTE: Using recorded ball position for color search region");
+                
+                    // Project the search position to 2D
+                    cv::Point2f ball_center_2d = project3DTo2D(search_position, intrinsics);
+                    logDebug("  projected to 2D: (", ball_center_2d.x, ", ", ball_center_2d.y, ")px");
+                    
+                    // CRITICAL FIX: Clamp visualization position to frame bounds
+                    cv::Point3f clamped_pos = clampToFieldOfView(search_position, intrinsics,
+                                                                 frame.cols, frame.rows);
+                    cv::Point2f clamped_center_2d = project3DTo2D(clamped_pos, intrinsics);
+                    logDebug("  clamped 3D: (", clamped_pos.x, ", ", clamped_pos.y, ", ", clamped_pos.z, ")m");
+                    logDebug("  clamped 2D: (", clamped_center_2d.x, ", ", clamped_center_2d.y, ")px");
+                    
+                    // Use clamped position for visualization
+                    if (clamped_center_2d.x >= 0 && clamped_center_2d.x < frame.cols &&
+                        clamped_center_2d.y >= 0 && clamped_center_2d.y < frame.rows) {
                         
-                        // Always use the ball's actual color
-                        cv::Scalar ball_color = getColorForName(ball.color_name);
-                        
-                        // Draw the search region circle
-                        cv::circle(frame, clamped_center_2d, static_cast<int>(radius_pixels),
-                                 ball_color, 2);
-                        
-                        // Draw a small dot at the center
-                        cv::circle(frame, clamped_center_2d, 3, ball_color, -1);
-                        
-                        // Add label with color name and off-screen indicator
-                        std::string label = ball.color_name + " search";
-                        if (ball_center_2d.x != clamped_center_2d.x ||
-                            ball_center_2d.y != clamped_center_2d.y) {
-                            label += " (OFF-SCREEN)";
+                        // Calculate radius in pixels based on association_max_distance_m
+                        float depth = clamped_pos.z;
+                        if (depth > 0) {
+                            float radius_pixels = (settings_.association_max_distance_m / depth) * intrinsics.fx;
+                            logDebug("  search_radius: ", radius_pixels, "px (", settings_.association_max_distance_m, "m at depth ", depth, "m)");
+                            
+                            // Always use the ball's actual color
+                            cv::Scalar ball_color = getColorForName(simple_ball.color_name);
+                            
+                            // Draw the search region circle
+                            cv::circle(frame, clamped_center_2d, static_cast<int>(radius_pixels),
+                                     ball_color, 2);
+                            
+                            // Draw a small dot at the center
+                            cv::circle(frame, clamped_center_2d, 3, ball_color, -1);
+                            
+                            // Add label with color name and off-screen indicator
+                            std::string label = simple_ball.color_name + " search";
+                            if (ball_center_2d.x != clamped_center_2d.x ||
+                                ball_center_2d.y != clamped_center_2d.y) {
+                                label += " (OFF-SCREEN)";
+                            }
+                            cv::Point label_pos(static_cast<int>(clamped_center_2d.x) + 10,
+                                              static_cast<int>(clamped_center_2d.y) - 10);
+                            cv::putText(frame, label, label_pos, cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                                      ball_color, 1);
+                            
+                            logDebug("  ✓ COLOR_SEARCH_REGION DRAWN at (", clamped_center_2d.x, ", ", clamped_center_2d.y, ")px");
+                        } else {
+                            logDebug("  ✗ SKIPPED: invalid depth");
                         }
-                        cv::Point label_pos(static_cast<int>(clamped_center_2d.x) + 10,
-                                          static_cast<int>(clamped_center_2d.y) - 10);
-                        cv::putText(frame, label, label_pos, cv::FONT_HERSHEY_SIMPLEX, 0.4,
-                                  ball_color, 1);
-                        
-                        logDebug("  ✓ COLOR_SEARCH_REGION DRAWN at (", clamped_center_2d.x, ", ", clamped_center_2d.y, ")px");
                     } else {
-                        logDebug("  ✗ SKIPPED: invalid depth");
+                        logDebug("  ✗ SKIPPED: clamped position out of bounds");
                     }
                 } else {
-                    logDebug("  ✗ SKIPPED: clamped position out of bounds");
+                    logDebug("  ✗ SKIPPED: Ball position invalid (z = ", simple_ball.position.z, ")");
                 }
-            } else {
-                logDebug("  ✗ SKIPPED: Ball has never been detected (last_detection_position.z = ", ball.last_detection_position.z, ")");
             }
+        } else {
+            // Use New3DBall from tracker state (real-time visualization)
+            for (const auto& ball : tracked_balls_) {
+                // CRITICAL: Color search region should ALWAYS be centered on last_detection_position
+                // This is where the ball was actually SEEN, not where predictions think it might be
+                // Show search region for ALL balls that have ever been detected (no frame limit)
+                if (ball.last_detection_position.z > 0) {
+                    // Use last_detection_position - this is where color tracking should search
+                    cv::Point3f search_position = ball.last_detection_position;
+                    
+                    logDebug("[COLOR_SEARCH_REGION] Ball ", ball.id, " (", ball.color_name, "):");
+                    logDebug("  state: ", (ball.state == HELD ? "HELD" : "IN_FLIGHT"));
+                    logDebug("  last_detection_position (3D): (", search_position.x, ", ", search_position.y, ", ", search_position.z, ")m");
+                    logDebug("  NOTE: Color search region is ALWAYS centered on last_detection_position, never on predictions");
+                    
+                    // Project the search position to 2D
+                    cv::Point2f ball_center_2d = project3DTo2D(search_position, intrinsics);
+                    logDebug("  projected to 2D: (", ball_center_2d.x, ", ", ball_center_2d.y, ")px");
+                    
+                    // CRITICAL FIX: Clamp visualization position to frame bounds
+                    cv::Point3f clamped_pos = clampToFieldOfView(search_position, intrinsics,
+                                                                 frame.cols, frame.rows);
+                    cv::Point2f clamped_center_2d = project3DTo2D(clamped_pos, intrinsics);
+                    logDebug("  clamped 3D: (", clamped_pos.x, ", ", clamped_pos.y, ", ", clamped_pos.z, ")m");
+                    logDebug("  clamped 2D: (", clamped_center_2d.x, ", ", clamped_center_2d.y, ")px");
+                    
+                    // Use clamped position for visualization
+                    if (clamped_center_2d.x >= 0 && clamped_center_2d.x < frame.cols &&
+                        clamped_center_2d.y >= 0 && clamped_center_2d.y < frame.rows) {
+                        
+                        // Calculate radius in pixels based on association_max_distance_m
+                        float depth = clamped_pos.z;
+                        if (depth > 0) {
+                            float radius_pixels = (settings_.association_max_distance_m / depth) * intrinsics.fx;
+                            logDebug("  search_radius: ", radius_pixels, "px (", settings_.association_max_distance_m, "m at depth ", depth, "m)");
+                            
+                            // Always use the ball's actual color
+                            cv::Scalar ball_color = getColorForName(ball.color_name);
+                            
+                            // Draw the search region circle
+                            cv::circle(frame, clamped_center_2d, static_cast<int>(radius_pixels),
+                                     ball_color, 2);
+                            
+                            // Draw a small dot at the center
+                            cv::circle(frame, clamped_center_2d, 3, ball_color, -1);
+                            
+                            // Add label with color name and off-screen indicator
+                            std::string label = ball.color_name + " search";
+                            if (ball_center_2d.x != clamped_center_2d.x ||
+                                ball_center_2d.y != clamped_center_2d.y) {
+                                label += " (OFF-SCREEN)";
+                            }
+                            cv::Point label_pos(static_cast<int>(clamped_center_2d.x) + 10,
+                                              static_cast<int>(clamped_center_2d.y) - 10);
+                            cv::putText(frame, label, label_pos, cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                                      ball_color, 1);
+                            
+                            logDebug("  ✓ COLOR_SEARCH_REGION DRAWN at (", clamped_center_2d.x, ", ", clamped_center_2d.y, ")px");
+                        } else {
+                            logDebug("  ✗ SKIPPED: invalid depth");
+                        }
+                    } else {
+                        logDebug("  ✗ SKIPPED: clamped position out of bounds");
+                    }
+                } else {
+                    logDebug("  ✗ SKIPPED: Ball has never been detected (last_detection_position.z = ", ball.last_detection_position.z, ")");
+                }
+            }
+        }
         }
     }
     

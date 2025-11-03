@@ -355,7 +355,7 @@ if PYQT_AVAILABLE:
             
             self.show_color_search_toggle = QPushButton("color_search_regions")
             self.show_color_search_toggle.setCheckable(True)
-            self.show_color_search_toggle.setChecked(False)
+            self.show_color_search_toggle.setChecked(self._load_visualization_setting('show_color_search_region', False))
             self.show_color_search_toggle.clicked.connect(self.toggle_overlays)
             self.show_color_search_toggle.setToolTip("frame_data.color_search_regions - Color tracking search areas")
             toggle_buttons.append(self.show_color_search_toggle)
@@ -397,7 +397,7 @@ if PYQT_AVAILABLE:
             
             self.show_hand_threshold_toggle = QPushButton("hand_threshold")
             self.show_hand_threshold_toggle.setCheckable(True)
-            self.show_hand_threshold_toggle.setChecked(False)
+            self.show_hand_threshold_toggle.setChecked(self._load_visualization_setting('show_held_radius', False))
             self.show_hand_threshold_toggle.clicked.connect(self.toggle_overlays)
             self.show_hand_threshold_toggle.setToolTip("tracking_settings.hand_distance_threshold - Blue circles around hands showing unified hand distance threshold")
             toggle_buttons.append(self.show_hand_threshold_toggle)
@@ -553,6 +553,33 @@ if PYQT_AVAILABLE:
             
             self.apply_dark_theme()
             self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            
+            # Send initial visualization states to engine after UI is fully initialized
+            # This ensures the engine's visualization settings match the UI toggle states
+            QTimer.singleShot(100, self.sync_initial_visualization_states)
+        
+        def sync_initial_visualization_states(self):
+            """Send the initial visualization states from UI toggles to the engine."""
+            try:
+                self.toggle_overlays()  # This will send all current toggle states to the engine
+                print("✅ Initial visualization states synchronized with engine")
+            except Exception as e:
+                print(f"⚠️ Warning: Could not sync initial visualization states: {e}")
+        
+        def _load_visualization_setting(self, setting_name, default_value):
+            """Load a visualization setting from the New3D calibration settings JSON file."""
+            try:
+                import json
+                import os
+                settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+                settings_path = os.path.normpath(settings_path)
+                
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+                    return settings.get(setting_name, default_value)
+            except Exception as e:
+                print(f"⚠️ Warning: Could not load visualization setting '{setting_name}': {e}")
+                return default_value
         
         def create_menu_bar(self):
             """Create the menu bar with File, App, and Help menus."""

@@ -102,6 +102,18 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
     // Set tracker reference for RecordingManager (will be updated when tracker switches)
     recording_manager_->setTracker(tracker_.get());
     
+    // CRITICAL FIX: Initialize visualization states from tracker's loaded settings
+    // This ensures the Engine's visualization_states_ matches what's in the JSON file
+    // Note: These settings are only available in New3DTracker, not in SimpleBallTracker
+    if (new_3d_tracker_) {
+        const auto& settings = new_3d_tracker_->getSettings();
+        visualization_states_.set_show_hand_threshold(settings.show_held_radius);
+        visualization_states_.set_show_color_search(settings.show_color_search_region);
+        writeDebugLog("Engine constructor: Initialized visualization states from New3D tracker settings");
+        writeDebugLog("  show_hand_threshold: " + std::string(settings.show_held_radius ? "true" : "false"));
+        writeDebugLog("  show_color_search: " + std::string(settings.show_color_search_region ? "true" : "false"));
+    }
+    
     writeDebugLog("Engine constructor: Initialization complete");
 }
 

@@ -2681,11 +2681,12 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                                      const std::vector<SimpleHand>& hands,
                                      const CameraIntrinsics& intrinsics,
                                      const std::vector<SimpleBall>* balls_override) {
-    // CRITICAL FIX: Use balls_override when provided (for recording visualization)
-    // This ensures color search regions are drawn at the correct recorded positions
-    // instead of using the current tracker state
+    // CRITICAL: This function draws TWO INDEPENDENT visualizations:
+    // 1. Color search regions (controlled by settings_.show_color_search_region)
+    // 2. Hand threshold circles (controlled by settings_.show_held_radius)
+    // These are completely independent and should not affect each other.
     
-    // Draw color search regions for each tracked ball
+    // Draw color search regions for each tracked ball (INDEPENDENT of held radius)
     if (settings_.show_color_search_region) {
         // Determine which ball list to use
         bool use_override = (balls_override != nullptr && !balls_override->empty());
@@ -2852,12 +2853,9 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
         }
     }
     
-    // Draw held radius circles for hands (independent of color search regions)
-    if (!settings_.show_held_radius) {
-        return;  // Only return if held radius is disabled
-    }
-    
-    for (const auto& hand : hands) {
+    // Draw held radius circles for hands (INDEPENDENT of color search regions)
+    if (settings_.show_held_radius) {
+        for (const auto& hand : hands) {
         // Calculate the held circle center (with offset from wrist)
         cv::Point3f held_center_3d = hand.wrist_pos_3d;
         
@@ -2947,6 +2945,7 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
         std::string label = (hand.id == 0) ? "L" : "R";
         cv::putText(frame, label, held_center_2d, cv::FONT_HERSHEY_SIMPLEX, 0.7,
                    cv::Scalar(0, 255, 255), 2);
+        }
     }
 }
 

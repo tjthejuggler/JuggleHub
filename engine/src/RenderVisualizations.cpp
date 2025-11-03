@@ -12,13 +12,16 @@
 #include <cmath>
 
 // Standalone function for rendering visualizations on recorded frames
-cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame, 
+cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame,
                                     const RecordingFrame& rec_frame,
                                     const CameraIntrinsics& camera_intrinsics,
                                     const juggler::v1::VisualizationStates& viz_states,
                                     bool record_with_yolo_boxes,
                                     IBallTracker* tracker) {
-    const auto& viz = viz_states;
+    // CRITICAL FIX: Use the visualization states that were recorded WITH the frame,
+    // not the current UI state. This ensures recordings show only the visualizations
+    // that were enabled at the time of recording.
+    const auto& viz = rec_frame.viz_states;
     
     // Prepare info panel data
     std::vector<std::string> info_lines;
@@ -306,6 +309,9 @@ cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame,
     
     // Draw color-tracked balls (final tracking result)
     if (viz.show_color_tracker()) {
+        std::cout << "[ColorTracker Recording] ===== COLOR TRACKER VISUALIZATION ENABLED =====" << std::endl;
+        std::cout << "[ColorTracker Recording] Number of tracked balls in frame: " << rec_frame.tracked_balls.size() << std::endl;
+        
         // Load color profiles to get display colors
         std::map<std::string, cv::Scalar> color_map;
         try {
@@ -319,25 +325,68 @@ cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame,
                         std::string name = profile["name"];
                         std::vector<int> rgb = profile["rgb"];
                         // Convert RGB to BGR for OpenCV
-                        color_map[name] = cv::Scalar(rgb[2], rgb[1], rgb[0]);
+                        cv::Scalar bgr_color(rgb[2], rgb[1], rgb[0]);
+                        color_map[name] = bgr_color;
+                        
+                        // Debug: Log loaded colors
+                        std::cout << "[ColorTracker Recording] Loaded color profile: " << name
+                                  << " RGB(" << rgb[0] << "," << rgb[1] << "," << rgb[2] << ")"
+                                  << " -> BGR(" << rgb[2] << "," << rgb[1] << "," << rgb[0] << ")" << std::endl;
                     }
                 }
+            } else {
+                std::cout << "[ColorTracker Recording] WARNING: Could not open color_profiles.json" << std::endl;
             }
-        } catch (...) {
-            // If loading fails, use default colors
+        } catch (const std::exception& e) {
+            std::cout << "[ColorTracker Recording] ERROR loading color profiles: " << e.what() << std::endl;
         }
         
+        std::cout << "[ColorTracker Recording] Drawing " << rec_frame.tracked_balls.size() << " balls" << std::endl;
+        
         for (const auto& ball : rec_frame.tracked_balls) {
-            // Get display color for this ball
-            cv::Scalar display_color = cv::Scalar(0, 255, 255);  // Default yellow
+            // Get display color for this ball from color profiles
+            cv::Scalar display_color = cv::Scalar(128, 128, 128);  // Default gray if not found
+            
             if (color_map.find(ball.color_name) != color_map.end()) {
                 display_color = color_map[ball.color_name];
+                std::cout << "[ColorTracker Recording] Ball ID=" << ball.id
+                          << " color=" << ball.color_name
+                          << " using profile color BGR(" << display_color[0] << ","
+                          << display_color[1] << "," << display_color[2] << ")" << std::endl;
+            } else {
+                std::cout << "[ColorTracker Recording] WARNING: Ball ID=" << ball.id
+                          << " color=" << ball.color_name
+                          << " NOT FOUND in color profiles, using default gray" << std::endl;
             }
             
-            // Draw circle at ball position
-            cv::Point2f pixel_pos = ball.pixel_pos;
-            cv::circle(temp_result, pixel_pos, 12, display_color, 2);
-            cv::circle(temp_result, pixel_pos, 12, cv::Scalar(0, 0, 0), 3);
+            // CRITICAL FIX: Recalculate pixel position from 3D position for accurate recording visualization
+            // Don't rely on ball.pixel_pos which might be stale in recordings
+            cv::Point2f pixel_pos;
+            if (ball.position.z > 0) {
+                // Project 3D position to 2D using camera intrinsics
+                float x_2d = (ball.position.x * camera_intrinsics.fx) / ball.position.z + camera_intrinsics.ppx;
+                float y_2d = (ball.position.y * camera_intrinsics.fy) / ball.position.z + camera_intrinsics.ppy;
+                pixel_pos = cv::Point2f(x_2d, y_2d);
+            } else {
+                // Fallback to stored pixel_pos if 3D position is invalid
+                pixel_pos = ball.pixel_pos;
+            }
+            
+            // Check if pixel position is within frame bounds
+            if (pixel_pos.x < 0 || pixel_pos.x >= temp_result.cols ||
+                pixel_pos.y < 0 || pixel_pos.y >= temp_result.rows) {
+                std::cout << "[ColorTracker Recording] Ball ID=" << ball.id
+                          << " SKIPPED: off-screen at (" << pixel_pos.x << "," << pixel_pos.y << ")" << std::endl;
+                continue;  // Skip balls that are off-screen
+            }
+            
+            std::cout << "[ColorTracker Recording] Drawing Ball ID=" << ball.id
+                      << " at pixel (" << pixel_pos.x << "," << pixel_pos.y << ")"
+                      << " with color BGR(" << display_color[0] << "," << display_color[1] << "," << display_color[2] << ")" << std::endl;
+            
+            // Draw circle at ball position with black outline for visibility
+            cv::circle(temp_result, pixel_pos, 12, cv::Scalar(0, 0, 0), 3);  // Black outline first
+            cv::circle(temp_result, pixel_pos, 12, display_color, 2);  // Colored circle on top
             
             // Draw ball ID and color name
             char label[64];
@@ -546,8 +595,9 @@ cv::Mat renderVisualizationsOnFrame(const cv::Mat& frame,
     }
     
     // Draw hand thresholds (catch/throw zones) and/or color search regions
-    // Check if either visualization is enabled before calling drawHandThresholds
-    // CRITICAL: Pass recorded balls data so color search regions use correct positions
+    // CRITICAL: These are two INDEPENDENT visualizations that should not affect each other
+    // The drawHandThresholds function internally checks which visualizations are enabled
+    // We call it if EITHER visualization is enabled
     if (tracker && (viz.show_hand_threshold() || viz.show_color_search())) {
         tracker->drawHandThresholds(temp_result, rec_frame.tracked_hands_simple, camera_intrinsics, &rec_frame.tracked_balls);
     }

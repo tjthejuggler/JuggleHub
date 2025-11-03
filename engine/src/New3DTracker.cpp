@@ -2694,11 +2694,11 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
         };
         
         for (const auto& ball : tracked_balls_) {
-            // CRITICAL FIX: Always show search region for IN_FLIGHT balls, regardless of frames_since_seen
-            // Use different color when ball has been lost for a while
-            if (ball.state == IN_FLIGHT && ball.last_detection_position.z > 0) {
-                // Use last_detection_position - this is where the ball was ACTUALLY detected
-                cv::Point3f search_position = ball.last_detection_position;
+            // Show search region for ALL balls (HELD and IN_FLIGHT) that have a valid position
+            // Use last_known_position which is updated every frame
+            if (ball.last_known_position.z > 0) {
+                // Use last_known_position - this is the current tracked position
+                cv::Point3f search_position = ball.last_known_position;
                 
                 logDebug("[COLOR_SEARCH_REGION] Ball ", ball.id, " (", ball.color_name, "):");
                 logDebug("  frames_since_seen: ", ball.frames_since_seen);
@@ -2727,13 +2727,8 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                         float radius_pixels = (settings_.association_max_distance_m / depth) * intrinsics.fx;
                         logDebug("  search_radius: ", radius_pixels, "px (", settings_.association_max_distance_m, "m at depth ", depth, "m)");
                         
-                        // Determine color based on how long ball has been lost
-                        cv::Scalar ball_color;
-                        if (ball.frames_since_seen < 5) {
-                            ball_color = getColorForName(ball.color_name);  // Normal color
-                        } else {
-                            ball_color = cv::Scalar(0, 0, 255);  // RED when lost >= 5 frames
-                        }
+                        // Always use the ball's actual color
+                        cv::Scalar ball_color = getColorForName(ball.color_name);
                         
                         // Draw the search region circle
                         cv::circle(frame, clamped_center_2d, static_cast<int>(radius_pixels),

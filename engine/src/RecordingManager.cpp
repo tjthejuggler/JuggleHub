@@ -205,9 +205,10 @@ void RecordingManager::saveFramesToDisk(const std::deque<RecordingFrame>& frames
                                  viz_states.show_hand_threshold() ||
                                  viz_states.show_yolo_color_calibration();
 
-        // Render visualizations if enabled and tracker is available
-        if (has_visualizations && tracker_) {
-            writeDebugLog("RecordingManager::saveFramesToDisk() - Rendering visualizations...");
+        // Always create with_visualizations folder and save frames
+        // If visualizations are enabled, render them; otherwise save plain frames
+        if (tracker_) {
+            writeDebugLog("RecordingManager::saveFramesToDisk() - Creating with_visualizations folder...");
             fs::path recording_dir_with_viz = recording_dir / "with_visualizations";
             
             try {
@@ -216,31 +217,39 @@ void RecordingManager::saveFramesToDisk(const std::deque<RecordingFrame>& frames
                 
                 int frame_num_viz = 0;
                 for (const auto& rec_frame : frames) {
-                    writeDebugLog("RecordingManager::saveFramesToDisk() - Rendering frame " + std::to_string(frame_num_viz));
+                    writeDebugLog("RecordingManager::saveFramesToDisk() - Processing frame " + std::to_string(frame_num_viz));
                     
-                    // Call the Engine.cpp renderVisualizationsOnFrame function
-                    cv::Mat frame_with_viz = renderVisualizationsOnFrame(
-                        rec_frame.frame, rec_frame, camera_intrinsics, viz_states,
-                        record_with_yolo_boxes, tracker_);
+                    cv::Mat frame_to_save;
+                    if (has_visualizations) {
+                        // Render visualizations on frame
+                        frame_to_save = renderVisualizationsOnFrame(
+                            rec_frame.frame, rec_frame, camera_intrinsics, viz_states,
+                            record_with_yolo_boxes, tracker_);
+                    } else {
+                        // No visualizations - just use the plain frame
+                        frame_to_save = rec_frame.frame;
+                    }
                     
-                    // Save visualization frame
+                    // Save frame (with or without visualizations)
                     std::string viz_filename = session_name + "_frame_" + std::to_string(frame_num_viz) + "_viz.jpg";
                     fs::path viz_filepath = recording_dir_with_viz / viz_filename;
-                    cv::imwrite(viz_filepath.string(), frame_with_viz);
+                    cv::imwrite(viz_filepath.string(), frame_to_save);
                     
                     frame_num_viz++;
                 }
                 
-                INFO_LOG("Saved ", frames.size(), " visualization frames to ", recording_dir_with_viz.string());
-                writeDebugLog("RecordingManager::saveFramesToDisk() - Visualization rendering complete");
+                if (has_visualizations) {
+                    INFO_LOG("Saved ", frames.size(), " visualization frames to ", recording_dir_with_viz.string());
+                } else {
+                    INFO_LOG("Saved ", frames.size(), " frames (no visualizations) to ", recording_dir_with_viz.string());
+                }
+                writeDebugLog("RecordingManager::saveFramesToDisk() - with_visualizations folder complete");
             } catch (const std::exception& e) {
-                writeDebugLog("RecordingManager::saveFramesToDisk() - ERROR rendering visualizations: " + std::string(e.what()));
+                writeDebugLog("RecordingManager::saveFramesToDisk() - ERROR saving with_visualizations: " + std::string(e.what()));
             }
-        } else if (has_visualizations) {
-            writeDebugLog("RecordingManager::saveFramesToDisk() - Visualizations requested but tracker not set");
-            INFO_LOG("Warning: Visualizations requested but tracker not available");
         } else {
-            writeDebugLog("RecordingManager::saveFramesToDisk() - No visualizations enabled");
+            writeDebugLog("RecordingManager::saveFramesToDisk() - Tracker not set, cannot create with_visualizations folder");
+            INFO_LOG("Warning: Tracker not available, skipping with_visualizations folder");
         }
 
         writeDebugLog("RecordingManager::saveFramesToDisk() - Complete");

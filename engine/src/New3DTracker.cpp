@@ -2679,7 +2679,11 @@ void New3DTracker::drawAssociations(cv::Mat& frame,
 
 void New3DTracker::drawHandThresholds(cv::Mat& frame,
                                      const std::vector<SimpleHand>& hands,
-                                     const CameraIntrinsics& intrinsics) {
+                                     const CameraIntrinsics& intrinsics,
+                                     const std::vector<SimpleBall>* balls_override) {
+    // Note: balls_override parameter is for compatibility with SimpleBallTracker
+    // New3DTracker doesn't use color search visualization, so we ignore it
+    (void)balls_override;  // Suppress unused parameter warning
     // Draw color search regions for each tracked ball
     if (settings_.show_color_search_region && !tracked_balls_.empty()) {
         logDebug("[drawHandThresholds] Drawing color search regions for ", tracked_balls_.size(), " balls");

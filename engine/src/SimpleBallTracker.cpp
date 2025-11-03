@@ -3529,8 +3529,53 @@ void SimpleBallTracker::drawTrajectory(
 void SimpleBallTracker::drawHandThresholds(
     cv::Mat& frame,
     const std::vector<SimpleHand>& hands,
-    const CameraIntrinsics& intrinsics
+    const CameraIntrinsics& intrinsics,
+    const std::vector<SimpleBall>* balls_override
 ) {
+    // Use override balls if provided, otherwise use internal state
+    const std::vector<SimpleBall>& balls_to_use = balls_override ? *balls_override : balls_;
+    
+    // Draw hand velocity detection zones using the appropriate balls data
+    if (viz_settings_.show_hand_velocity_zone) {
+        for (const auto& tracked_ball : balls_to_use) {
+            if (tracked_ball.hand_velocity_active && tracked_ball.hand_velocity_radius > 0) {
+                // Project 3D center to 2D
+                cv::Point2f center_2d = project_3d_to_2d(tracked_ball.hand_velocity_center, intrinsics);
+                
+                // Check if on-screen
+                if (center_2d.x >= 0 && center_2d.x < frame.cols &&
+                    center_2d.y >= 0 && center_2d.y < frame.rows) {
+                    
+                    // Calculate pixel radius from meters
+                    float radius_pixels = tracked_ball.hand_velocity_radius * intrinsics.fx / tracked_ball.hand_velocity_center.z;
+                    
+                    // Draw purple circle showing detection zone
+                    cv::circle(frame, center_2d, static_cast<int>(radius_pixels),
+                              viz_settings_.hand_velocity_zone_color, 2);
+                    
+                    // Draw direction arrow from hand to zone center
+                    cv::Point3f arrow_start = tracked_ball.hand_velocity_center -
+                                             tracked_ball.hand_velocity_direction * tracked_ball.hand_velocity_radius;
+                    cv::Point2f hand_2d = project_3d_to_2d(arrow_start, intrinsics);
+                    
+                    if (hand_2d.x >= 0 && hand_2d.x < frame.cols &&
+                        hand_2d.y >= 0 && hand_2d.y < frame.rows) {
+                        cv::arrowedLine(frame, hand_2d, center_2d,
+                                       viz_settings_.hand_velocity_zone_color, 2);
+                    }
+                    
+                    // Add label with hand speed
+                    float hand_speed = cv::norm(tracked_ball.hand_velocity_direction);
+                    std::string label = cv::format("Hand: %.2fm/s", hand_speed);
+                    cv::Point text_pos(center_2d.x + 10, center_2d.y - static_cast<int>(radius_pixels) - 5);
+                    cv::putText(frame, label, text_pos,
+                               cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                               viz_settings_.hand_velocity_zone_color, 1);
+                }
+            }
+        }
+    }
+    
     // Draw threshold circles around each hand's wrist
     for (const auto& hand : hands) {
         if (!hand.is_visible) continue;

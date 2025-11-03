@@ -83,10 +83,12 @@ public:
      * @param frame Image to draw on
      * @param hands Vector of hands to draw thresholds for
      * @param intrinsics Camera intrinsics for projection
+     * @param balls_override Optional override for balls data (for recordings)
      */
-    virtual void drawHandThresholds(cv::Mat& frame, 
+    virtual void drawHandThresholds(cv::Mat& frame,
                                     const std::vector<SimpleHand>& hands,
-                                    const CameraIntrinsics& intrinsics) = 0;
+                                    const CameraIntrinsics& intrinsics,
+                                    const std::vector<SimpleBall>* balls_override = nullptr) = 0;
     
     /**
      * @brief Evaluate override criteria for detections (for recording visualization)

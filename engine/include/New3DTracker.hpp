@@ -316,7 +316,8 @@ public:
     
     void drawHandThresholds(cv::Mat& frame,
                            const std::vector<SimpleHand>& hands,
-                           const CameraIntrinsics& intrinsics) override;
+                           const CameraIntrinsics& intrinsics,
+                           const std::vector<SimpleBall>* balls_override = nullptr) override;
     
     void evaluateOverrideCriteria(std::vector<Detection>& detections,
                                  const cv::Mat& color_image) override;

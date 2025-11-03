@@ -392,8 +392,9 @@ public:
     * @param frame Frame to draw on (modified in-place)
     * @param hands Hands to draw thresholds around
     * @param intrinsics Camera intrinsics for 3D-to-2D projection
+    * @param balls_override Optional override for balls data (for recordings)
     */
-   void drawHandThresholds(cv::Mat& frame, const std::vector<SimpleHand>& hands, const CameraIntrinsics& intrinsics) override;
+   void drawHandThresholds(cv::Mat& frame, const std::vector<SimpleHand>& hands, const CameraIntrinsics& intrinsics, const std::vector<SimpleBall>* balls_override = nullptr) override;
    
    const TrackingSettings& getTrackingSettings() const { return tracking_settings_; }
     TrackingSettings& getTrackingSettings() override { return tracking_settings_; }

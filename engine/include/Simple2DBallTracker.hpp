@@ -143,10 +143,12 @@ public:
      * No thresholds to draw in 2D-only mode since we don't track
      * hand-ball proximity or state transitions.
      */
-    void drawHandThresholds(cv::Mat& frame, 
+    void drawHandThresholds(cv::Mat& frame,
                            const std::vector<SimpleHand>& hands,
-                           const CameraIntrinsics& intrinsics) override {
+                           const CameraIntrinsics& intrinsics,
+                           const std::vector<SimpleBall>* balls_override = nullptr) override {
         // No-op: no thresholds in 2D tracker
+        (void)balls_override;  // Suppress unused parameter warning
     }
     
     /**

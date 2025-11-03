@@ -1131,31 +1131,33 @@ void New3DTracker::handleUnmatchedBalls(
                 
                 // Keep ball locked to held circle center even though it's not detected
                 ball->predicted_position = held_position;
-                // CRITICAL: Update last_detection_position to follow the hand
-                // This ensures the color search region stays with the held ball
-                ball->last_detection_position = held_position;
+                // CRITICAL FIX: DO NOT update last_detection_position when ball is not detected
+                // last_detection_position should only be updated on ACTUAL detections
+                // This keeps the color search region anchored where the ball was last SEEN
+                // ball->last_detection_position = held_position;  // REMOVED - causes search region to drift
                 ball->tracking_reason = "HELD (not visible, tracking held circle center) - " +
                                        std::to_string(ball->frames_since_seen) + " frames";
                 
                 logDebug("  Ball ", ball->id, " (", ball->color_name, ") HELD but not visible - ",
                          "keeping at held circle center of hand ", ball->associated_hand_id,
-                         " and updating last_detection_position to (", held_position.x, ", ",
-                         held_position.y, ", ", held_position.z, ")m for color search region");
+                         " | last_detection_position remains at (", ball->last_detection_position.x, ", ",
+                         ball->last_detection_position.y, ", ", ball->last_detection_position.z, ")m for color search region");
             } else {
                 // Hand temporarily lost (e.g., pose detection failed or hand occluded)
                 // DO NOT transition to IN_FLIGHT! Keep the ball HELD and use last known position
                 // The ball will only transition to IN_FLIGHT when we SEE it leave the hand
                 ball->predicted_position = ball->last_known_position;  // Keep at last held circle position
-                // CRITICAL: Keep last_detection_position at the last known hand position
-                // The color search region should stay where the ball was last seen (at the hand)
-                ball->last_detection_position = ball->last_known_position;
+                // CRITICAL FIX: DO NOT update last_detection_position when hand is lost
+                // last_detection_position should only be updated on ACTUAL detections
+                // This keeps the color search region anchored where the ball was last SEEN
+                // ball->last_detection_position = ball->last_known_position;  // REMOVED - causes search region to drift
                 ball->tracking_reason = "HELD (hand temporarily lost, keeping last held circle position) - " +
                                        std::to_string(ball->frames_since_seen) + " frames";
                 
                 logDebug("  Ball ", ball->id, " (", ball->color_name, ") HELD but hand ",
                          ball->associated_hand_id, " temporarily lost - keeping HELD at last held circle position",
-                         " and last_detection_position at (", ball->last_known_position.x, ", ",
-                         ball->last_known_position.y, ", ", ball->last_known_position.z, ")m");
+                         " | last_detection_position remains at (", ball->last_detection_position.x, ", ",
+                         ball->last_detection_position.y, ", ", ball->last_detection_position.z, ")m for color search region");
             }
         } else {
             // Ball is IN_FLIGHT and not detected

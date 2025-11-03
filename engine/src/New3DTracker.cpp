@@ -990,6 +990,12 @@ void New3DTracker::handleHeldStateUpdate(
         }
     }
     
+    // CRITICAL: Update last_detection_position for HELD balls
+    // This ensures the color search region follows the ball even when held
+    ball.last_detection_position = detection.world_pos;
+    logDebug("      Updated last_detection_position to (", detection.world_pos.x, ", ",
+              detection.world_pos.y, ", ", detection.world_pos.z, ")m for color search region");
+    
     // The final position will be set to the hand's wrist in finalizeBallPositions().
     // We don't update last_known_position here to avoid inconsistency.
 }
@@ -1135,21 +1141,31 @@ void New3DTracker::handleUnmatchedBalls(
                 
                 // Keep ball locked to held circle center even though it's not detected
                 ball->predicted_position = held_position;
+                // CRITICAL: Update last_detection_position to follow the hand
+                // This ensures the color search region stays with the held ball
+                ball->last_detection_position = held_position;
                 ball->tracking_reason = "HELD (not visible, tracking held circle center) - " +
                                        std::to_string(ball->frames_since_seen) + " frames";
                 
                 logDebug("  Ball ", ball->id, " (", ball->color_name, ") HELD but not visible - ",
-                         "keeping at held circle center of hand ", ball->associated_hand_id);
+                         "keeping at held circle center of hand ", ball->associated_hand_id,
+                         " and updating last_detection_position to (", held_position.x, ", ",
+                         held_position.y, ", ", held_position.z, ")m for color search region");
             } else {
                 // Hand temporarily lost (e.g., pose detection failed or hand occluded)
                 // DO NOT transition to IN_FLIGHT! Keep the ball HELD and use last known position
                 // The ball will only transition to IN_FLIGHT when we SEE it leave the hand
                 ball->predicted_position = ball->last_known_position;  // Keep at last held circle position
+                // CRITICAL: Keep last_detection_position at the last known hand position
+                // The color search region should stay where the ball was last seen (at the hand)
+                ball->last_detection_position = ball->last_known_position;
                 ball->tracking_reason = "HELD (hand temporarily lost, keeping last held circle position) - " +
                                        std::to_string(ball->frames_since_seen) + " frames";
                 
                 logDebug("  Ball ", ball->id, " (", ball->color_name, ") HELD but hand ",
-                         ball->associated_hand_id, " temporarily lost - keeping HELD at last held circle position");
+                         ball->associated_hand_id, " temporarily lost - keeping HELD at last held circle position",
+                         " and last_detection_position at (", ball->last_known_position.x, ", ",
+                         ball->last_known_position.y, ", ", ball->last_known_position.z, ")m");
             }
         } else {
             // Ball is IN_FLIGHT and not detected
@@ -1250,15 +1266,17 @@ void New3DTracker::createNewTracks(
         return;
     }
     
-    // CRITICAL: Filter out HELD balls - they should NEVER be re-acquired by distant detections
-    // Only IN_FLIGHT balls that have been lost for a while should be re-acquired
+    // CRITICAL FIX: HELD balls should NEVER be re-acquired by createNewTracks
+    // They are handled by handleUnmatchedBalls and stay locked to their hand
+    // Only IN_FLIGHT balls can be re-acquired here
     std::vector<New3DBall*> reacquirable_balls;
     for (auto* ball : unmatched_balls) {
         if (ball->state == IN_FLIGHT) {
             reacquirable_balls.push_back(ball);
+            logDebug("  Ball ", ball->id, " (", ball->color_name, ") is IN_FLIGHT - can be re-acquired");
         } else {
             logDebug("  Skipping HELD ball ", ball->id, " (", ball->color_name,
-                     ") - will not re-acquire with distant detection");
+                     ") - HELD balls stay with their hand, never re-acquired by detections");
         }
     }
     
@@ -2694,16 +2712,17 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
         };
         
         for (const auto& ball : tracked_balls_) {
-            // Show search region for ALL balls (HELD and IN_FLIGHT) that have a valid position
-            // Use last_known_position which is updated every frame
-            if (ball.last_known_position.z > 0) {
-                // Use last_known_position - this is the current tracked position
-                cv::Point3f search_position = ball.last_known_position;
+            // CRITICAL: Color search region should ALWAYS be centered on last_detection_position
+            // This is where the ball was actually SEEN, not where predictions think it might be
+            // Show search region for ALL balls that have ever been detected (no frame limit)
+            if (ball.last_detection_position.z > 0) {
+                // Use last_detection_position - this is where color tracking should search
+                cv::Point3f search_position = ball.last_detection_position;
                 
                 logDebug("[COLOR_SEARCH_REGION] Ball ", ball.id, " (", ball.color_name, "):");
-                logDebug("  frames_since_seen: ", ball.frames_since_seen);
                 logDebug("  state: ", (ball.state == HELD ? "HELD" : "IN_FLIGHT"));
                 logDebug("  last_detection_position (3D): (", search_position.x, ", ", search_position.y, ", ", search_position.z, ")m");
+                logDebug("  NOTE: Color search region is ALWAYS centered on last_detection_position, never on predictions");
                 
                 // Project the search position to 2D
                 cv::Point2f ball_center_2d = project3DTo2D(search_position, intrinsics);
@@ -2755,6 +2774,8 @@ void New3DTracker::drawHandThresholds(cv::Mat& frame,
                 } else {
                     logDebug("  ✗ SKIPPED: clamped position out of bounds");
                 }
+            } else {
+                logDebug("  ✗ SKIPPED: Ball has never been detected (last_detection_position.z = ", ball.last_detection_position.z, ")");
             }
         }
     }

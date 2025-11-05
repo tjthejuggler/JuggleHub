@@ -234,3 +234,75 @@ bool CameraManager::getFrames(cv::Mat& color_image, cv::Mat& depth_image) {
         return false;
     }
 }
+
+void CameraManager::setExposure(int exposure_microseconds) {
+    if (!camera_running_) {
+        ERROR_LOG("Cannot set exposure: camera is not running");
+        return;
+    }
+
+    try {
+        auto profile = pipe_.get_active_profile();
+        rs2::device dev = profile.get_device();
+        
+        // Get the color sensor
+        auto sensors = dev.query_sensors();
+        for (auto& sensor : sensors) {
+            if (sensor.is<rs2::color_sensor>()) {
+                // Disable auto exposure first
+                if (sensor.supports(RS2_OPTION_ENABLE_AUTO_EXPOSURE)) {
+                    sensor.set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0.0f);
+                    INFO_LOG("Auto exposure disabled");
+                }
+                
+                // Set manual exposure
+                if (sensor.supports(RS2_OPTION_EXPOSURE)) {
+                    // Clamp exposure value to valid range
+                    auto range = sensor.get_option_range(RS2_OPTION_EXPOSURE);
+                    float clamped_exposure = std::max(range.min, std::min(range.max, static_cast<float>(exposure_microseconds)));
+                    
+                    sensor.set_option(RS2_OPTION_EXPOSURE, clamped_exposure);
+                    INFO_LOG("Camera exposure set to ", clamped_exposure, " microseconds");
+                } else {
+                    ERROR_LOG("Camera does not support manual exposure control");
+                }
+                break;
+            }
+        }
+    } catch (const rs2::error& e) {
+        ERROR_LOG("RealSense error setting exposure: ", e.what());
+    } catch (const std::exception& e) {
+        ERROR_LOG("Error setting exposure: ", e.what());
+    }
+}
+
+void CameraManager::setAutoExposure(bool enabled) {
+    if (!camera_running_) {
+        ERROR_LOG("Cannot set auto exposure: camera is not running");
+        return;
+    }
+
+    try {
+        auto profile = pipe_.get_active_profile();
+        rs2::device dev = profile.get_device();
+        
+        // Get the color sensor
+        auto sensors = dev.query_sensors();
+        for (auto& sensor : sensors) {
+            if (sensor.is<rs2::color_sensor>()) {
+                // Set auto exposure
+                if (sensor.supports(RS2_OPTION_ENABLE_AUTO_EXPOSURE)) {
+                    sensor.set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, enabled ? 1.0f : 0.0f);
+                    INFO_LOG("Auto exposure ", enabled ? "enabled" : "disabled");
+                } else {
+                    ERROR_LOG("Camera does not support auto exposure control");
+                }
+                break;
+            }
+        }
+    } catch (const rs2::error& e) {
+        ERROR_LOG("RealSense error setting auto exposure: ", e.what());
+    } catch (const std::exception& e) {
+        ERROR_LOG("Error setting auto exposure: ", e.what());
+    }
+}

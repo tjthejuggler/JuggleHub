@@ -1,13 +1,15 @@
 #include "UdpBallSettingsModule.hpp"
+#include "CameraManager.hpp"
 #include <iostream>
 #include <sstream>
 
 namespace juggler {
 namespace modules {
 
-UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<IBallTracker> tracker, bool* use_dnn_tracker_ptr)
+UdpBallSettingsModule::UdpBallSettingsModule(std::shared_ptr<IBallTracker> tracker, bool* use_dnn_tracker_ptr, CameraManager* camera_manager)
     : tracker_(tracker),
       use_dnn_tracker_ptr_(use_dnn_tracker_ptr),
+      camera_manager_(camera_manager),
       socket_(io_context_, asio::ip::udp::endpoint(asio::ip::udp::v4(), 12346)) {
 }
 
@@ -42,6 +44,11 @@ void UdpBallSettingsModule::setTracker(std::shared_ptr<IBallTracker> tracker) {
     std::cout << "UdpBallSettingsModule: Tracker pointer updated" << std::endl;
 }
 
+void UdpBallSettingsModule::setCameraManager(CameraManager* camera_manager) {
+    camera_manager_ = camera_manager;
+    std::cout << "UdpBallSettingsModule: CameraManager pointer updated" << std::endl;
+}
+
 void UdpBallSettingsModule::UdpListen() {
     while (!stop_listening_) {
         try {
@@ -55,8 +62,28 @@ void UdpBallSettingsModule::UdpListen() {
                         std::istringstream iss(message);
                         std::string key, value;
                         if (std::getline(iss, key, '=') && std::getline(iss, value)) {
+                            // Handle camera_auto_exposure - forward to CameraManager
+                            if (key == "camera_auto_exposure" && camera_manager_) {
+                                try {
+                                    bool enabled = (value == "1" || value == "true");
+                                    camera_manager_->setAutoExposure(enabled);
+                                    std::cout << "✅ Camera auto exposure " << (enabled ? "enabled" : "disabled") << std::endl;
+                                } catch (const std::exception& e) {
+                                    std::cerr << "❌ Error setting camera auto exposure: " << e.what() << std::endl;
+                                }
+                            }
+                            // Handle camera_exposure - forward to CameraManager
+                            else if (key == "camera_exposure" && camera_manager_) {
+                                try {
+                                    int exposure = std::stoi(value);
+                                    camera_manager_->setExposure(exposure);
+                                    std::cout << "✅ Camera exposure set to " << exposure << " microseconds" << std::endl;
+                                } catch (const std::exception& e) {
+                                    std::cerr << "❌ Error setting camera exposure: " << e.what() << std::endl;
+                                }
+                            }
                             // Handle enable_ball_detection - forward to tracker to control ball inference
-                            if (key == "enable_ball_detection" && tracker_) {
+                            else if (key == "enable_ball_detection" && tracker_) {
                                 tracker_->updateSetting(key, value);
                                 bool enabled = (value == "1" || value == "true");
                                 std::cout << "✅ YOLO ball detection " << (enabled ? "enabled" : "disabled") << std::endl;

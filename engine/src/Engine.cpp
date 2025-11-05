@@ -144,7 +144,7 @@ void Engine::run() {
 
     // Initialize settings module with current tracker and use_dnn_tracker flag
     writeDebugLog("Engine::run() - Initializing settings module...");
-    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(tracker_, &use_dnn_tracker_);
+    settings_module_ = std::make_unique<juggler::modules::UdpBallSettingsModule>(tracker_, &use_dnn_tracker_, camera_manager_.get());
     settings_module_->setup();
     writeDebugLog("Engine::run() - Settings module initialized");
 

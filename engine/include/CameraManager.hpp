@@ -33,6 +33,10 @@ public:
     uint32_t getWidth() const { return camera_width_; }
     uint32_t getHeight() const { return camera_height_; }
     uint32_t getFPS() const { return camera_fps_; }
+    
+    // Camera settings control
+    void setExposure(int exposure_microseconds);
+    void setAutoExposure(bool enabled);
 
 private:
     void applySettings();

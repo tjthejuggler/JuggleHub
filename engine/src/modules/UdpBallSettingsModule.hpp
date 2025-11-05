@@ -6,12 +6,15 @@
 #include <thread>
 #include <asio.hpp>
 
+// Forward declaration
+class CameraManager;
+
 namespace juggler {
 namespace modules {
 
 class UdpBallSettingsModule : public ModuleBase {
 public:
-    UdpBallSettingsModule(std::shared_ptr<IBallTracker> tracker, bool* use_dnn_tracker_ptr = nullptr);
+    UdpBallSettingsModule(std::shared_ptr<IBallTracker> tracker, bool* use_dnn_tracker_ptr = nullptr, CameraManager* camera_manager = nullptr);
     ~UdpBallSettingsModule();
 
     // ModuleBase interface
@@ -22,12 +25,16 @@ public:
     
     // Update the tracker pointer (used when switching trackers)
     void setTracker(std::shared_ptr<IBallTracker> tracker);
+    
+    // Update the camera manager pointer
+    void setCameraManager(CameraManager* camera_manager);
 
 private:
     void UdpListen();
 
     std::shared_ptr<IBallTracker> tracker_;  // Pointer to tracker (works with both SimpleBallTracker and Simple2DBallTracker)
     bool* use_dnn_tracker_ptr_;  // Pointer to Engine's use_dnn_tracker_ flag
+    CameraManager* camera_manager_;  // Pointer to CameraManager for camera settings
 
     std::unique_ptr<std::thread> listener_thread_;
     asio::io_context io_context_;

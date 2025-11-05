@@ -971,6 +971,38 @@ if PYQT_AVAILABLE:
                 print(f"❌ Error toggling depth sensor: {e}")
                 QMessageBox.critical(self, "Error", f"Error toggling depth sensor:\n{str(e)}")
 
+        def toggle_auto_exposure(self, state):
+            """Toggle auto exposure on/off"""
+            from PyQt6.QtCore import Qt
+            is_enabled = (state == Qt.CheckState.Checked.value)
+            
+            # Enable/disable manual exposure slider
+            if hasattr(self, 'exposure_slider'):
+                self.exposure_slider.setEnabled(not is_enabled)
+            
+            # Only send settings if not loading and camera is likely running
+            if not self._loading_settings:
+                # Send auto exposure setting to camera
+                print(f"📷 Auto exposure {'enabled' if is_enabled else 'disabled'}")
+                self.udp_client.send_setting('camera_auto_exposure', 1 if is_enabled else 0)
+                
+                # If disabling auto exposure, send current manual exposure value
+                if not is_enabled and hasattr(self, 'exposure_slider'):
+                    current_exposure = self.exposure_slider.value()
+                    self.udp_client.send_setting('camera_exposure', current_exposure)
+                    print(f"📷 Setting manual exposure to {current_exposure} microseconds")
+                
+                self.save_settings()
+
+        def update_camera_exposure(self, value: int):
+            """Update camera exposure setting"""
+            # Only send if auto exposure is disabled
+            if hasattr(self, 'auto_exposure_toggle') and not self.auto_exposure_toggle.isChecked():
+                print(f"📷 Setting camera exposure to {value} microseconds")
+                self.udp_client.send_setting('camera_exposure', value)
+                if not self._loading_settings:
+                    self.save_settings()
+
         def test_catch_sound(self):
             """Play test sound for catch events"""
             self.play_system_sound(frequency=800, duration=100)

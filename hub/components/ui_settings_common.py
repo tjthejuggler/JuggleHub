@@ -125,8 +125,44 @@ class CommonSettingsSections:
         )
         camera_layout.addWidget(self.parent.depth_sensor_toggle, 6, 0, 1, 2)
         
+        # Auto Exposure toggle
+        row = 7
+        from PyQt6.QtWidgets import QCheckBox
+        camera_layout.addWidget(QLabel("Auto Exposure:"), row, 0)
+        self.parent.auto_exposure_toggle = QCheckBox()
+        self.parent.auto_exposure_toggle.setChecked(True)  # Default to auto exposure enabled
+        self.parent.auto_exposure_toggle.setToolTip(
+            "Enable automatic exposure control.\n"
+            "When enabled, camera adjusts exposure automatically.\n"
+            "When disabled, use manual exposure slider below."
+        )
+        self.parent.auto_exposure_toggle.stateChanged.connect(
+            lambda state: self.parent.toggle_auto_exposure(state)
+        )
+        camera_layout.addWidget(self.parent.auto_exposure_toggle, row, 1, 1, 2)
+        row += 1
+        
+        # Manual Exposure slider (disabled by default when auto exposure is on)
+        self.parent.exposure_slider, self.parent.exposure_label = self.parent._create_slider_widget(
+            parent_layout=camera_layout,
+            row=row,
+            label_text="Manual Exposure",
+            tooltip_text="Manual camera exposure setting.\n"
+                         "Range: 1-10000 (microseconds). Default: 8500.\n"
+                         "Lower = darker image, Higher = brighter image.\n"
+                         "Only active when Auto Exposure is disabled.",
+            range_min=1,
+            range_max=10000,
+            initial_value=8500,
+            update_func=lambda v: self.parent.update_camera_exposure(v),
+            is_float=False
+        )
+        # Disable manual exposure slider by default (auto exposure is on)
+        self.parent.exposure_slider.setEnabled(False)
+        row += 1
+        
         # Tracking System Selection
-        camera_layout.addWidget(QLabel("Tracking System:"), 7, 0)
+        camera_layout.addWidget(QLabel("Tracking System:"), row, 0)
         self.parent.tracking_system_combo = QComboBox()
         self.parent.tracking_system_combo.addItem("Depth-Based 3D (Current)", "depth_based")
         self.parent.tracking_system_combo.addItem("New 3D Kalman ⭐", "new_3d")
@@ -137,10 +173,10 @@ class CommonSettingsSections:
             "• Depth-Based 3D: Uses RealSense depth data for 3D tracking (current system)\n"
             "• Simple 2D: 2D-only tracking without depth (new system - to be implemented)"
         )
-        camera_layout.addWidget(self.parent.tracking_system_combo, 7, 1)
+        camera_layout.addWidget(self.parent.tracking_system_combo, row, 1)
+        row += 1
         
         # ========== PLAYBACK MODE SECTION ==========
-        row = 8  # Adjust based on current row count
 
         # Separator
         separator = QLabel("─" * 50)

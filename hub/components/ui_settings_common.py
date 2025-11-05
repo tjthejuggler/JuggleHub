@@ -143,22 +143,71 @@ class CommonSettingsSections:
         row += 1
         
         # Manual Exposure slider (disabled by default when auto exposure is on)
-        self.parent.exposure_slider, self.parent.exposure_label = self.parent._create_slider_widget(
-            parent_layout=camera_layout,
-            row=row,
-            label_text="Manual Exposure",
-            tooltip_text="Manual camera exposure setting.\n"
-                         "Range: 1-10000 (microseconds). Default: 8500.\n"
-                         "Lower = darker image, Higher = brighter image.\n"
-                         "Only active when Auto Exposure is disabled.",
-            range_min=1,
-            range_max=10000,
-            initial_value=8500,
-            update_func=lambda v: self.parent.update_camera_exposure(v),
-            is_float=False
+        # Note: We create this manually instead of using _create_slider_widget to use sliderReleased
+        from PyQt6.QtWidgets import QSlider
+        exposure_label = QLabel("Manual Exposure (μs)")
+        exposure_label.setToolTip(
+            "Manual camera exposure setting.\n"
+            "Range: 1-400 microseconds. Default: 100.\n"
+            "Lower = darker image, Higher = brighter image.\n"
+            "Only active when Auto Exposure is disabled."
         )
+        camera_layout.addWidget(exposure_label, row, 0)
+        
+        self.parent.exposure_slider = QSlider(Qt.Orientation.Horizontal)
+        self.parent.exposure_slider.setRange(1, 400)
+        self.parent.exposure_slider.setValue(100)
+        camera_layout.addWidget(self.parent.exposure_slider, row, 1)
+        
+        self.parent.exposure_label = QLabel()
+        self.parent.exposure_label.setMinimumWidth(60)
+        self.parent.exposure_label.setText("100")
+        camera_layout.addWidget(self.parent.exposure_label, row, 2)
+        
+        # Update label on value change (for visual feedback while dragging)
+        self.parent.exposure_slider.valueChanged.connect(
+            lambda v: self.parent.exposure_label.setText(str(v))
+        )
+        
+        # Only send to camera when slider is released (prevents lag)
+        self.parent.exposure_slider.sliderReleased.connect(
+            lambda: self.parent.update_camera_exposure(self.parent.exposure_slider.value())
+        )
+        
         # Disable manual exposure slider by default (auto exposure is on)
         self.parent.exposure_slider.setEnabled(False)
+        row += 1
+        
+        # Manual Gain slider (for controlling sensor sensitivity)
+        gain_label = QLabel("Camera Gain")
+        gain_label.setToolTip(
+            "Camera gain (ISO/sensitivity) setting.\n"
+            "Range: 0-248. Default: 64.\n"
+            "Lower gain = less sensitive, prevents bright objects from clipping to white.\n"
+            "Higher gain = more sensitive, better for low light.\n"
+            "Use lower gain to prevent juggling balls from appearing pure white."
+        )
+        camera_layout.addWidget(gain_label, row, 0)
+        
+        self.parent.gain_slider = QSlider(Qt.Orientation.Horizontal)
+        self.parent.gain_slider.setRange(0, 248)
+        self.parent.gain_slider.setValue(64)
+        camera_layout.addWidget(self.parent.gain_slider, row, 1)
+        
+        self.parent.gain_label = QLabel()
+        self.parent.gain_label.setMinimumWidth(60)
+        self.parent.gain_label.setText("64")
+        camera_layout.addWidget(self.parent.gain_label, row, 2)
+        
+        # Update label on value change (for visual feedback while dragging)
+        self.parent.gain_slider.valueChanged.connect(
+            lambda v: self.parent.gain_label.setText(str(v))
+        )
+        
+        # Only send to camera when slider is released (prevents lag)
+        self.parent.gain_slider.sliderReleased.connect(
+            lambda: self.parent.update_camera_gain(self.parent.gain_slider.value())
+        )
         row += 1
         
         # Tracking System Selection

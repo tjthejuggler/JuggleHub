@@ -37,6 +37,7 @@ public:
     // Camera settings control
     void setExposure(int exposure_microseconds);
     void setAutoExposure(bool enabled);
+    void setGain(int gain_value);
 
 private:
     void applySettings();

@@ -306,3 +306,38 @@ void CameraManager::setAutoExposure(bool enabled) {
         ERROR_LOG("Error setting auto exposure: ", e.what());
     }
 }
+
+void CameraManager::setGain(int gain_value) {
+    if (!camera_running_) {
+        ERROR_LOG("Cannot set gain: camera is not running");
+        return;
+    }
+
+    try {
+        auto profile = pipe_.get_active_profile();
+        rs2::device dev = profile.get_device();
+        
+        // Get the color sensor
+        auto sensors = dev.query_sensors();
+        for (auto& sensor : sensors) {
+            if (sensor.is<rs2::color_sensor>()) {
+                // Set gain
+                if (sensor.supports(RS2_OPTION_GAIN)) {
+                    // Clamp gain value to valid range
+                    auto range = sensor.get_option_range(RS2_OPTION_GAIN);
+                    float clamped_gain = std::max(range.min, std::min(range.max, static_cast<float>(gain_value)));
+                    
+                    sensor.set_option(RS2_OPTION_GAIN, clamped_gain);
+                    INFO_LOG("Camera gain set to ", clamped_gain);
+                } else {
+                    ERROR_LOG("Camera does not support gain control");
+                }
+                break;
+            }
+        }
+    } catch (const rs2::error& e) {
+        ERROR_LOG("RealSense error setting gain: ", e.what());
+    } catch (const std::exception& e) {
+        ERROR_LOG("Error setting gain: ", e.what());
+    }
+}

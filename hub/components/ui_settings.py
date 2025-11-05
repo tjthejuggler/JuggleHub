@@ -327,6 +327,9 @@ if PYQT_AVAILABLE:
                 'resolution': self.resolution_combo.currentText() if hasattr(self, 'resolution_combo') else '640 x 480',
                 'fps': self.fps_combo.currentData() if hasattr(self, 'fps_combo') else 60,
                 'depth_sensor_enabled': self.depth_sensor_toggle.isChecked() if hasattr(self, 'depth_sensor_toggle') else True,
+                'camera_exposure': self.exposure_slider.value() if hasattr(self, 'exposure_slider') else 100,
+                'camera_gain': self.gain_slider.value() if hasattr(self, 'gain_slider') else 64,
+                'auto_exposure_enabled': self.auto_exposure_toggle.isChecked() if hasattr(self, 'auto_exposure_toggle') else True,
                 'tracking_system': self.current_tracker,
                 'enable_ball_detection': self.use_dnn_tracker_toggle.isChecked() if hasattr(self, 'use_dnn_tracker_toggle') else True,
                 'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0 if hasattr(self, 'ball_confidence_slider') else 0.25,
@@ -503,6 +506,14 @@ if PYQT_AVAILABLE:
             # Depth sensor
             if 'depth_sensor_enabled' in settings and hasattr(self, 'depth_sensor_toggle'):
                 self.depth_sensor_toggle.setChecked(settings['depth_sensor_enabled'])
+            
+            # Camera exposure and gain
+            if 'camera_exposure' in settings and hasattr(self, 'exposure_slider'):
+                self.exposure_slider.setValue(settings['camera_exposure'])
+            if 'camera_gain' in settings and hasattr(self, 'gain_slider'):
+                self.gain_slider.setValue(settings['camera_gain'])
+            if 'auto_exposure_enabled' in settings and hasattr(self, 'auto_exposure_toggle'):
+                self.auto_exposure_toggle.setChecked(settings['auto_exposure_enabled'])
             
             # Tracking system - block signals to prevent recursion
             if 'tracking_system' in settings:
@@ -986,22 +997,26 @@ if PYQT_AVAILABLE:
                 print(f"📷 Auto exposure {'enabled' if is_enabled else 'disabled'}")
                 self.udp_client.send_setting('camera_auto_exposure', 1 if is_enabled else 0)
                 
-                # If disabling auto exposure, send current manual exposure value
-                if not is_enabled and hasattr(self, 'exposure_slider'):
-                    current_exposure = self.exposure_slider.value()
-                    self.udp_client.send_setting('camera_exposure', current_exposure)
-                    print(f"📷 Setting manual exposure to {current_exposure} microseconds")
+                # Note: We don't send the manual exposure value here anymore
+                # The user will adjust it with the slider, which sends on release
                 
                 self.save_settings()
 
         def update_camera_exposure(self, value: int):
-            """Update camera exposure setting"""
+            """Update camera exposure setting (called when slider is released)"""
             # Only send if auto exposure is disabled
             if hasattr(self, 'auto_exposure_toggle') and not self.auto_exposure_toggle.isChecked():
                 print(f"📷 Setting camera exposure to {value} microseconds")
                 self.udp_client.send_setting('camera_exposure', value)
                 if not self._loading_settings:
                     self.save_settings()
+        
+        def update_camera_gain(self, value: int):
+            """Update camera gain setting (called when slider is released)"""
+            print(f"📷 Setting camera gain to {value}")
+            self.udp_client.send_setting('camera_gain', value)
+            if not self._loading_settings:
+                self.save_settings()
 
         def test_catch_sound(self):
             """Play test sound for catch events"""

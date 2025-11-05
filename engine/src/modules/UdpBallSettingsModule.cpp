@@ -82,6 +82,16 @@ void UdpBallSettingsModule::UdpListen() {
                                     std::cerr << "❌ Error setting camera exposure: " << e.what() << std::endl;
                                 }
                             }
+                            // Handle camera_gain - forward to CameraManager
+                            else if (key == "camera_gain" && camera_manager_) {
+                                try {
+                                    int gain = std::stoi(value);
+                                    camera_manager_->setGain(gain);
+                                    std::cout << "✅ Camera gain set to " << gain << std::endl;
+                                } catch (const std::exception& e) {
+                                    std::cerr << "❌ Error setting camera gain: " << e.what() << std::endl;
+                                }
+                            }
                             // Handle enable_ball_detection - forward to tracker to control ball inference
                             else if (key == "enable_ball_detection" && tracker_) {
                                 tracker_->updateSetting(key, value);

@@ -458,6 +458,7 @@ if PYQT_AVAILABLE:
                 'depth_blob_max_distance_cm': self.new3d_depth_max_distance_slider.value() if hasattr(self, 'new3d_depth_max_distance_slider') else 150,
                 'depth_blob_min_area_px': self.new3d_depth_min_area_slider.value() if hasattr(self, 'new3d_depth_min_area_slider') else 50,
                 'depth_blob_max_area_px': self.new3d_depth_max_area_slider.value() if hasattr(self, 'new3d_depth_max_area_slider') else 2000,
+                'depth_blob_min_brightness': self.new3d_depth_min_brightness_slider.value() if hasattr(self, 'new3d_depth_min_brightness_slider') else 0,
                 'show_depth_filtered_pixels': self.new3d_show_depth_filtered_toggle.isChecked() if hasattr(self, 'new3d_show_depth_filtered_toggle') else True,
             }
 
@@ -750,6 +751,8 @@ if PYQT_AVAILABLE:
                 self.new3d_depth_min_area_slider.setValue(settings['depth_blob_min_area_px'])
             if 'depth_blob_max_area_px' in settings and hasattr(self, 'new3d_depth_max_area_slider'):
                 self.new3d_depth_max_area_slider.setValue(settings['depth_blob_max_area_px'])
+            if 'depth_blob_min_brightness' in settings and hasattr(self, 'new3d_depth_min_brightness_slider'):
+                self.new3d_depth_min_brightness_slider.setValue(settings['depth_blob_min_brightness'])
             if 'show_depth_filtered_pixels' in settings and hasattr(self, 'new3d_show_depth_filtered_toggle'):
                 self.new3d_show_depth_filtered_toggle.setChecked(settings['show_depth_filtered_pixels'])
 
@@ -1459,6 +1462,8 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('depth_blob_min_area_px', settings['depth_blob_min_area_px'])
             if 'depth_blob_max_area_px' in settings:
                 self.udp_client.send_setting('depth_blob_max_area_px', settings['depth_blob_max_area_px'])
+            if 'depth_blob_min_brightness' in settings:
+                self.udp_client.send_setting('depth_blob_min_brightness', settings['depth_blob_min_brightness'])
             if 'show_depth_filtered_pixels' in settings:
                 self.udp_client.send_setting('show_depth_filtered_pixels', 1 if settings['show_depth_filtered_pixels'] else 0)
         

@@ -527,6 +527,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("depth_blob_min_circularity")) {
             settings_.depth_blob_min_circularity = j["depth_blob_min_circularity"];
         }
+        if (j.contains("depth_blob_min_brightness")) {
+            settings_.depth_blob_min_brightness = j["depth_blob_min_brightness"];
+        }
         if (j.contains("show_depth_filtered_pixels")) {
             settings_.show_depth_filtered_pixels = j["show_depth_filtered_pixels"];
         }
@@ -616,6 +619,7 @@ void New3DTracker::saveSettings() {
         j["depth_blob_min_area_px"] = settings_.depth_blob_min_area_px;
         j["depth_blob_max_area_px"] = settings_.depth_blob_max_area_px;
         j["depth_blob_min_circularity"] = settings_.depth_blob_min_circularity;
+        j["depth_blob_min_brightness"] = settings_.depth_blob_min_brightness;
         j["show_depth_filtered_pixels"] = settings_.show_depth_filtered_pixels;
         
         // Save color profiles
@@ -1954,6 +1958,37 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
             cv::Point2f center(blob.bbox.x + blob.bbox.width / 2.0f,
                              blob.bbox.y + blob.bbox.height / 2.0f);
             
+            // STEP 4.5: Brightness filtering (for LED juggling balls)
+            // Calculate average brightness (RGB) of the blob
+            if (settings_.depth_blob_min_brightness > 0) {
+                // Sample pixels within the blob's bounding box
+                int sample_count = 0;
+                float brightness_sum = 0.0f;
+                
+                for (const auto& pt : blob.pixels) {
+                    if (pt.x >= 0 && pt.x < color_frame.cols &&
+                        pt.y >= 0 && pt.y < color_frame.rows) {
+                        cv::Vec3b bgr = color_frame.at<cv::Vec3b>(pt.y, pt.x);
+                        // Calculate brightness as average of RGB channels
+                        float brightness = (bgr[0] + bgr[1] + bgr[2]) / 3.0f;
+                        brightness_sum += brightness;
+                        sample_count++;
+                    }
+                }
+                
+                float avg_brightness = (sample_count > 0) ? (brightness_sum / sample_count) : 0.0f;
+                
+                // Filter out blobs below minimum brightness threshold
+                if (avg_brightness < settings_.depth_blob_min_brightness) {
+                    std::cout << "[DepthBlob] ✗ BRIGHTNESS REJECT: avg_brightness=" << avg_brightness
+                              << " (threshold: " << settings_.depth_blob_min_brightness << ")" << std::endl;
+                    continue;  // Skip this blob
+                }
+                
+                std::cout << "[DepthBlob] ✓ BRIGHTNESS PASS: avg_brightness=" << avg_brightness
+                          << " (threshold: " << settings_.depth_blob_min_brightness << ")" << std::endl;
+            }
+            
             // Deproject to 3D using average depth
             cv::Point3f world_pos = deprojectToWorld(center, blob.avg_depth, intrinsics);
             
@@ -3029,6 +3064,8 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.depth_blob_max_area_px = std::stoi(value);
         } else if (key == "depth_blob_min_circularity") {
             settings_.depth_blob_min_circularity = std::stof(value);
+        } else if (key == "depth_blob_min_brightness") {
+            settings_.depth_blob_min_brightness = std::stoi(value);
         } else if (key == "show_depth_filtered_pixels") {
             settings_.show_depth_filtered_pixels = (value == "true" || value == "1");
         } else {

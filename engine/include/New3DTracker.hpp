@@ -212,6 +212,7 @@ struct New3DTrackerSettings {
     int depth_blob_min_area_px = 50;                // Min blob physical surface area (cm²) - DEPTH-AWARE
     int depth_blob_max_area_px = 2000;              // Max blob physical surface area (cm²) - DEPTH-AWARE
     float depth_blob_min_circularity = 0.65f;       // Min circularity (0.0-1.0, 1.0=perfect circle)
+    int depth_blob_min_brightness = 0;              // Min average brightness (0-255, for LED balls)
     bool show_depth_filtered_pixels = true;         // Show filtered depth pixels in visualization
     
     // === HAND VELOCITY (for throw prediction) ===

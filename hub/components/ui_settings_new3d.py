@@ -751,6 +751,27 @@ class New3DSettingsSections:
         )
         row += 1
         
+        # Min Brightness Slider
+        self.parent.new3d_depth_min_brightness_slider, self.parent.new3d_depth_min_brightness_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Brightness (0-255)",
+            tooltip_text="Minimum average brightness for blob detection (for LED balls).\n"
+                         "Range: 0-255. Default: 0 (disabled).\n"
+                         "This filters blobs by their average RGB brightness value.\n"
+                         "Useful for LED juggling balls which are much brighter than regular balls.\n"
+                         "0 = no brightness filtering (all blobs pass)\n"
+                         "50 = filter out dim objects\n"
+                         "100+ = only detect bright LED balls\n"
+                         "Higher values = only very bright objects pass through.",
+            range_min=0,
+            range_max=255,
+            initial_value=0,
+            update_func=lambda v: self.parent.update_setting('depth_blob_min_brightness', v),
+            is_float=False
+        )
+        row += 1
+        
         # Show Filtered Pixels Toggle
         label = QLabel("Show Filtered Pixels")
         label.setToolTip("Display RGB data for pixels that pass depth blob filters.\n"

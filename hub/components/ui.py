@@ -948,18 +948,14 @@ if PYQT_AVAILABLE:
                                                 filtered_by_top_saturation = 0
                                                 
                                                 if pixel_data:
-                                                    # Sort by saturation (descending)
-                                                    pixel_data.sort(key=lambda p: p[1], reverse=True)
-                                                    
-                                                    # Take top 20% most saturated pixels (more selective than 50%)
-                                                    top_20_percent = max(1, len(pixel_data) // 5)
-                                                    top_pixels = pixel_data[:top_20_percent]
-                                                    
-                                                    for h, s, v, w in top_pixels:
+                                                    # CRITICAL FIX: Don't filter by "top X%" - use ALL pixels that passed whiteness/saturation filters
+                                                    # The whiteness and saturation filters already removed bad pixels
+                                                    # Taking "top 20%" was removing good colored pixels and keeping only the most saturated (often highlights)
+                                                    for h, s, v, w in pixel_data:
                                                         hue_samples.append(h)
                                                         sat_samples.append(s)
                                                     
-                                                    filtered_by_top_saturation = len(pixel_data) - len(top_pixels)
+                                                    filtered_by_top_saturation = 0  # Not filtering by top saturation anymore
                                                     
                                                     # For debug: show all pixels stats
                                                     for h, s, v, w in pixel_data:
@@ -990,8 +986,7 @@ if PYQT_AVAILABLE:
                                                     print(f"[UI] 📊 Passed basic filters: {len(all_hues)} pixels, H={avg_all_hue:.1f}° S={avg_all_sat:.1f}")
                                                     if filtered_by_whiteness > 0 or filtered_by_saturation > 0:
                                                         print(f"[UI] 🔍 Filtered: {filtered_by_whiteness} by whiteness (>{max_whiteness}), {filtered_by_saturation} by saturation (<{min_saturation})")
-                                                    if filtered_by_top_saturation > 0:
-                                                        print(f"[UI] 🎯 Using top 50% saturated: {len(hue_samples)} pixels (filtered {filtered_by_top_saturation} lower saturation)")
+                                                    # Removed top-saturation filtering - using all pixels that passed whiteness/saturation thresholds
                                                 
                                                 # If we got valid samples, use MODE (most common hue) instead of MEAN/MEDIAN
                                                 if hue_samples and sat_samples:
@@ -1032,13 +1027,14 @@ if PYQT_AVAILABLE:
                                                     max_hue = float(np.max(hue_array))
                                                     
                                                     print(f"[UI] 🎨 Final sample: {len(hue_samples)} pixels")
-                                                    print(f"[UI]    Mode:   H={mode_hue:.1f}° S={mode_sat:.1f} (using this - {len(peak_hues)} pixels in peak bin)")
-                                                    print(f"[UI]    Median: H={median_hue:.1f}° S={median_sat:.1f}")
+                                                    print(f"[UI]    Mode:   H={mode_hue:.1f}° S={mode_sat:.1f} ({len(peak_hues)} pixels in peak bin)")
+                                                    print(f"[UI]    Median: H={median_hue:.1f}° S={median_sat:.1f} (using this - robust against highlights)")
                                                     print(f"[UI]    Mean:   H={mean_hue:.1f}° S={mean_sat:.1f} (range {min_hue:.0f}-{max_hue:.0f})")
                                                     
-                                                    # Use MODE (most common hue) for calibration
+                                                    # Use MEDIAN (most robust against specular highlights and outliers)
+                                                    # MODE was picking up bright white highlights (H=0-5°) instead of actual ball color
                                                     new3d_sections.calibration_system.add_color_sample(
-                                                        mode_hue, mode_sat
+                                                        median_hue, median_sat
                                                     )
                                                 else:
                                                     print(f"[UI] ⚠️  No valid pixels found in detection region")

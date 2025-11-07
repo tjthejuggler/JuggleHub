@@ -2337,6 +2337,10 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     
     std::vector<BallEvent> events;
     
+    // CRITICAL FIX: Store a clean copy of the original RGB frame BEFORE any visualizations
+    // This ensures color calibration samples from the actual camera feed, not from visualizations
+    current_color_image_ = color_frame.clone();
+    
     // Calculate time delta
     auto current_time = std::chrono::steady_clock::now();
     float dt = std::chrono::duration<float>(current_time - last_update_time_).count();
@@ -2371,7 +2375,8 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     
     if (settings_.enable_depth_blob_detection) {
         // Use depth-based blob detection instead of YOLO
-        detections = runDepthBlobDetection(color_frame, depth_frame, intrinsics);
+        // CRITICAL: Pass current_color_image_ (clean copy) for color sampling
+        detections = runDepthBlobDetection(current_color_image_, depth_frame, intrinsics);
         logDebug("--- DEPTH BLOB DETECTION: RUNNING ---");
         logDebug("Found ", detections.size(), " depth blobs");
     } else if (settings_.enable_ball_detection) {
@@ -2397,8 +2402,9 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
         
         if (should_process) {
             // Run ball detection
+            // CRITICAL: Pass current_color_image_ (clean copy) for color sampling
             detections = runBallDetection(
-                preprocessed, scale_x, scale_y, color_frame, depth_frame, intrinsics);
+                preprocessed, scale_x, scale_y, current_color_image_, depth_frame, intrinsics);
             
             logDebug("--- BALL DETECTION: RUNNING (frame ", ball_frame_counter_,
                      ", density ", density, "%) ---");
@@ -2498,9 +2504,10 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     
     // STEP 2: ASSOCIATION (with color-aware cost)
     logDebug("\n--- STEP 2: ASSOCIATION ---");
+    // CRITICAL: Pass current_color_image_ (clean copy) for color sampling
     auto association = associateDetections(tracked_balls_, detections,
                                           settings_.association_max_distance_m,
-                                          color_frame);
+                                          current_color_image_);
     
     // DEBUG LOGGING: Association results
     logDebug("Matched pairs: ", association.matched_pairs.size());
@@ -2527,7 +2534,8 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
     // STEP 4: CREATE NEW TRACKS (with re-acquisition logic)
     logDebug("\n--- STEP 4: RE-ACQUIRE LOST BALLS ---");
     // This must happen BEFORE handleUnmatchedBalls so we can re-acquire lost tracks
-    createNewTracks(association.unmatched_detections, association.unmatched_balls, color_frame);
+    // CRITICAL: Pass current_color_image_ (clean copy) for color sampling
+    createNewTracks(association.unmatched_detections, association.unmatched_balls, current_color_image_);
 
     // STEP 5: RE-ACQUIRE HELD BALLS BY PROXIMITY
     logDebug("\n--- STEP 5: RE-ACQUIRE HELD BALLS BY PROXIMITY ---");
@@ -2576,10 +2584,8 @@ std::pair<std::vector<SimpleBall>, std::vector<BallEvent>> New3DTracker::update(
     const cv::Mat& depth_image,
     const CameraIntrinsics& intrinsics) {
     
-    // Store current color image for color sampling in convertToSimpleBall
-    current_color_image_ = color_image;
-    
     // Call the main update function
+    // NOTE: updateNew3D() will store a clean copy of color_image in current_color_image_
     auto [new_balls, events] = updateNew3D(color_image, depth_image, intrinsics);
     
     // Convert New3DBall to SimpleBall for interface compatibility

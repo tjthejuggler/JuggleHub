@@ -92,6 +92,26 @@ void UdpBallSettingsModule::UdpListen() {
                                     std::cerr << "❌ Error setting camera gain: " << e.what() << std::endl;
                                 }
                             }
+                            // Handle camera_auto_white_balance - forward to CameraManager
+                            else if (key == "camera_auto_white_balance" && camera_manager_) {
+                                try {
+                                    bool enabled = (value == "1" || value == "true");
+                                    camera_manager_->setAutoWhiteBalance(enabled);
+                                    std::cout << "✅ Camera auto white balance " << (enabled ? "enabled" : "disabled") << std::endl;
+                                } catch (const std::exception& e) {
+                                    std::cerr << "❌ Error setting camera auto white balance: " << e.what() << std::endl;
+                                }
+                            }
+                            // Handle camera_white_balance - forward to CameraManager
+                            else if (key == "camera_white_balance" && camera_manager_) {
+                                try {
+                                    int white_balance = std::stoi(value);
+                                    camera_manager_->setWhiteBalance(white_balance);
+                                    std::cout << "✅ Camera white balance set to " << white_balance << " K" << std::endl;
+                                } catch (const std::exception& e) {
+                                    std::cerr << "❌ Error setting camera white balance: " << e.what() << std::endl;
+                                }
+                            }
                             // Handle enable_ball_detection - forward to tracker to control ball inference
                             else if (key == "enable_ball_detection" && tracker_) {
                                 tracker_->updateSetting(key, value);

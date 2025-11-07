@@ -210,6 +210,57 @@ class CommonSettingsSections:
         )
         row += 1
         
+        # Auto White Balance toggle
+        camera_layout.addWidget(QLabel("Auto White Balance:"), row, 0)
+        from PyQt6.QtWidgets import QCheckBox
+        self.parent.auto_white_balance_toggle = QCheckBox()
+        self.parent.auto_white_balance_toggle.setChecked(True)  # Default to auto white balance enabled
+        self.parent.auto_white_balance_toggle.setToolTip(
+            "Enable automatic white balance control.\n"
+            "When enabled, camera adjusts white balance automatically.\n"
+            "When disabled, use manual white balance slider below."
+        )
+        self.parent.auto_white_balance_toggle.stateChanged.connect(
+            lambda state: self.parent.toggle_auto_white_balance(state)
+        )
+        camera_layout.addWidget(self.parent.auto_white_balance_toggle, row, 1, 1, 2)
+        row += 1
+        
+        # Manual White Balance slider (disabled by default when auto white balance is on)
+        from PyQt6.QtWidgets import QSlider
+        white_balance_label = QLabel("Manual White Balance (K)")
+        white_balance_label.setToolTip(
+            "Manual camera white balance setting.\n"
+            "Range: 2800-6500 Kelvin. Default: 4600.\n"
+            "Lower = warmer (more orange), Higher = cooler (more blue).\n"
+            "Only active when Auto White Balance is disabled."
+        )
+        camera_layout.addWidget(white_balance_label, row, 0)
+        
+        self.parent.white_balance_slider = QSlider(Qt.Orientation.Horizontal)
+        self.parent.white_balance_slider.setRange(2800, 6500)
+        self.parent.white_balance_slider.setValue(4600)
+        camera_layout.addWidget(self.parent.white_balance_slider, row, 1)
+        
+        self.parent.white_balance_label = QLabel()
+        self.parent.white_balance_label.setMinimumWidth(60)
+        self.parent.white_balance_label.setText("4600")
+        camera_layout.addWidget(self.parent.white_balance_label, row, 2)
+        
+        # Update label on value change (for visual feedback while dragging)
+        self.parent.white_balance_slider.valueChanged.connect(
+            lambda v: self.parent.white_balance_label.setText(str(v))
+        )
+        
+        # Only send to camera when slider is released (prevents lag)
+        self.parent.white_balance_slider.sliderReleased.connect(
+            lambda: self.parent.update_camera_white_balance(self.parent.white_balance_slider.value())
+        )
+        
+        # Disable manual white balance slider by default (auto white balance is on)
+        self.parent.white_balance_slider.setEnabled(False)
+        row += 1
+        
         # Tracking System Selection
         camera_layout.addWidget(QLabel("Tracking System:"), row, 0)
         self.parent.tracking_system_combo = QComboBox()

@@ -341,3 +341,75 @@ void CameraManager::setGain(int gain_value) {
         ERROR_LOG("Error setting gain: ", e.what());
     }
 }
+
+void CameraManager::setAutoWhiteBalance(bool enabled) {
+    if (!camera_running_) {
+        ERROR_LOG("Cannot set auto white balance: camera is not running");
+        return;
+    }
+
+    try {
+        auto profile = pipe_.get_active_profile();
+        rs2::device dev = profile.get_device();
+        
+        // Get the color sensor
+        auto sensors = dev.query_sensors();
+        for (auto& sensor : sensors) {
+            if (sensor.is<rs2::color_sensor>()) {
+                // Set auto white balance
+                if (sensor.supports(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE)) {
+                    sensor.set_option(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE, enabled ? 1.0f : 0.0f);
+                    INFO_LOG("Auto white balance ", enabled ? "enabled" : "disabled");
+                } else {
+                    ERROR_LOG("Camera does not support auto white balance control");
+                }
+                break;
+            }
+        }
+    } catch (const rs2::error& e) {
+        ERROR_LOG("RealSense error setting auto white balance: ", e.what());
+    } catch (const std::exception& e) {
+        ERROR_LOG("Error setting auto white balance: ", e.what());
+    }
+}
+
+void CameraManager::setWhiteBalance(int white_balance_value) {
+    if (!camera_running_) {
+        ERROR_LOG("Cannot set white balance: camera is not running");
+        return;
+    }
+
+    try {
+        auto profile = pipe_.get_active_profile();
+        rs2::device dev = profile.get_device();
+        
+        // Get the color sensor
+        auto sensors = dev.query_sensors();
+        for (auto& sensor : sensors) {
+            if (sensor.is<rs2::color_sensor>()) {
+                // Disable auto white balance first
+                if (sensor.supports(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE)) {
+                    sensor.set_option(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE, 0.0f);
+                    INFO_LOG("Auto white balance disabled");
+                }
+                
+                // Set manual white balance
+                if (sensor.supports(RS2_OPTION_WHITE_BALANCE)) {
+                    // Clamp white balance value to valid range
+                    auto range = sensor.get_option_range(RS2_OPTION_WHITE_BALANCE);
+                    float clamped_wb = std::max(range.min, std::min(range.max, static_cast<float>(white_balance_value)));
+                    
+                    sensor.set_option(RS2_OPTION_WHITE_BALANCE, clamped_wb);
+                    INFO_LOG("Camera white balance set to ", clamped_wb);
+                } else {
+                    ERROR_LOG("Camera does not support manual white balance control");
+                }
+                break;
+            }
+        }
+    } catch (const rs2::error& e) {
+        ERROR_LOG("RealSense error setting white balance: ", e.what());
+    } catch (const std::exception& e) {
+        ERROR_LOG("Error setting white balance: ", e.what());
+    }
+}

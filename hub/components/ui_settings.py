@@ -329,6 +329,8 @@ if PYQT_AVAILABLE:
                 'camera_exposure': self.exposure_slider.value() if hasattr(self, 'exposure_slider') else 100,
                 'camera_gain': self.gain_slider.value() if hasattr(self, 'gain_slider') else 64,
                 'auto_exposure_enabled': self.auto_exposure_toggle.isChecked() if hasattr(self, 'auto_exposure_toggle') else True,
+                'camera_white_balance': self.white_balance_slider.value() if hasattr(self, 'white_balance_slider') else 4600,
+                'auto_white_balance_enabled': self.auto_white_balance_toggle.isChecked() if hasattr(self, 'auto_white_balance_toggle') else True,
                 'tracking_system': self.current_tracker,
                 'enable_ball_detection': self.use_dnn_tracker_toggle.isChecked() if hasattr(self, 'use_dnn_tracker_toggle') else True,
                 'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0 if hasattr(self, 'ball_confidence_slider') else 0.25,
@@ -513,6 +515,12 @@ if PYQT_AVAILABLE:
                 self.gain_slider.setValue(settings['camera_gain'])
             if 'auto_exposure_enabled' in settings and hasattr(self, 'auto_exposure_toggle'):
                 self.auto_exposure_toggle.setChecked(settings['auto_exposure_enabled'])
+            
+            # Camera white balance
+            if 'camera_white_balance' in settings and hasattr(self, 'white_balance_slider'):
+                self.white_balance_slider.setValue(settings['camera_white_balance'])
+            if 'auto_white_balance_enabled' in settings and hasattr(self, 'auto_white_balance_toggle'):
+                self.auto_white_balance_toggle.setChecked(settings['auto_white_balance_enabled'])
             
             # Tracking system - block signals to prevent recursion
             if 'tracking_system' in settings:
@@ -1014,6 +1022,31 @@ if PYQT_AVAILABLE:
             self.udp_client.send_setting('camera_gain', value)
             if not self._loading_settings:
                 self.save_settings()
+        
+        def toggle_auto_white_balance(self, state):
+            """Toggle auto white balance on/off"""
+            from PyQt6.QtCore import Qt
+            is_enabled = (state == Qt.CheckState.Checked.value)
+            
+            # Enable/disable manual white balance slider
+            if hasattr(self, 'white_balance_slider'):
+                self.white_balance_slider.setEnabled(not is_enabled)
+            
+            # Only send settings if not loading and camera is likely running
+            if not self._loading_settings:
+                # Send auto white balance setting to camera
+                print(f"📷 Auto white balance {'enabled' if is_enabled else 'disabled'}")
+                self.udp_client.send_setting('camera_auto_white_balance', 1 if is_enabled else 0)
+                self.save_settings()
+        
+        def update_camera_white_balance(self, value: int):
+            """Update camera white balance setting (called when slider is released)"""
+            # Only send if auto white balance is disabled
+            if hasattr(self, 'auto_white_balance_toggle') and not self.auto_white_balance_toggle.isChecked():
+                print(f"📷 Setting camera white balance to {value} K")
+                self.udp_client.send_setting('camera_white_balance', value)
+                if not self._loading_settings:
+                    self.save_settings()
 
         def test_catch_sound(self):
             """Play test sound for catch events"""

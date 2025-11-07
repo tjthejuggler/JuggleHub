@@ -38,6 +38,8 @@ public:
     void setExposure(int exposure_microseconds);
     void setAutoExposure(bool enabled);
     void setGain(int gain_value);
+    void setAutoWhiteBalance(bool enabled);
+    void setWhiteBalance(int white_balance_value);
 
 private:
     void applySettings();

@@ -5,6 +5,8 @@ Contains settings sections that are ONLY visible when new_3d tracker is selected
 
 from PyQt6.QtWidgets import (QLabel, QPushButton, QGridLayout, QCheckBox, QVBoxLayout, QGroupBox)
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
+import colorsys
 from .ui_widgets import CollapsibleGroupBox
 from .time_based_calibration import TimeBasedCalibration
 import juggler_pb2
@@ -893,10 +895,29 @@ class New3DSettingsSections:
             ball_layout.addWidget(sat_value_label, row, 1, 1, 2)
             row += 1
             
+            # Color sample square (on its own row)
+            ball_layout.addWidget(QLabel("Color Sample:"), row, 0)
+            color_sample = QLabel()
+            color_sample.setFixedSize(30, 30)
+            if avg_hue >= 0 and avg_sat >= 0:
+                # Convert HSV to RGB for display (OpenCV uses H: 0-180, S: 0-255, V: 0-255)
+                # Convert to 0-1 range for colorsys
+                h_normalized = avg_hue / 180.0
+                s_normalized = avg_sat / 255.0
+                v_normalized = 0.8  # Use 80% brightness for visibility
+                r, g, b = colorsys.hsv_to_rgb(h_normalized, s_normalized, v_normalized)
+                color = QColor(int(r * 255), int(g * 255), int(b * 255))
+                color_sample.setStyleSheet(f"background-color: {color.name()}; border: 2px solid #555;")
+            else:
+                color_sample.setStyleSheet("background-color: #2b2b2b; border: 2px solid #555;")
+            ball_layout.addWidget(color_sample, row, 1, 1, 2)
+            row += 1
+            
             # Store label references for updates
             self.parent.new3d_ball_calibration_labels[ball_name] = {
                 'hue': hue_value_label,
-                'saturation': sat_value_label
+                'saturation': sat_value_label,
+                'color_sample': color_sample
             }
             
             # HSV Ranges display (min/max)
@@ -1267,6 +1288,15 @@ class New3DSettingsSections:
                 # Update saturation label
                 labels['saturation'].setText(f"{avg_sat:.1f}")
                 labels['saturation'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+                
+                # Update color sample square
+                if 'color_sample' in labels:
+                    h_normalized = avg_hue / 180.0
+                    s_normalized = avg_sat / 255.0
+                    v_normalized = 0.8
+                    r, g, b = colorsys.hsv_to_rgb(h_normalized, s_normalized, v_normalized)
+                    color = QColor(int(r * 255), int(g * 255), int(b * 255))
+                    labels['color_sample'].setStyleSheet(f"background-color: {color.name()}; border: 2px solid #555;")
         
         # Send reload command to engine
         if self.zmq_client:

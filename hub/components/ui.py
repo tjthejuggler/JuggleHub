@@ -808,10 +808,17 @@ if PYQT_AVAILABLE:
             self.last_frame_data = frame_data
             self.frame_count += 1
             
-            # Collect depth blob color samples during calibration
+            # Collect depth blob color samples during calibration AND baseline detections
             if hasattr(self, 'settings_widget') and self.settings_widget:
                 if hasattr(self.settings_widget, 'tracker_new3d_sections'):
                     new3d_sections = self.settings_widget.tracker_new3d_sections
+                    
+                    # Collect baseline detections if recording
+                    if hasattr(new3d_sections, 'is_baseline_recording'):
+                        if new3d_sections.is_baseline_recording():
+                            new3d_sections.collect_baseline_detections(frame_data)
+                    
+                    # Collect color calibration samples
                     if hasattr(new3d_sections, 'calibration_system'):
                         if new3d_sections.calibration_system.is_recording():
                             print(f"[UI] 🎬 Calibration is recording, checking for depth blob detections...")
@@ -1944,6 +1951,31 @@ if PYQT_AVAILABLE:
                         history_text = f"Hand locations history when {held_ball_color} ball is held"
                         text_y = center_y if show_velocity_zone else center_y - 20
                         painter.drawText(center_x + 10, text_y, history_text)
+            
+            # --- Draw Exclusion Zones (grey squares) ---
+            # Get exclusion zones from New3D tracker settings
+            if hasattr(self, 'settings_widget') and self.settings_widget:
+                if hasattr(self.settings_widget, 'tracker_new3d_sections'):
+                    new3d_sections = self.settings_widget.tracker_new3d_sections
+                    if hasattr(new3d_sections, 'get_exclusion_zones'):
+                        exclusion_zones = new3d_sections.get_exclusion_zones()
+                        
+                        if exclusion_zones and len(exclusion_zones) > 0:
+                            # Draw each exclusion zone as a semi-transparent grey rectangle
+                            painter.setBrush(QBrush(QColor(128, 128, 128, 150)))  # Grey with 150/255 opacity
+                            painter.setPen(QPen(QColor(200, 200, 200, 200), 2))  # Light grey border
+                            
+                            for zone in exclusion_zones:
+                                x = int(zone['x'])
+                                y = int(zone['y'])
+                                w = int(zone['width'])
+                                h = int(zone['height'])
+                                painter.drawRect(x, y, w, h)
+                            
+                            # Draw label indicating exclusion zones
+                            painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                            painter.setPen(QPen(QColor(255, 255, 255)))
+                            painter.drawText(10, 30, f"🚫 {len(exclusion_zones)} Exclusion Zones")
 
             painter.end()
             self.video_pixmap_item.setPixmap(pixmap)

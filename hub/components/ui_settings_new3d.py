@@ -33,6 +33,12 @@ class New3DSettingsSections:
         self.calibration_system.state_changed.connect(self._on_calibration_state_changed)
         self.calibration_system.calibration_complete.connect(self._on_calibration_complete)
         self.calibration_system.calibration_error.connect(self._on_calibration_error)
+        
+        # Initialize baseline recording system
+        self.baseline_recording = False
+        self.baseline_start_time = 0
+        self.baseline_detections = []  # List of (x, y, width, height) tuples
+        self.exclusion_zones = []  # List of exclusion zone rectangles
     
     def create_physics_section(self):
         """Create the Physics & Kalman Filter settings section"""
@@ -816,6 +822,71 @@ class New3DSettingsSections:
         layout.addWidget(self.parent.new3d_show_depth_filtered_toggle, row, 1, 1, 2)
         row += 1
         
+        # Separator for baseline section
+        separator = QLabel("─" * 50)
+        separator.setStyleSheet("color: #555555;")
+        layout.addWidget(separator, row, 0, 1, 3)
+        row += 1
+        
+        # Baseline Exclusion Zones section
+        baseline_info = QLabel("🎯 Baseline Exclusion Zones")
+        baseline_info.setStyleSheet("color: #4CAF50; font-size: 11px; font-weight: bold;")
+        layout.addWidget(baseline_info, row, 0, 1, 3)
+        row += 1
+        
+        baseline_desc = QLabel("Set exclusion zones to ignore false positives around camera edges")
+        baseline_desc.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+        baseline_desc.setWordWrap(True)
+        layout.addWidget(baseline_desc, row, 0, 1, 3)
+        row += 1
+        
+        # Set Baseline button
+        self.parent.new3d_set_baseline_button = QPushButton("🎯 Set Baseline (5s)")
+        self.parent.new3d_set_baseline_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                padding: 10px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #F57C00; }
+            QPushButton:pressed { background-color: #E65100; }
+        """)
+        self.parent.new3d_set_baseline_button.clicked.connect(self._start_baseline_recording)
+        layout.addWidget(self.parent.new3d_set_baseline_button, row, 0, 1, 2)
+        
+        # Clear Baseline button
+        self.parent.new3d_clear_baseline_button = QPushButton("Clear Zones")
+        self.parent.new3d_clear_baseline_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 10px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #da190b; }
+            QPushButton:pressed { background-color: #b71c1c; }
+        """)
+        self.parent.new3d_clear_baseline_button.clicked.connect(self._clear_baseline_zones)
+        layout.addWidget(self.parent.new3d_clear_baseline_button, row, 2)
+        row += 1
+        
+        # Baseline status label
+        self.parent.new3d_baseline_status_label = QLabel("")
+        self.parent.new3d_baseline_status_label.setStyleSheet("color: #4CAF50; font-size: 10px; font-weight: bold;")
+        self.parent.new3d_baseline_status_label.setWordWrap(True)
+        self.parent.new3d_baseline_status_label.setVisible(False)
+        layout.addWidget(self.parent.new3d_baseline_status_label, row, 0, 1, 3)
+        row += 1
+        
+        # Exclusion zones count label
+        self.parent.new3d_exclusion_zones_label = QLabel("Exclusion zones: 0")
+        self.parent.new3d_exclusion_zones_label.setStyleSheet("color: #2196F3; font-size: 9px;")
+        layout.addWidget(self.parent.new3d_exclusion_zones_label, row, 0, 1, 3)
+        row += 1
+        
         return section
     
     def _toggle_depth_blob_detection(self):
@@ -1350,3 +1421,170 @@ class New3DSettingsSections:
             if hasattr(blob, 'avg_hue') and hasattr(blob, 'avg_saturation'):
                 # Add sample if it passes whiteness filter (already applied in engine)
                 self.calibration_system.add_color_sample(blob.avg_hue, blob.avg_saturation)
+    
+    def _start_baseline_recording(self):
+        """Start recording baseline exclusion zones for 5 seconds"""
+        import time
+        from PyQt6.QtCore import QTimer
+        
+        print("🎯 Starting baseline recording for 5 seconds...")
+        
+        # Reset baseline data
+        self.baseline_detections = []
+        self.baseline_recording = True
+        self.baseline_start_time = time.time()
+        
+        # Update UI
+        if hasattr(self.parent, 'new3d_baseline_status_label'):
+            self.parent.new3d_baseline_status_label.setText("⏱️ Recording baseline... (5s)")
+            self.parent.new3d_baseline_status_label.setStyleSheet("color: #f44336; font-size: 10px; font-weight: bold;")
+            self.parent.new3d_baseline_status_label.setVisible(True)
+        
+        if hasattr(self.parent, 'new3d_set_baseline_button'):
+            self.parent.new3d_set_baseline_button.setEnabled(False)
+        
+        # Set timer to stop recording after 5 seconds
+        QTimer.singleShot(5000, self._finish_baseline_recording)
+    
+    def _finish_baseline_recording(self):
+        """Finish baseline recording and create exclusion zones"""
+        import time
+        
+        self.baseline_recording = False
+        elapsed = time.time() - self.baseline_start_time
+        
+        print(f"✅ Baseline recording complete! Collected {len(self.baseline_detections)} detections in {elapsed:.1f}s")
+        
+        # Create exclusion zones from collected detections
+        self._create_exclusion_zones()
+        
+        # Update UI
+        if hasattr(self.parent, 'new3d_baseline_status_label'):
+            self.parent.new3d_baseline_status_label.setText(f"✅ Baseline set! Created {len(self.exclusion_zones)} exclusion zones")
+            self.parent.new3d_baseline_status_label.setStyleSheet("color: #4CAF50; font-size: 10px; font-weight: bold;")
+            
+            # Hide status after 3 seconds
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(3000, lambda: self.parent.new3d_baseline_status_label.setVisible(False))
+        
+        if hasattr(self.parent, 'new3d_set_baseline_button'):
+            self.parent.new3d_set_baseline_button.setEnabled(True)
+        
+        if hasattr(self.parent, 'new3d_exclusion_zones_label'):
+            self.parent.new3d_exclusion_zones_label.setText(f"Exclusion zones: {len(self.exclusion_zones)}")
+    
+    def _create_exclusion_zones(self):
+        """Create exclusion zones from baseline detections with small padding"""
+        self.exclusion_zones = []
+        
+        # Add small padding around each detection (e.g., 10 pixels)
+        padding = 10
+        
+        for detection in self.baseline_detections:
+            x, y, w, h = detection
+            zone = {
+                'x': max(0, x - padding),
+                'y': max(0, y - padding),
+                'width': w + 2 * padding,
+                'height': h + 2 * padding
+            }
+            self.exclusion_zones.append(zone)
+        
+        print(f"📦 Created {len(self.exclusion_zones)} exclusion zones:")
+        for i, zone in enumerate(self.exclusion_zones):
+            print(f"   Zone {i+1}: x={zone['x']:.0f}, y={zone['y']:.0f}, w={zone['width']:.0f}, h={zone['height']:.0f}")
+        
+        # Send exclusion zones to engine
+        self._send_exclusion_zones_to_engine()
+    
+    def _send_exclusion_zones_to_engine(self):
+        """Send exclusion zones to the engine via ZMQ command"""
+        if not self.zmq_client:
+            print("⚠️ ZMQ client not available - exclusion zones not sent to engine")
+            return
+        
+        try:
+            import juggler_pb2
+            
+            # Create command with exclusion zones
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.SET_EXCLUSION_ZONES
+            
+            # Add each exclusion zone to the command
+            for zone in self.exclusion_zones:
+                zone_msg = command.exclusion_zones.add()
+                zone_msg.x = int(zone['x'])
+                zone_msg.y = int(zone['y'])
+                zone_msg.width = int(zone['width'])
+                zone_msg.height = int(zone['height'])
+            
+            print(f"📤 Sending {len(self.exclusion_zones)} exclusion zones to engine...")
+            response = self.zmq_client.send_command(command)
+            
+            if response and response.success:
+                print(f"✅ Engine received exclusion zones successfully!")
+            else:
+                error_msg = response.message if response else "No response"
+                print(f"⚠️ Engine failed to set exclusion zones: {error_msg}")
+        except Exception as e:
+            print(f"❌ Error sending exclusion zones to engine: {e}")
+            import traceback
+            print(traceback.format_exc())
+    
+    def _clear_baseline_zones(self):
+        """Clear all exclusion zones"""
+        print("🗑️ Clearing all exclusion zones...")
+        
+        self.baseline_detections = []
+        self.exclusion_zones = []
+        
+        # Update UI
+        if hasattr(self.parent, 'new3d_exclusion_zones_label'):
+            self.parent.new3d_exclusion_zones_label.setText("Exclusion zones: 0")
+        
+        if hasattr(self.parent, 'new3d_baseline_status_label'):
+            self.parent.new3d_baseline_status_label.setText("✅ Exclusion zones cleared")
+            self.parent.new3d_baseline_status_label.setStyleSheet("color: #4CAF50; font-size: 10px; font-weight: bold;")
+            self.parent.new3d_baseline_status_label.setVisible(True)
+            
+            # Hide status after 2 seconds
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(2000, lambda: self.parent.new3d_baseline_status_label.setVisible(False))
+        
+        # Send empty exclusion zones to engine
+        self._send_exclusion_zones_to_engine()
+        
+        print("✅ Exclusion zones cleared")
+    
+    def collect_baseline_detections(self, frame_data):
+        """
+        Collect depth blob detections during baseline recording.
+        This should be called from the main UI when frame data is received.
+        
+        Args:
+            frame_data: FrameData protobuf message containing raw_detections
+        """
+        if not self.baseline_recording:
+            return
+        
+        # Collect all raw detections (depth blobs when depth blob detection is enabled)
+        if hasattr(frame_data, 'raw_detections'):
+            for detection in frame_data.raw_detections:
+                # Store detection bounding box
+                self.baseline_detections.append((
+                    detection.x,
+                    detection.y,
+                    detection.width,
+                    detection.height
+                ))
+            
+            if len(frame_data.raw_detections) > 0:
+                print(f"📦 Collected {len(frame_data.raw_detections)} detections (total: {len(self.baseline_detections)})")
+    
+    def is_baseline_recording(self):
+        """Check if baseline recording is active"""
+        return self.baseline_recording
+    
+    def get_exclusion_zones(self):
+        """Get the current exclusion zones for visualization"""
+        return self.exclusion_zones

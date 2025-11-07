@@ -2020,6 +2020,23 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
             std::cout << "[DepthBlob] ✓ DETECTION CREATED: 2D center=(" << center.x << ", " << center.y
                       << "), 3D world_pos=(" << world_pos.x << ", " << world_pos.y << ", " << world_pos.z << ")m" << std::endl;
             
+            // Check if detection is in an exclusion zone
+            bool in_exclusion_zone = false;
+            cv::Point2f det_center(center.x, center.y);
+            for (const auto& zone : exclusion_zones_) {
+                if (zone.contains(cv::Point(static_cast<int>(det_center.x), static_cast<int>(det_center.y)))) {
+                    in_exclusion_zone = true;
+                    std::cout << "[DepthBlob] ✗ DETECTION FILTERED: In exclusion zone at ("
+                              << det_center.x << ", " << det_center.y << ")" << std::endl;
+                    break;
+                }
+            }
+            
+            // Skip this detection if it's in an exclusion zone
+            if (in_exclusion_zone) {
+                continue;
+            }
+            
             // Create detection
             Detection det;
             det.box = cv::Rect_<float>(blob.bbox.x, blob.bbox.y, blob.bbox.width, blob.bbox.height);
@@ -3110,5 +3127,19 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
     } catch (const std::exception& e) {
         std::cerr << "[New3DTracker] Error updating setting " << key << ": " << e.what() << std::endl;
         return false;
+    }
+}
+
+// ============================================================================
+// EXCLUSION ZONES
+// ============================================================================
+
+void New3DTracker::setExclusionZones(const std::vector<cv::Rect>& zones) {
+    exclusion_zones_ = zones;
+    std::cout << "[New3DTracker] Set " << zones.size() << " exclusion zones" << std::endl;
+    for (size_t i = 0; i < zones.size(); ++i) {
+        const auto& zone = zones[i];
+        std::cout << "  Zone " << (i+1) << ": x=" << zone.x << ", y=" << zone.y 
+                  << ", w=" << zone.width << ", h=" << zone.height << std::endl;
     }
 }

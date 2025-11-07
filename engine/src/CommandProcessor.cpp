@@ -393,6 +393,36 @@ void CommandProcessor::handleExternalCommand(const juggler::v1::CommandRequest& 
             }
             break;
 
+        case juggler::v1::CommandRequest::SET_EXCLUSION_ZONES:
+            writeDebugLog("CommandProcessor - SET_EXCLUSION_ZONES command received");
+            if (new_3d_tracker_) {
+                // Cast to New3DTracker to access setExclusionZones()
+                auto* new3d = dynamic_cast<New3DTracker*>(new_3d_tracker_.get());
+                if (new3d) {
+                    // Convert protobuf exclusion zones to vector of rectangles
+                    std::vector<cv::Rect> zones;
+                    for (const auto& zone : command.exclusion_zones()) {
+                        zones.emplace_back(zone.x(), zone.y(), zone.width(), zone.height());
+                        writeDebugLog("CommandProcessor - Adding exclusion zone: x=" + std::to_string(zone.x()) +
+                                    ", y=" + std::to_string(zone.y()) +
+                                    ", w=" + std::to_string(zone.width()) +
+                                    ", h=" + std::to_string(zone.height()));
+                    }
+                    new3d->setExclusionZones(zones);
+                    response.set_message("Exclusion zones set successfully (" + std::to_string(zones.size()) + " zones)");
+                    writeDebugLog("CommandProcessor - Set " + std::to_string(zones.size()) + " exclusion zones");
+                } else {
+                    response.set_success(false);
+                    response.set_message("Failed to cast to New3DTracker");
+                    writeDebugLog("CommandProcessor - ERROR: Failed to cast to New3DTracker");
+                }
+            } else {
+                response.set_success(false);
+                response.set_message("New3D tracker not available");
+                writeDebugLog("CommandProcessor - ERROR: New3D tracker not available");
+            }
+            break;
+
         default:
             response.set_success(false);
             response.set_message("Unknown command");

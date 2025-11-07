@@ -39,6 +39,14 @@ message BoundingBox2D {
   string class_name = 7;
 }
 
+// Exclusion zone for filtering out false positive detections
+message ExclusionZone {
+  int32 x = 1;
+  int32 y = 2;
+  int32 width = 3;
+  int32 height = 4;
+}
+
 message Ball {
   int32 id = 1; // The tracker ID. May be -1 if predicted.
   Vector3 position = 2;
@@ -286,6 +294,7 @@ message CommandRequest {
     PLAYBACK_PAUSE = 28;           // Pause automatic playback
     PLAYBACK_RESUME = 29;          // Resume automatic playback
     SET_VISUALIZATION_STATES = 30; // Update visualization states in real-time
+    SET_EXCLUSION_ZONES = 31;      // Set exclusion zones for depth blob detection
   }
   
   CommandType type = 1;
@@ -329,6 +338,9 @@ message CommandRequest {
   string playback_directory = 30;    // Path to recording directory
   float playback_speed = 31;         // Playback speed multiplier (0.1 to 2.0)
   int32 playback_frame_number = 32;  // Specific frame to jump to
+  
+  // For SET_EXCLUSION_ZONES
+  repeated ExclusionZone exclusion_zones = 33;  // List of exclusion zones
 }
 
 // Visualization states for recording with overlays

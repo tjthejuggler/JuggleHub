@@ -354,6 +354,19 @@ public:
     const std::vector<New3DBall>& getBalls() const { return tracked_balls_; }
     New3DTrackerSettings& getNew3DSettings() { return settings_; }
     std::vector<ColorProfile>& getColorProfilesMutable() { return color_profiles_; }
+    
+    // === EXCLUSION ZONES ===
+    /**
+     * @brief Set exclusion zones for filtering out false positive detections
+     * @param zones Vector of rectangles defining areas to exclude from detection
+     */
+    void setExclusionZones(const std::vector<cv::Rect>& zones);
+    
+    /**
+     * @brief Get current exclusion zones
+     * @return Vector of exclusion zone rectangles
+     */
+    const std::vector<cv::Rect>& getExclusionZones() const { return exclusion_zones_; }
 
 private:
     // ========================================================================
@@ -731,6 +744,7 @@ private:
     int recording_frame_number_ = -1;               // Current recording frame (-1 if not recording)
     cv::Mat current_color_image_;                   // Current frame color image for color sampling
     cv::Mat depth_filtered_mask_;                   // Mask of filtered depth pixels for visualization
+    std::vector<cv::Rect> exclusion_zones_;         // Exclusion zones for filtering false positives
     
 public:
     // Get the depth filtered mask for visualization

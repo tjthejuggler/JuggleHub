@@ -216,10 +216,9 @@ if PYQT_AVAILABLE:
             container_layout.addWidget(self.new3d_audio_indicators_section)
             self.tracker_new3d_section_widgets.append(self.new3d_audio_indicators_section)
             
-            # Add Ball Profiles section
-            self.new3d_ball_profiles_section = self.tracker_new3d_sections.create_ball_profiles_section()
-            container_layout.addWidget(self.new3d_ball_profiles_section)
-            self.tracker_new3d_section_widgets.append(self.new3d_ball_profiles_section)
+            # NOTE: Ball Profiles section removed - replaced by Color Calibration section
+            # The old single-click calibration system has been replaced with time-based calibration
+            # See create_color_calibration_section() for the new system
             
             # Add Color Calibration section
             self.new3d_color_calibration_section = self.tracker_new3d_sections.create_color_calibration_section()
@@ -482,7 +481,7 @@ if PYQT_AVAILABLE:
                 'collapsed_trajectory': self.trajectory_section.is_collapsed if hasattr(self, 'trajectory_section') else False,
                 'collapsed_hand_velocity': self.hand_velocity_section.is_collapsed if hasattr(self, 'hand_velocity_section') else False,
                 'collapsed_ball_profiles': self.ball_profiles_section.is_collapsed if hasattr(self, 'ball_profiles_section') else False,
-                'collapsed_new3d_ball_profiles': self.new3d_ball_profiles_section.is_collapsed if hasattr(self, 'new3d_ball_profiles_section') else False,
+                # NOTE: collapsed_new3d_ball_profiles removed - old ball profiles section no longer exists
             }
 
         def apply_settings(self, settings: dict):
@@ -804,9 +803,7 @@ if PYQT_AVAILABLE:
             if 'collapsed_ball_profiles' in settings and hasattr(self, 'ball_profiles_section'):
                 if settings['collapsed_ball_profiles'] != self.ball_profiles_section.is_collapsed:
                     self.ball_profiles_section.toggle_collapsed()
-            if 'collapsed_new3d_ball_profiles' in settings and hasattr(self, 'new3d_ball_profiles_section'):
-                if settings['collapsed_new3d_ball_profiles'] != self.new3d_ball_profiles_section.is_collapsed:
-                    self.new3d_ball_profiles_section.toggle_collapsed()
+            # NOTE: collapsed_new3d_ball_profiles removed - old ball profiles section no longer exists
 
         def load_settings(self):
             """Load settings for current tracker"""

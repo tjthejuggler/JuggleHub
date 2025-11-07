@@ -6,6 +6,7 @@ Contains settings sections that are ONLY visible when new_3d tracker is selected
 from PyQt6.QtWidgets import (QLabel, QPushButton, QGridLayout, QCheckBox, QVBoxLayout, QGroupBox)
 from PyQt6.QtCore import Qt
 from .ui_widgets import CollapsibleGroupBox
+from .time_based_calibration import TimeBasedCalibration
 import juggler_pb2
 
 
@@ -24,6 +25,12 @@ class New3DSettingsSections:
         self.parent = parent_widget
         self.udp_client = udp_client
         self.zmq_client = zmq_client
+        
+        # Initialize time-based calibration system
+        self.calibration_system = TimeBasedCalibration()
+        self.calibration_system.state_changed.connect(self._on_calibration_state_changed)
+        self.calibration_system.calibration_complete.connect(self._on_calibration_complete)
+        self.calibration_system.calibration_error.connect(self._on_calibration_error)
     
     def create_physics_section(self):
         """Create the Physics & Kalman Filter settings section"""
@@ -911,7 +918,7 @@ class New3DSettingsSections:
             row += 1
             
             # Calibrate button
-            calibrate_button = QPushButton("🎯 Calibrate Color")
+            calibrate_button = QPushButton("🎯 Calibrate Color (10s)")
             calibrate_button.setStyleSheet("""
                 QPushButton {
                     background-color: #2196F3;
@@ -923,12 +930,25 @@ class New3DSettingsSections:
                 QPushButton:hover { background-color: #1976D2; }
                 QPushButton:pressed { background-color: #0D47A1; }
             """)
-            calibrate_button.clicked.connect(lambda checked, name=ball_name: self.parent.start_color_calibration(name))
+            calibrate_button.clicked.connect(lambda checked, name=ball_name: self._start_time_based_calibration(name))
             ball_layout.addWidget(calibrate_button, row, 0, 1, 3)
             row += 1
             
+            # Calibration status label (hidden by default)
+            status_label = QLabel("")
+            status_label.setStyleSheet("color: #4CAF50; font-size: 10px; font-weight: bold;")
+            status_label.setWordWrap(True)
+            status_label.setVisible(False)
+            ball_layout.addWidget(status_label, row, 0, 1, 3)
+            
+            # Store reference to status label for this ball
+            if not hasattr(self.parent, 'new3d_calibration_status_labels'):
+                self.parent.new3d_calibration_status_labels = {}
+            self.parent.new3d_calibration_status_labels[ball_name] = status_label
+            row += 1
+            
             # Info label
-            info_label = QLabel("ℹ️ Click on a ball in the video feed to calibrate")
+            info_label = QLabel("ℹ️ Juggle the ball for 10 seconds to calibrate")
             info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
             info_label.setWordWrap(True)
             ball_layout.addWidget(info_label, row, 0, 1, 3)
@@ -1190,3 +1210,113 @@ class New3DSettingsSections:
             print(f"✅ Saved New 3D ball profiles to {settings_path}")
         except Exception as e:
             print(f"❌ Error saving New 3D profiles: {e}")
+    
+    def _start_time_based_calibration(self, ball_name: str):
+        """Start time-based calibration for a specific ball"""
+        print(f"🎨 Starting time-based calibration for {ball_name}")
+        
+        # Check if calibration is already active
+        if self.calibration_system.is_active():
+            print(f"⚠️ Calibration already in progress")
+            return
+        
+        # Start calibration
+        if self.calibration_system.start_calibration(ball_name):
+            # Show status label
+            if hasattr(self.parent, 'new3d_calibration_status_labels'):
+                if ball_name in self.parent.new3d_calibration_status_labels:
+                    self.parent.new3d_calibration_status_labels[ball_name].setVisible(True)
+    
+    def _on_calibration_state_changed(self, state: str, message: str):
+        """Handle calibration state changes"""
+        print(f"📊 Calibration state: {state} - {message}")
+        
+        # Update status label for current color
+        if self.calibration_system.color_name and hasattr(self.parent, 'new3d_calibration_status_labels'):
+            color_name = self.calibration_system.color_name
+            if color_name in self.parent.new3d_calibration_status_labels:
+                label = self.parent.new3d_calibration_status_labels[color_name]
+                label.setText(message)
+                label.setVisible(True)
+                
+                # Set color based on state
+                if state == "preparation":
+                    label.setStyleSheet("color: #FF9800; font-size: 10px; font-weight: bold;")
+                elif state == "recording":
+                    label.setStyleSheet("color: #f44336; font-size: 10px; font-weight: bold;")
+                elif state == "processing":
+                    label.setStyleSheet("color: #2196F3; font-size: 10px; font-weight: bold;")
+                elif state == "complete":
+                    label.setStyleSheet("color: #4CAF50; font-size: 10px; font-weight: bold;")
+                elif state == "error":
+                    label.setStyleSheet("color: #f44336; font-size: 10px; font-weight: bold;")
+    
+    def _on_calibration_complete(self, color_name: str, avg_hue: float, avg_sat: float, sample_count: int):
+        """Handle calibration completion"""
+        print(f"🎉 Calibration complete for '{color_name}': H={avg_hue:.1f}° S={avg_sat:.1f} ({sample_count} samples)")
+        
+        # Update UI labels
+        if hasattr(self.parent, 'new3d_ball_calibration_labels'):
+            if color_name in self.parent.new3d_ball_calibration_labels:
+                labels = self.parent.new3d_ball_calibration_labels[color_name]
+                
+                # Update hue label
+                labels['hue'].setText(f"{avg_hue:.1f}°")
+                labels['hue'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+                
+                # Update saturation label
+                labels['saturation'].setText(f"{avg_sat:.1f}")
+                labels['saturation'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+        
+        # Send reload command to engine
+        if self.zmq_client:
+            print(f"🔄 Sending RELOAD_COLOR_PROFILES command to engine...")
+            try:
+                import juggler_pb2
+                command = juggler_pb2.CommandRequest()
+                command.type = juggler_pb2.CommandRequest.RELOAD_COLOR_PROFILES
+                
+                response = self.zmq_client.send_command(command)
+                
+                if response and response.success:
+                    print(f"✅ Engine reloaded color profiles successfully!")
+                else:
+                    error_msg = response.message if response else "No response"
+                    print(f"⚠️ Engine reload failed: {error_msg}")
+            except Exception as e:
+                print(f"❌ Error sending reload command: {e}")
+        
+        # Hide status label after 3 seconds
+        if hasattr(self.parent, 'new3d_calibration_status_labels'):
+            if color_name in self.parent.new3d_calibration_status_labels:
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(3000, lambda: self.parent.new3d_calibration_status_labels[color_name].setVisible(False))
+    
+    def _on_calibration_error(self, error_message: str):
+        """Handle calibration errors"""
+        print(f"❌ Calibration error: {error_message}")
+        
+        # Hide status label after 3 seconds
+        if self.calibration_system.color_name and hasattr(self.parent, 'new3d_calibration_status_labels'):
+            color_name = self.calibration_system.color_name
+            if color_name in self.parent.new3d_calibration_status_labels:
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(3000, lambda: self.parent.new3d_calibration_status_labels[color_name].setVisible(False))
+    
+    def collect_depth_blob_colors(self, depth_blobs):
+        """
+        Collect color samples from depth blobs during calibration.
+        
+        This should be called from the main UI when depth blob data is received.
+        
+        Args:
+            depth_blobs: List of depth blob detections with color information
+        """
+        if not self.calibration_system.is_recording():
+            return
+        
+        # Extract color samples from depth blobs
+        for blob in depth_blobs:
+            if hasattr(blob, 'avg_hue') and hasattr(blob, 'avg_saturation'):
+                # Add sample if it passes whiteness filter (already applied in engine)
+                self.calibration_system.add_color_sample(blob.avg_hue, blob.avg_saturation)

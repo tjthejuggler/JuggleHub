@@ -808,6 +808,84 @@ if PYQT_AVAILABLE:
             self.last_frame_data = frame_data
             self.frame_count += 1
             
+            # Collect depth blob color samples during calibration
+            if hasattr(self, 'settings_widget') and self.settings_widget:
+                if hasattr(self.settings_widget, 'tracker_new3d_sections'):
+                    new3d_sections = self.settings_widget.tracker_new3d_sections
+                    if hasattr(new3d_sections, 'calibration_system'):
+                        if new3d_sections.calibration_system.is_recording():
+                            print(f"[UI] 🎬 Calibration is recording, checking for depth blob detections...")
+                            # Collect color samples from depth blob detections
+                            # When depth blob detection is enabled, raw_detections contains depth blobs
+                            # We need to sample the color from each detection's center point
+                            if hasattr(frame_data, 'raw_detections') and len(frame_data.raw_detections) > 0:
+                                print(f"[UI] 📦 Found {len(frame_data.raw_detections)} raw_detections")
+                                # Get the color frame for sampling
+                                if hasattr(frame_data, 'color_image_b64') and frame_data.color_image_b64:
+                                    print(f"[UI] 🖼️  Color image available, decoding...")
+                                    import numpy as np
+                                    
+                                    # Decode the color image (it's raw JPEG bytes, not base64)
+                                    nparr = np.frombuffer(frame_data.color_image_b64, np.uint8)
+                                    color_frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                                    
+                                    if color_frame is not None:
+                                        print(f"[UI] ✓ Color frame decoded: {color_frame.shape}")
+                                        # Sample color from each detection's center
+                                        for idx, detection in enumerate(frame_data.raw_detections):
+                                            print(f"[UI] 🎯 Processing detection #{idx}: bbox=({detection.x:.0f}, {detection.y:.0f}, {detection.width:.0f}x{detection.height:.0f})")
+                                            # Calculate center of bounding box
+                                            center_x = int(detection.x + detection.width / 2)
+                                            center_y = int(detection.y + detection.height / 2)
+                                            
+                                            # Ensure coordinates are within frame bounds
+                                            if 0 <= center_x < color_frame.shape[1] and 0 <= center_y < color_frame.shape[0]:
+                                                # Sample a small region around the center (3x3)
+                                                sample_radius = 1
+                                                y_min = max(0, center_y - sample_radius)
+                                                y_max = min(color_frame.shape[0], center_y + sample_radius + 1)
+                                                x_min = max(0, center_x - sample_radius)
+                                                x_max = min(color_frame.shape[1], center_x + sample_radius + 1)
+                                                
+                                                # Extract region and convert to HSV
+                                                region = color_frame[y_min:y_max, x_min:x_max]
+                                                hsv_region = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
+                                                
+                                                # Calculate average hue and saturation, filtering by whiteness
+                                                hue_samples = []
+                                                sat_samples = []
+                                                
+                                                for y in range(hsv_region.shape[0]):
+                                                    for x in range(hsv_region.shape[1]):
+                                                        h, s, v = hsv_region[y, x]
+                                                        b, g, r = region[y, x]
+                                                        
+                                                        # Calculate whiteness (average of RGB)
+                                                        whiteness = (int(b) + int(g) + int(r)) / 3.0
+                                                        
+                                                        # Apply whiteness filter (default max is 255, but user may have set lower)
+                                                        # Also apply minimum saturation threshold (default 50)
+                                                        if s > 50 and whiteness <= 255:  # These should match engine settings
+                                                            hue_samples.append(float(h))
+                                                            sat_samples.append(float(s))
+                                                
+                                                # If we got valid samples, add them
+                                                if hue_samples and sat_samples:
+                                                    avg_hue = sum(hue_samples) / len(hue_samples)
+                                                    avg_sat = sum(sat_samples) / len(sat_samples)
+                                                    print(f"[UI] 🎨 Sampled {len(hue_samples)} pixels → avg H={avg_hue:.1f}° S={avg_sat:.1f}")
+                                                    new3d_sections.calibration_system.add_color_sample(
+                                                        avg_hue, avg_sat
+                                                    )
+                                                else:
+                                                    print(f"[UI] ⚠️  No valid pixels found in detection region (all filtered out)")
+                                    else:
+                                        print(f"[UI] ❌ Failed to decode color frame")
+                                else:
+                                    print(f"[UI] ⚠️  No color_image_b64 in frame_data")
+                            else:
+                                print(f"[UI] ⚠️  No raw_detections in frame_data (or empty list)")
+            
             # Update rolling window of frame timestamps for FPS calculation
             # Only update timestamps when NOT in playback mode (for live camera FPS)
             if not (frame_data.HasField('status') and

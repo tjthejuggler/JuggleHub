@@ -530,6 +530,9 @@ bool New3DTracker::loadSettings() {
         if (j.contains("depth_blob_min_brightness")) {
             settings_.depth_blob_min_brightness = j["depth_blob_min_brightness"];
         }
+        if (j.contains("depth_blob_max_whiteness")) {
+            settings_.depth_blob_max_whiteness = j["depth_blob_max_whiteness"];
+        }
         if (j.contains("show_depth_filtered_pixels")) {
             settings_.show_depth_filtered_pixels = j["show_depth_filtered_pixels"];
         }
@@ -620,6 +623,7 @@ void New3DTracker::saveSettings() {
         j["depth_blob_max_area_px"] = settings_.depth_blob_max_area_px;
         j["depth_blob_min_circularity"] = settings_.depth_blob_min_circularity;
         j["depth_blob_min_brightness"] = settings_.depth_blob_min_brightness;
+        j["depth_blob_max_whiteness"] = settings_.depth_blob_max_whiteness;
         j["show_depth_filtered_pixels"] = settings_.show_depth_filtered_pixels;
         
         // Save color profiles
@@ -1571,13 +1575,13 @@ float New3DTracker::matchColor(const Detection& det, const ColorProfile& profile
     int roi_height = std::min(color_frame.rows - roi_y, sample_radius * 2 + 1);
     
     cv::Rect roi(roi_x, roi_y, roi_width, roi_height);
+    cv::Mat color_roi = color_frame(roi);  // Extract color ROI for whiteness checking
     cv::Mat hsv_roi;
     
     if (gpu_hsv_converter_) {
         hsv_roi = gpu_hsv_converter_->convertRoiToHsv(color_frame, roi);
     } else {
         // Fallback to CPU conversion
-        cv::Mat color_roi = color_frame(roi);
         cv::cvtColor(color_roi, hsv_roi, cv::COLOR_BGR2HSV);
     }
     
@@ -1594,11 +1598,24 @@ float New3DTracker::matchColor(const Detection& det, const ColorProfile& profile
                 
                 if (x >= 0 && x < hsv_roi.cols && y >= 0 && y < hsv_roi.rows) {
                     cv::Vec3b hsv = hsv_roi.at<cv::Vec3b>(y, x);
-                    // Filter out low-saturation pixels (grays/whites) that vary most with lighting
-                    // Only use pixels with saturation above threshold for more stable color detection
-                    if (hsv[1] > settings_.min_saturation_threshold) {
-                        hue_samples.push_back(static_cast<float>(hsv[0]));
-                        sat_samples.push_back(static_cast<float>(hsv[1]));
+                    
+                    // Get corresponding BGR pixel for whiteness check
+                    int bgr_x = static_cast<int>(center.x) + dx - roi.x;
+                    int bgr_y = static_cast<int>(center.y) + dy - roi.y;
+                    
+                    if (bgr_x >= 0 && bgr_x < color_roi.cols && bgr_y >= 0 && bgr_y < color_roi.rows) {
+                        cv::Vec3b bgr = color_roi.at<cv::Vec3b>(bgr_y, bgr_x);
+                        
+                        // Calculate whiteness (average of RGB channels)
+                        float whiteness = (bgr[0] + bgr[1] + bgr[2]) / 3.0f;
+                        
+                        // Filter out low-saturation pixels AND overly white pixels
+                        // This helps with LED juggling balls where the brightest parts are too white
+                        if (hsv[1] > settings_.min_saturation_threshold &&
+                            whiteness <= settings_.depth_blob_max_whiteness) {
+                            hue_samples.push_back(static_cast<float>(hsv[0]));
+                            sat_samples.push_back(static_cast<float>(hsv[1]));
+                        }
                     }
                 }
             }
@@ -1671,7 +1688,8 @@ cv::Vec3b New3DTracker::sampleDetectedColor(const Detection& det, const cv::Mat&
     
     static int sample_count = 0;
     if (sample_count++ % 30 == 0) {  // Log every 30th sample to avoid spam
-        std::cout << "[sampleDetectedColor] Using min_saturation_threshold=" << settings_.min_saturation_threshold << std::endl;
+        std::cout << "[sampleDetectedColor] Using min_saturation_threshold=" << settings_.min_saturation_threshold
+                  << ", max_whiteness=" << settings_.depth_blob_max_whiteness << std::endl;
     }
     
     cv::Point2f center(det.box.x + det.box.width / 2, det.box.y + det.box.height / 2);
@@ -1707,9 +1725,16 @@ cv::Vec3b New3DTracker::sampleDetectedColor(const Detection& det, const cv::Mat&
             
             if (x >= 0 && x < hsv_roi.cols && y >= 0 && y < hsv_roi.rows) {
                 cv::Vec3b hsv = hsv_roi.at<cv::Vec3b>(y, x);
-                // Filter out low-saturation pixels using configured threshold
-                if (hsv[1] > settings_.min_saturation_threshold) {
-                    bgr_samples.push_back(color_roi.at<cv::Vec3b>(y, x));
+                cv::Vec3b bgr = color_roi.at<cv::Vec3b>(y, x);
+                
+                // Calculate whiteness (average of RGB channels)
+                float whiteness = (bgr[0] + bgr[1] + bgr[2]) / 3.0f;
+                
+                // Filter out low-saturation pixels AND overly white pixels
+                // This helps with LED juggling balls where the brightest parts are too white
+                if (hsv[1] > settings_.min_saturation_threshold &&
+                    whiteness <= settings_.depth_blob_max_whiteness) {
+                    bgr_samples.push_back(bgr);
                 }
             }
         }
@@ -3066,6 +3091,9 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             settings_.depth_blob_min_circularity = std::stof(value);
         } else if (key == "depth_blob_min_brightness") {
             settings_.depth_blob_min_brightness = std::stoi(value);
+        } else if (key == "depth_blob_max_whiteness") {
+            settings_.depth_blob_max_whiteness = std::stoi(value);
+            std::cout << "[New3DTracker] ⚙️ depth_blob_max_whiteness updated to: " << settings_.depth_blob_max_whiteness << std::endl;
         } else if (key == "show_depth_filtered_pixels") {
             settings_.show_depth_filtered_pixels = (value == "true" || value == "1");
         } else {

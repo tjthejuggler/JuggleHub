@@ -772,6 +772,27 @@ class New3DSettingsSections:
         )
         row += 1
         
+        # Max Whiteness Slider
+        self.parent.new3d_depth_max_whiteness_slider, self.parent.new3d_depth_max_whiteness_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Max Whiteness (0-255)",
+            tooltip_text="Maximum whiteness for color sampling (filters bright pixels).\n"
+                         "Range: 0-255. Default: 255 (no filtering).\n"
+                         "This filters out overly white/bright pixels when determining blob color.\n"
+                         "Useful for LED juggling balls where the brightest parts are too white.\n"
+                         "Lower values = more aggressive filtering of bright pixels.\n"
+                         "0 = only use completely black pixels (not recommended)\n"
+                         "200 = filter out very bright pixels (good for LED balls)\n"
+                         "255 = no filtering (include all pixels)",
+            range_min=0,
+            range_max=255,
+            initial_value=255,
+            update_func=lambda v: self.parent.update_setting('depth_blob_max_whiteness', v),
+            is_float=False
+        )
+        row += 1
+        
         # Show Filtered Pixels Toggle
         label = QLabel("Show Filtered Pixels")
         label.setToolTip("Display RGB data for pixels that pass depth blob filters.\n"

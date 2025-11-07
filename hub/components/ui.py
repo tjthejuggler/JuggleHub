@@ -832,29 +832,93 @@ if PYQT_AVAILABLE:
                                     if color_frame is not None:
                                         print(f"[UI] ✓ Color frame decoded: {color_frame.shape}")
                                         # Sample color from each detection's center
+                                        # Get camera intrinsics for 3D distance calculations
+                                        fx = frame_data.intrinsics.fx if frame_data.HasField('intrinsics') else 385.0
+                                        fy = frame_data.intrinsics.fy if frame_data.HasField('intrinsics') else 385.0
+                                        ppx = frame_data.intrinsics.ppx if frame_data.HasField('intrinsics') else 320.0
+                                        ppy = frame_data.intrinsics.ppy if frame_data.HasField('intrinsics') else 240.0
+                                        
+                                        # Get held radius setting (default 12cm = 0.12m)
+                                        held_radius_m = 0.12
+                                        if hasattr(self.settings_widget, 'new3d_held_radius_slider'):
+                                            held_radius_m = self.settings_widget.new3d_held_radius_slider.value() / 100.0
+                                        
                                         for idx, detection in enumerate(frame_data.raw_detections):
-                                            print(f"[UI] 🎯 Processing detection #{idx}: bbox=({detection.x:.0f}, {detection.y:.0f}, {detection.width:.0f}x{detection.height:.0f})")
+                                            print(f"[UI] 🎯 Processing detection #{idx}: bbox=({detection.x:.0f}, {detection.y:.0f}, {detection.width:.0f}x{detection.height:.0f}), class_id={detection.class_id}")
+                                            
                                             # Calculate center of bounding box
                                             center_x = int(detection.x + detection.width / 2)
                                             center_y = int(detection.y + detection.height / 2)
                                             
-                                            # Ensure coordinates are within frame bounds
-                                            if 0 <= center_x < color_frame.shape[1] and 0 <= center_y < color_frame.shape[0]:
-                                                # Sample a small region around the center (3x3)
-                                                sample_radius = 1
-                                                y_min = max(0, center_y - sample_radius)
-                                                y_max = min(color_frame.shape[0], center_y + sample_radius + 1)
-                                                x_min = max(0, center_x - sample_radius)
-                                                x_max = min(color_frame.shape[1], center_x + sample_radius + 1)
+                                            # Skip if detection is class_id=1 (ball_held)
+                                            if detection.class_id == 1:
+                                                print(f"[UI] ⏭️  Skipping detection #{idx}: class_id=1 (ball_held)")
+                                                continue
+                                            
+                                            # Check if detection is near any hand (within held radius)
+                                            is_near_hand = False
+                                            for hand in frame_data.hands:
+                                                if not hand.is_visible:
+                                                    continue
                                                 
-                                                # Extract region and convert to HSV
-                                                region = color_frame[y_min:y_max, x_min:x_max]
+                                                # Project hand wrist position to 2D
+                                                if hand.wrist_pos_3d.z > 0:
+                                                    hand_2d_x = int((hand.wrist_pos_3d.x * fx) / hand.wrist_pos_3d.z + ppx)
+                                                    hand_2d_y = int((hand.wrist_pos_3d.y * fy) / hand.wrist_pos_3d.z + ppy)
+                                                    
+                                                    # Calculate 2D distance
+                                                    dx = center_x - hand_2d_x
+                                                    dy = center_y - hand_2d_y
+                                                    distance_2d = (dx*dx + dy*dy) ** 0.5
+                                                    
+                                                    # Calculate held radius in pixels (approximate)
+                                                    held_radius_pixels = (held_radius_m * fx) / hand.wrist_pos_3d.z
+                                                    
+                                                    if distance_2d < held_radius_pixels:
+                                                        is_near_hand = True
+                                                        print(f"[UI] ⏭️  Skipping detection #{idx}: Near {hand.side} hand (dist={distance_2d:.0f}px < {held_radius_pixels:.0f}px)")
+                                                        break
+                                            
+                                            if is_near_hand:
+                                                continue
+                                            
+                                            # Sample from the ENTIRE detection bounding box, not just center
+                                            bbox_x = int(detection.x)
+                                            bbox_y = int(detection.y)
+                                            bbox_w = int(detection.width)
+                                            bbox_h = int(detection.height)
+                                            
+                                            # Ensure bbox is within frame bounds
+                                            bbox_x = max(0, bbox_x)
+                                            bbox_y = max(0, bbox_y)
+                                            bbox_w = min(bbox_w, color_frame.shape[1] - bbox_x)
+                                            bbox_h = min(bbox_h, color_frame.shape[0] - bbox_y)
+                                            
+                                            if bbox_w > 0 and bbox_h > 0:
+                                                # Extract entire detection region
+                                                region = color_frame[bbox_y:bbox_y+bbox_h, bbox_x:bbox_x+bbox_w]
                                                 hsv_region = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
                                                 
-                                                # Calculate average hue and saturation, filtering by whiteness
-                                                hue_samples = []
-                                                sat_samples = []
+                                                # Get max whiteness setting from depth blob settings (default 255)
+                                                max_whiteness = 255
+                                                if hasattr(self.settings_widget, 'new3d_depth_max_whiteness_slider'):
+                                                    max_whiteness = self.settings_widget.new3d_depth_max_whiteness_slider.value()
                                                 
+                                                # Get min saturation setting (default 50)
+                                                min_saturation = 50
+                                                if hasattr(self.settings_widget, 'new3d_min_saturation_threshold_slider'):
+                                                    min_saturation = self.settings_widget.new3d_min_saturation_threshold_slider.value()
+                                                
+                                                # CRITICAL FIX: Use MEDIAN hue instead of MEAN
+                                                # The ball has pixels across the entire hue spectrum (0-179) due to:
+                                                # - Pink pixels (H~150-165)
+                                                # - White/yellow highlights (H~0-30)
+                                                # - Shadows (various hues)
+                                                # Taking the MEAN gives us green (~70°) which is wrong!
+                                                # Taking the MEDIAN gives us the most common hue value.
+                                                
+                                                # Collect all pixels passing basic filters
+                                                pixel_data = []
                                                 for y in range(hsv_region.shape[0]):
                                                     for x in range(hsv_region.shape[1]):
                                                         h, s, v = hsv_region[y, x]
@@ -863,22 +927,116 @@ if PYQT_AVAILABLE:
                                                         # Calculate whiteness (average of RGB)
                                                         whiteness = (int(b) + int(g) + int(r)) / 3.0
                                                         
-                                                        # Apply whiteness filter (default max is 255, but user may have set lower)
-                                                        # Also apply minimum saturation threshold (default 50)
-                                                        if s > 50 and whiteness <= 255:  # These should match engine settings
-                                                            hue_samples.append(float(h))
-                                                            sat_samples.append(float(s))
+                                                        # Skip if too white or too desaturated
+                                                        if whiteness <= max_whiteness and s >= min_saturation:
+                                                            pixel_data.append((float(h), float(s), float(v), whiteness))
                                                 
-                                                # If we got valid samples, add them
+                                                # Use top 20% most saturated pixels (more selective)
+                                                hue_samples = []
+                                                sat_samples = []
+                                                all_hues = []
+                                                all_sats = []
+                                                filtered_by_whiteness = 0
+                                                filtered_by_saturation = 0
+                                                filtered_by_top_saturation = 0
+                                                
+                                                if pixel_data:
+                                                    # Sort by saturation (descending)
+                                                    pixel_data.sort(key=lambda p: p[1], reverse=True)
+                                                    
+                                                    # Take top 20% most saturated pixels (more selective than 50%)
+                                                    top_20_percent = max(1, len(pixel_data) // 5)
+                                                    top_pixels = pixel_data[:top_20_percent]
+                                                    
+                                                    for h, s, v, w in top_pixels:
+                                                        hue_samples.append(h)
+                                                        sat_samples.append(s)
+                                                    
+                                                    filtered_by_top_saturation = len(pixel_data) - len(top_pixels)
+                                                    
+                                                    # For debug: show all pixels stats
+                                                    for h, s, v, w in pixel_data:
+                                                        all_hues.append(h)
+                                                        all_sats.append(s)
+                                                else:
+                                                    # Count filtered pixels for debug
+                                                    for y in range(hsv_region.shape[0]):
+                                                        for x in range(hsv_region.shape[1]):
+                                                            h, s, v = hsv_region[y, x]
+                                                            b, g, r = region[y, x]
+                                                            whiteness = (int(b) + int(g) + int(r)) / 3.0
+                                                            
+                                                            all_hues.append(float(h))
+                                                            all_sats.append(float(s))
+                                                            
+                                                            if whiteness > max_whiteness:
+                                                                filtered_by_whiteness += 1
+                                                            elif s < min_saturation:
+                                                                filtered_by_saturation += 1
+                                                
+                                                # Debug: Show what was filtered out
+                                                total_pixels = bbox_w * bbox_h
+                                                if all_hues:
+                                                    avg_all_hue = sum(all_hues) / len(all_hues)
+                                                    avg_all_sat = sum(all_sats) / len(all_sats)
+                                                    print(f"[UI] 📊 Blob region: {bbox_w}x{bbox_h} = {total_pixels} pixels")
+                                                    print(f"[UI] 📊 Passed basic filters: {len(all_hues)} pixels, H={avg_all_hue:.1f}° S={avg_all_sat:.1f}")
+                                                    if filtered_by_whiteness > 0 or filtered_by_saturation > 0:
+                                                        print(f"[UI] 🔍 Filtered: {filtered_by_whiteness} by whiteness (>{max_whiteness}), {filtered_by_saturation} by saturation (<{min_saturation})")
+                                                    if filtered_by_top_saturation > 0:
+                                                        print(f"[UI] 🎯 Using top 50% saturated: {len(hue_samples)} pixels (filtered {filtered_by_top_saturation} lower saturation)")
+                                                
+                                                # If we got valid samples, use MODE (most common hue) instead of MEAN/MEDIAN
                                                 if hue_samples and sat_samples:
-                                                    avg_hue = sum(hue_samples) / len(hue_samples)
-                                                    avg_sat = sum(sat_samples) / len(sat_samples)
-                                                    print(f"[UI] 🎨 Sampled {len(hue_samples)} pixels → avg H={avg_hue:.1f}° S={avg_sat:.1f}")
+                                                    # Create histogram of hue values (bin size = 10 degrees)
+                                                    import numpy as np
+                                                    hue_array = np.array(hue_samples)
+                                                    sat_array = np.array(sat_samples)
+                                                    
+                                                    # Create histogram with 18 bins (180/10 = 18 bins of 10 degrees each)
+                                                    hist, bin_edges = np.histogram(hue_array, bins=18, range=(0, 180))
+                                                    
+                                                    # Find the bin with the most pixels (the mode/peak)
+                                                    peak_bin_idx = np.argmax(hist)
+                                                    peak_bin_start = bin_edges[peak_bin_idx]
+                                                    peak_bin_end = bin_edges[peak_bin_idx + 1]
+                                                    peak_bin_center = (peak_bin_start + peak_bin_end) / 2
+                                                    
+                                                    # Get all pixels in the peak bin
+                                                    peak_mask = (hue_array >= peak_bin_start) & (hue_array < peak_bin_end)
+                                                    peak_hues = hue_array[peak_mask]
+                                                    peak_sats = sat_array[peak_mask]
+                                                    
+                                                    # Use average of pixels in the peak bin
+                                                    if len(peak_hues) > 0:
+                                                        mode_hue = float(np.mean(peak_hues))
+                                                        mode_sat = float(np.mean(peak_sats))
+                                                    else:
+                                                        mode_hue = peak_bin_center
+                                                        mode_sat = float(np.mean(sat_array))
+                                                    
+                                                    # Also calculate median and mean for comparison
+                                                    median_hue = float(np.median(hue_array))
+                                                    median_sat = float(np.median(sat_array))
+                                                    mean_hue = float(np.mean(hue_array))
+                                                    mean_sat = float(np.mean(sat_array))
+                                                    
+                                                    min_hue = float(np.min(hue_array))
+                                                    max_hue = float(np.max(hue_array))
+                                                    
+                                                    print(f"[UI] 🎨 Final sample: {len(hue_samples)} pixels")
+                                                    print(f"[UI]    Mode:   H={mode_hue:.1f}° S={mode_sat:.1f} (using this - {len(peak_hues)} pixels in peak bin)")
+                                                    print(f"[UI]    Median: H={median_hue:.1f}° S={median_sat:.1f}")
+                                                    print(f"[UI]    Mean:   H={mean_hue:.1f}° S={mean_sat:.1f} (range {min_hue:.0f}-{max_hue:.0f})")
+                                                    
+                                                    # Use MODE (most common hue) for calibration
                                                     new3d_sections.calibration_system.add_color_sample(
-                                                        avg_hue, avg_sat
+                                                        mode_hue, mode_sat
                                                     )
                                                 else:
-                                                    print(f"[UI] ⚠️  No valid pixels found in detection region (all filtered out)")
+                                                    print(f"[UI] ⚠️  No valid pixels found in detection region")
+                                                    if filtered_by_whiteness > 0 or filtered_by_saturation > 0:
+                                                        print(f"[UI] 💡 Hint: Try lowering min saturation (<{min_saturation}) or raising max whiteness (>{max_whiteness})")
                                     else:
                                         print(f"[UI] ❌ Failed to decode color frame")
                                 else:

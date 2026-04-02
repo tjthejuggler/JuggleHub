@@ -24,16 +24,21 @@ void logDebug(Args&&... args) {
 New3DTracker::New3DTracker(const std::string& ball_model_path,
                            const std::string& pose_model_path,
                            const std::string& device_name,
-                           const std::string& settings_file)
-    : settings_file_(settings_file) {
+                           const std::string& settings_file,
+                           bool skip_ball_model)
+    : settings_file_(settings_file), ball_model_loaded_(!skip_ball_model) {
     
     std::cout << "[New3DTracker] Initializing New 3D Tracker..." << std::endl;
     
     // Initialize OpenVINO models
-    std::cout << "[New3DTracker] Loading ball detection model: " << ball_model_path << std::endl;
-    auto ball_model = core_.read_model(ball_model_path);
-    ball_model_ = core_.compile_model(ball_model, device_name);
-    ball_infer_ = ball_model_.create_infer_request();
+    if (skip_ball_model) {
+        std::cout << "[New3DTracker] ⚡ SIMPLE TRACKING MODE: Skipping YOLO ball model (using depth+color instead)" << std::endl;
+    } else {
+        std::cout << "[New3DTracker] Loading ball detection model: " << ball_model_path << std::endl;
+        auto ball_model = core_.read_model(ball_model_path);
+        ball_model_ = core_.compile_model(ball_model, device_name);
+        ball_infer_ = ball_model_.create_infer_request();
+    }
     
     std::cout << "[New3DTracker] Loading pose estimation model: " << pose_model_path << std::endl;
     auto pose_model = core_.read_model(pose_model_path);
@@ -42,8 +47,15 @@ New3DTracker::New3DTracker(const std::string& ball_model_path,
     
     // Load settings from JSON file
     if (!loadSettings()) {
-        std::cout << "[New3DTracker] Warning: Could not load settings from " << settings_file 
+        std::cout << "[New3DTracker] Warning: Could not load settings from " << settings_file
                   << ", using defaults" << std::endl;
+    }
+    
+    // If ball model was skipped, force simple tracking settings
+    if (!ball_model_loaded_) {
+        settings_.enable_depth_blob_detection = true;
+        settings_.enable_ball_detection = false;
+        std::cout << "[New3DTracker] ⚡ Simple mode: depth_blob_detection=ON, ball_detection=OFF" << std::endl;
     }
     
     // Initialize GPU HSV converter
@@ -3059,7 +3071,13 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
         } else if (key == "min_frames_for_color_lock") {
             settings_.min_frames_for_color_lock = std::stoi(value);
         } else if (key == "enable_ball_detection") {
-            settings_.enable_ball_detection = (value == "true" || value == "1");
+            bool requested = (value == "true" || value == "1");
+            if (requested && !ball_model_loaded_) {
+                std::cout << "[New3DTracker] ⚠️ Cannot enable YOLO ball detection: ball model was not loaded (simple tracking mode)" << std::endl;
+                settings_.enable_ball_detection = false;
+            } else {
+                settings_.enable_ball_detection = requested;
+            }
         } else if (key == "enable_pose_estimation") {
             settings_.enable_pose_estimation = (value == "true" || value == "1");
         } else if (key == "pose_processing_density") {

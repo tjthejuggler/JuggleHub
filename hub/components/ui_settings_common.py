@@ -261,20 +261,53 @@ class CommonSettingsSections:
         self.parent.white_balance_slider.setEnabled(False)
         row += 1
         
-        # Tracking System Selection
-        camera_layout.addWidget(QLabel("Tracking System:"), row, 0)
+        # ========== BALL TRACKING MODE (prominent toggle) ==========
+        ball_mode_label = QLabel("⚡ Ball Tracking Mode:")
+        ball_mode_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+        camera_layout.addWidget(ball_mode_label, row, 0)
+        
+        self.parent.ball_tracking_mode_combo = QComboBox()
+        self.parent.ball_tracking_mode_combo.addItem("⚡ Simple (Depth + LED Color)", "simple")
+        self.parent.ball_tracking_mode_combo.addItem("🤖 YOLO Ball Detection", "yolo")
+        self.parent.ball_tracking_mode_combo.setCurrentIndex(0)  # Default to simple
+        self.parent.ball_tracking_mode_combo.currentIndexChanged.connect(self.parent.on_ball_tracking_mode_changed)
+        self.parent.ball_tracking_mode_combo.setToolTip(
+            "How balls are detected each frame:\n"
+            "• Simple (Depth + LED Color): Uses depth camera to filter background,\n"
+            "  then finds glowing LED balls by color. Fast, no AI model needed.\n"
+            "• YOLO Ball Detection: Uses a trained AI model to detect balls.\n"
+            "  More robust but heavier. Requires YOLO ball model to be loaded.\n\n"
+            "NOTE: Skeleton/hand tracking always uses YOLO pose model regardless."
+        )
+        self.parent.ball_tracking_mode_combo.setStyleSheet("""
+            QComboBox {
+                padding: 6px;
+                font-size: 12px;
+                font-weight: bold;
+                border: 2px solid #4CAF50;
+                border-radius: 4px;
+            }
+        """)
+        camera_layout.addWidget(self.parent.ball_tracking_mode_combo, row, 1)
+        row += 1
+        
+        # Ball tracking mode info label
+        self.parent.ball_tracking_mode_info = QLabel("⚡ Using depth + LED color detection (no YOLO ball model)")
+        self.parent.ball_tracking_mode_info.setStyleSheet("color: #4CAF50; font-size: 10px; font-style: italic;")
+        self.parent.ball_tracking_mode_info.setWordWrap(True)
+        camera_layout.addWidget(self.parent.ball_tracking_mode_info, row, 0, 1, 2)
+        row += 1
+
+        # Hidden tracking system combo (kept for internal use / backward compatibility)
+        # This is auto-set by ball_tracking_mode_combo and not shown to user
         self.parent.tracking_system_combo = QComboBox()
         self.parent.tracking_system_combo.addItem("Depth-Based 3D (Current)", "depth_based")
         self.parent.tracking_system_combo.addItem("New 3D Kalman ⭐", "new_3d")
         self.parent.tracking_system_combo.addItem("Simple 2D (New)", "simple_2d")
         self.parent.tracking_system_combo.currentIndexChanged.connect(self.parent.on_tracking_system_changed)
-        self.parent.tracking_system_combo.setToolTip(
-            "Select which tracking system to use:\n"
-            "• Depth-Based 3D: Uses RealSense depth data for 3D tracking (current system)\n"
-            "• Simple 2D: 2D-only tracking without depth (new system - to be implemented)"
-        )
-        camera_layout.addWidget(self.parent.tracking_system_combo, row, 1)
-        row += 1
+        self.parent.tracking_system_combo.setVisible(False)  # Hidden - controlled by ball tracking mode
+        camera_layout.addWidget(self.parent.tracking_system_combo, row, 0, 1, 2)
+        # Don't increment row since it's hidden
         
         # ========== PLAYBACK MODE SECTION ==========
 

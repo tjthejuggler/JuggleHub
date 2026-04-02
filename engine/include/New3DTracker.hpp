@@ -268,15 +268,17 @@ class New3DTracker : public IBallTracker {
 public:
     /**
      * @brief Constructor
-     * @param ball_model_path Path to YOLO ball detection model
+     * @param ball_model_path Path to YOLO ball detection model (ignored if skip_ball_model=true)
      * @param pose_model_path Path to pose estimation model
      * @param device_name OpenVINO device (CPU, GPU, NPU, etc.)
      * @param settings_file Path to settings JSON file
+     * @param skip_ball_model If true, skip loading YOLO ball model (for simple depth+color tracking)
      */
     New3DTracker(const std::string& ball_model_path,
                  const std::string& pose_model_path,
                  const std::string& device_name,
-                 const std::string& settings_file = "new_3d_settings.json");
+                 const std::string& settings_file = "new_3d_settings.json",
+                 bool skip_ball_model = false);
     
     ~New3DTracker() = default;
     
@@ -770,6 +772,7 @@ private:
     ov::InferRequest ball_infer_;                   // Ball inference request
     ov::CompiledModel pose_model_;                  // Compiled pose estimation model
     ov::InferRequest pose_infer_;                   // Pose inference request
+    bool ball_model_loaded_ = true;                 // False when ball model was skipped (simple tracking mode)
     
     // ========================================================================
     // GPU ACCELERATION

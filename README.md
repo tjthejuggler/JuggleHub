@@ -2,7 +2,20 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2025-11-01 18:36 CET
+**Last Updated:** 2026-04-02 10:55 CST
+
+**Recent Changes (2026-04-02):**
+- **⚡ SIMPLE BALL TRACKING MODE (Depth + LED Color) — DEFAULT ✅**
+  - **New Feature**: Toggle between YOLO AI ball detection and simple depth+color ball tracking
+  - **Simple Mode (Default)**: Uses depth camera to filter background, then detects glowing LED balls by color. No YOLO ball model loaded — faster startup, less memory.
+  - **YOLO Mode**: Uses trained YOLO model for ball detection (heavier but more robust for non-LED balls)
+  - **Skeleton tracking unchanged**: YOLO pose model always loads for hand/skeleton tracking regardless of ball tracking mode
+  - **Hub UI Toggle**: Prominent "Ball Tracking Mode" dropdown at top of settings panel
+  - **Script Flags**: `--simple-tracking` (default) or `--yolo-tracking` in `run_hub.sh`
+  - **Engine Flags**: `--simple-tracking` (default) or `--yolo-tracking` CLI flags
+  - **Memory Savings**: In simple mode, YOLO ball model (~30MB) is never loaded
+  - **Settings Persisted**: Ball tracking mode preference saved/restored between sessions
+  - **Files Modified**: [`engine/src/main.cpp`](engine/src/main.cpp:56), [`engine/include/Engine.hpp`](engine/include/Engine.hpp:29), [`engine/src/Engine.cpp`](engine/src/Engine.cpp:21), [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp:276), [`engine/src/New3DTracker.cpp`](engine/src/New3DTracker.cpp:24), [`hub/components/ui_settings_common.py`](hub/components/ui_settings_common.py:264), [`hub/components/ui_settings.py`](hub/components/ui_settings.py:268), [`scripts/run_hub.sh`](scripts/run_hub.sh:85)
 
 **Recent Changes (2025-11-01):**
 - **🎨 COLOR SEARCH REGION VISUALIZATION**

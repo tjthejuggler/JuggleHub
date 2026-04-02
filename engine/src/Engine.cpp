@@ -18,13 +18,14 @@ namespace fs = std::filesystem;
 // External debug log function from main.cpp
 extern void writeDebugLog(const std::string& message);
 
-Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, const std::string& model_name, const std::string& pose_model_name, OutputFormat format, bool use_dnn_tracker, bool verbose)
+Engine::Engine(const std::string& camera_settings_path, const std::string& device_name, const std::string& model_name, const std::string& pose_model_name, OutputFormat format, bool use_dnn_tracker, bool verbose, bool simple_tracking)
     : output_format_(format),
       running_(false),
       color_module_(std::make_unique<UdpBallColorModule>()),
-      current_tracker_type_("depth_based"),  // Default to depth-based tracking
+      current_tracker_type_(simple_tracking ? "new_3d" : "depth_based"),
       use_dnn_tracker_(use_dnn_tracker),
       verbose_(verbose),
+      simple_tracking_(simple_tracking),
       zmq_context_(1),
       zmq_publisher_(zmq_context_, ZMQ_PUB),
       frame_counter_(0),
@@ -50,28 +51,42 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
    zmq_publisher_.bind("tcp://127.0.0.1:5555");
    writeDebugLog("Engine constructor: ZMQ publisher socket bound successfully");
 
-    // Initialize default tracker (depth-based SimpleBallTracker)
+    // Initialize trackers
     try {
-        writeDebugLog("Engine constructor: Initializing default tracker (depth_based)...");
         const std::string ball_model_path = "engine/models/" + model_name + ".xml";
         const std::string pose_model_path = "engine/models/" + pose_model_name + ".xml";
         writeDebugLog("Engine constructor: Ball model path: " + ball_model_path);
         writeDebugLog("Engine constructor: Pose model path: " + pose_model_path);
         
-        simple_tracker_ = std::make_shared<SimpleBallTracker>(
-            ball_model_path, pose_model_path, device_name, "hub/ball_settings.json");
-        tracker_ = simple_tracker_;  // Set polymorphic pointer to default tracker
-        writeDebugLog("Engine constructor: Default tracker initialized successfully");
-        
-        // Initialize 2D-only tracker
-        simple_2d_tracker_ = std::make_shared<Simple2DBallTracker>(
-            ball_model_path, pose_model_path, device_name);
-        writeDebugLog("Engine constructor: 2D tracker initialized successfully");
-        
-        // Initialize New3D tracker
-        new_3d_tracker_ = std::make_shared<New3DTracker>(
-            ball_model_path, pose_model_path, device_name, "hub/calibration_settings_new3d.json");
-        writeDebugLog("Engine constructor: New3D tracker initialized successfully");
+        if (simple_tracking_) {
+            // SIMPLE TRACKING MODE: Only load New3DTracker with depth+color detection
+            // Skip YOLO ball model entirely to save memory and startup time
+            writeDebugLog("Engine constructor: ⚡ SIMPLE TRACKING MODE - skipping YOLO ball model");
+            new_3d_tracker_ = std::make_shared<New3DTracker>(
+                ball_model_path, pose_model_path, device_name,
+                "hub/calibration_settings_new3d.json", true /* skip_ball_model */);
+            tracker_ = new_3d_tracker_;
+            writeDebugLog("Engine constructor: New3D tracker (simple mode) initialized successfully");
+            // Other trackers left as nullptr - will be lazy-loaded if user switches via UI
+        } else {
+            // FULL MODE: Load all trackers with YOLO ball models
+            writeDebugLog("Engine constructor: Initializing all trackers (full YOLO mode)...");
+            
+            simple_tracker_ = std::make_shared<SimpleBallTracker>(
+                ball_model_path, pose_model_path, device_name, "hub/ball_settings.json");
+            tracker_ = simple_tracker_;  // Set polymorphic pointer to default tracker
+            writeDebugLog("Engine constructor: Default tracker initialized successfully");
+            
+            // Initialize 2D-only tracker
+            simple_2d_tracker_ = std::make_shared<Simple2DBallTracker>(
+                ball_model_path, pose_model_path, device_name);
+            writeDebugLog("Engine constructor: 2D tracker initialized successfully");
+            
+            // Initialize New3D tracker
+            new_3d_tracker_ = std::make_shared<New3DTracker>(
+                ball_model_path, pose_model_path, device_name, "hub/calibration_settings_new3d.json");
+            writeDebugLog("Engine constructor: New3D tracker initialized successfully");
+        }
     } catch (const std::exception& e) {
         writeDebugLog("Engine constructor: EXCEPTION in tracker init: " + std::string(e.what()));
         return;

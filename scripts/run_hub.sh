@@ -82,6 +82,7 @@ CREATE_VENV=false
 NO_UI=false
 DEBUG=false
 ENGINE_LOG=false  # New flag for engine logging
+TRACKING_MODE="simple"  # Default: simple (depth+color), alternative: yolo
 ZMQ_ENDPOINT="tcp://localhost:5555"
 CAMERA_SETTINGS=""
 ENGINE_DEVICE="GPU"  # Default device for the engine
@@ -119,6 +120,14 @@ PASS_THROUGH_ARGS=()
              ENGINE_LOG=true
              shift
              ;;
+         --yolo-tracking)
+             TRACKING_MODE="yolo"
+             shift
+             ;;
+         --simple-tracking)
+             TRACKING_MODE="simple"
+             shift
+             ;;
          -h|--help)
              echo "Usage: $0 [OPTIONS] [-- SCRIPT_ARGS]"
              echo "Options:"
@@ -129,6 +138,8 @@ PASS_THROUGH_ARGS=()
              echo "  --device <device>           Engine inference device (CPU, GPU, NPU, AUTO) [default: GPU]"
              echo "  --model <model>             Engine model name (e.g., yolo11s) [default: yolo11n]"
              echo "  --engine-log                Enable engine logging to engine.log and engine_debug.log"
+             echo "  --simple-tracking           Use depth+color ball tracking (DEFAULT - no YOLO ball model)"
+             echo "  --yolo-tracking             Use YOLO ball detection model (loads all trackers)"
              echo "  -h, --help                  Show this help message"
              echo ""
              echo "Script Arguments (passed to hub/main.py):"
@@ -285,7 +296,16 @@ fi
 
 # Start the C++ engine in the background
 echo -e "${BLUE}🧠 Starting C++ engine with device: $ENGINE_DEVICE${NC}"
-ENGINE_ARGS=("--use-dnn-tracker" "--verbose" "--device=$ENGINE_DEVICE" "--model=$ENGINE_MODEL" "--pose-model=yolo11n-pose")
+ENGINE_ARGS=("--verbose" "--device=$ENGINE_DEVICE" "--model=$ENGINE_MODEL" "--pose-model=yolo11n-pose")
+
+# Set ball tracking mode
+if [ "$TRACKING_MODE" = "yolo" ]; then
+    echo -e "${BLUE}🎯 Ball tracking mode: YOLO (loading ball detection model)${NC}"
+    ENGINE_ARGS+=("--yolo-tracking")
+else
+    echo -e "${BLUE}⚡ Ball tracking mode: Simple (depth + LED color, no YOLO ball model)${NC}"
+    ENGINE_ARGS+=("--simple-tracking")
+fi
 
 # Add debug-log flag if engine logging is enabled
 if [ "$ENGINE_LOG" = true ]; then

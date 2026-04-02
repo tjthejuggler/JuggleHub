@@ -265,6 +265,79 @@ if PYQT_AVAILABLE:
                 for section in self.tracker_2d_section_widgets:
                     section.setVisible(True)
 
+        def on_ball_tracking_mode_changed(self, index=None):
+            """Handle ball tracking mode toggle (Simple vs YOLO)
+            
+            This is the primary user-facing toggle. It controls:
+            - Which tracker is active (always new_3d for both modes)
+            - Whether YOLO ball detection or depth blob detection is used
+            - The info label text
+            """
+            mode = self.ball_tracking_mode_combo.currentData()
+            print(f"⚡ Ball tracking mode changed to: {mode}")
+            
+            if mode == "simple":
+                # Simple mode: depth + LED color detection
+                self.ball_tracking_mode_info.setText("⚡ Using depth + LED color detection (no YOLO ball model)")
+                self.ball_tracking_mode_info.setStyleSheet("color: #4CAF50; font-size: 10px; font-style: italic;")
+                
+                # Ensure we're on new_3d tracker
+                idx = self.tracking_system_combo.findData("new_3d")
+                if idx >= 0:
+                    self.tracking_system_combo.blockSignals(True)
+                    self.tracking_system_combo.setCurrentIndex(idx)
+                    self.tracking_system_combo.blockSignals(False)
+                
+                # If tracker isn't already new_3d, switch it
+                if self.current_tracker != "new_3d":
+                    self.tracking_system_combo.blockSignals(False)
+                    self.on_tracking_system_changed()
+                
+                # Enable depth blob detection, disable YOLO ball detection
+                self.update_setting('enable_depth_blob_detection', 1)
+                self.update_setting('enable_ball_detection', 0)
+                
+                # Update the depth blob toggle if it exists
+                if hasattr(self, 'new3d_depth_blob_enabled_toggle'):
+                    self.new3d_depth_blob_enabled_toggle.setChecked(True)
+                    self.new3d_depth_blob_enabled_toggle.setText("Depth Blob Detection ACTIVE")
+                
+                # Update the YOLO toggle if it exists
+                if hasattr(self, 'use_dnn_tracker_toggle'):
+                    self.use_dnn_tracker_toggle.setChecked(False)
+                    self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
+                    
+            elif mode == "yolo":
+                # YOLO mode: AI ball detection
+                self.ball_tracking_mode_info.setText("🤖 Using YOLO AI model for ball detection")
+                self.ball_tracking_mode_info.setStyleSheet("color: #2196F3; font-size: 10px; font-style: italic;")
+                
+                # Ensure we're on new_3d tracker (YOLO works with new_3d too)
+                idx = self.tracking_system_combo.findData("new_3d")
+                if idx >= 0:
+                    self.tracking_system_combo.blockSignals(True)
+                    self.tracking_system_combo.setCurrentIndex(idx)
+                    self.tracking_system_combo.blockSignals(False)
+                
+                if self.current_tracker != "new_3d":
+                    self.on_tracking_system_changed()
+                
+                # Disable depth blob detection, enable YOLO ball detection
+                self.update_setting('enable_depth_blob_detection', 0)
+                self.update_setting('enable_ball_detection', 1)
+                
+                # Update the depth blob toggle if it exists
+                if hasattr(self, 'new3d_depth_blob_enabled_toggle'):
+                    self.new3d_depth_blob_enabled_toggle.setChecked(False)
+                    self.new3d_depth_blob_enabled_toggle.setText("Use Depth Blob Detection")
+                
+                # Update the YOLO toggle if it exists
+                if hasattr(self, 'use_dnn_tracker_toggle'):
+                    self.use_dnn_tracker_toggle.setChecked(True)
+                    self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
+            
+            print(f"✅ Ball tracking mode set to: {mode}")
+
         def on_tracking_system_changed(self, index=None):
             """Handle tracking system selection change
             
@@ -332,6 +405,7 @@ if PYQT_AVAILABLE:
                 'camera_white_balance': self.white_balance_slider.value() if hasattr(self, 'white_balance_slider') else 4600,
                 'auto_white_balance_enabled': self.auto_white_balance_toggle.isChecked() if hasattr(self, 'auto_white_balance_toggle') else True,
                 'tracking_system': self.current_tracker,
+                'ball_tracking_mode': self.ball_tracking_mode_combo.currentData() if hasattr(self, 'ball_tracking_mode_combo') else 'simple',
                 'enable_ball_detection': self.use_dnn_tracker_toggle.isChecked() if hasattr(self, 'use_dnn_tracker_toggle') else True,
                 'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0 if hasattr(self, 'ball_confidence_slider') else 0.25,
                 'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0 if hasattr(self, 'ball_held_confidence_slider') else 0.25,
@@ -534,6 +608,23 @@ if PYQT_AVAILABLE:
                     # Update current_tracker to match loaded settings
                     self.current_tracker = tracker_type
                     print(f"✅ Tracking system combo set to: {tracker_type}")
+            
+            # Ball tracking mode (simple vs yolo)
+            if 'ball_tracking_mode' in settings and hasattr(self, 'ball_tracking_mode_combo'):
+                mode = settings['ball_tracking_mode']
+                idx = self.ball_tracking_mode_combo.findData(mode)
+                if idx >= 0:
+                    self.ball_tracking_mode_combo.blockSignals(True)
+                    self.ball_tracking_mode_combo.setCurrentIndex(idx)
+                    self.ball_tracking_mode_combo.blockSignals(False)
+                    # Update info label
+                    if mode == "simple":
+                        self.ball_tracking_mode_info.setText("⚡ Using depth + LED color detection (no YOLO ball model)")
+                        self.ball_tracking_mode_info.setStyleSheet("color: #4CAF50; font-size: 10px; font-style: italic;")
+                    else:
+                        self.ball_tracking_mode_info.setText("🤖 Using YOLO AI model for ball detection")
+                        self.ball_tracking_mode_info.setStyleSheet("color: #2196F3; font-size: 10px; font-style: italic;")
+                    print(f"✅ Ball tracking mode set to: {mode}")
             
             # Ball detection
             if 'enable_ball_detection' in settings and hasattr(self, 'use_dnn_tracker_toggle'):

@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
     Engine::OutputFormat format = Engine::OutputFormat::DEFAULT;
     bool use_dnn_tracker = false;
     bool verbose = false;
+    bool simple_tracking = true;  // Default to simple tracking (depth+color)
     std::string device_name = "CPU"; // Default to CPU
     std::string camera_settings_path = ""; // Path to camera settings JSON file
     std::string model_name = "yolo11n"; // Default to yolo11n
@@ -64,13 +65,25 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--help") {
+            std::cout << "JuggleHub Engine" << std::endl;
+            std::cout << "  --simple-tracking     Use depth+color ball tracking (DEFAULT, no YOLO ball model)" << std::endl;
+            std::cout << "  --yolo-tracking       Use YOLO ball detection model (loads all trackers)" << std::endl;
+            std::cout << "  --device=<device>     OpenVINO device (CPU, GPU, NPU, AUTO)" << std::endl;
+            std::cout << "  --model=<name>        YOLO ball model name (default: yolo11n)" << std::endl;
+            std::cout << "  --pose-model=<name>   YOLO pose model name (default: yolo11n-pose)" << std::endl;
+            std::cout << "  --camera-settings=<f> Camera settings JSON file path" << std::endl;
+            std::cout << "  --debug-log           Enable debug logging to engine_debug.log" << std::endl;
+            std::cout << "  --verbose             Enable verbose output" << std::endl;
             return EXIT_SUCCESS;
         } else if (arg == "--output-format=simple") {
             format = Engine::OutputFormat::SIMPLE;
         } else if (arg == "--output-format=legacy") {
             format = Engine::OutputFormat::LEGACY;
-        } else if (arg == "--use-dnn-tracker") {
+        } else if (arg == "--use-dnn-tracker" || arg == "--yolo-tracking") {
             use_dnn_tracker = true;
+            simple_tracking = false;
+        } else if (arg == "--simple-tracking") {
+            simple_tracking = true;
         } else if (arg == "--verbose") {
             verbose = true;
         } else if (arg == "--debug-log") {
@@ -103,6 +116,7 @@ int main(int argc, char* argv[]) {
         writeDebugLog("Camera Settings: " + (camera_settings_path.empty() ? "none" : camera_settings_path));
         writeDebugLog("Use DNN Tracker: " + std::string(use_dnn_tracker ? "true" : "false"));
         writeDebugLog("Verbose: " + std::string(verbose ? "true" : "false"));
+        writeDebugLog("Simple Tracking: " + std::string(simple_tracking ? "true" : "false"));
         
         writeDebugLog("=== ENGINE STARTED ===");
         writeDebugLog("Build: 3D MATCHING - 2025-10-03");
@@ -116,7 +130,7 @@ int main(int argc, char* argv[]) {
         if (g_enable_debug_log) {
             writeDebugLog("Creating Engine instance...");
         }
-        Engine engine(camera_settings_path, device_name, model_name, pose_model_name, format, use_dnn_tracker, verbose);
+        Engine engine(camera_settings_path, device_name, model_name, pose_model_name, format, use_dnn_tracker, verbose, simple_tracking);
         if (g_enable_debug_log) {
             writeDebugLog("Engine instance created successfully");
             writeDebugLog("Starting engine.run()...");

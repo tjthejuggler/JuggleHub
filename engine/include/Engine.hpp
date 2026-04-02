@@ -26,7 +26,7 @@ public:
         LEGACY
     };
 
-    Engine(const std::string& camera_settings_path, const std::string& device_name = "CPU", const std::string& model_name = "yolo11n", const std::string& pose_model_name = "yolo11n-pose", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false);
+    Engine(const std::string& camera_settings_path, const std::string& device_name = "CPU", const std::string& model_name = "yolo11n", const std::string& pose_model_name = "yolo11n-pose", OutputFormat format = OutputFormat::DEFAULT, bool use_dnn_tracker = true, bool verbose = false, bool simple_tracking = false);
     ~Engine();
 
     void run();
@@ -57,6 +57,7 @@ private:
     std::shared_ptr<New3DTracker> new_3d_tracker_;
     bool use_dnn_tracker_;
     bool verbose_;
+    bool simple_tracking_;  // When true, use depth+color tracking instead of YOLO for balls
 
     // ZMQ
     zmq::context_t zmq_context_;

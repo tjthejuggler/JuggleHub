@@ -71,3 +71,5 @@ runs/
 data_augmentation/config.py
 
 perf.data*
+# Memory Bank (local AI context)
+memory-bank/

@@ -68,8 +68,13 @@ if ! command -v protoc &> /dev/null; then
 fi
 
 # Check if virtual environment should be used
-USE_VENV=false
+# Auto-detect venv if it exists
 VENV_DIR="$PROJECT_ROOT/venv"
+if [ -d "$VENV_DIR" ] && [ -f "$VENV_DIR/bin/activate" ]; then
+    USE_VENV=true
+else
+    USE_VENV=false
+fi
 
 # Parse command line arguments
 INSTALL_DEPS=false

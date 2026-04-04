@@ -49,7 +49,7 @@ enum BallState {
     IN_FLIGHT   // Ball is airborne, tracker on trajectory
 };
 
-// Detection from YOLO
+// Detection from YOLO or depth blob detection
 struct Detection {
     cv::Rect_<float> box;
     cv::Point3f world_pos;
@@ -57,6 +57,7 @@ struct Detection {
     int class_id;
     int index;  // Index in detection array
     cv::Vec3b detected_bgr_color;  // Sampled BGR color (median-filtered, saturation-thresholded)
+    std::string color_name;  // Pre-identified color name (set by color-first detection, empty otherwise)
     
     // Override evaluation (calculated per-ball during tracking)
     struct OverrideEval {

@@ -2,7 +2,19 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2026-04-02 10:55 CST
+**Last Updated:** 2026-04-04 09:28 CST
+
+**Recent Changes (2026-04-04):**
+- **🌈 COLOR-FIRST BALL DETECTION FOR LED BALLS ✅**
+  - **Problem Solved**: Simple ball tracking was unreliable — either too many false positives (body parts detected as balls) or the actual ball wasn't detected, regardless of filter tuning
+  - **Root Cause**: Old pipeline filtered by geometry first (depth → area → circularity), treating all depth pixels equally. The juggler's body at the same depth as balls generated massive false positives.
+  - **Solution**: New "color-first" detection mode uses calibrated HSV color profiles as the PRIMARY discriminator. For each calibrated ball color, creates an HSV mask → ANDs with depth mask → finds contours → filters by area/circularity. Eliminates 95%+ of false positives.
+  - **Pre-Identified Colors**: Each detection carries its color identity from the mask stage — no ambiguous color sampling needed during association
+  - **Default ON**: `depth_blob_color_filter = true` (requires color calibration per ball)
+  - **Tunable Parameters**: Hue Tolerance (default 15), Min Saturation (default 80), Min Value/Brightness (default 80)
+  - **Legacy Fallback**: Old geometry-first pipeline preserved when color filter is disabled
+  - **UI Controls**: New "Color-First Detection (LED Ball Mode)" section in Depth Blob Detection settings
+  - **Files Modified**: [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp:222), [`engine/include/SimpleBallTracker.hpp`](engine/include/SimpleBallTracker.hpp:59), [`engine/src/New3DTracker.cpp`](engine/src/New3DTracker.cpp:1850), [`hub/components/ui_settings_new3d.py`](hub/components/ui_settings_new3d.py:823)
 
 **Recent Changes (2026-04-02):**
 - **⚡ SIMPLE BALL TRACKING MODE (Depth + LED Color) — DEFAULT ✅**

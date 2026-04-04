@@ -548,6 +548,18 @@ bool New3DTracker::loadSettings() {
         if (j.contains("show_depth_filtered_pixels")) {
             settings_.show_depth_filtered_pixels = j["show_depth_filtered_pixels"];
         }
+        if (j.contains("depth_blob_color_filter")) {
+            settings_.depth_blob_color_filter = j["depth_blob_color_filter"];
+        }
+        if (j.contains("depth_blob_hue_tolerance")) {
+            settings_.depth_blob_hue_tolerance = j["depth_blob_hue_tolerance"];
+        }
+        if (j.contains("depth_blob_sat_minimum")) {
+            settings_.depth_blob_sat_minimum = j["depth_blob_sat_minimum"];
+        }
+        if (j.contains("depth_blob_val_minimum")) {
+            settings_.depth_blob_val_minimum = j["depth_blob_val_minimum"];
+        }
         
         // Load color profiles
         if (j.contains("color_profiles")) {
@@ -637,6 +649,10 @@ void New3DTracker::saveSettings() {
         j["depth_blob_min_brightness"] = settings_.depth_blob_min_brightness;
         j["depth_blob_max_whiteness"] = settings_.depth_blob_max_whiteness;
         j["show_depth_filtered_pixels"] = settings_.show_depth_filtered_pixels;
+        j["depth_blob_color_filter"] = settings_.depth_blob_color_filter;
+        j["depth_blob_hue_tolerance"] = settings_.depth_blob_hue_tolerance;
+        j["depth_blob_sat_minimum"] = settings_.depth_blob_sat_minimum;
+        j["depth_blob_val_minimum"] = settings_.depth_blob_val_minimum;
         
         // Save color profiles
         json profiles_json = json::array();
@@ -701,13 +717,10 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
     
     // Handle edge cases
     if (balls.empty() && detections.empty()) {
-        logDebug("  No balls and no detections - nothing to associate");
-        return result;  // Nothing to associate
+        return result;
     }
     
     if (balls.empty()) {
-        logDebug("  No balls - all detections unmatched");
-        // All detections are unmatched
         for (const auto& det : detections) {
             result.unmatched_detections.push_back(&det);
         }
@@ -715,141 +728,126 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
     }
     
     if (detections.empty()) {
-        logDebug("  No detections - all balls unmatched");
-        // All balls are unmatched
         for (auto& ball : balls) {
             result.unmatched_balls.push_back(&ball);
         }
         return result;
     }
     
-    // Create tracking sets for matched items
     std::vector<bool> ball_matched(balls.size(), false);
     std::vector<bool> detection_matched(detections.size(), false);
     
-    // Greedy nearest-neighbor association with color-aware cost
-    // Repeatedly find the closest ball-detection pair until no valid matches remain
-    logDebug("  Starting greedy association...");
-    int iteration = 0;
-    while (true) {
-        iteration++;
-        float min_cost = std::numeric_limits<float>::max();  // Start with infinite cost
-        int best_ball_idx = -1;
-        int best_detection_idx = -1;
-        std::string best_match_reason;
+    // =========================================================================
+    // PHASE 1: Direct color matching for pre-identified detections
+    // When color-first detection is active, each detection already knows its color.
+    // Match directly by color name — NO distance gate needed.
+    // This is the key insight: a pink detection IS the pink ball, period.
+    // =========================================================================
+    for (size_t j = 0; j < detections.size(); ++j) {
+        if (detection_matched[j]) continue;
+        const Detection& detection = detections[j];
         
-        // Find the best unmatched ball-detection pair based on combined cost
+        // Only for pre-identified detections (from color-first detection)
+        if (detection.color_name.empty()) continue;
+        
+        // Find the ball with this color name
         for (size_t i = 0; i < balls.size(); ++i) {
             if (ball_matched[i]) continue;
             
+            if (balls[i].color_name == detection.color_name) {
+                // Direct match by color — no distance check needed
+                MatchPair match;
+                match.ball = &balls[i];
+                match.detection = &detection;
+                
+                // Calculate distance for logging only
+                const cv::Point3f& pred_pos = balls[i].predicted_position;
+                const cv::Point3f& det_pos = detection.world_pos;
+                float dx = pred_pos.x - det_pos.x;
+                float dy = pred_pos.y - det_pos.y;
+                float dz = pred_pos.z - det_pos.z;
+                match.distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+                
+                result.matched_pairs.push_back(match);
+                ball_matched[i] = true;
+                detection_matched[j] = true;
+                
+                logDebug("  COLOR MATCH: Ball ", balls[i].id, " (", balls[i].color_name,
+                         ") <- Detection '", detection.color_name, "' dist=", match.distance, "m");
+                break;
+            }
+        }
+    }
+    
+    // =========================================================================
+    // PHASE 2: Distance-based association for remaining unmatched detections
+    // (Legacy path for detections without pre-identified color)
+    // =========================================================================
+    int iteration = 0;
+    while (true) {
+        iteration++;
+        float min_cost = std::numeric_limits<float>::max();
+        int best_ball_idx = -1;
+        int best_detection_idx = -1;
+        
+        for (size_t i = 0; i < balls.size(); ++i) {
+            if (ball_matched[i]) continue;
             const New3DBall& track = balls[i];
-            
-            // CRITICAL: ALWAYS use fixed max_distance (color search radius)
-            // NEVER expand the search radius, no matter how long the ball has been unseen
-            // The color search region defines the ONLY area where we look for the ball
-            float search_radius = max_distance;  // This is association_max_distance_m
+            float search_radius = max_distance;
             
             for (size_t j = 0; j < detections.size(); ++j) {
                 if (detection_matched[j]) continue;
-                
                 const Detection& detection = detections[j];
                 
-                // 1. Calculate the distance cost
                 const cv::Point3f& pred_pos = track.predicted_position;
                 const cv::Point3f& det_pos = detection.world_pos;
-                
                 float dx = pred_pos.x - det_pos.x;
                 float dy = pred_pos.y - det_pos.y;
                 float dz = pred_pos.z - det_pos.z;
                 float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
                 
-                // CRITICAL: Detection MUST be within the fixed search radius
-                // This is the color search region - detections outside are NEVER matched
-                if (distance >= search_radius) {
-                    continue;
-                }
+                if (distance >= search_radius) continue;
                 
-                // 2. Calculate the color mismatch penalty
                 float color_penalty = 0.0f;
-                std::string detection_color = "unknown";
-                
-                // If the track's color is locked, check for color mismatch
                 if (track.color_locked && settings_.use_color_tracking) {
-                    // Determine the detection's color
-                    detection_color = determineColor(detection, color_frame);
-                    
-                    // Apply penalty if colors don't match
+                    std::string detection_color = detection.color_name.empty() ?
+                        determineColor(detection, color_frame) : detection.color_name;
                     if (detection_color != track.color_name) {
                         color_penalty = settings_.color_mismatch_penalty_m;
                     }
                 }
                 
-                // 3. Calculate the final cost
                 float total_cost = distance + color_penalty;
-                
                 if (total_cost < min_cost) {
                     min_cost = total_cost;
                     best_ball_idx = static_cast<int>(i);
                     best_detection_idx = static_cast<int>(j);
-                    
-                    // Build reason string
-                    std::ostringstream reason;
-                    reason << "dist=" << distance << "m";
-                    if (color_penalty > 0) {
-                        reason << " + color_penalty=" << color_penalty << "m (det_color="
-                               << detection_color << " vs ball_color=" << track.color_name << ")";
-                    } else if (track.color_locked && settings_.use_color_tracking) {
-                        reason << " (colors match: " << detection_color << ")";
-                    }
-                    reason << " = total_cost=" << total_cost << "m";
-                    reason << " [SEARCH RADIUS: " << search_radius << "m]";
-                    best_match_reason = reason.str();
                 }
             }
         }
         
-        // If no valid match found, we're done
-        if (best_ball_idx == -1 || best_detection_idx == -1) {
-            logDebug("  Iteration ", iteration, ": No more valid matches found");
-            break;
-        }
+        if (best_ball_idx == -1 || best_detection_idx == -1) break;
+        if (min_cost > max_distance) break;
         
-        // Validate that the best match is within the fixed search radius
-        // This should always be true due to the distance check above, but double-check
-        if (min_cost > max_distance) {
-            logDebug("  Iteration ", iteration, ": Best match cost ", min_cost,
-                     "m exceeds search radius ", max_distance, "m - stopping");
-            break;
-        }
-        
-        // Add the match to results
         MatchPair match;
         match.ball = &balls[best_ball_idx];
         match.detection = &detections[best_detection_idx];
-        match.distance = min_cost;  // Store total cost instead of just distance
+        match.distance = min_cost;
         result.matched_pairs.push_back(match);
         
-        logDebug("  Iteration ", iteration, ": Matched Ball ", match.ball->id, " (", match.ball->color_name,
-                  ") to Detection at (", match.detection->world_pos.x, ", ", match.detection->world_pos.y, ", ",
-                  match.detection->world_pos.z, ") | ", best_match_reason);
+        logDebug("  DIST MATCH: Ball ", match.ball->id, " (", match.ball->color_name,
+                 ") <- Detection dist=", min_cost, "m");
         
-        // Mark as matched
         ball_matched[best_ball_idx] = true;
         detection_matched[best_detection_idx] = true;
     }
     
-    // Collect unmatched balls
+    // Collect unmatched
     for (size_t i = 0; i < balls.size(); ++i) {
-        if (!ball_matched[i]) {
-            result.unmatched_balls.push_back(&balls[i]);
-        }
+        if (!ball_matched[i]) result.unmatched_balls.push_back(&balls[i]);
     }
-    
-    // Collect unmatched detections
     for (size_t j = 0; j < detections.size(); ++j) {
-        if (!detection_matched[j]) {
-            result.unmatched_detections.push_back(&detections[j]);
-        }
+        if (!detection_matched[j]) result.unmatched_detections.push_back(&detections[j]);
     }
     
     return result;
@@ -1022,13 +1020,32 @@ void New3DTracker::handleInFlightStateUpdate(
     logDebug("      BEFORE UPDATE: last_known_position = (", ball.last_known_position.x, ", ",
               ball.last_known_position.y, ", ", ball.last_known_position.z, ") m");
     
-    // Update Kalman filter with detection measurement
-    cv::Mat measurement = (cv::Mat_<float>(3, 1) <<
-        detection.world_pos.x,
-        detection.world_pos.y,
-        detection.world_pos.z
-    );
-    ball.kf.correct(measurement);
+    // Check if detection is far from prediction — if so, reset Kalman filter
+    // This handles cases where the ball was unseen and the prediction drifted
+    float dx_pred = ball.predicted_position.x - detection.world_pos.x;
+    float dy_pred = ball.predicted_position.y - detection.world_pos.y;
+    float dz_pred = ball.predicted_position.z - detection.world_pos.z;
+    float pred_error = std::sqrt(dx_pred*dx_pred + dy_pred*dy_pred + dz_pred*dz_pred);
+    
+    if (pred_error > 0.30f || ball.frames_since_seen > 3) {
+        // Prediction was way off or ball was unseen — reset Kalman to snap to detection
+        logDebug("      Kalman RESET: pred_error=", pred_error, "m, frames_unseen=", ball.frames_since_seen);
+        ball.kf.statePost.at<float>(0) = detection.world_pos.x;
+        ball.kf.statePost.at<float>(1) = detection.world_pos.y;
+        ball.kf.statePost.at<float>(2) = detection.world_pos.z;
+        ball.kf.statePost.at<float>(3) = 0.0f;  // Reset velocity
+        ball.kf.statePost.at<float>(4) = 0.0f;
+        ball.kf.statePost.at<float>(5) = 0.0f;
+        cv::setIdentity(ball.kf.errorCovPost, cv::Scalar::all(1));
+    } else {
+        // Normal Kalman update
+        cv::Mat measurement = (cv::Mat_<float>(3, 1) <<
+            detection.world_pos.x,
+            detection.world_pos.y,
+            detection.world_pos.z
+        );
+        ball.kf.correct(measurement);
+    }
     
     // Check distance to all hands for catch detection
     logDebug("      Checking catch distances (threshold: ", settings_.held_radius_m, "m):");
@@ -1348,7 +1365,14 @@ void New3DTracker::createNewTracks(
                 }
                 
                 // Match detection color to ball's color profile
-                float score = matchColor(*detection, ball->color_profile, color_frame);
+                float score;
+                if (!detection->color_name.empty()) {
+                    // Color-first detection: use pre-identified color name for instant matching
+                    score = (detection->color_name == ball->color_name) ? 1.0f : 0.0f;
+                } else {
+                    // Legacy: sample-based color matching
+                    score = matchColor(*detection, ball->color_profile, color_frame);
+                }
                 
                 if (score > best_score) {
                     best_score = score;
@@ -1857,31 +1881,217 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
     const float min_dist_m = settings_.depth_blob_min_distance_m;
     const float max_dist_m = settings_.depth_blob_max_distance_m;
     
-    std::cout << "[DepthBlob] === STEP 1: DEPTH FILTERING ===" << std::endl;
-    std::cout << "[DepthBlob] Filtering pixels by depth range: " << min_dist_m << "m - " << max_dist_m << "m" << std::endl;
-    
-    // STEP 1: Filter pixels by depth range and group by depth layers
-    // We'll use 10cm depth bins to separate objects at different distances
-    const float depth_bin_size = 0.10f;  // 10cm bins
-    std::map<int, std::vector<cv::Point>> depth_bins;
+    // STEP 1: Create depth mask — pixels within the valid depth range
+    cv::Mat depth_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
     
     for (int y = 0; y < depth_frame.rows; y++) {
         for (int x = 0; x < depth_frame.cols; x++) {
             uint16_t depth_mm = depth_frame.at<uint16_t>(y, x);
             float depth_m = depth_mm / 1000.0f;
-            
             if (depth_m >= min_dist_m && depth_m <= max_dist_m) {
-                // Assign pixel to a depth bin
+                depth_mask.at<uchar>(y, x) = 255;
+            }
+        }
+    }
+    
+    // =========================================================================
+    // COLOR-FIRST DETECTION MODE (for LED balls)
+    // Uses calibrated color profiles to pre-filter — massively reduces false positives
+    // =========================================================================
+    if (settings_.depth_blob_color_filter) {
+        
+        // Convert entire frame to HSV once
+        cv::Mat hsv_frame;
+        if (gpu_hsv_converter_) {
+            cv::Rect full_roi(0, 0, color_frame.cols, color_frame.rows);
+            hsv_frame = gpu_hsv_converter_->convertRoiToHsv(color_frame, full_roi);
+        } else {
+            cv::cvtColor(color_frame, hsv_frame, cv::COLOR_BGR2HSV);
+        }
+        
+        cv::Mat filtered_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
+        
+        int hue_tol = settings_.depth_blob_hue_tolerance;
+        int sat_min = settings_.depth_blob_sat_minimum;
+        int val_min = settings_.depth_blob_val_minimum;
+        
+        // Check if we're in preview mode for a specific color
+        bool preview_mode = !settings_.depth_blob_preview_color.empty();
+        
+        // For each enabled color profile with valid calibration, create a color mask
+        for (const auto& profile : color_profiles_) {
+            if (!profile.enabled) continue;
+            if (profile.avg_hue < 0.0f || profile.avg_saturation < 0.0f) continue;  // Not calibrated
+            
+            int target_hue = static_cast<int>(profile.avg_hue);
+            
+            // Create HSV color mask for this profile
+            cv::Mat color_mask;
+            int hue_low = target_hue - hue_tol;
+            int hue_high = target_hue + hue_tol;
+            
+            if (hue_low < 0) {
+                // Hue wraps around 0 (e.g., red)
+                cv::Mat mask1, mask2;
+                cv::inRange(hsv_frame,
+                    cv::Scalar(0, sat_min, val_min),
+                    cv::Scalar(hue_high, 255, 255),
+                    mask1);
+                cv::inRange(hsv_frame,
+                    cv::Scalar(180 + hue_low, sat_min, val_min),
+                    cv::Scalar(180, 255, 255),
+                    mask2);
+                cv::bitwise_or(mask1, mask2, color_mask);
+            } else if (hue_high > 180) {
+                // Hue wraps around 180 (e.g., red)
+                cv::Mat mask1, mask2;
+                cv::inRange(hsv_frame,
+                    cv::Scalar(hue_low, sat_min, val_min),
+                    cv::Scalar(180, 255, 255),
+                    mask1);
+                cv::inRange(hsv_frame,
+                    cv::Scalar(0, sat_min, val_min),
+                    cv::Scalar(hue_high - 180, 255, 255),
+                    mask2);
+                cv::bitwise_or(mask1, mask2, color_mask);
+            } else {
+                // Normal range
+                cv::inRange(hsv_frame,
+                    cv::Scalar(hue_low, sat_min, val_min),
+                    cv::Scalar(hue_high, 255, 255),
+                    color_mask);
+            }
+            
+            // AND color mask with depth mask — only pixels that are BOTH the right color AND right depth
+            cv::Mat combined_mask;
+            cv::bitwise_and(color_mask, depth_mask, combined_mask);
+            
+            // If previewing this specific color, show the RAW color+depth mask
+            // (before morphology/contour filtering) so user can see exactly what the color filter captures
+            bool is_preview_color = preview_mode && (profile.name == settings_.depth_blob_preview_color);
+            if (is_preview_color) {
+                // Show raw combined mask for this color (all matching pixels)
+                cv::bitwise_or(filtered_mask, combined_mask, filtered_mask);
+            }
+            
+            // Morphological close to fill small gaps in the ball (LED hotspot can cause holes)
+            cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
+            cv::morphologyEx(combined_mask, combined_mask, cv::MORPH_CLOSE, kernel);
+            
+            // Find contours in the combined mask
+            std::vector<std::vector<cv::Point>> contours;
+            cv::findContours(combined_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+            
+            for (const auto& contour : contours) {
+                if (contour.size() < 3) continue;
+                
+                cv::Rect bbox = cv::boundingRect(contour);
+                double pixel_area = cv::contourArea(contour);
+                
+                // Calculate average depth for this blob
+                float depth_sum = 0.0f;
+                int valid_count = 0;
+                for (const auto& pt : contour) {
+                    uint16_t depth_mm = depth_frame.at<uint16_t>(pt.y, pt.x);
+                    float depth_m = depth_mm / 1000.0f;
+                    if (depth_m > 0.1f) {
+                        depth_sum += depth_m;
+                        valid_count++;
+                    }
+                }
+                float avg_depth = (valid_count > 0) ? (depth_sum / valid_count) : 0.0f;
+                if (avg_depth < 0.1f) continue;
+                
+                // Physical surface area filtering (depth-aware)
+                float depth_squared = avg_depth * avg_depth;
+                float focal_product = intrinsics.fx * intrinsics.fy;
+                float physical_area_m2 = (pixel_area * depth_squared) / focal_product;
+                float physical_area_cm2 = physical_area_m2 * 10000.0f;
+                
+                float min_area_cm2 = static_cast<float>(settings_.depth_blob_min_area_px);
+                float max_area_cm2 = static_cast<float>(settings_.depth_blob_max_area_px);
+                
+                if (physical_area_cm2 < min_area_cm2 || physical_area_cm2 > max_area_cm2) {
+                    continue;
+                }
+                
+                // Circularity filtering
+                double perimeter = cv::arcLength(contour, true);
+                if (perimeter < 0.01) continue;
+                double circularity = (4.0 * CV_PI * pixel_area) / (perimeter * perimeter);
+                if (circularity < settings_.depth_blob_min_circularity) {
+                    continue;
+                }
+                
+                // Calculate center and deproject to 3D
+                cv::Point2f center(bbox.x + bbox.width / 2.0f, bbox.y + bbox.height / 2.0f);
+                cv::Point3f world_pos = deprojectToWorld(center, avg_depth, intrinsics);
+                
+                // Exclusion zone check
+                bool in_exclusion_zone = false;
+                for (const auto& zone : exclusion_zones_) {
+                    if (zone.contains(cv::Point(static_cast<int>(center.x), static_cast<int>(center.y)))) {
+                        in_exclusion_zone = true;
+                        break;
+                    }
+                }
+                if (in_exclusion_zone) continue;
+                
+                // Create detection with pre-identified color
+                Detection det;
+                det.box = cv::Rect_<float>(bbox.x, bbox.y, bbox.width, bbox.height);
+                det.world_pos = world_pos;
+                det.confidence = 1.0f;
+                det.class_id = 0;
+                det.color_name = profile.name;  // Pre-identified!
+                det.detected_bgr_color = sampleDetectedColor(det, color_frame);
+                
+                detections.push_back(det);
+                
+                // Add to visualization mask (only if not in preview mode, or if this is the preview color)
+                // In preview mode, the raw mask was already added above — contours are for non-preview mode
+                if (!preview_mode || is_preview_color) {
+                    cv::drawContours(filtered_mask, std::vector<std::vector<cv::Point>>{contour},
+                                    0, cv::Scalar(255), cv::FILLED);
+                }
+                
+                std::cout << "[DepthBlob-Color] ✓ " << profile.name << " ball detected: "
+                          << "area=" << physical_area_cm2 << "cm², "
+                          << "circ=" << circularity << ", "
+                          << "pos=(" << world_pos.x << "," << world_pos.y << "," << world_pos.z << ")m"
+                          << std::endl;
+            }
+        }
+        
+        depth_filtered_mask_ = filtered_mask;
+        
+        std::cout << "[DepthBlob-Color] === RESULT: " << detections.size()
+                  << " color-identified detections ===" << std::endl;
+        
+        return detections;
+    }
+    
+    // =========================================================================
+    // LEGACY DETECTION MODE (geometry-first, no color pre-filtering)
+    // Used when color_filter is disabled or no calibrated profiles exist
+    // =========================================================================
+    
+    std::cout << "[DepthBlob] === LEGACY MODE: DEPTH FILTERING ===" << std::endl;
+    
+    // Group depth pixels into 10cm bins
+    const float depth_bin_size = 0.10f;
+    std::map<int, std::vector<cv::Point>> depth_bins;
+    
+    for (int y = 0; y < depth_frame.rows; y++) {
+        for (int x = 0; x < depth_frame.cols; x++) {
+            if (depth_mask.at<uchar>(y, x) > 0) {
+                uint16_t depth_mm = depth_frame.at<uint16_t>(y, x);
+                float depth_m = depth_mm / 1000.0f;
                 int bin_index = static_cast<int>(depth_m / depth_bin_size);
                 depth_bins[bin_index].push_back(cv::Point(x, y));
             }
         }
     }
-    
-    std::cout << "[DepthBlob] Found " << depth_bins.size() << " depth layers" << std::endl;
-    
-    // STEP 2: For each depth layer, find connected components (blobs)
-    std::cout << "[DepthBlob] === STEP 2: SEPARATING BLOBS BY DEPTH ===" << std::endl;
     
     struct DepthBlob {
         std::vector<cv::Point> pixels;
@@ -1894,26 +2104,21 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
     for (const auto& [bin_index, pixels] : depth_bins) {
         if (pixels.empty()) continue;
         
-        // Create a binary mask for this depth layer
         cv::Mat layer_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
         for (const auto& pt : pixels) {
             layer_mask.at<uchar>(pt.y, pt.x) = 255;
         }
         
-        // Find connected components in this depth layer
         std::vector<std::vector<cv::Point>> contours;
-        std::vector<cv::Vec4i> hierarchy;
-        cv::findContours(layer_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+        cv::findContours(layer_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
         
-        // Each contour is a separate blob at this depth
         for (const auto& contour : contours) {
-            if (contour.size() < 3) continue;  // Skip tiny contours
+            if (contour.size() < 3) continue;
             
             DepthBlob blob;
             blob.pixels = contour;
             blob.bbox = cv::boundingRect(contour);
             
-            // Calculate average depth for this blob
             float depth_sum = 0.0f;
             int valid_count = 0;
             for (const auto& pt : contour) {
@@ -1932,151 +2137,73 @@ std::vector<Detection> New3DTracker::runDepthBlobDetection(
         }
     }
     
-    std::cout << "[DepthBlob] Separated into " << depth_separated_blobs.size() << " depth-distinct blobs" << std::endl;
-    
-    // STEP 3: Calculate physical surface area for each depth-separated blob and filter
-    std::cout << "[DepthBlob] === STEP 3: SURFACE AREA FILTERING ===" << std::endl;
-    std::cout << "[DepthBlob] Settings: min_area=" << settings_.depth_blob_min_area_px << "cm², "
-              << "max_area=" << settings_.depth_blob_max_area_px << "cm²" << std::endl;
-    
-    // Store blobs that pass area filtering for circularity check
-    std::vector<DepthBlob> area_filtered_blobs;
+    cv::Mat filtered_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
     
     for (const auto& blob : depth_separated_blobs) {
-        // Calculate pixel area
         double pixel_area = cv::contourArea(blob.pixels);
         
-        // Calculate physical surface area using the blob's average depth
         float depth_squared = blob.avg_depth * blob.avg_depth;
         float focal_product = intrinsics.fx * intrinsics.fy;
         float physical_area_m2 = (pixel_area * depth_squared) / focal_product;
-        float physical_area_cm2 = physical_area_m2 * 10000.0f;  // Convert to cm²
+        float physical_area_cm2 = physical_area_m2 * 10000.0f;
         
         float min_area_cm2 = static_cast<float>(settings_.depth_blob_min_area_px);
         float max_area_cm2 = static_cast<float>(settings_.depth_blob_max_area_px);
         
-        if (physical_area_cm2 >= min_area_cm2 && physical_area_cm2 <= max_area_cm2) {
-            area_filtered_blobs.push_back(blob);
-            std::cout << "[DepthBlob] ✓ AREA PASS: pixel_area=" << pixel_area << "px², "
-                      << "avg_depth=" << blob.avg_depth << "m, "
-                      << "physical_area=" << physical_area_cm2 << "cm² "
-                      << "(range: " << min_area_cm2 << "-" << max_area_cm2 << "cm²)" << std::endl;
-        } else {
-            std::cout << "[DepthBlob] ✗ AREA REJECT: pixel_area=" << pixel_area << "px², "
-                      << "avg_depth=" << blob.avg_depth << "m, "
-                      << "physical_area=" << physical_area_cm2 << "cm² "
-                      << "(outside range: " << min_area_cm2 << "-" << max_area_cm2 << "cm²)" << std::endl;
-        }
-    }
-    
-    // STEP 4: Circularity filtering to remove irregular shapes
-    std::cout << "[DepthBlob] === STEP 4: CIRCULARITY FILTERING ===" << std::endl;
-    std::cout << "[DepthBlob] Settings: min_circularity=" << settings_.depth_blob_min_circularity
-              << " (1.0=perfect circle)" << std::endl;
-    
-    cv::Mat filtered_mask = cv::Mat::zeros(depth_frame.size(), CV_8UC1);
-    
-    for (const auto& blob : area_filtered_blobs) {
-        // Calculate circularity: (4 * π * Area) / (Perimeter²)
+        if (physical_area_cm2 < min_area_cm2 || physical_area_cm2 > max_area_cm2) continue;
+        
         double perimeter = cv::arcLength(blob.pixels, true);
-        double area = cv::contourArea(blob.pixels);
+        if (perimeter < 0.01) continue;
+        double circularity = (4.0 * CV_PI * pixel_area) / (perimeter * perimeter);
+        if (circularity < settings_.depth_blob_min_circularity) continue;
         
-        // Avoid division by zero
-        if (perimeter < 0.01) {
-            std::cout << "[DepthBlob] ✗ CIRCULARITY REJECT: perimeter too small (" << perimeter << ")" << std::endl;
-            continue;
+        cv::Point2f center(blob.bbox.x + blob.bbox.width / 2.0f,
+                         blob.bbox.y + blob.bbox.height / 2.0f);
+        
+        // Brightness filtering
+        if (settings_.depth_blob_min_brightness > 0) {
+            int sample_count = 0;
+            float brightness_sum = 0.0f;
+            for (const auto& pt : blob.pixels) {
+                if (pt.x >= 0 && pt.x < color_frame.cols &&
+                    pt.y >= 0 && pt.y < color_frame.rows) {
+                    cv::Vec3b bgr = color_frame.at<cv::Vec3b>(pt.y, pt.x);
+                    brightness_sum += (bgr[0] + bgr[1] + bgr[2]) / 3.0f;
+                    sample_count++;
+                }
+            }
+            float avg_brightness = (sample_count > 0) ? (brightness_sum / sample_count) : 0.0f;
+            if (avg_brightness < settings_.depth_blob_min_brightness) continue;
         }
         
-        double circularity = (4.0 * CV_PI * area) / (perimeter * perimeter);
+        cv::Point3f world_pos = deprojectToWorld(center, blob.avg_depth, intrinsics);
         
-        // Filter by circularity threshold
-        if (circularity >= settings_.depth_blob_min_circularity) {
-            // Calculate center point
-            cv::Point2f center(blob.bbox.x + blob.bbox.width / 2.0f,
-                             blob.bbox.y + blob.bbox.height / 2.0f);
-            
-            // STEP 4.5: Brightness filtering (for LED juggling balls)
-            // Calculate average brightness (RGB) of the blob
-            if (settings_.depth_blob_min_brightness > 0) {
-                // Sample pixels within the blob's bounding box
-                int sample_count = 0;
-                float brightness_sum = 0.0f;
-                
-                for (const auto& pt : blob.pixels) {
-                    if (pt.x >= 0 && pt.x < color_frame.cols &&
-                        pt.y >= 0 && pt.y < color_frame.rows) {
-                        cv::Vec3b bgr = color_frame.at<cv::Vec3b>(pt.y, pt.x);
-                        // Calculate brightness as average of RGB channels
-                        float brightness = (bgr[0] + bgr[1] + bgr[2]) / 3.0f;
-                        brightness_sum += brightness;
-                        sample_count++;
-                    }
-                }
-                
-                float avg_brightness = (sample_count > 0) ? (brightness_sum / sample_count) : 0.0f;
-                
-                // Filter out blobs below minimum brightness threshold
-                if (avg_brightness < settings_.depth_blob_min_brightness) {
-                    std::cout << "[DepthBlob] ✗ BRIGHTNESS REJECT: avg_brightness=" << avg_brightness
-                              << " (threshold: " << settings_.depth_blob_min_brightness << ")" << std::endl;
-                    continue;  // Skip this blob
-                }
-                
-                std::cout << "[DepthBlob] ✓ BRIGHTNESS PASS: avg_brightness=" << avg_brightness
-                          << " (threshold: " << settings_.depth_blob_min_brightness << ")" << std::endl;
+        // Exclusion zone check
+        bool in_exclusion_zone = false;
+        for (const auto& zone : exclusion_zones_) {
+            if (zone.contains(cv::Point(static_cast<int>(center.x), static_cast<int>(center.y)))) {
+                in_exclusion_zone = true;
+                break;
             }
-            
-            // Deproject to 3D using average depth
-            cv::Point3f world_pos = deprojectToWorld(center, blob.avg_depth, intrinsics);
-            
-            std::cout << "[DepthBlob] ✓ DETECTION CREATED: 2D center=(" << center.x << ", " << center.y
-                      << "), 3D world_pos=(" << world_pos.x << ", " << world_pos.y << ", " << world_pos.z << ")m" << std::endl;
-            
-            // Check if detection is in an exclusion zone
-            bool in_exclusion_zone = false;
-            cv::Point2f det_center(center.x, center.y);
-            for (const auto& zone : exclusion_zones_) {
-                if (zone.contains(cv::Point(static_cast<int>(det_center.x), static_cast<int>(det_center.y)))) {
-                    in_exclusion_zone = true;
-                    std::cout << "[DepthBlob] ✗ DETECTION FILTERED: In exclusion zone at ("
-                              << det_center.x << ", " << det_center.y << ")" << std::endl;
-                    break;
-                }
-            }
-            
-            // Skip this detection if it's in an exclusion zone
-            if (in_exclusion_zone) {
-                continue;
-            }
-            
-            // Create detection
-            Detection det;
-            det.box = cv::Rect_<float>(blob.bbox.x, blob.bbox.y, blob.bbox.width, blob.bbox.height);
-            det.world_pos = world_pos;
-            det.confidence = 1.0f;
-            det.class_id = 0;
-            det.detected_bgr_color = sampleDetectedColor(det, color_frame);
-            
-            detections.push_back(det);
-            
-            // Add this blob's pixels to the visualization mask
-            cv::drawContours(filtered_mask, std::vector<std::vector<cv::Point>>{blob.pixels},
-                            0, cv::Scalar(255), cv::FILLED);
-            
-            std::cout << "[DepthBlob] ✓ CIRCULARITY PASS: circularity=" << circularity
-                      << " (threshold: " << settings_.depth_blob_min_circularity << ")" << std::endl;
-        } else {
-            std::cout << "[DepthBlob] ✗ CIRCULARITY REJECT: circularity=" << circularity
-                      << " (threshold: " << settings_.depth_blob_min_circularity << ")" << std::endl;
         }
+        if (in_exclusion_zone) continue;
+        
+        Detection det;
+        det.box = cv::Rect_<float>(blob.bbox.x, blob.bbox.y, blob.bbox.width, blob.bbox.height);
+        det.world_pos = world_pos;
+        det.confidence = 1.0f;
+        det.class_id = 0;
+        det.detected_bgr_color = sampleDetectedColor(det, color_frame);
+        
+        detections.push_back(det);
+        
+        cv::drawContours(filtered_mask, std::vector<std::vector<cv::Point>>{blob.pixels},
+                        0, cv::Scalar(255), cv::FILLED);
     }
     
-    // Store the filtered mask for visualization
     depth_filtered_mask_ = filtered_mask;
     
-    std::cout << "[New3DTracker] === FINAL RESULT ===" << std::endl;
-    std::cout << "[New3DTracker] Accepted " << detections.size() << " blobs out of "
-              << depth_separated_blobs.size() << " depth-separated blobs" << std::endl;
+    std::cout << "[DepthBlob] === RESULT: " << detections.size() << " detections ===" << std::endl;
     
     return detections;
 }
@@ -3137,6 +3264,18 @@ bool New3DTracker::updateSetting(const std::string& key, const std::string& valu
             std::cout << "[New3DTracker] ⚙️ depth_blob_max_whiteness updated to: " << settings_.depth_blob_max_whiteness << std::endl;
         } else if (key == "show_depth_filtered_pixels") {
             settings_.show_depth_filtered_pixels = (value == "true" || value == "1");
+        } else if (key == "depth_blob_color_filter") {
+            settings_.depth_blob_color_filter = (value == "true" || value == "1");
+            std::cout << "[New3DTracker] ⚙️ Color-first detection " << (settings_.depth_blob_color_filter ? "ENABLED" : "DISABLED") << std::endl;
+        } else if (key == "depth_blob_hue_tolerance") {
+            settings_.depth_blob_hue_tolerance = std::stoi(value);
+        } else if (key == "depth_blob_sat_minimum") {
+            settings_.depth_blob_sat_minimum = std::stoi(value);
+        } else if (key == "depth_blob_val_minimum") {
+            settings_.depth_blob_val_minimum = std::stoi(value);
+        } else if (key == "depth_blob_preview_color") {
+            settings_.depth_blob_preview_color = value;
+            std::cout << "[New3DTracker] ⚙️ Preview color: " << (value.empty() ? "(all)" : value) << std::endl;
         } else {
             std::cerr << "[New3DTracker] Unknown setting key: " << key << std::endl;
             return false;

@@ -216,6 +216,13 @@ struct New3DTrackerSettings {
     int depth_blob_max_whiteness = 255;             // Max whiteness for color sampling (0-255, filters bright pixels)
     bool show_depth_filtered_pixels = true;         // Show filtered depth pixels in visualization
     
+    // === COLOR-FIRST DETECTION (for LED balls) ===
+    bool depth_blob_color_filter = true;            // Use color profiles to pre-filter blobs (LED ball mode)
+    int depth_blob_hue_tolerance = 15;              // Hue tolerance for color mask (0-90, in OpenCV hue units 0-180)
+    int depth_blob_sat_minimum = 80;                // Minimum saturation for color mask (0-255)
+    int depth_blob_val_minimum = 80;                // Minimum value/brightness for color mask (0-255)
+    std::string depth_blob_preview_color = "";      // Preview only this color's mask ("" = all colors, "pink" = only pink)
+    
     // === HAND VELOCITY (for throw prediction) ===
     bool hand_velocity_enabled = true;              // Enable velocity-based throw detection
     float hand_velocity_threshold = 1.0f;           // Min hand speed (m/s) for enhanced detection

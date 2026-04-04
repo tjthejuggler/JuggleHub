@@ -280,40 +280,26 @@ if PYQT_AVAILABLE:
             # Right panel - Calibration Visualization (extends to right of Ball Tracking)
             right_panel_layout = QVBoxLayout()
             
-            calibration_group = QGroupBox("🎨 Calibration & Visualization")
+            calibration_group = QGroupBox("🎨 Visualization")
             calibration_layout = QVBoxLayout(calibration_group)
             
-            # --- Color Profile Controls ---
-            color_profile_layout = QHBoxLayout()
-            color_profile_layout.addWidget(QLabel("Color Profile:"))
-            
+            # --- Color Profile Controls (hidden — calibration moved to right-side settings panel) ---
             self.color_profile_combo = QComboBox()
             self.populate_color_profiles()
-            color_profile_layout.addWidget(self.color_profile_combo)
+            self.color_profile_combo.setVisible(False)
             
             self.set_color_profile_button = QPushButton("Set Color Profile")
             self.set_color_profile_button.setCheckable(True)
-            self.set_color_profile_button.clicked.connect(self.start_color_profile_calibration)
-            self.set_color_profile_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #555;
-                    color: white;
-                    border: 1px solid #777;
-                    padding: 5px;
-                    border-radius: 3px;
-                }
-                QPushButton:checked {
-                    background-color: #007ACC;
-                    border-color: #005A9E;
-                }
-            """)
-            color_profile_layout.addWidget(self.set_color_profile_button)
-            calibration_layout.addLayout(color_profile_layout)
+            self.set_color_profile_button.setVisible(False)
             
-            # Status label
-            self.color_profile_status_label = QLabel("Select a color profile and click 'Set Color Profile', then click on a ball in the video.")
-            self.color_profile_status_label.setWordWrap(True)
-            calibration_layout.addWidget(self.color_profile_status_label)
+            self.color_profile_status_label = QLabel("")
+            self.color_profile_status_label.setVisible(False)
+            
+            # Note directing users to the right panel
+            cal_note = QLabel("💡 Color calibration: use '🎨 Color Calibration' in the settings panel →")
+            cal_note.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+            cal_note.setWordWrap(True)
+            calibration_layout.addWidget(cal_note)
             
             # --- Visualization Toggles (Pipeline Steps) ---
             # Use a flow layout that wraps buttons to the next row automatically
@@ -2146,8 +2132,68 @@ if PYQT_AVAILABLE:
                 print("Color profile calibration cancelled.")
 
         def video_view_clicked(self, event):
+            # === CLICK-BASED CALIBRATION (from right-side panel) ===
+            # Check if a click calibration is pending from the settings panel
+            pending_cal = getattr(self.settings_widget, 'pending_click_calibration', None) if hasattr(self, 'settings_widget') and self.settings_widget else None
+            if pending_cal:
+                scene_pos = self.video_view.mapToScene(event.pos())
+                pixmap_item = self.video_pixmap_item
+                if pixmap_item and pixmap_item.pixmap() and pixmap_item.sceneBoundingRect().contains(scene_pos):
+                    img_pos = pixmap_item.mapFromScene(scene_pos)
+                    frame_image = self.get_latest_frame()
+                    if frame_image is not None:
+                        x = max(0, min(int(img_pos.x()), frame_image.shape[1] - 1))
+                        y = max(0, min(int(img_pos.y()), frame_image.shape[0] - 1))
+                        
+                        # Sample a region around the click point
+                        sample_size = 15
+                        x1 = max(0, x - sample_size)
+                        y1 = max(0, y - sample_size)
+                        x2 = min(frame_image.shape[1], x + sample_size)
+                        y2 = min(frame_image.shape[0], y + sample_size)
+                        
+                        roi = frame_image[y1:y2, x1:x2]
+                        hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                        
+                        # Filter by saturation to avoid sampling white/gray pixels
+                        # LED balls have high saturation — skin and background don't
+                        hue_samples = []
+                        sat_samples = []
+                        for py in range(hsv_roi.shape[0]):
+                            for px in range(hsv_roi.shape[1]):
+                                h, s, v = hsv_roi[py, px]
+                                if s > 50 and v > 50:  # Only include colorful, bright pixels
+                                    hue_samples.append(float(h))
+                                    sat_samples.append(float(s))
+                        
+                        if len(hue_samples) >= 5:
+                            # Use median for robustness
+                            hue_samples.sort()
+                            sat_samples.sort()
+                            avg_hue = hue_samples[len(hue_samples) // 2]
+                            avg_sat = sat_samples[len(sat_samples) // 2]
+                            
+                            print(f"🎯 Click calibration for '{pending_cal}': H={avg_hue:.1f}° S={avg_sat:.1f} ({len(hue_samples)} samples)")
+                            
+                            # Find the new3d settings sections and complete calibration
+                            if hasattr(self.settings_widget, 'tracker_new3d_sections'):
+                                self.settings_widget.tracker_new3d_sections.complete_click_calibration(
+                                    pending_cal, avg_hue, avg_sat
+                                )
+                        else:
+                            print(f"❌ Not enough colorful pixels at click location ({len(hue_samples)} samples)")
+                            self.settings_widget.pending_click_calibration = None
+                            if hasattr(self.settings_widget, 'new3d_calibration_status_labels'):
+                                if pending_cal in self.settings_widget.new3d_calibration_status_labels:
+                                    label = self.settings_widget.new3d_calibration_status_labels[pending_cal]
+                                    label.setText("❌ No colorful pixels found. Click directly on the glowing ball.")
+                                    label.setStyleSheet("color: #f44336; font-size: 10px; font-weight: bold;")
+                    
+                QGraphicsView.mousePressEvent(self.video_view, event)
+                return
+            
+            # === LEGACY LEFT-SIDE CALIBRATION ===
             print(f"🖱️ video_view_clicked() called! Button checked: {self.set_color_profile_button.isChecked()}")
-            # Ball management calibration removed - using legacy color tracking only
             if self.set_color_profile_button.isChecked():
                 print(f"✅ Calibration mode is active!")
                 scene_pos = self.video_view.mapToScene(event.pos())

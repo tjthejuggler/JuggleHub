@@ -3,7 +3,7 @@ New 3D Tracker Settings Sections for JuggleHub UI.
 Contains settings sections that are ONLY visible when new_3d tracker is selected.
 """
 
-from PyQt6.QtWidgets import (QLabel, QPushButton, QGridLayout, QCheckBox, QVBoxLayout, QGroupBox)
+from PyQt6.QtWidgets import (QLabel, QPushButton, QGridLayout, QCheckBox, QVBoxLayout, QGroupBox, QComboBox)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 import colorsys
@@ -822,6 +822,159 @@ class New3DSettingsSections:
         layout.addWidget(self.parent.new3d_show_depth_filtered_toggle, row, 1, 1, 2)
         row += 1
         
+        # === COLOR-FIRST DETECTION (LED Ball Mode) ===
+        color_separator = QLabel("─" * 50)
+        color_separator.setStyleSheet("color: #555555;")
+        layout.addWidget(color_separator, row, 0, 1, 3)
+        row += 1
+        
+        color_header = QLabel("🌈 Color-First Detection (LED Ball Mode)")
+        color_header.setStyleSheet("color: #FF9800; font-size: 11px; font-weight: bold;")
+        layout.addWidget(color_header, row, 0, 1, 3)
+        row += 1
+        
+        color_desc = QLabel("Uses calibrated color profiles to detect balls by color FIRST, then filters by depth/shape.\n"
+                           "Much more robust for glowing LED balls — eliminates body/background false positives.")
+        color_desc.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+        color_desc.setWordWrap(True)
+        layout.addWidget(color_desc, row, 0, 1, 3)
+        row += 1
+        
+        # Color Filter Enable Toggle
+        label = QLabel("Enable Color-First Detection")
+        label.setToolTip("When enabled, uses calibrated HSV color profiles to pre-filter blobs.\n"
+                        "Only pixels matching a calibrated ball color AND within depth range are considered.\n"
+                        "This dramatically reduces false positives from body parts and background.\n"
+                        "Requires color calibration for each ball color.\n"
+                        "Default: ON (recommended for LED balls)")
+        layout.addWidget(label, row, 0)
+        
+        self.parent.new3d_color_filter_toggle = QPushButton("Color-First Detection ON")
+        self.parent.new3d_color_filter_toggle.setCheckable(True)
+        self.parent.new3d_color_filter_toggle.setChecked(True)
+        self.parent.new3d_color_filter_toggle.clicked.connect(
+            lambda: self._toggle_color_filter()
+        )
+        self.parent.new3d_color_filter_toggle.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #d32f2f; }
+            QPushButton:checked { background-color: #4CAF50; }
+            QPushButton:checked:hover { background-color: #45a049; }
+            QPushButton:!checked { background-color: #f44336; }
+        """)
+        layout.addWidget(self.parent.new3d_color_filter_toggle, row, 1, 1, 2)
+        row += 1
+        
+        # Ball Color Preview Dropdown
+        preview_label = QLabel("👁️ Preview Ball Color")
+        preview_label.setToolTip("Select a ball color to preview its color+depth filter.\n"
+                                "When 'Show Filtered Pixels' is ON, only pixels matching\n"
+                                "this color's filter will be shown.\n"
+                                "Use this to tune the filter until you see ONLY the ball.\n"
+                                "Then switch to the next ball and repeat.\n"
+                                "'All Colors' shows all detected ball pixels.")
+        layout.addWidget(preview_label, row, 0)
+        
+        self.parent.new3d_preview_color_dropdown = QComboBox()
+        self.parent.new3d_preview_color_dropdown.addItem("All Colors", "")
+        # Populate with enabled ball colors from profiles
+        if hasattr(self.parent, 'new3d_ball_profiles'):
+            for profile in self.parent.new3d_ball_profiles:
+                if profile.get('enabled', True):
+                    name = profile['name']
+                    self.parent.new3d_preview_color_dropdown.addItem(f"🔵 {name}", name)
+        self.parent.new3d_preview_color_dropdown.currentIndexChanged.connect(
+            lambda idx: self.parent.update_setting(
+                'depth_blob_preview_color',
+                self.parent.new3d_preview_color_dropdown.currentData() or ""
+            )
+        )
+        self.parent.new3d_preview_color_dropdown.setStyleSheet("""
+            QComboBox {
+                background-color: #333333;
+                color: white;
+                padding: 6px;
+                border-radius: 4px;
+                border: 1px solid #555555;
+                font-weight: bold;
+            }
+            QComboBox:hover { border-color: #FF9800; }
+            QComboBox QAbstractItemView {
+                background-color: #333333;
+                color: white;
+                selection-background-color: #FF9800;
+            }
+        """)
+        layout.addWidget(self.parent.new3d_preview_color_dropdown, row, 1, 1, 2)
+        row += 1
+        
+        preview_hint = QLabel("💡 Turn ON 'Show Filtered Pixels' above to see the preview.\n"
+                             "Adjust Hue Tolerance / Min Saturation / Min Value until you see only the ball.")
+        preview_hint.setStyleSheet("color: #FF9800; font-size: 9px;")
+        preview_hint.setWordWrap(True)
+        layout.addWidget(preview_hint, row, 0, 1, 3)
+        row += 1
+        
+        # Hue Tolerance Slider
+        self.parent.new3d_hue_tolerance_slider, self.parent.new3d_hue_tolerance_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Hue Tolerance",
+            tooltip_text="How much hue variation to allow around the calibrated color.\n"
+                         "Range: 5-45. Default: 15.\n"
+                         "Lower = stricter color matching (fewer false positives)\n"
+                         "Higher = more permissive (catches more of the ball but may include other objects)\n"
+                         "For bright LED balls, 10-20 works well.",
+            range_min=5,
+            range_max=45,
+            initial_value=15,
+            update_func=lambda v: self.parent.update_setting('depth_blob_hue_tolerance', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Saturation Minimum Slider
+        self.parent.new3d_sat_minimum_slider, self.parent.new3d_sat_minimum_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Saturation",
+            tooltip_text="Minimum color saturation for the color mask.\n"
+                         "Range: 20-200. Default: 80.\n"
+                         "Higher = only strongly colored pixels (good for LED balls)\n"
+                         "Lower = includes washed-out colors (may include skin/background)\n"
+                         "LED balls typically have saturation > 100.",
+            range_min=20,
+            range_max=200,
+            initial_value=80,
+            update_func=lambda v: self.parent.update_setting('depth_blob_sat_minimum', v),
+            is_float=False
+        )
+        row += 1
+        
+        # Value/Brightness Minimum Slider
+        self.parent.new3d_val_minimum_slider, self.parent.new3d_val_minimum_label = self.parent._create_slider_widget(
+            parent_layout=layout,
+            row=row,
+            label_text="Min Value (Brightness)",
+            tooltip_text="Minimum brightness value for the color mask.\n"
+                         "Range: 20-200. Default: 80.\n"
+                         "Higher = only bright pixels (good for glowing LED balls)\n"
+                         "Lower = includes darker areas (may include shadows)\n"
+                         "LED balls are typically very bright (value > 100).",
+            range_min=20,
+            range_max=200,
+            initial_value=80,
+            update_func=lambda v: self.parent.update_setting('depth_blob_val_minimum', v),
+            is_float=False
+        )
+        row += 1
+        
         # Separator for baseline section
         separator = QLabel("─" * 50)
         separator.setStyleSheet("color: #555555;")
@@ -903,6 +1056,14 @@ class New3DSettingsSections:
             self.parent.update_setting('enable_ball_detection', 0)
         else:
             print("ℹ️ Depth blob detection disabled - YOLO ball detection can be re-enabled")
+    
+    def _toggle_color_filter(self):
+        """Toggle color-first detection on/off"""
+        is_enabled = self.parent.new3d_color_filter_toggle.isChecked()
+        self.parent.new3d_color_filter_toggle.setText(
+            "Color-First Detection ON" if is_enabled else "Color-First Detection OFF"
+        )
+        self.parent.update_setting('depth_blob_color_filter', 1 if is_enabled else 0)
     
     def create_color_calibration_section(self):
         """Create the Color Calibration section for New 3D Tracker"""
@@ -1009,8 +1170,8 @@ class New3DSettingsSections:
             ball_layout.addWidget(max_hsv_label, row, 1, 1, 2)
             row += 1
             
-            # Calibrate button
-            calibrate_button = QPushButton("🎯 Calibrate Color (10s)")
+            # Calibrate button — click-based: hold up ball, click on it in video
+            calibrate_button = QPushButton("🎯 Click to Calibrate")
             calibrate_button.setStyleSheet("""
                 QPushButton {
                     background-color: #2196F3;
@@ -1022,13 +1183,13 @@ class New3DSettingsSections:
                 QPushButton:hover { background-color: #1976D2; }
                 QPushButton:pressed { background-color: #0D47A1; }
             """)
-            calibrate_button.clicked.connect(lambda checked, name=ball_name: self._start_time_based_calibration(name))
+            calibrate_button.clicked.connect(lambda checked, name=ball_name: self._start_click_calibration(name))
             ball_layout.addWidget(calibrate_button, row, 0, 1, 3)
             row += 1
             
             # Calibration status label (hidden by default)
             status_label = QLabel("")
-            status_label.setStyleSheet("color: #4CAF50; font-size: 10px; font-weight: bold;")
+            status_label.setStyleSheet("color: #FF9800; font-size: 10px; font-weight: bold;")
             status_label.setWordWrap(True)
             status_label.setVisible(False)
             ball_layout.addWidget(status_label, row, 0, 1, 3)
@@ -1040,7 +1201,7 @@ class New3DSettingsSections:
             row += 1
             
             # Info label
-            info_label = QLabel("ℹ️ Juggle the ball for 10 seconds to calibrate")
+            info_label = QLabel("ℹ️ Hold up the ball, click 'Calibrate', then click on the ball in the video")
             info_label.setStyleSheet("color: #aaaaaa; font-size: 9px;")
             info_label.setWordWrap(True)
             ball_layout.addWidget(info_label, row, 0, 1, 3)
@@ -1303,8 +1464,111 @@ class New3DSettingsSections:
         except Exception as e:
             print(f"❌ Error saving New 3D profiles: {e}")
     
+    def _start_click_calibration(self, ball_name: str):
+        """Start click-based calibration: user clicks on ball in video to sample its color."""
+        print(f"🎯 Click calibration: waiting for click on {ball_name} ball in video")
+        
+        # Set the pending calibration flag on the parent widget
+        # The video_view_clicked handler in ui.py will check this flag
+        self.parent.pending_click_calibration = ball_name
+        
+        # Show status label
+        if hasattr(self.parent, 'new3d_calibration_status_labels'):
+            if ball_name in self.parent.new3d_calibration_status_labels:
+                label = self.parent.new3d_calibration_status_labels[ball_name]
+                label.setText(f"👆 Now click on the {ball_name} ball in the video...")
+                label.setStyleSheet("color: #FF9800; font-size: 10px; font-weight: bold;")
+                label.setVisible(True)
+    
+    def complete_click_calibration(self, ball_name: str, avg_hue: float, avg_sat: float):
+        """Complete click-based calibration with sampled HSV values."""
+        print(f"🎉 Click calibration complete for '{ball_name}': H={avg_hue:.1f}° S={avg_sat:.1f}")
+        
+        # Clear pending flag
+        self.parent.pending_click_calibration = None
+        
+        # Save to calibration_settings_new3d.json
+        import json
+        import os
+        settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "calibration_settings_new3d.json")
+        settings_path = os.path.normpath(settings_path)
+        
+        try:
+            with open(settings_path, 'r') as f:
+                settings = json.load(f)
+            
+            # Update the color profile
+            if 'color_profiles' in settings:
+                for profile in settings['color_profiles']:
+                    if profile['name'] == ball_name:
+                        profile['avg_hue'] = float(avg_hue)
+                        profile['avg_saturation'] = float(avg_sat)
+                        print(f"💾 Updated {ball_name}: H={avg_hue:.1f}, S={avg_sat:.1f}")
+                        break
+            
+            with open(settings_path, 'w') as f:
+                json.dump(settings, f, indent=4)
+            
+            print(f"💾 Saved calibration to {settings_path}")
+            
+            # Update UI labels
+            if hasattr(self.parent, 'new3d_ball_calibration_labels'):
+                if ball_name in self.parent.new3d_ball_calibration_labels:
+                    labels = self.parent.new3d_ball_calibration_labels[ball_name]
+                    labels['hue'].setText(f"{avg_hue:.1f}°")
+                    labels['hue'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+                    labels['saturation'].setText(f"{avg_sat:.1f}")
+                    labels['saturation'].setStyleSheet("color: #4CAF50; font-weight: bold;")
+                    
+                    # Update color sample square
+                    if 'color_sample' in labels:
+                        h_normalized = avg_hue / 180.0
+                        s_normalized = avg_sat / 255.0
+                        v_normalized = 0.8
+                        import colorsys
+                        r, g, b = colorsys.hsv_to_rgb(h_normalized, s_normalized, v_normalized)
+                        from PyQt6.QtGui import QColor
+                        color = QColor(int(r * 255), int(g * 255), int(b * 255))
+                        labels['color_sample'].setStyleSheet(f"background-color: {color.name()}; border: 2px solid #555;")
+            
+            # Show success in status label
+            if hasattr(self.parent, 'new3d_calibration_status_labels'):
+                if ball_name in self.parent.new3d_calibration_status_labels:
+                    label = self.parent.new3d_calibration_status_labels[ball_name]
+                    label.setText(f"✅ Calibrated! H={avg_hue:.1f}° S={avg_sat:.1f}")
+                    label.setStyleSheet("color: #4CAF50; font-size: 10px; font-weight: bold;")
+                    from PyQt6.QtCore import QTimer
+                    QTimer.singleShot(5000, lambda: label.setVisible(False))
+            
+            # Tell engine to reload color profiles
+            if self.zmq_client:
+                try:
+                    command = juggler_pb2.CommandRequest()
+                    command.type = juggler_pb2.CommandRequest.CommandType.RELOAD_COLOR_PROFILES
+                    response = self.zmq_client.send_command(command)
+                    print(f"📤 Reload color profiles: {response.message}")
+                except Exception as e:
+                    print(f"⚠️ Could not reload engine profiles: {e}")
+            
+        except Exception as e:
+            print(f"❌ Error saving click calibration: {e}")
+            if hasattr(self.parent, 'new3d_calibration_status_labels'):
+                if ball_name in self.parent.new3d_calibration_status_labels:
+                    label = self.parent.new3d_calibration_status_labels[ball_name]
+                    label.setText(f"❌ Error: {e}")
+                    label.setStyleSheet("color: #f44336; font-size: 10px; font-weight: bold;")
+    
+    def cancel_click_calibration(self):
+        """Cancel pending click calibration."""
+        if hasattr(self.parent, 'pending_click_calibration') and self.parent.pending_click_calibration:
+            ball_name = self.parent.pending_click_calibration
+            self.parent.pending_click_calibration = None
+            if hasattr(self.parent, 'new3d_calibration_status_labels'):
+                if ball_name in self.parent.new3d_calibration_status_labels:
+                    self.parent.new3d_calibration_status_labels[ball_name].setVisible(False)
+    
     def _start_time_based_calibration(self, ball_name: str):
-        """Start time-based calibration for a specific ball"""
+        """Start time-based calibration for a specific ball (legacy)"""
         print(f"🎨 Starting time-based calibration for {ball_name}")
         
         # Check if calibration is already active

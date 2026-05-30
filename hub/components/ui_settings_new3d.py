@@ -810,12 +810,12 @@ class New3DSettingsSections:
         
         # Show Filtered Pixels Toggle
         label = QLabel("Show Filtered Pixels")
-        label.setToolTip("Display RGB data for pixels that pass depth blob filters.\n"
-                        "Useful for debugging and tuning filter parameters.")
+        label.setToolTip("Debug view: black out all RGB pixels except those passing depth blob filters.\n"
+                        "Leave this off for the normal camera feed.")
         layout.addWidget(label, row, 0)
         
         self.parent.new3d_show_depth_filtered_toggle = QCheckBox()
-        self.parent.new3d_show_depth_filtered_toggle.setChecked(True)
+        self.parent.new3d_show_depth_filtered_toggle.setChecked(False)
         self.parent.new3d_show_depth_filtered_toggle.stateChanged.connect(
             lambda state: self.parent.update_setting('show_depth_filtered_pixels', 1 if state == Qt.CheckState.Checked.value else 0)
         )

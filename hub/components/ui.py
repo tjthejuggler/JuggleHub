@@ -1184,15 +1184,31 @@ if PYQT_AVAILABLE:
             if self.video_group.isVisible() and not self.hide_video_feed_toggle.isChecked():
                 if frame_data.color_image_b64:
                     self.update_video_feed(frame_data)
+                else:
+                    # Diagnostic: log once every 300 frames if no image data
+                    if not hasattr(self, '_no_image_diag_counter'):
+                        self._no_image_diag_counter = 0
+                    self._no_image_diag_counter += 1
+                    if self._no_image_diag_counter % 300 == 1:
+                        print(f"[UI] ⚠️ No color_image_b64 in frame {frame_data.frame_number} (video_feed may be disabled in engine)")
             
-            if self.settings_widget:
-                is_camera_running = "Running" in self.settings_widget.camera_status_label.text()
-                self.settings_widget.update_ir_status(frame_data.ir_projector_active and is_camera_running)
-
             if frame_data.HasField('status'):
                 status = frame_data.status
                 self.camera_status.setText(f"📷 Camera: {'Connected' if status.camera_connected else 'Disconnected'}")
                 self.engine_status.setText(f"🔧 Engine: {'Running' if status.engine_running else 'Stopped'}")
+
+                # Sync settings panel camera status label with engine status
+                if self.settings_widget and hasattr(self.settings_widget, 'camera_status_label'):
+                    if status.camera_connected:
+                        self.settings_widget.camera_status_label.setText("● Camera Running")
+                        self.settings_widget.camera_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+                    else:
+                        self.settings_widget.camera_status_label.setText("● Camera Stopped")
+                        self.settings_widget.camera_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
+
+            if self.settings_widget:
+                is_camera_running = "Running" in self.settings_widget.camera_status_label.text()
+                self.settings_widget.update_ir_status(frame_data.ir_projector_active and is_camera_running)
                 self.mode_status.setText(f"🎯 Mode: {status.mode}")
                 if status.error_message: print(f"❌ Error: {status.error_message}")
                 
@@ -1362,15 +1378,35 @@ if PYQT_AVAILABLE:
         def update_video_feed(self, frame_data: juggler_pb2.FrameData):
             # Check if video feed should be hidden - skip all rendering if so
             if self.hide_video_feed_toggle.isChecked():
+                if not hasattr(self, '_video_feed_diag_done'):
+                    print(f"[UI] ⚠️ Video feed HIDDEN (hide_video_feed_toggle is checked)")
+                    self._video_feed_diag_done = True
                 return
             
             if not frame_data.color_image_b64:
+                if not hasattr(self, '_no_image_diag_done'):
+                    print(f"[UI] ⚠️ No color_image_b64 in frame {frame_data.frame_number}")
+                    self._no_image_diag_done = True
                 return
+
+            # First-frame diagnostic: save JPEG to disk for inspection
+            if not hasattr(self, '_video_feed_first_frame'):
+                print(f"[UI] 🖼️ First video frame: size={len(frame_data.color_image_b64)}, frame={frame_data.frame_number}")
+                try:
+                    with open("/tmp/jugglehub_first_frame.jpg", "wb") as f:
+                        f.write(frame_data.color_image_b64)
+                    print(f"[UI] 💾 Saved first frame to /tmp/jugglehub_first_frame.jpg")
+                except Exception as e:
+                    print(f"[UI] ❌ Failed to save frame: {e}")
+                self._video_feed_first_frame = True
 
             image = QImage()
             load_success = image.loadFromData(frame_data.color_image_b64, "JPEG")
 
             if not load_success:
+                if not hasattr(self, '_jpeg_fail_diag_done'):
+                    print(f"[UI] ⚠️ JPEG decode FAILED for frame {frame_data.frame_number}, data size={len(frame_data.color_image_b64)}")
+                    self._jpeg_fail_diag_done = True
                 return
 
             # Use the actual video frame
@@ -1965,6 +2001,11 @@ if PYQT_AVAILABLE:
             # Update scene rect to match pixmap size exactly
             self.video_scene.setSceneRect(self.video_pixmap_item.boundingRect())
             self.video_view.fitInView(self.video_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+            
+            # Diagnostic: confirm rendering on first frame
+            if not hasattr(self, '_render_diag_done'):
+                print(f"[UI] ✅ Rendered frame {frame_data.frame_number}: pixmap={pixmap.width()}x{pixmap.height()}, view_visible={self.video_view.isVisible()}, group_visible={self.video_group.isVisible()}")
+                self._render_diag_done = True
 
         def update_tail_length(self, value):
             self.tail_length_label.setText(f"{value} frames")

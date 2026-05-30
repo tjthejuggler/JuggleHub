@@ -2,7 +2,14 @@
 
 A high-performance monorepo combining C++ real-time ball tracking with Python-based analysis and visualization.
 
-**Last Updated:** 2026-04-04 09:28 CST
+**Last Updated:** 2026-05-30 09:20 IST
+
+**Recent Changes (2026-05-30):**
+- **📹 LIVE CAMERA FEED VISIBILITY FIX ✅**
+  - **Problem Solved**: The hub video panel could appear mostly black while tracking overlays still flickered, making it look like the camera feed was missing even though frames were arriving.
+  - **Root Cause**: The New 3D depth debug option `show_depth_filtered_pixels` was enabled by default and in persisted settings, so the live RGB frame was replaced with a black image containing only depth-filtered pixels.
+  - **Solution**: Changed the depth-filtered pixel view to debug-only/off by default and updated the tooltip to clarify that it intentionally blacks out non-matching camera pixels.
+  - **Files Modified**: [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp:217), [`hub/calibration_settings_new3d.json`](hub/calibration_settings_new3d.json:249), [`hub/components/ui_settings_new3d.py`](hub/components/ui_settings_new3d.py:811)
 
 **Recent Changes (2026-04-04):**
 - **🌈 COLOR-FIRST BALL DETECTION FOR LED BALLS ✅**

@@ -186,21 +186,33 @@ void CommandProcessor::handleExternalCommand(const juggler::v1::CommandRequest& 
         case juggler::v1::CommandRequest::CAMERA_START:
             if (!command.camera_settings_file().empty() && camera_manager_) {
                 if (command.camera_width() > 0 && command.camera_height() > 0 && command.camera_fps() > 0) {
-                    camera_manager_->startWithSettings(command.camera_settings_file(),
-                                                      command.camera_width(),
-                                                      command.camera_height(),
-                                                      command.camera_fps());
-                    response.set_message("Camera started with settings: " + command.camera_settings_file() +
-                                       " at " + std::to_string(command.camera_width()) + "x" + 
-                                       std::to_string(command.camera_height()) +
-                                       " @ " + std::to_string(command.camera_fps()) + " FPS");
+                    try {
+                        camera_manager_->startWithSettings(command.camera_settings_file(),
+                                                          command.camera_width(),
+                                                          command.camera_height(),
+                                                          command.camera_fps());
+                        response.set_message("Camera started with settings: " + command.camera_settings_file() +
+                                           " at " + std::to_string(command.camera_width()) + "x" +
+                                           std::to_string(command.camera_height()) +
+                                           " @ " + std::to_string(command.camera_fps()) + " FPS");
+                    } catch (const std::exception& e) {
+                        response.set_message("Failed to start camera: " + std::string(e.what()));
+                    }
                 } else {
-                    camera_manager_->startWithSettings(command.camera_settings_file());
-                    response.set_message("Camera started with settings: " + command.camera_settings_file());
+                    try {
+                        camera_manager_->startWithSettings(command.camera_settings_file());
+                        response.set_message("Camera started with settings: " + command.camera_settings_file());
+                    } catch (const std::exception& e) {
+                        response.set_message("Failed to start camera: " + std::string(e.what()));
+                    }
                 }
             } else if (camera_manager_) {
-                camera_manager_->start();
-                response.set_message("Camera started with current settings");
+                try {
+                    camera_manager_->start();
+                    response.set_message("Camera started with current settings");
+                } catch (const std::exception& e) {
+                    response.set_message("Failed to start camera: " + std::string(e.what()));
+                }
             }
             break;
             

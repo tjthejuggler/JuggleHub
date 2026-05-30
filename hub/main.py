@@ -105,6 +105,14 @@ class JuggleHub:
                 frame_data = self.zmq_client.receive_frame_data()
                 if frame_data:
                     image_size = len(frame_data.color_image_b64)
+                    # Diagnostic: log image size on first frame and every 300 after
+                    if not hasattr(self, '_frame_diag_counter'):
+                        self._frame_diag_counter = 0
+                        print(f"[Hub] FIRST FRAME RECEIVED: image_size={image_size}, frame_number={frame_data.frame_number}")
+                    self._frame_diag_counter += 1
+                    if self._frame_diag_counter % 300 == 0:
+                        cam_connected = frame_data.status.camera_connected if frame_data.HasField('status') else '?'
+                        print(f"[Hub] Frame {frame_data.frame_number}: image_size={image_size}, camera_connected={cam_connected}")
                 else:
                     pass
 

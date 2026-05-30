@@ -214,6 +214,23 @@ void Engine::run() {
             continue;
         }
         
+        // One-time diagnostic: check if color image is all black
+        {
+            static bool color_diag_done = false;
+            if (!color_diag_done) {
+                double min_val, max_val;
+                cv::minMaxLoc(color_image, &min_val, &max_val);
+                cv::Scalar mean_val = cv::mean(color_image);
+                writeDebugLog("COLOR IMAGE DIAGNOSTIC: min=" + std::to_string(min_val) +
+                             " max=" + std::to_string(max_val) +
+                             " mean=" + std::to_string(mean_val[0]));
+                if (max_val < 5) {
+                    writeDebugLog("WARNING: Color image appears to be ALL BLACK! Check camera settings (exposure/gain)");
+                }
+                color_diag_done = true;
+            }
+        }
+        
         // Frames are already cached in CameraManager
         
         juggler::v1::FrameData frame_data;

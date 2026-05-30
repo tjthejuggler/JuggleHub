@@ -214,7 +214,7 @@ struct New3DTrackerSettings {
     float depth_blob_min_circularity = 0.65f;       // Min circularity (0.0-1.0, 1.0=perfect circle)
     int depth_blob_min_brightness = 0;              // Min average brightness (0-255, for LED balls)
     int depth_blob_max_whiteness = 255;             // Max whiteness for color sampling (0-255, filters bright pixels)
-    bool show_depth_filtered_pixels = true;         // Show filtered depth pixels in visualization
+    bool show_depth_filtered_pixels = false;        // Debug-only: show filtered depth pixels in visualization
     
     // === COLOR-FIRST DETECTION (for LED balls) ===
     bool depth_blob_color_filter = true;            // Use color profiles to pre-filter blobs (LED ball mode)

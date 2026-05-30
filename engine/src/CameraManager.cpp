@@ -107,56 +107,68 @@ void CameraManager::start() {
     DEBUG_LOG("[LOG] Attempting to start camera pipeline...");
     writeDebugLog("CameraManager::start() - Attempting to start RealSense pipeline...");
 
-    try {
-        writeDebugLog("CameraManager::start() - Calling pipe_.start()...");
-        rs2::pipeline_profile profile = pipe_.start(rs_config_);
-        camera_running_ = true;
-        INFO_LOG("[LOG] Camera pipeline started successfully.");
-        writeDebugLog("CameraManager::start() - Pipeline started successfully");
-
-        // Store Camera Intrinsics
-        writeDebugLog("CameraManager::start() - Retrieving camera intrinsics...");
-        auto stream = profile.get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
-        auto intrinsics = stream.get_intrinsics();
-        camera_intrinsics_.fx = intrinsics.fx;
-        camera_intrinsics_.fy = intrinsics.fy;
-        camera_intrinsics_.ppx = intrinsics.ppx;
-        camera_intrinsics_.ppy = intrinsics.ppy;
-        writeDebugLog("CameraManager::start() - Intrinsics: fx=" + std::to_string(intrinsics.fx) +
-                      " fy=" + std::to_string(intrinsics.fy) +
-                      " ppx=" + std::to_string(intrinsics.ppx) +
-                      " ppy=" + std::to_string(intrinsics.ppy));
-
-        // Wait for device to stabilize
-        writeDebugLog("CameraManager::start() - Waiting 500ms for device to stabilize...");
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // Apply advanced settings from JSON
-        writeDebugLog("CameraManager::start() - Applying camera settings...");
-        applySettings();
-        writeDebugLog("CameraManager::start() - Camera settings applied");
-
-        // Enable IR projector
-        writeDebugLog("CameraManager::start() - Enabling IR projector...");
+    const int max_retries = 3;
+    for (int attempt = 1; attempt <= max_retries; ++attempt) {
         try {
-            auto sensor = profile.get_device().first<rs2::depth_sensor>();
-            if (sensor.supports(RS2_OPTION_EMITTER_ENABLED)) {
-                sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 1.f);
-                ir_projector_active_ = true;
-                writeDebugLog("CameraManager::start() - IR projector enabled");
-            } else {
-                writeDebugLog("CameraManager::start() - IR projector not supported");
-            }
-        } catch (const rs2::error& e) {
-            ir_projector_active_ = false;
-            writeDebugLog("CameraManager::start() - Failed to enable IR projector: " + std::string(e.what()));
-        }
+            writeDebugLog("CameraManager::start() - Attempt " + std::to_string(attempt) +
+                          "/" + std::to_string(max_retries) + ": Calling pipe_.start()...");
+            rs2::pipeline_profile profile = pipe_.start(rs_config_);
+            camera_running_ = true;
+            INFO_LOG("[LOG] Camera pipeline started successfully.");
+            writeDebugLog("CameraManager::start() - Pipeline started successfully");
 
-        writeDebugLog("CameraManager::start() - Complete");
-    } catch (const rs2::error& e) {
-        camera_running_ = false;
-        writeDebugLog("CameraManager::start() - EXCEPTION: " + std::string(e.what()));
-        throw;
+            // Store Camera Intrinsics
+            writeDebugLog("CameraManager::start() - Retrieving camera intrinsics...");
+            auto stream = profile.get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
+            auto intrinsics = stream.get_intrinsics();
+            camera_intrinsics_.fx = intrinsics.fx;
+            camera_intrinsics_.fy = intrinsics.fy;
+            camera_intrinsics_.ppx = intrinsics.ppx;
+            camera_intrinsics_.ppy = intrinsics.ppy;
+            writeDebugLog("CameraManager::start() - Intrinsics: fx=" + std::to_string(intrinsics.fx) +
+                          " fy=" + std::to_string(intrinsics.fy) +
+                          " ppx=" + std::to_string(intrinsics.ppx) +
+                          " ppy=" + std::to_string(intrinsics.ppy));
+
+            // Wait for device to stabilize
+            writeDebugLog("CameraManager::start() - Waiting 500ms for device to stabilize...");
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+            // Apply advanced settings from JSON
+            writeDebugLog("CameraManager::start() - Applying camera settings...");
+            applySettings();
+            writeDebugLog("CameraManager::start() - Camera settings applied");
+
+            // Enable IR projector
+            writeDebugLog("CameraManager::start() - Enabling IR projector...");
+            try {
+                auto sensor = profile.get_device().first<rs2::depth_sensor>();
+                if (sensor.supports(RS2_OPTION_EMITTER_ENABLED)) {
+                    sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 1.f);
+                    ir_projector_active_ = true;
+                    writeDebugLog("CameraManager::start() - IR projector enabled");
+                } else {
+                    writeDebugLog("CameraManager::start() - IR projector not supported");
+                }
+            } catch (const rs2::error& e) {
+                ir_projector_active_ = false;
+                writeDebugLog("CameraManager::start() - Failed to enable IR projector: " + std::string(e.what()));
+            }
+
+            writeDebugLog("CameraManager::start() - Complete");
+            return;  // Success
+        } catch (const rs2::error& e) {
+            camera_running_ = false;
+            writeDebugLog("CameraManager::start() - EXCEPTION on attempt " +
+                          std::to_string(attempt) + ": " + std::string(e.what()));
+            if (attempt < max_retries) {
+                INFO_LOG("Camera start failed (attempt ", attempt, "/", max_retries, "), retrying in 1s...");
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            } else {
+                ERROR_LOG("Camera start failed after ", max_retries, " attempts: ", e.what());
+                throw;
+            }
+        }
     }
 }
 
@@ -171,6 +183,9 @@ void CameraManager::startWithSettings(const std::string& settings_file, uint32_t
     // Stop the pipeline completely
     if (camera_running_) {
         stop();
+        // Give the RealSense device time to fully release and re-enumerate
+        writeDebugLog("startWithSettings() - Waiting 1s for device to re-enumerate after stop...");
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     // Create a new configuration object
@@ -194,8 +209,14 @@ void CameraManager::startWithSettings(const std::string& settings_file, uint32_t
         loadSettingsFromJson(camera_settings_path_);
     }
 
-    // Start camera with new configuration
-    start();
+    // Start camera with new configuration (with retry logic inside start())
+    try {
+        start();
+    } catch (const rs2::error& e) {
+        ERROR_LOG("Failed to restart camera after reconfiguration: ", e.what());
+    } catch (const std::exception& e) {
+        ERROR_LOG("Failed to restart camera after reconfiguration: ", e.what());
+    }
 }
 
 bool CameraManager::getFrames(cv::Mat& color_image, cv::Mat& depth_image) {

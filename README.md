@@ -5,6 +5,13 @@ A high-performance monorepo combining C++ real-time ball tracking with Python-ba
 **Last Updated:** 2026-05-30 09:20 IST
 
 **Recent Changes (2026-05-30):**
+- **🎯 RELIABLE LED/DEPTH + SKELETON BALL TRACKING DEFAULTS ✅**
+  - **Problem Solved**: Ball tracking had too many competing paths and could lose identity when a glowing LED ball disappeared into a hand.
+  - **Root Cause**: The active simple mode still allowed stale settings and detection-only state transitions to fight skeleton ownership; held balls could be treated as thrown while still inside the hand radius.
+  - **Solution**: Forced simple mode to use New 3D color-first depth blobs for ball detections, YOLO pose every frame for skeleton hands, and an occlusion hand-off path that keeps an unseen in-flight ball attached to the nearest hand until color detection sees it leave again.
+  - **Recommended UI State**: Tracking System = New 3D / simple mode, Depth Blob Detection = ON, Color-First Detection = ON, YOLO Ball Detection = OFF, Pose Model = ON, Held Radius = 18cm, Max Association Distance = 45cm, Show Filtered Pixels = OFF unless debugging masks.
+  - **Files Modified**: [`engine/include/New3DTracker.hpp`](engine/include/New3DTracker.hpp:40), [`engine/src/New3DTracker.cpp`](engine/src/New3DTracker.cpp:54), [`hub/calibration_settings_new3d.json`](hub/calibration_settings_new3d.json:2), [`hub/components/ui_settings.py`](hub/components/ui_settings.py:491), [`hub/components/ui_settings_new3d.py`](hub/components/ui_settings_new3d.py:63)
+
 - **📹 LIVE CAMERA FEED VISIBILITY FIX ✅**
   - **Problem Solved**: The hub video panel could appear mostly black while tracking overlays still flickered, making it look like the camera feed was missing even though frames were arriving.
   - **Root Cause**: The New 3D depth debug option `show_depth_filtered_pixels` was enabled by default and in persisted settings, so the live RGB frame was replaced with a black image containing only depth-filtered pixels.
@@ -295,6 +302,14 @@ A high-performance monorepo combining C++ real-time ball tracking with Python-ba
   - **Automatic Creation**: Log file automatically created in recording directory as `recording.log`
   - **Use Case**: Debug strange Kalman prediction behavior and analyze tracking performance
   - See [`RECORDING_LOG_DOCUMENTATION.md`](RECORDING_LOG_DOCUMENTATION.md) for complete documentation
+
+**Previous Changes (2026-05-30 09:08 UTC):**
+- **⚡ AUTOMATIC RELIABLE LED TRACKING PRESET ✅**
+  - **Problem Solved**: Reliable ball tracking still required manually lining up multiple UI controls, which was error-prone and unnecessary.
+  - **Solution**: The hub now automatically applies and saves the reliable New 3D + simple depth/LED color + skeleton preset on settings startup, and the Camera Settings panel includes a one-click “Apply Reliable LED Tracking Preset” recovery button.
+  - **Preset State**: New 3D tracker, Simple ball tracking mode, YOLO ball detection OFF, pose/skeleton ON at 100% density, depth blob detection ON, color-first detection ON, held radius 18cm, hand offset 5cm, association max distance 45cm, depth range 10–300cm, normal camera feed preserved.
+  - **Persistence**: Both [`hub/config/calibration_settings_new3d.json`](hub/config/calibration_settings_new3d.json) and [`hub/calibration_settings_new3d.json`](hub/calibration_settings_new3d.json) now carry the preset values so stale saved UI settings cannot revert the tracker.
+  - **Implementation**: See [`SettingsManager.RELIABLE_LED_TRACKING_PRESET`](hub/components/ui_settings_manager.py:15), [`CalibrationSettingsWidget.apply_reliable_led_tracking_preset()`](hub/components/ui_settings.py:421), and the UI button in [`CommonSettingsSections.create_camera_section()`](hub/components/ui_settings_common.py:294).
 
 **Previous Changes (2025-10-06):**
 - **🎯 CONFIGURABLE YOLO SCORE THRESHOLD FOR KALMAN FALLBACK**

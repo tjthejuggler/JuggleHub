@@ -298,6 +298,30 @@ class CommonSettingsSections:
         camera_layout.addWidget(self.parent.ball_tracking_mode_info, row, 0, 1, 2)
         row += 1
 
+        # One-click recovery for the reliable tracking state.
+        self.parent.reliable_led_preset_button = QPushButton("⚡ Apply Reliable LED Tracking Preset")
+        self.parent.reliable_led_preset_button.setToolTip(
+            "Forces the known-good ball tracking setup:\n"
+            "New 3D tracker, Simple depth+LED color mode, YOLO ball OFF, pose/skeleton ON,\n"
+            "depth blob detection ON, color-first detection ON, and reliable hand-off thresholds."
+        )
+        self.parent.reliable_led_preset_button.clicked.connect(
+            lambda: self.parent.apply_reliable_led_tracking_preset(save=True, send=True, show_message=True)
+        )
+        self.parent.reliable_led_preset_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45a049; }
+            QPushButton:pressed { background-color: #2e7d32; }
+        """)
+        camera_layout.addWidget(self.parent.reliable_led_preset_button, row, 0, 1, 2)
+        row += 1
+
         # Hidden tracking system combo (kept for internal use / backward compatibility)
         # This is auto-set by ball_tracking_mode_combo and not shown to user
         self.parent.tracking_system_combo = QComboBox()
@@ -487,13 +511,13 @@ class CommonSettingsSections:
         row = 0
         
         # Enable/Disable YOLO Ball Model toggle
-        self.parent.use_dnn_tracker_toggle = QPushButton("Enable YOLO Ball Detection")
+        self.parent.use_dnn_tracker_toggle = QPushButton("YOLO Ball Detection DISABLED")
         self.parent.use_dnn_tracker_toggle.setCheckable(True)
-        self.parent.use_dnn_tracker_toggle.setChecked(True)  # Enabled by default
+        self.parent.use_dnn_tracker_toggle.setChecked(False)  # Reliable LED preset keeps YOLO ball detection off
         self.parent.use_dnn_tracker_toggle.clicked.connect(self.parent.toggle_dnn_tracker)
         
         # Send initial state to engine
-        self.udp_client.send_setting('enable_ball_detection', 1)
+        self.udp_client.send_setting('enable_ball_detection', 0)
         self.parent.use_dnn_tracker_toggle.setToolTip(
             "Enable or disable YOLO ball detection model.\n"
             "When disabled, no ball detection occurs (useful for performance testing).\n"

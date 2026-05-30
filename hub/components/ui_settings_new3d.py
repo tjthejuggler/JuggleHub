@@ -60,12 +60,12 @@ class New3DSettingsSections:
             parent_layout=layout,
             row=row,
             label_text="Held Radius (cm)",
-            tooltip_text="Radius around wrist where ball is considered 'held'.\n"
-                         "Range: 5-30cm. Default: 12cm.\n"
-                         "Smaller = stricter held detection, Larger = more forgiving.",
+            tooltip_text="Radius around wrist/held-circle where ball is considered 'held'.\n"
+                         "Range: 5-30cm. Default: 18cm for LED/depth tracking.\n"
+                         "Larger radius keeps an occluded ball attached to the hand until thrown.",
             range_min=5,
             range_max=30,
-            initial_value=12,
+            initial_value=18,
             update_func=lambda v: self.parent.update_setting('held_radius_m', v / 100.0),
             is_float=False
         )
@@ -194,12 +194,12 @@ class New3DSettingsSections:
             parent_layout=layout,
             row=row,
             label_text="Max Association Distance (m)",
-            tooltip_text="Maximum distance for matching detections to tracks.\n"
-                         "Range: 0.1-2.0 m. Default: 0.5 m.\n"
-                         "Smaller = stricter matching, Larger = more flexible.",
+            tooltip_text="Maximum fallback distance for matching detections to tracks.\n"
+                         "Range: 0.1-2.0 m. Default: 0.45 m.\n"
+                         "Color-first LED detections still preserve identity by color.",
             range_min=10,
             range_max=200,
-            initial_value=50,
+            initial_value=45,
             update_func=lambda v: self.parent.update_setting('association_max_distance_m', v / 100.0),
             is_float=True
         )
@@ -642,13 +642,13 @@ class New3DSettingsSections:
         
         # Enable Depth Blob Detection Toggle
         label = QLabel("Enable Depth Blob Detection")
-        label.setToolTip("Enable depth-based blob detection as an alternative to YOLO.\n"
-                        "When enabled, balls are detected using depth filtering instead of YOLO model.")
+        label.setToolTip("Enable depth + calibrated LED color blob detection.\n"
+                        "This is the default reliable ball path; YOLO ball detection stays off.")
         layout.addWidget(label, row, 0)
         
-        self.parent.new3d_depth_blob_enabled_toggle = QPushButton("Use Depth Blob Detection")
+        self.parent.new3d_depth_blob_enabled_toggle = QPushButton("Depth Blob Detection ACTIVE")
         self.parent.new3d_depth_blob_enabled_toggle.setCheckable(True)
-        self.parent.new3d_depth_blob_enabled_toggle.setChecked(False)
+        self.parent.new3d_depth_blob_enabled_toggle.setChecked(True)
         self.parent.new3d_depth_blob_enabled_toggle.clicked.connect(
             lambda: self._toggle_depth_blob_detection()
         )
@@ -681,11 +681,11 @@ class New3DSettingsSections:
             row=row,
             label_text="Min Distance (cm)",
             tooltip_text="Minimum depth distance for blob detection.\n"
-                         "Range: 10-200cm. Default: 30cm.\n"
-                         "Blobs closer than this will be filtered out.",
+                         "Range: 10-200cm. Default: 10cm.\n"
+                         "Low default keeps close hand-held throws visible.",
             range_min=10,
             range_max=200,
-            initial_value=30,
+            initial_value=10,
             update_func=lambda v: self.parent.update_setting('depth_blob_min_distance_cm', v),
             is_float=False
         )
@@ -697,11 +697,11 @@ class New3DSettingsSections:
             row=row,
             label_text="Max Distance (cm)",
             tooltip_text="Maximum depth distance for blob detection.\n"
-                         "Range: 20-300cm. Default: 150cm.\n"
-                         "Blobs farther than this will be filtered out.",
+                         "Range: 20-300cm. Default: 300cm.\n"
+                         "Allows full juggling space in front of the depth camera.",
             range_min=20,
             range_max=300,
-            initial_value=150,
+            initial_value=300,
             update_func=lambda v: self.parent.update_setting('depth_blob_max_distance_cm', v),
             is_float=False
         )
@@ -713,14 +713,14 @@ class New3DSettingsSections:
             row=row,
             label_text="Min Surface Area (cm²)",
             tooltip_text="Minimum blob physical surface area in cm².\n"
-                         "Range: 0-200 cm². Default: 50 cm².\n"
+                         "Range: 0-200 cm². Default: 2 cm².\n"
                          "This is DEPTH-AWARE: filters by actual 3D size, not pixel size.\n"
                          "Blobs are separated by depth FIRST, then filtered by surface area.\n"
                          "A small ball close to camera = same physical area as small ball far away.\n"
                          "Use this to filter out tiny noise while keeping balls at any distance.",
             range_min=0,
             range_max=200,
-            initial_value=50,
+            initial_value=2,
             update_func=lambda v: self.parent.update_setting('depth_blob_min_area_px', v),
             is_float=False
         )
@@ -732,14 +732,14 @@ class New3DSettingsSections:
             row=row,
             label_text="Max Surface Area (cm²)",
             tooltip_text="Maximum blob physical surface area in cm².\n"
-                         "Range: 0-200 cm². Default: 200 cm².\n"
+                         "Range: 0-200 cm². Default: 120 cm².\n"
                          "This is DEPTH-AWARE: filters by actual 3D size, not pixel size.\n"
                          "Blobs are separated by depth FIRST, then filtered by surface area.\n"
                          "A large person far away = same physical area as large person close.\n"
                          "Use this to filter out large objects (juggler, furniture) while keeping balls.",
             range_min=0,
             range_max=200,
-            initial_value=200,
+            initial_value=120,
             update_func=lambda v: self.parent.update_setting('depth_blob_max_area_px', v),
             is_float=False
         )
@@ -751,7 +751,7 @@ class New3DSettingsSections:
             row=row,
             label_text="Min Circularity",
             tooltip_text="Minimum circularity for blob shape filtering (0.0-1.0).\n"
-                         "Range: 0.0-1.0. Default: 0.65.\n"
+                         "Range: 0.0-1.0. Default: 0.20.\n"
                          "Circularity = (4 × π × Area) / (Perimeter²)\n"
                          "1.0 = perfect circle, 0.785 = square, <0.7 = irregular shapes.\n"
                          "This filters out non-circular shapes like hands, fingers, and irregular objects.\n"
@@ -760,7 +760,7 @@ class New3DSettingsSections:
                          "Recommended: 0.6-0.7 for juggling balls (allows slight occlusion/motion blur)",
             range_min=0,
             range_max=100,
-            initial_value=65,
+            initial_value=20,
             update_func=lambda v: self.parent.update_setting('depth_blob_min_circularity', v / 100.0),
             is_float=True
         )

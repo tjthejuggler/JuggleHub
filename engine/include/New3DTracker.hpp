@@ -40,6 +40,7 @@ struct New3DBall {
     cv::Point3f last_known_position; // Official position from previous frame
     cv::Point3f predicted_position;  // Kalman prediction for this frame
     cv::Point3f last_detection_position; // Last ACTUAL detection (for color search region)
+    cv::Point3f last_observed_velocity;  // Measured velocity from actual detections for simple ballistic carry
     
     // === TRACKING QUALITY ===
     int frames_since_seen;           // Counter for deletion
@@ -59,10 +60,11 @@ struct New3DBall {
     
     // Constructor with default values
     New3DBall() : id(-1), state(HELD), associated_hand_id(-1),
+                  last_detection_position(0.0f, 0.0f, 0.0f),
+                  last_observed_velocity(0.0f, 0.0f, 0.0f),
                   frames_since_seen(0), consecutive_frames_seen(0),
                   color_locked(false), yolo_confidence(0.0f),
-                  color_match_score(0.0f),
-                  last_detection_position(0.0f, 0.0f, 0.0f) {
+                  color_match_score(0.0f) {
         std::cout << "[New3DBall] Default constructor called" << std::endl;
     }
     
@@ -76,7 +78,7 @@ struct New3DBall {
         : id(other.id), color_name(other.color_name), color_profile(other.color_profile),
           state(other.state), associated_hand_id(other.associated_hand_id),
           last_known_position(other.last_known_position), predicted_position(other.predicted_position),
-          last_detection_position(other.last_detection_position),
+          last_detection_position(other.last_detection_position), last_observed_velocity(other.last_observed_velocity),
           frames_since_seen(other.frames_since_seen), consecutive_frames_seen(other.consecutive_frames_seen),
           color_locked(other.color_locked), pixel_pos(other.pixel_pos), bbox(other.bbox),
           yolo_confidence(other.yolo_confidence), color_match_score(other.color_match_score),
@@ -111,7 +113,7 @@ struct New3DBall {
           state(other.state), associated_hand_id(other.associated_hand_id),
           kf(std::move(other.kf)),  // Move the Kalman filter
           last_known_position(other.last_known_position), predicted_position(other.predicted_position),
-          last_detection_position(other.last_detection_position),
+          last_detection_position(other.last_detection_position), last_observed_velocity(other.last_observed_velocity),
           frames_since_seen(other.frames_since_seen), consecutive_frames_seen(other.consecutive_frames_seen),
           color_locked(other.color_locked), pixel_pos(other.pixel_pos), bbox(other.bbox),
           yolo_confidence(other.yolo_confidence), color_match_score(other.color_match_score),
@@ -132,6 +134,7 @@ struct New3DBall {
             last_known_position = other.last_known_position;
             predicted_position = other.predicted_position;
             last_detection_position = other.last_detection_position;
+            last_observed_velocity = other.last_observed_velocity;
             frames_since_seen = other.frames_since_seen;
             consecutive_frames_seen = other.consecutive_frames_seen;
             color_locked = other.color_locked;
@@ -176,9 +179,9 @@ struct New3DBall {
  */
 struct New3DTrackerSettings {
     // === GEOMETRY & DISTANCE (meters) ===
-    float held_radius_m = 0.12f;                    // 12cm radius for "held" detection
+    float held_radius_m = 0.18f;                    // 18cm radius for hand/ball proximity with depth noise tolerance
     float held_circle_offset_cm = 5.0f;             // Offset distance from wrist towards hand center (cm)
-    float association_max_distance_m = 0.50f;       // Max distance for detection matching
+    float association_max_distance_m = 0.45f;       // Max fallback distance for detection matching
     float color_mismatch_penalty_m = 1.0f;          // Distance penalty for color mismatch (meters)
     
     // === PHYSICS & DYNAMICS ===
@@ -197,21 +200,21 @@ struct New3DTrackerSettings {
     int min_saturation_threshold = 50;              // Min saturation to include pixel in color sampling (0-255)
     
     // === YOLO INTEGRATION ===
-    bool enable_ball_detection = true;              // Enable/disable YOLO ball detection
-    bool enable_pose_estimation = true;             // Enable/disable YOLO pose estimation
-    int ball_processing_density = 50;               // Percentage of frames to process ball detection (10-100%)
-    int pose_processing_density = 50;               // Percentage of frames to process pose (10-100%)
+    bool enable_ball_detection = false;             // Prefer depth+LED color detection over YOLO ball detection
+    bool enable_pose_estimation = true;             // Keep YOLO pose estimation enabled for hand/skeleton tracking
+    int ball_processing_density = 100;              // Process every frame when YOLO ball detection is explicitly enabled
+    int pose_processing_density = 100;              // Process every frame for reliable hand-off during occlusion
     float ball_confidence_threshold = 0.25f;        // Min confidence for 'ball' class
     float ball_held_confidence_threshold = 0.25f;   // Min confidence for 'ball_held' class
     bool ignore_class = false;                      // Treat ball/ball_held same
     
     // === DEPTH BLOB DETECTION (alternative to YOLO) ===
-    bool enable_depth_blob_detection = false;       // Enable depth-based blob detection
-    float depth_blob_min_distance_m = 0.30f;        // Min depth distance (meters)
-    float depth_blob_max_distance_m = 1.50f;        // Max depth distance (meters)
-    int depth_blob_min_area_px = 50;                // Min blob physical surface area (cm²) - DEPTH-AWARE
-    int depth_blob_max_area_px = 2000;              // Max blob physical surface area (cm²) - DEPTH-AWARE
-    float depth_blob_min_circularity = 0.65f;       // Min circularity (0.0-1.0, 1.0=perfect circle)
+    bool enable_depth_blob_detection = true;        // Enable depth+color blob detection for LED balls
+    float depth_blob_min_distance_m = 0.10f;        // Min depth distance (meters)
+    float depth_blob_max_distance_m = 3.00f;        // Max depth distance (meters)
+    int depth_blob_min_area_px = 2;                 // Min blob physical surface area (cm²) - DEPTH-AWARE
+    int depth_blob_max_area_px = 120;               // Max blob physical surface area (cm²) - DEPTH-AWARE
+    float depth_blob_min_circularity = 0.20f;       // Lenient circularity; LED blobs can be partially occluded
     int depth_blob_min_brightness = 0;              // Min average brightness (0-255, for LED balls)
     int depth_blob_max_whiteness = 255;             // Max whiteness for color sampling (0-255, filters bright pixels)
     bool show_depth_filtered_pixels = false;        // Debug-only: show filtered depth pixels in visualization
@@ -731,6 +734,11 @@ private:
                                     const CameraIntrinsics& intrinsics,
                                     int frame_width,
                                     int frame_height);
+    
+    /**
+     * @brief Calculate the stable held tracker position for a hand.
+     */
+    cv::Point3f calculateHeldPosition(const SimpleHand& hand, const cv::Point3f& fallback) const;
     
     /**
      * @brief Convert New3DBall to SimpleBall for interface compatibility

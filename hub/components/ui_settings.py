@@ -78,8 +78,9 @@ if PYQT_AVAILABLE:
             # Initialize UI
             self.init_ui()
             
-            # Load settings after UI is initialized
+            # Load settings after UI is initialized, then force the reliable LED preset.
             self.load_settings()
+            self.apply_reliable_led_tracking_preset(save=True, send=True, show_message=False)
             
             # Allow auto-save
             self._loading_settings = False
@@ -98,7 +99,7 @@ if PYQT_AVAILABLE:
                 "simple_2d": self.settings_manager.settings_2d_file,
             }
             
-            latest_tracker = "depth_based"  # Default fallback
+            latest_tracker = "new_3d"  # Default to reliable LED/depth+skeleton tracking
             latest_time = None
             
             for tracker_type, filepath in tracker_files.items():
@@ -307,6 +308,8 @@ if PYQT_AVAILABLE:
                     self.use_dnn_tracker_toggle.setChecked(False)
                     self.use_dnn_tracker_toggle.setText("YOLO Ball Detection DISABLED")
                     
+                self.apply_reliable_led_tracking_preset(save=True, send=True, show_message=False)
+                    
             elif mode == "yolo":
                 # YOLO mode: AI ball detection
                 self.ball_tracking_mode_info.setText("🤖 Using YOLO AI model for ball detection")
@@ -390,6 +393,76 @@ if PYQT_AVAILABLE:
             except Exception as e:
                 print(f"❌ Error switching tracker: {e}")
                 QMessageBox.critical(self, "Error", f"Error switching tracking system:\n{str(e)}")
+
+        def get_reliable_led_tracking_settings(self) -> dict:
+            """Build settings for the automatic reliable LED/depth+skeleton preset."""
+            settings = self.settings_manager.get_default_settings("new_3d")
+            if hasattr(self, 'camera_settings_combo'):
+                settings['camera_settings_profile'] = self.camera_settings_combo.currentData()
+            if hasattr(self, 'resolution_combo'):
+                settings['resolution'] = self.resolution_combo.currentText()
+            if hasattr(self, 'fps_combo'):
+                settings['fps'] = self.fps_combo.currentData()
+            if hasattr(self, 'depth_sensor_toggle'):
+                settings['depth_sensor_enabled'] = self.depth_sensor_toggle.isChecked()
+            if hasattr(self, 'exposure_slider'):
+                settings['camera_exposure'] = self.exposure_slider.value()
+            if hasattr(self, 'gain_slider'):
+                settings['camera_gain'] = self.gain_slider.value()
+            if hasattr(self, 'auto_exposure_toggle'):
+                settings['auto_exposure_enabled'] = self.auto_exposure_toggle.isChecked()
+            if hasattr(self, 'white_balance_slider'):
+                settings['camera_white_balance'] = self.white_balance_slider.value()
+            if hasattr(self, 'auto_white_balance_toggle'):
+                settings['auto_white_balance_enabled'] = self.auto_white_balance_toggle.isChecked()
+            settings.update(self.settings_manager.get_reliable_led_tracking_preset())
+            return settings
+
+        def apply_reliable_led_tracking_preset(self, save: bool = True, send: bool = True, show_message: bool = True):
+            """Apply, save, and optionally send the reliable LED/depth+skeleton tracking preset."""
+            settings = self.get_reliable_led_tracking_settings()
+            was_loading = self._loading_settings
+            self._loading_settings = True
+
+            self.current_tracker = "new_3d"
+            if hasattr(self, 'tracking_system_combo'):
+                idx = self.tracking_system_combo.findData("new_3d")
+                if idx >= 0:
+                    self.tracking_system_combo.blockSignals(True)
+                    self.tracking_system_combo.setCurrentIndex(idx)
+                    self.tracking_system_combo.blockSignals(False)
+            self.hide_all_tracker_sections()
+            self.show_tracker_sections("new_3d")
+            self.apply_settings(settings)
+
+            self._loading_settings = was_loading
+            if save:
+                self.settings_manager.save_settings("new_3d", settings)
+            if send:
+                self._switch_engine_tracker("new_3d")
+                self._send_all_settings_to_engine(settings)
+            if show_message:
+                QMessageBox.information(
+                    self,
+                    "Reliable Tracking Preset Applied",
+                    "Reliable LED/depth+skeleton tracking is now active and saved."
+                )
+            print("✅ Reliable LED/depth+skeleton tracking preset applied")
+
+        def _switch_engine_tracker(self, tracker_type: str):
+            """Tell the engine which tracker type is active."""
+            command = juggler_pb2.CommandRequest()
+            command.type = juggler_pb2.CommandRequest.CommandType.SET_TRACKER_TYPE
+            command.tracker_type = tracker_type
+
+            try:
+                response = self.zmq_client.send_command(command)
+                if response.success:
+                    print(f"✅ Engine switched to {tracker_type}: {response.message}")
+                else:
+                    print(f"❌ Failed to switch tracker in engine: {response.message}")
+            except Exception as e:
+                print(f"❌ Error switching tracker in engine: {e}")
 
         def get_current_settings(self) -> dict:
             """Get current settings structured by tracker type"""
@@ -488,8 +561,8 @@ if PYQT_AVAILABLE:
             """Get New 3D Kalman tracker-specific settings"""
             return {
                 # === GEOMETRY & DISTANCE (meters) ===
-                'held_radius_m': self.new3d_held_radius_slider.value() / 100.0 if hasattr(self, 'new3d_held_radius_slider') else 0.12,
-                'association_max_distance_m': self.new3d_association_max_distance_slider.value() / 100.0 if hasattr(self, 'new3d_association_max_distance_slider') else 0.50,
+                'held_radius_m': self.new3d_held_radius_slider.value() / 100.0 if hasattr(self, 'new3d_held_radius_slider') else 0.18,
+                'association_max_distance_m': self.new3d_association_max_distance_slider.value() / 100.0 if hasattr(self, 'new3d_association_max_distance_slider') else 0.45,
                 'color_mismatch_penalty_m': self.new3d_color_mismatch_penalty_slider.value() / 100.0 if hasattr(self, 'new3d_color_mismatch_penalty_slider') else 1.0,
                 
                 # === PHYSICS & DYNAMICS ===
@@ -511,6 +584,10 @@ if PYQT_AVAILABLE:
                 # === YOLO INTEGRATION ===
                 'ball_confidence_threshold': self.ball_confidence_slider.value() / 100.0 if hasattr(self, 'ball_confidence_slider') else 0.25,
                 'ball_held_confidence_threshold': self.ball_held_confidence_slider.value() / 100.0 if hasattr(self, 'ball_held_confidence_slider') else 0.25,
+                'enable_ball_detection': False,
+                'enable_pose_estimation': True,
+                'ball_processing_density': 100,
+                'pose_processing_density': 100,
                 'ignore_class': self.new3d_ignore_class_toggle.isChecked() if hasattr(self, 'new3d_ignore_class_toggle') else False,
                 
                 # === HAND VELOCITY ===
@@ -531,13 +608,20 @@ if PYQT_AVAILABLE:
                 'tc_name_on_throw': self.new3d_name_on_throw_toggle.isChecked() if hasattr(self, 'new3d_name_on_throw_toggle') else False,
                 
                 # === DEPTH BLOB DETECTION ===
-                'enable_depth_blob_detection': self.new3d_depth_blob_enabled_toggle.isChecked() if hasattr(self, 'new3d_depth_blob_enabled_toggle') else False,
-                'depth_blob_min_distance_cm': self.new3d_depth_min_distance_slider.value() if hasattr(self, 'new3d_depth_min_distance_slider') else 30,
-                'depth_blob_max_distance_cm': self.new3d_depth_max_distance_slider.value() if hasattr(self, 'new3d_depth_max_distance_slider') else 150,
-                'depth_blob_min_area_px': self.new3d_depth_min_area_slider.value() if hasattr(self, 'new3d_depth_min_area_slider') else 50,
-                'depth_blob_max_area_px': self.new3d_depth_max_area_slider.value() if hasattr(self, 'new3d_depth_max_area_slider') else 2000,
+                'enable_depth_blob_detection': self.new3d_depth_blob_enabled_toggle.isChecked() if hasattr(self, 'new3d_depth_blob_enabled_toggle') else True,
+                'depth_blob_color_filter': self.new3d_color_filter_toggle.isChecked() if hasattr(self, 'new3d_color_filter_toggle') else True,
+                'depth_blob_min_distance_cm': self.new3d_depth_min_distance_slider.value() if hasattr(self, 'new3d_depth_min_distance_slider') else 10,
+                'depth_blob_max_distance_cm': self.new3d_depth_max_distance_slider.value() if hasattr(self, 'new3d_depth_max_distance_slider') else 300,
+                'depth_blob_min_area_px': self.new3d_depth_min_area_slider.value() if hasattr(self, 'new3d_depth_min_area_slider') else 2,
+                'depth_blob_max_area_px': self.new3d_depth_max_area_slider.value() if hasattr(self, 'new3d_depth_max_area_slider') else 120,
+                'depth_blob_min_circularity': self.new3d_depth_min_circularity_slider.value() / 100.0 if hasattr(self, 'new3d_depth_min_circularity_slider') else 0.20,
                 'depth_blob_min_brightness': self.new3d_depth_min_brightness_slider.value() if hasattr(self, 'new3d_depth_min_brightness_slider') else 0,
-                'show_depth_filtered_pixels': self.new3d_show_depth_filtered_toggle.isChecked() if hasattr(self, 'new3d_show_depth_filtered_toggle') else True,
+                'depth_blob_max_whiteness': self.new3d_depth_max_whiteness_slider.value() if hasattr(self, 'new3d_depth_max_whiteness_slider') else 255,
+                'depth_blob_hue_tolerance': self.new3d_hue_tolerance_slider.value() if hasattr(self, 'new3d_hue_tolerance_slider') else 15,
+                'depth_blob_sat_minimum': self.new3d_sat_minimum_slider.value() if hasattr(self, 'new3d_sat_minimum_slider') else 80,
+                'depth_blob_val_minimum': self.new3d_val_minimum_slider.value() if hasattr(self, 'new3d_val_minimum_slider') else 80,
+                'depth_blob_preview_color': self.new3d_preview_color_dropdown.currentData() if hasattr(self, 'new3d_preview_color_dropdown') else '',
+                'show_depth_filtered_pixels': self.new3d_show_depth_filtered_toggle.isChecked() if hasattr(self, 'new3d_show_depth_filtered_toggle') else False,
             }
 
         def _get_2d_tracker_settings(self) -> dict:
@@ -782,6 +866,8 @@ if PYQT_AVAILABLE:
             # === GEOMETRY & DISTANCE ===
             if 'held_radius_m' in settings and hasattr(self, 'new3d_held_radius_slider'):
                 self.new3d_held_radius_slider.setValue(int(settings['held_radius_m'] * 100))
+            if 'held_circle_offset_cm' in settings and hasattr(self, 'new3d_held_circle_offset_slider'):
+                self.new3d_held_circle_offset_slider.setValue(int(settings['held_circle_offset_cm']))
             if 'association_max_distance_m' in settings and hasattr(self, 'new3d_association_max_distance_slider'):
                 self.new3d_association_max_distance_slider.setValue(int(settings['association_max_distance_m'] * 100))
             if 'color_mismatch_penalty_m' in settings and hasattr(self, 'new3d_color_mismatch_penalty_slider'):
@@ -860,8 +946,26 @@ if PYQT_AVAILABLE:
                 self.new3d_depth_min_area_slider.setValue(settings['depth_blob_min_area_px'])
             if 'depth_blob_max_area_px' in settings and hasattr(self, 'new3d_depth_max_area_slider'):
                 self.new3d_depth_max_area_slider.setValue(settings['depth_blob_max_area_px'])
+            if 'depth_blob_min_circularity' in settings and hasattr(self, 'new3d_depth_min_circularity_slider'):
+                self.new3d_depth_min_circularity_slider.setValue(int(settings['depth_blob_min_circularity'] * 100))
             if 'depth_blob_min_brightness' in settings and hasattr(self, 'new3d_depth_min_brightness_slider'):
                 self.new3d_depth_min_brightness_slider.setValue(settings['depth_blob_min_brightness'])
+            if 'depth_blob_max_whiteness' in settings and hasattr(self, 'new3d_depth_max_whiteness_slider'):
+                self.new3d_depth_max_whiteness_slider.setValue(settings['depth_blob_max_whiteness'])
+            if 'depth_blob_color_filter' in settings and hasattr(self, 'new3d_color_filter_toggle'):
+                is_enabled = settings['depth_blob_color_filter']
+                self.new3d_color_filter_toggle.setChecked(is_enabled)
+                self.new3d_color_filter_toggle.setText("Color-First Detection ON" if is_enabled else "Color-First Detection OFF")
+            if 'depth_blob_hue_tolerance' in settings and hasattr(self, 'new3d_hue_tolerance_slider'):
+                self.new3d_hue_tolerance_slider.setValue(settings['depth_blob_hue_tolerance'])
+            if 'depth_blob_sat_minimum' in settings and hasattr(self, 'new3d_sat_minimum_slider'):
+                self.new3d_sat_minimum_slider.setValue(settings['depth_blob_sat_minimum'])
+            if 'depth_blob_val_minimum' in settings and hasattr(self, 'new3d_val_minimum_slider'):
+                self.new3d_val_minimum_slider.setValue(settings['depth_blob_val_minimum'])
+            if 'depth_blob_preview_color' in settings and hasattr(self, 'new3d_preview_color_dropdown'):
+                idx = self.new3d_preview_color_dropdown.findData(settings['depth_blob_preview_color'])
+                if idx >= 0:
+                    self.new3d_preview_color_dropdown.setCurrentIndex(idx)
             if 'show_depth_filtered_pixels' in settings and hasattr(self, 'new3d_show_depth_filtered_toggle'):
                 self.new3d_show_depth_filtered_toggle.setChecked(settings['show_depth_filtered_pixels'])
 
@@ -907,6 +1011,8 @@ if PYQT_AVAILABLE:
         def load_settings(self):
             """Load settings for current tracker"""
             settings = self.settings_manager.load_settings(self.current_tracker)
+            if not settings:
+                settings = self.settings_manager.get_default_settings(self.current_tracker)
             if settings:
                 self._loading_settings = True
                 self.apply_settings(settings)
@@ -915,18 +1021,7 @@ if PYQT_AVAILABLE:
                 
                 # Send tracker switch command to engine FIRST
                 print(f"📤 Sending tracker switch command to engine: {self.current_tracker}")
-                command = juggler_pb2.CommandRequest()
-                command.type = juggler_pb2.CommandRequest.CommandType.SET_TRACKER_TYPE
-                command.tracker_type = self.current_tracker
-                
-                try:
-                    response = self.zmq_client.send_command(command)
-                    if response.success:
-                        print(f"✅ Engine switched to {self.current_tracker}: {response.message}")
-                    else:
-                        print(f"❌ Failed to switch tracker in engine: {response.message}")
-                except Exception as e:
-                    print(f"❌ Error switching tracker in engine: {e}")
+                self._switch_engine_tracker(self.current_tracker)
                 
                 # Send all settings to engine
                 print("📤 Sending loaded settings to engine...")
@@ -1443,6 +1538,8 @@ if PYQT_AVAILABLE:
             # Send tracker-specific settings based on active tracker
             if tracker_type == "depth_based":
                 self._send_3d_tracker_settings(settings)
+            elif tracker_type == "new_3d":
+                self._send_new3d_tracker_settings(settings)
             elif tracker_type == "simple_2d":
                 self._send_2d_tracker_settings(settings)
         
@@ -1556,6 +1653,8 @@ if PYQT_AVAILABLE:
             # === GEOMETRY & DISTANCE ===
             if 'held_radius_m' in settings:
                 self.udp_client.send_setting('held_radius_m', settings['held_radius_m'])
+            if 'held_circle_offset_cm' in settings:
+                self.udp_client.send_setting('held_circle_offset_cm', settings['held_circle_offset_cm'])
             if 'association_max_distance_m' in settings:
                 self.udp_client.send_setting('association_max_distance_m', settings['association_max_distance_m'])
             if 'color_mismatch_penalty_m' in settings:
@@ -1606,8 +1705,8 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('show_association_lines', 1 if settings['show_association_lines'] else 0)
             if 'show_depth_globs' in settings:
                 self.udp_client.send_setting('show_depth_globs', 1 if settings['show_depth_globs'] else 0)
-            if 'show_depth_globs' in settings:
-                self.udp_client.send_setting('show_depth_globs', 1 if settings['show_depth_globs'] else 0)
+            if 'show_color_search_region' in settings:
+                self.udp_client.send_setting('show_color_search_region', 1 if settings['show_color_search_region'] else 0)
             
             # === AUDIO INDICATORS ===
             if 'tc_sound_on_catch' in settings:
@@ -1622,6 +1721,8 @@ if PYQT_AVAILABLE:
             # === DEPTH BLOB DETECTION ===
             if 'enable_depth_blob_detection' in settings:
                 self.udp_client.send_setting('enable_depth_blob_detection', 1 if settings['enable_depth_blob_detection'] else 0)
+            if 'depth_blob_color_filter' in settings:
+                self.udp_client.send_setting('depth_blob_color_filter', 1 if settings['depth_blob_color_filter'] else 0)
             if 'depth_blob_min_distance_cm' in settings:
                 self.udp_client.send_setting('depth_blob_min_distance_cm', settings['depth_blob_min_distance_cm'])
             if 'depth_blob_max_distance_cm' in settings:
@@ -1630,8 +1731,20 @@ if PYQT_AVAILABLE:
                 self.udp_client.send_setting('depth_blob_min_area_px', settings['depth_blob_min_area_px'])
             if 'depth_blob_max_area_px' in settings:
                 self.udp_client.send_setting('depth_blob_max_area_px', settings['depth_blob_max_area_px'])
+            if 'depth_blob_min_circularity' in settings:
+                self.udp_client.send_setting('depth_blob_min_circularity', settings['depth_blob_min_circularity'])
             if 'depth_blob_min_brightness' in settings:
                 self.udp_client.send_setting('depth_blob_min_brightness', settings['depth_blob_min_brightness'])
+            if 'depth_blob_max_whiteness' in settings:
+                self.udp_client.send_setting('depth_blob_max_whiteness', settings['depth_blob_max_whiteness'])
+            if 'depth_blob_hue_tolerance' in settings:
+                self.udp_client.send_setting('depth_blob_hue_tolerance', settings['depth_blob_hue_tolerance'])
+            if 'depth_blob_sat_minimum' in settings:
+                self.udp_client.send_setting('depth_blob_sat_minimum', settings['depth_blob_sat_minimum'])
+            if 'depth_blob_val_minimum' in settings:
+                self.udp_client.send_setting('depth_blob_val_minimum', settings['depth_blob_val_minimum'])
+            if 'depth_blob_preview_color' in settings:
+                self.udp_client.send_setting('depth_blob_preview_color', settings['depth_blob_preview_color'])
             if 'show_depth_filtered_pixels' in settings:
                 self.udp_client.send_setting('show_depth_filtered_pixels', 1 if settings['show_depth_filtered_pixels'] else 0)
         

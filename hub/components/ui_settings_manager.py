@@ -11,6 +11,49 @@ from typing import Dict, Any, Optional
 
 class SettingsManager:
     """Manages settings persistence for different tracker types."""
+
+    RELIABLE_LED_TRACKING_PRESET = {
+        # User-facing mode selection
+        'tracking_system': 'new_3d',
+        'tracker_type': 'new_3d',
+        'ball_tracking_mode': 'simple',
+        'use_reliable_led_tracking_preset': True,
+
+        # LED/depth ball path: no YOLO ball detector, skeleton pose remains enabled
+        'enable_ball_detection': False,
+        'enable_pose_estimation': True,
+        'pose_model_enabled': True,
+        'ball_processing_density': 100,
+        'pose_processing_density': 100,
+
+        # Skeleton hand-off and color/depth association
+        'held_radius_m': 0.18,
+        'held_circle_offset_cm': 5,
+        'association_max_distance_m': 0.45,
+        'color_mismatch_penalty_m': 1.0,
+        'use_color_tracking': True,
+
+        # Depth + calibrated LED color blob detection
+        'enable_depth_blob_detection': True,
+        'depth_blob_color_filter': True,
+        'depth_blob_min_distance_cm': 10,
+        'depth_blob_max_distance_cm': 300,
+        'depth_blob_min_area_px': 2,
+        'depth_blob_max_area_px': 120,
+        'depth_blob_min_circularity': 0.20,
+        'depth_blob_min_brightness': 0,
+        'depth_blob_max_whiteness': 255,
+        'depth_blob_hue_tolerance': 15,
+        'depth_blob_sat_minimum': 80,
+        'depth_blob_val_minimum': 80,
+        'depth_blob_preview_color': '',
+
+        # Useful overlays, without hijacking the normal camera feed
+        'show_depth_filtered_pixels': False,
+        'show_depth_globs': True,
+        'show_held_radius': True,
+        'show_color_search_region': True,
+    }
     
     def __init__(self, config_dir: str = "hub/config"):
         """
@@ -62,6 +105,7 @@ class SettingsManager:
             try:
                 with open(settings_file, 'r') as f:
                     settings = json.load(f)
+                settings = self.apply_reliable_led_tracking_preset(settings, tracker_type)
                 print(f"✅ Loaded {tracker_type} settings from {settings_file}")
                 if 'saved_at' in settings:
                     print(f"   Saved at: {settings['saved_at']}")
@@ -85,11 +129,12 @@ class SettingsManager:
         Args:
             tracker_type: Either "depth_based" (3D), "new_3d" (New 3D Kalman), or "simple_2d" (2D)
             settings: Settings dictionary to save
-            
+        
         Returns:
             True if successful, False otherwise
         """
         settings_file = self.get_settings_file(tracker_type)
+        settings = self.apply_reliable_led_tracking_preset(settings, tracker_type)
         settings['saved_at'] = datetime.now().isoformat()
         settings['tracker_type'] = tracker_type
         
@@ -197,6 +242,22 @@ class SettingsManager:
         
         return common_settings
     
+    def get_reliable_led_tracking_preset(self) -> Dict[str, Any]:
+        """Return a copy of the reliable LED/depth+skeleton tracking preset."""
+        return self.RELIABLE_LED_TRACKING_PRESET.copy()
+
+    def apply_reliable_led_tracking_preset(self, settings: Dict[str, Any], tracker_type: str) -> Dict[str, Any]:
+        """
+        Force the reliable LED/depth+skeleton preset for New 3D tracking.
+
+        The user should not have to manually align many UI controls. Existing color profiles,
+        camera settings, collapsed UI state, and unrelated tuning remain untouched.
+        """
+        merged = settings.copy()
+        if tracker_type == "new_3d" or merged.get('tracking_system') == "new_3d" or merged.get('tracker_type') == "new_3d":
+            merged.update(self.get_reliable_led_tracking_preset())
+        return merged
+
     def get_default_settings(self, tracker_type: str) -> Dict[str, Any]:
         """
         Get default settings for a specific tracker type.
@@ -221,6 +282,7 @@ class SettingsManager:
             'show_raw_yolo_detections': False,
             'ball_processing_density': 50,
             'pose_model_enabled': True,
+            'enable_pose_estimation': True,
             'pose_processing_density': 50,
             'collapsed_camera': False,
             'collapsed_yolo': False,
@@ -312,5 +374,6 @@ class SettingsManager:
                 'collapsed_new3d_association': False,
                 'collapsed_new3d_state': False,
             })
+            defaults = self.apply_reliable_led_tracking_preset(defaults, tracker_type)
         
         return defaults

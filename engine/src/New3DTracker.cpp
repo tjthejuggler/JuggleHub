@@ -51,11 +51,26 @@ New3DTracker::New3DTracker(const std::string& ball_model_path,
                   << ", using defaults" << std::endl;
     }
     
-    // If ball model was skipped, force simple tracking settings
+    // If ball model was skipped, force reliable LED/depth tracking settings regardless of stale UI JSON.
     if (!ball_model_loaded_) {
         settings_.enable_depth_blob_detection = true;
+        settings_.depth_blob_color_filter = true;
         settings_.enable_ball_detection = false;
-        std::cout << "[New3DTracker] ⚡ Simple mode: depth_blob_detection=ON, ball_detection=OFF" << std::endl;
+        settings_.enable_pose_estimation = true;
+        settings_.ball_processing_density = 100;
+        settings_.pose_processing_density = 100;
+        settings_.held_radius_m = std::max(settings_.held_radius_m, 0.18f);
+        settings_.association_max_distance_m = std::max(settings_.association_max_distance_m, 0.45f);
+        settings_.depth_blob_min_distance_m = 0.10f;
+        settings_.depth_blob_max_distance_m = std::max(settings_.depth_blob_max_distance_m, 3.0f);
+        settings_.depth_blob_min_area_px = std::max(2, settings_.depth_blob_min_area_px);
+        settings_.depth_blob_max_area_px = std::max(settings_.depth_blob_max_area_px, 120);
+        settings_.depth_blob_min_circularity = std::min(settings_.depth_blob_min_circularity, 0.20f);
+        settings_.show_depth_filtered_pixels = false;
+        settings_.show_depth_globs = true;
+        settings_.show_held_radius = true;
+        settings_.show_color_search_region = true;
+        std::cout << "[New3DTracker] ⚡ Simple mode: LED color+depth blobs=ON, YOLO ball=OFF, pose=ON every frame" << std::endl;
     }
     
     // Initialize GPU HSV converter
@@ -105,16 +120,16 @@ void New3DTracker::initializePersistentBalls() {
         ball.color_name = profile.name;
         ball.color_profile = profile;
         
-        // Initialize at default left hand position
+        // Initialize at a valid fallback position until the first hand or color detection arrives.
         ball.kf = createKalmanFilter(default_left_hand_pos);
         ball.last_known_position = default_left_hand_pos;
         ball.predicted_position = default_left_hand_pos;
         ball.last_detection_position = default_left_hand_pos;
+        ball.last_observed_velocity = cv::Point3f(0.0f, 0.0f, 0.0f);
         
-        // CRITICAL: Start in HELD state, associated with left hand (id=0)
-        // This assumes all balls start in the left hand until detected leaving
+        // Start HELD but unassigned. The first visible hands/detections decide the actual hand.
         ball.state = HELD;
-        ball.associated_hand_id = 0;  // Left hand
+        ball.associated_hand_id = -1;
         ball.frames_since_seen = 0;  // Consider it "seen" since we know where it is
         ball.consecutive_frames_seen = 0;
         ball.color_locked = true;  // Color is locked from the start since we know it
@@ -230,44 +245,7 @@ void New3DTracker::predictHeldBall(New3DBall& ball, const SimpleHand& hand, floa
     // For held balls, the Kalman filter tracks the hand's position
     // The predicted position is offset from the wrist towards the hand center
     
-    // Start with wrist position
-    cv::Point3f held_position = hand.wrist_pos_3d;
-    
-    // Calculate offset direction from forearm skeleton if available
-    if (!hand.keypoints.empty() && hand.keypoints.size() > 10) {
-        // COCO keypoint indices: 7=left_elbow, 8=right_elbow, 9=left_wrist, 10=right_wrist
-        int elbow_idx = (hand.id == 0) ? 7 : 8;   // 0=left hand, 1=right hand
-        int wrist_idx = (hand.id == 0) ? 9 : 10;
-        
-        // Check if both elbow and wrist keypoints are valid
-        if (elbow_idx < hand.keypoints.size() && wrist_idx < hand.keypoints.size()) {
-            const cv::Point3f& elbow_pos = hand.keypoints[elbow_idx];
-            const cv::Point3f& wrist_pos = hand.keypoints[wrist_idx];
-            
-            // Verify keypoints have valid depth (z > 0)
-            if (elbow_pos.z > 0.1f && wrist_pos.z > 0.1f) {
-                // Calculate forearm direction (from elbow to wrist)
-                cv::Point3f forearm_dir = wrist_pos - elbow_pos;
-                float forearm_length = std::sqrt(
-                    forearm_dir.x * forearm_dir.x +
-                    forearm_dir.y * forearm_dir.y +
-                    forearm_dir.z * forearm_dir.z
-                );
-                
-                // Normalize direction and apply offset
-                if (forearm_length > 0.01f) {  // Avoid division by zero
-                    forearm_dir = forearm_dir / forearm_length;
-                    
-                    // Convert offset from cm to meters and apply
-                    float offset_m = settings_.held_circle_offset_cm / 100.0f;
-                    held_position = wrist_pos + forearm_dir * offset_m;
-                    
-                    logDebug("  Ball ", ball.id, " held position offset by ", settings_.held_circle_offset_cm,
-                             "cm along forearm direction");
-                }
-            }
-        }
-    }
+    cv::Point3f held_position = calculateHeldPosition(hand, ball.last_known_position);
     
     ball.predicted_position = held_position;
     
@@ -302,8 +280,9 @@ void New3DTracker::predictInFlightBall(New3DBall& ball, float dt) {
     
     // CRITICAL: Only apply gravity and prediction if ball was recently seen
     // If ball hasn't been seen for a while, move it back to the hand it was associated with
-    // This allows easy re-acquisition when the ball comes back into view
-    if (ball.frames_since_seen < 30) {  // Only predict for 30 frames (~1 second)
+    // This allows easy re-acquisition when the ball comes back into view.
+    // If the ball is temporarily hidden in a hand, proximity re-acquisition below will snap it there.
+    if (ball.frames_since_seen < 90) {  // carry for ~3 seconds before freezing
         // Apply gravity to velocity states before prediction
         // Gravity affects velocity: v_new = v_old + g*dt
         // We add this as a control input to the state
@@ -321,50 +300,9 @@ void New3DTracker::predictInFlightBall(New3DBall& ball, float dt) {
             prediction.at<float>(2)
         );
     } else {
-        // Ball hasn't been seen for a while - move it back to left hand for easy re-acquisition
-        // Find left hand (id=0) and position ball there
-        bool found_hand = false;
-        for (const auto& hand : hands_) {
-            if (hand.id == 0) {  // Left hand
-                // Position at left hand with offset
-                cv::Point3f held_position = hand.wrist_pos_3d;
-                
-                // Apply offset along forearm if skeleton data available
-                if (!hand.keypoints.empty() && hand.keypoints.size() > 10) {
-                    int elbow_idx = 7;  // Left elbow
-                    int wrist_idx = 9;  // Left wrist
-                    
-                    if (elbow_idx < hand.keypoints.size() && wrist_idx < hand.keypoints.size()) {
-                        const cv::Point3f& elbow_pos = hand.keypoints[elbow_idx];
-                        const cv::Point3f& wrist_pos = hand.keypoints[wrist_idx];
-                        
-                        if (elbow_pos.z > 0.1f && wrist_pos.z > 0.1f) {
-                            cv::Point3f forearm_dir = wrist_pos - elbow_pos;
-                            float forearm_length = std::sqrt(
-                                forearm_dir.x * forearm_dir.x +
-                                forearm_dir.y * forearm_dir.y +
-                                forearm_dir.z * forearm_dir.z
-                            );
-                            
-                            if (forearm_length > 0.01f) {
-                                forearm_dir = forearm_dir / forearm_length;
-                                float offset_m = settings_.held_circle_offset_cm / 100.0f;
-                                held_position = wrist_pos + forearm_dir * offset_m;
-                            }
-                        }
-                    }
-                }
-                
-                ball.predicted_position = held_position;
-                found_hand = true;
-                break;
-            }
-        }
-        
-        if (!found_hand) {
-            // No hand found - keep at last known position
-            ball.predicted_position = ball.last_known_position;
-        }
+        // Ball has not been detected for a while. Freeze at the last reliable position;
+        // do not invent a catch or teleport it to a default hand.
+        ball.predicted_position = ball.last_known_position;
         
         // Zero out velocities in Kalman filter to stop further prediction
         ball.kf.statePost.at<float>(3) = 0.0f;  // vx
@@ -740,8 +678,9 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
     // =========================================================================
     // PHASE 1: Direct color matching for pre-identified detections
     // When color-first detection is active, each detection already knows its color.
-    // Match directly by color name — NO distance gate needed.
-    // This is the key insight: a pink detection IS the pink ball, period.
+    // Match directly by color name. A calibrated pink detection is the pink ball;
+    // however, if that ball is currently HELD and the same color blob is still inside
+    // the held hand radius, do not turn it into a throw. Keep skeleton ownership.
     // =========================================================================
     for (size_t j = 0; j < detections.size(); ++j) {
         if (detection_matched[j]) continue;
@@ -755,7 +694,26 @@ New3DTracker::AssociationResult New3DTracker::associateDetections(
             if (ball_matched[i]) continue;
             
             if (balls[i].color_name == detection.color_name) {
-                // Direct match by color — no distance check needed
+                if (balls[i].state == HELD && balls[i].associated_hand_id >= 0) {
+                    const SimpleHand* holding_hand = nullptr;
+                    for (const auto& hand : hands_) {
+                        if (hand.id == balls[i].associated_hand_id) {
+                            holding_hand = &hand;
+                            break;
+                        }
+                    }
+                    if (holding_hand) {
+                        cv::Point3f held_pos = calculateHeldPosition(*holding_hand, balls[i].last_known_position);
+                        float held_dist = cv::norm(detection.world_pos - held_pos);
+                        if (held_dist <= settings_.held_radius_m) {
+                            logDebug("  COLOR MATCH HELD-SKIP: Ball ", balls[i].id, " (", balls[i].color_name,
+                                     ") detection remains inside held radius dist=", held_dist, "m");
+                            continue;
+                        }
+                    }
+                }
+                
+                // Direct match by color — no distance check needed after held-radius guard.
                 MatchPair match;
                 match.ball = &balls[i];
                 match.detection = &detection;
@@ -934,8 +892,8 @@ void New3DTracker::handleHeldStateUpdate(
         return;
     }
     
-    // Calculate distance to associated hand
-    cv::Point3f hand_pos = holding_hand->wrist_pos_3d;
+    // Calculate distance to the same held-circle center used for skeleton hand-off tracking.
+    cv::Point3f hand_pos = calculateHeldPosition(*holding_hand, holding_hand->wrist_pos_3d);
     float dx = detection.world_pos.x - hand_pos.x;
     float dy = detection.world_pos.y - hand_pos.y;
     float dz = detection.world_pos.z - hand_pos.z;
@@ -955,11 +913,19 @@ void New3DTracker::handleHeldStateUpdate(
     if (distance_exceeded) {
         logDebug("      >>> THROW DETECTED! Ball ", ball.id, " thrown from Hand ", ball.associated_hand_id);
         
+        cv::Point3f previous_pos = ball.last_known_position;
+        
         // Transition to IN_FLIGHT state
         ball.state = IN_FLIGHT;
         int previous_hand_id = ball.associated_hand_id;
         ball.associated_hand_id = -1;
         ball.tracking_reason = "Throw detected";
+        ball.last_known_position = detection.world_pos;
+        ball.predicted_position = detection.world_pos;
+        ball.last_detection_position = detection.world_pos;
+        if (dt > 0.001f && previous_pos.z > 0.1f) {
+            ball.last_observed_velocity = (detection.world_pos - previous_pos) / dt;
+        }
         
         // Generate THROW event
         BallEvent throw_event;
@@ -1020,6 +986,8 @@ void New3DTracker::handleInFlightStateUpdate(
     logDebug("      BEFORE UPDATE: last_known_position = (", ball.last_known_position.x, ", ",
               ball.last_known_position.y, ", ", ball.last_known_position.z, ") m");
     
+    cv::Point3f previous_position = ball.last_known_position;
+    
     // Check if detection is far from prediction — if so, reset Kalman filter
     // This handles cases where the ball was unseen and the prediction drifted
     float dx_pred = ball.predicted_position.x - detection.world_pos.x;
@@ -1047,10 +1015,14 @@ void New3DTracker::handleInFlightStateUpdate(
         ball.kf.correct(measurement);
     }
     
+    if (previous_position.z > 0.1f) {
+        ball.last_observed_velocity = detection.world_pos - previous_position;
+    }
+    
     // Check distance to all hands for catch detection
     logDebug("      Checking catch distances (threshold: ", settings_.held_radius_m, "m):");
     for (const auto& hand : current_hands) {
-        cv::Point3f hand_pos = hand.wrist_pos_3d;
+        cv::Point3f hand_pos = calculateHeldPosition(hand, hand.wrist_pos_3d);
         float dx = detection.world_pos.x - hand_pos.x;
         float dy = detection.world_pos.y - hand_pos.y;
         float dz = detection.world_pos.z - hand_pos.z;
@@ -1060,9 +1032,9 @@ void New3DTracker::handleInFlightStateUpdate(
                   distance_to_hand, "m");
         
         // Detect catch: ball comes within held_radius of any hand
-        // Use a tighter threshold for catches to avoid false positives with depth blob noise
-        // Catch threshold is 70% of held_radius to require the ball to be clearly in the hand
-        float catch_threshold = settings_.held_radius_m * 0.7f;
+        // Use the full held radius for LED/depth mode: when the blob vanishes into a hand,
+        // proximity should keep the tracker on that hand instead of losing identity.
+        float catch_threshold = settings_.held_radius_m;
         if (distance_to_hand < catch_threshold) {
             logDebug("        >>> CATCH DETECTED! Ball ", ball.id, " caught by Hand ", hand.id);
             
@@ -1109,6 +1081,34 @@ void New3DTracker::handleInFlightStateUpdate(
 // PHASE 5: TRACK MANAGEMENT
 // ============================================================================
 
+cv::Point3f New3DTracker::calculateHeldPosition(const SimpleHand& hand, const cv::Point3f& fallback) const {
+    cv::Point3f held_position = fallback;
+    if (hand.wrist_pos_3d.z > 0.1f) {
+        held_position = hand.wrist_pos_3d;
+    }
+    
+    // Apply a small offset from wrist toward hand direction when elbow/wrist skeleton points are valid.
+    if (!hand.keypoints.empty() && hand.keypoints.size() > 10) {
+        int elbow_idx = (hand.id == 0) ? 7 : 8;
+        int wrist_idx = (hand.id == 0) ? 9 : 10;
+        if (elbow_idx < static_cast<int>(hand.keypoints.size()) &&
+            wrist_idx < static_cast<int>(hand.keypoints.size())) {
+            const cv::Point3f& elbow_pos = hand.keypoints[elbow_idx];
+            const cv::Point3f& wrist_pos = hand.keypoints[wrist_idx];
+            if (elbow_pos.z > 0.1f && wrist_pos.z > 0.1f) {
+                cv::Point3f forearm_dir = wrist_pos - elbow_pos;
+                float forearm_length = cv::norm(forearm_dir);
+                if (forearm_length > 0.01f) {
+                    forearm_dir = forearm_dir / forearm_length;
+                    held_position = wrist_pos + forearm_dir * (settings_.held_circle_offset_cm / 100.0f);
+                }
+            }
+        }
+    }
+    
+    return held_position;
+}
+
 void New3DTracker::handleUnmatchedBalls(
     const std::vector<New3DBall*>& unmatched_balls) {
     
@@ -1134,40 +1134,10 @@ void New3DTracker::handleUnmatchedBalls(
             }
             
             if (holding_hand) {
-                // Start with previous position as default
-                cv::Point3f held_position = ball->last_known_position;
-                
-                // Apply offset along forearm direction if skeleton data is available
-                if (!holding_hand->keypoints.empty() && holding_hand->keypoints.size() > 10) {
-                    // COCO keypoint indices: 7=left_elbow, 8=right_elbow, 9=left_wrist, 10=right_wrist
-                    int elbow_idx = (holding_hand->id == 0) ? 7 : 8;
-                    int wrist_idx = (holding_hand->id == 0) ? 9 : 10;
-                    
-                    if (elbow_idx < holding_hand->keypoints.size() && wrist_idx < holding_hand->keypoints.size()) {
-                        const cv::Point3f& elbow_pos = holding_hand->keypoints[elbow_idx];
-                        const cv::Point3f& wrist_pos = holding_hand->keypoints[wrist_idx];
-                        
-                        // Verify keypoints have valid depth
-                        if (elbow_pos.z > 0.1f && wrist_pos.z > 0.1f) {
-                            // Calculate forearm direction
-                            cv::Point3f forearm_dir = wrist_pos - elbow_pos;
-                            float forearm_length = std::sqrt(
-                                forearm_dir.x * forearm_dir.x +
-                                forearm_dir.y * forearm_dir.y +
-                                forearm_dir.z * forearm_dir.z
-                            );
-                            
-                            if (forearm_length > 0.01f) {
-                                forearm_dir = forearm_dir / forearm_length;
-                                float offset_m = settings_.held_circle_offset_cm / 100.0f;
-                                held_position = wrist_pos + forearm_dir * offset_m;
-                            }
-                        }
-                    }
-                }
-                
                 // Keep ball locked to held circle center even though it's not detected
+                cv::Point3f held_position = calculateHeldPosition(*holding_hand, ball->last_known_position);
                 ball->predicted_position = held_position;
+                ball->last_known_position = held_position;
                 // CRITICAL FIX: DO NOT update last_detection_position when ball is not detected
                 // last_detection_position should only be updated on ACTUAL detections
                 // This keeps the color search region anchored where the ball was last SEEN
@@ -1236,9 +1206,9 @@ void New3DTracker::reacquireHeldBallsByProximity(
         
         bool reacquired = false;
         for (const auto& hand : hands) {
-            // Check distance from ball's predicted position to hand's wrist
+            // Check distance from ball's predicted position to the held-circle center.
             const cv::Point3f& pred_pos = ball->predicted_position;
-            const cv::Point3f& hand_pos = hand.wrist_pos_3d;
+            cv::Point3f hand_pos = calculateHeldPosition(hand, hand.wrist_pos_3d);
             
             float dx = pred_pos.x - hand_pos.x;
             float dy = pred_pos.y - hand_pos.y;
@@ -1397,6 +1367,7 @@ void New3DTracker::createNewTracks(
                   << " with color match score=" << best_score << std::endl;
         
         // Update ball with detection
+        cv::Point3f previous_position = ball->last_known_position;
         ball->frames_since_seen = 0;
         ball->consecutive_frames_seen = 1;
         
@@ -1426,6 +1397,7 @@ void New3DTracker::createNewTracks(
         ball->last_known_position = detection->world_pos;
         ball->predicted_position = detection->world_pos;
         ball->last_detection_position = detection->world_pos;
+        ball->last_observed_velocity = (previous_position.z > 0.1f) ? (detection->world_pos - previous_position) : cv::Point3f(0.0f, 0.0f, 0.0f);
         
         // CRITICAL FIX: Always re-acquire as IN_FLIGHT
         // Let the normal catch detection logic in handleInFlightStateUpdate() handle
@@ -1468,56 +1440,14 @@ void New3DTracker::finalizeBallPositions(const std::vector<SimpleHand>& hands,
             }
             
             if (holding_hand) {
-                // Start with previous position as default
-                cv::Point3f held_position = ball.last_known_position;
-                
-                // Apply offset along forearm direction if skeleton data is available
-                if (!holding_hand->keypoints.empty() && holding_hand->keypoints.size() > 10) {
-                    // COCO keypoint indices: 7=left_elbow, 8=right_elbow, 9=left_wrist, 10=right_wrist
-                    int elbow_idx = (holding_hand->id == 0) ? 7 : 8;
-                    int wrist_idx = (holding_hand->id == 0) ? 9 : 10;
-                    
-                    if (elbow_idx < holding_hand->keypoints.size() && wrist_idx < holding_hand->keypoints.size()) {
-                        const cv::Point3f& elbow_pos = holding_hand->keypoints[elbow_idx];
-                        const cv::Point3f& wrist_pos = holding_hand->keypoints[wrist_idx];
-                        
-                        // Verify keypoints have valid depth
-                        if (elbow_pos.z > 0.1f && wrist_pos.z > 0.1f) {
-                            // Calculate forearm direction
-                            cv::Point3f forearm_dir = wrist_pos - elbow_pos;
-                            float forearm_length = std::sqrt(
-                                forearm_dir.x * forearm_dir.x +
-                                forearm_dir.y * forearm_dir.y +
-                                forearm_dir.z * forearm_dir.z
-                            );
-                            
-                            if (forearm_length > 0.01f) {
-                                forearm_dir = forearm_dir / forearm_length;
-                                float offset_m = settings_.held_circle_offset_cm / 100.0f;
-                                held_position = wrist_pos + forearm_dir * offset_m;
-                                
-                                logDebug("  Ball ", ball.id, " (", ball.color_name, ") HELD - locked to hand ",
-                                         ball.associated_hand_id, " held circle center: (", held_position.x, ", ",
-                                         held_position.y, ", ", held_position.z, ") m");
-                            } else {
-                                logDebug("  Ball ", ball.id, " (", ball.color_name, ") HELD - skeleton data invalid, ",
-                                         "keeping previous position");
-                            }
-                        } else {
-                            logDebug("  Ball ", ball.id, " (", ball.color_name, ") HELD - keypoints have invalid depth, ",
-                                     "keeping previous position");
-                        }
-                    } else {
-                        logDebug("  Ball ", ball.id, " (", ball.color_name, ") HELD - keypoint indices out of range, ",
-                                 "keeping previous position");
-                    }
-                } else {
-                    logDebug("  Ball ", ball.id, " (", ball.color_name, ") HELD - no skeleton data available, ",
-                             "keeping previous position");
-                }
+                cv::Point3f held_position = calculateHeldPosition(*holding_hand, ball.last_known_position);
+                logDebug("  Ball ", ball.id, " (", ball.color_name, ") HELD - locked to hand ",
+                         ball.associated_hand_id, " held circle center: (", held_position.x, ", ",
+                         held_position.y, ", ", held_position.z, ") m");
                 
                 // Update ball position
                 ball.last_known_position = held_position;
+                ball.predicted_position = held_position;
                 
                 // Also update pixel position for visualization
                 ball.pixel_pos = project3DTo2D(held_position, intrinsics);
@@ -2639,6 +2569,50 @@ std::pair<std::vector<New3DBall>, std::vector<BallEvent>> New3DTracker::updateNe
         logDebug("Ball ", ball.id, " (", ball.color_name, ") predicted at: (",
                   ball.predicted_position.x, ", ", ball.predicted_position.y, ", ",
                   ball.predicted_position.z, ") m");
+    }
+    
+    // STEP 1.5: Snap hidden in-flight balls to hands before association.
+    // This is the critical occlusion path: when a LED ball vanishes into a hand,
+    // keep that ball's tracker on the hand until color detection sees it leave again.
+    for (auto& ball : tracked_balls_) {
+        if (ball.state != IN_FLIGHT || ball.frames_since_seen < 1) {
+            continue;
+        }
+        
+        float best_dist = settings_.held_radius_m;
+        const SimpleHand* best_hand = nullptr;
+        for (const auto& hand : current_hands) {
+            cv::Point3f held_pos = calculateHeldPosition(hand, hand.wrist_pos_3d);
+            float dist = cv::norm(ball.predicted_position - held_pos);
+            if (dist < best_dist) {
+                best_dist = dist;
+                best_hand = &hand;
+            }
+        }
+        
+        if (best_hand) {
+            cv::Point3f held_pos = calculateHeldPosition(*best_hand, ball.predicted_position);
+            ball.state = HELD;
+            ball.associated_hand_id = best_hand->id;
+            ball.last_known_position = held_pos;
+            ball.predicted_position = held_pos;
+            ball.last_observed_velocity = cv::Point3f(0.0f, 0.0f, 0.0f);
+            ball.tracking_reason = "Occluded in hand (skeleton hand-off)";
+            ball.frames_since_seen = 0;
+            ball.kf = createKalmanFilter(held_pos);
+            
+            BallEvent catch_event;
+            catch_event.type = BallEvent::CATCH;
+            catch_event.ball_id = static_cast<int>(ball.id);
+            catch_event.hand_id = best_hand->id;
+            catch_event.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+            ).count();
+            events.push_back(catch_event);
+            
+            logDebug("--- OCCLUSION HAND-OFF: Ball ", ball.id, " (", ball.color_name,
+                     ") snapped to hand ", best_hand->id, " dist=", best_dist, "m ---");
+        }
     }
     
     // STEP 2: ASSOCIATION (with color-aware cost)

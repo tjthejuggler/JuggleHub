@@ -265,6 +265,11 @@ if PYQT_AVAILABLE:
             elif tracker_type == "simple_2d":
                 for section in self.tracker_2d_section_widgets:
                     section.setVisible(True)
+            elif tracker_type == "color_only":
+                # Reuse the New 3D sections: they contain the ball color calibration
+                # UI and the color/depth detection sliders that this tracker honors.
+                for section in self.tracker_new3d_section_widgets:
+                    section.setVisible(True)
 
         def on_ball_tracking_mode_changed(self, index=None):
             """Handle ball tracking mode toggle (Simple vs YOLO)
@@ -339,6 +344,35 @@ if PYQT_AVAILABLE:
                     self.use_dnn_tracker_toggle.setChecked(True)
                     self.use_dnn_tracker_toggle.setText("Enable YOLO Ball Detection")
             
+            elif mode == "color":
+                # Color-only mode: identity-free color-class tracking.
+                # Reports WHERE each COLOR ball is each frame; no ball identity,
+                # no throw/catch events, no AI models.
+                self.ball_tracking_mode_info.setText(
+                    "🎨 Color-only tracking: reports where each COLOR ball is (no ball identity)")
+                self.ball_tracking_mode_info.setStyleSheet("color: #FF9800; font-size: 10px; font-style: italic;")
+                
+                # Switch the (hidden) tracking system combo to color_only
+                idx = self.tracking_system_combo.findData("color_only")
+                if idx >= 0:
+                    self.tracking_system_combo.blockSignals(True)
+                    self.tracking_system_combo.setCurrentIndex(idx)
+                    self.tracking_system_combo.blockSignals(False)
+                
+                # If tracker isn't already color_only, switch it
+                # (saves previous tracker settings, sends SET_TRACKER_TYPE to engine)
+                if self.current_tracker != "color_only":
+                    self.on_tracking_system_changed()
+                
+                # Ask the engine to reload color profiles from the shared calibration
+                # file so freshly calibrated colors are picked up immediately
+                try:
+                    command = juggler_pb2.CommandRequest()
+                    command.type = juggler_pb2.CommandRequest.CommandType.RELOAD_COLOR_PROFILES
+                    self.zmq_client.send_command(command)
+                except Exception as e:
+                    print(f"ℹ️ Could not send RELOAD_COLOR_PROFILES (engine may be offline): {e}")
+             
             print(f"✅ Ball tracking mode set to: {mode}")
 
         def on_tracking_system_changed(self, index=None):
@@ -705,6 +739,9 @@ if PYQT_AVAILABLE:
                     if mode == "simple":
                         self.ball_tracking_mode_info.setText("⚡ Using depth + LED color detection (no YOLO ball model)")
                         self.ball_tracking_mode_info.setStyleSheet("color: #4CAF50; font-size: 10px; font-style: italic;")
+                    elif mode == "color":
+                        self.ball_tracking_mode_info.setText("🎨 Color-only tracking: reports where each COLOR ball is (no ball identity)")
+                        self.ball_tracking_mode_info.setStyleSheet("color: #FF9800; font-size: 10px; font-style: italic;")
                     else:
                         self.ball_tracking_mode_info.setText("🤖 Using YOLO AI model for ball detection")
                         self.ball_tracking_mode_info.setStyleSheet("color: #2196F3; font-size: 10px; font-style: italic;")

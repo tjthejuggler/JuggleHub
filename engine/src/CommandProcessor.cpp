@@ -1,6 +1,7 @@
 #include "CommandProcessor.hpp"
 #include "DebugLog.hpp"
 #include "New3DTracker.hpp"
+#include "ColorOnlyTracker.hpp"
 #include "../src/modules/UdpBallColorModule.hpp"
 #include "../src/modules/PositionToRgbModule.hpp"
 #include "../src/modules/UdpBallSettingsModule.hpp"
@@ -301,6 +302,17 @@ void CommandProcessor::handleExternalCommand(const juggler::v1::CommandRequest& 
                 } else {
                     response.set_success(false);
                     response.set_message("Failed to cast to New3DTracker");
+                }
+            } else if (current_tracker_type_ && *current_tracker_type_ == "color_only" && color_only_tracker_) {
+                writeDebugLog("CommandProcessor - RELOAD_COLOR_PROFILES for color_only tracker");
+                auto color_only = std::dynamic_pointer_cast<ColorOnlyTracker>(color_only_tracker_);
+                if (color_only) {
+                    color_only->reloadColorProfiles();
+                    response.set_message("Color profiles reloaded successfully");
+                    writeDebugLog("CommandProcessor - Color profiles reloaded (color_only)");
+                } else {
+                    response.set_success(false);
+                    response.set_message("Failed to cast to ColorOnlyTracker");
                 }
             } else {
                 response.set_success(false);

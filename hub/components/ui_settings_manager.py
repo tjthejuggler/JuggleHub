@@ -66,6 +66,7 @@ class SettingsManager:
         self.settings_3d_file = os.path.join(config_dir, "calibration_settings_3d.json")
         self.settings_new3d_file = os.path.join(config_dir, "calibration_settings_new3d.json")
         self.settings_2d_file = os.path.join(config_dir, "calibration_settings_2d.json")
+        self.settings_color_only_file = os.path.join(config_dir, "calibration_settings_color_only.json")
         self.legacy_settings_file = os.path.join(config_dir, "calibration_settings.json")
         
         # Ensure config directory exists
@@ -85,6 +86,8 @@ class SettingsManager:
             return self.settings_2d_file
         elif tracker_type == "new_3d":
             return self.settings_new3d_file
+        elif tracker_type == "color_only":
+            return self.settings_color_only_file
         else:
             return self.settings_3d_file
     
@@ -344,6 +347,23 @@ class SettingsManager:
                 'collapsed_trajectory': False,
                 'collapsed_hand_velocity': False,
                 'collapsed_ball_profiles': False,
+            })
+        
+        # Add Color-Only (identity-free) tracker defaults
+        elif tracker_type == "color_only":
+            defaults.update({
+                'tracking_system': 'color_only',
+                'ball_tracking_mode': 'color',
+                # Detection tuning (mirrors ColorOnlyTracker C++ defaults)
+                'use_depth_filter': True,
+                'depth_blob_min_distance_cm': 10,
+                'depth_blob_max_distance_cm': 300,
+                'depth_blob_hue_tolerance': 15,
+                'depth_blob_sat_minimum': 80,
+                'depth_blob_val_minimum': 80,
+                'depth_blob_min_area_px': 2,     # cm^2 (legacy key name)
+                'depth_blob_max_area_px': 120,   # cm^2 (legacy key name)
+                'depth_blob_min_circularity': 0.20,
             })
         
         # Add New 3D Kalman-specific defaults

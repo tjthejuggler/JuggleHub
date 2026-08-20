@@ -8,6 +8,7 @@
 #include "SimpleBallTracker.hpp"
 #include "Simple2DBallTracker.hpp"
 #include "New3DTracker.hpp"
+#include "ColorOnlyTracker.hpp"
 #include "CameraManager.hpp"
 #include "RecordingManager.hpp"
 #include "PlaybackController.hpp"
@@ -49,12 +50,13 @@ private:
     
     // Tracker system (polymorphic - can be any IBallTracker implementation)
     std::shared_ptr<IBallTracker> tracker_;
-    std::string current_tracker_type_;  // "depth_based", "simple_2d", or "new_3d"
+    std::string current_tracker_type_;  // "depth_based", "simple_2d", "new_3d", or "color_only"
     
     // Tracker instances
     std::shared_ptr<SimpleBallTracker> simple_tracker_;
     std::shared_ptr<Simple2DBallTracker> simple_2d_tracker_;
     std::shared_ptr<New3DTracker> new_3d_tracker_;
+    std::shared_ptr<ColorOnlyTracker> color_only_tracker_;
     bool use_dnn_tracker_;
     bool verbose_;
     bool simple_tracking_;  // When true, use depth+color tracking instead of YOLO for balls

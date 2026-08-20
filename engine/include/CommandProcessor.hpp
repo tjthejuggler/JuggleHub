@@ -39,6 +39,7 @@ public:
     void setSimpleTracker(std::shared_ptr<IBallTracker> tracker) { simple_tracker_ = tracker; }
     void setSimple2DTracker(std::shared_ptr<IBallTracker> tracker) { simple_2d_tracker_ = tracker; }
     void setNew3DTracker(std::shared_ptr<IBallTracker> tracker) { new_3d_tracker_ = tracker; }
+    void setColorOnlyTracker(std::shared_ptr<IBallTracker> tracker) { color_only_tracker_ = tracker; }
     void setColorModule(UdpBallColorModule* color_module) { color_module_ = color_module; }
     void setSettingsModule(juggler::modules::UdpBallSettingsModule* settings_module) { settings_module_ = settings_module; }
     void setVisualizationStates(juggler::v1::VisualizationStates* viz_states) { visualization_states_ = viz_states; }
@@ -64,11 +65,13 @@ public:
     void setTrackerReferences(std::shared_ptr<IBallTracker> tracker,
                              std::shared_ptr<IBallTracker> simple_tracker,
                              std::shared_ptr<IBallTracker> simple_2d_tracker,
-                             std::shared_ptr<IBallTracker> new_3d_tracker) {
+                             std::shared_ptr<IBallTracker> new_3d_tracker,
+                             std::shared_ptr<IBallTracker> color_only_tracker = nullptr) {
         tracker_ = tracker;
         simple_tracker_ = simple_tracker;
         simple_2d_tracker_ = simple_2d_tracker;
         new_3d_tracker_ = new_3d_tracker;
+        color_only_tracker_ = color_only_tracker;
     }
     
     // Module management
@@ -100,6 +103,7 @@ private:
     std::shared_ptr<IBallTracker> simple_tracker_;
     std::shared_ptr<IBallTracker> simple_2d_tracker_;
     std::shared_ptr<IBallTracker> new_3d_tracker_;
+    std::shared_ptr<IBallTracker> color_only_tracker_;
     UdpBallColorModule* color_module_;
     juggler::modules::UdpBallSettingsModule* settings_module_;
     juggler::v1::VisualizationStates* visualization_states_;

@@ -6,6 +6,7 @@
 #include "SimpleBallTracker.hpp"
 #include "Simple2DBallTracker.hpp"
 #include "New3DTracker.hpp"
+#include "ColorOnlyTracker.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -87,6 +88,10 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
                 ball_model_path, pose_model_path, device_name, "hub/calibration_settings_new3d.json");
             writeDebugLog("Engine constructor: New3D tracker initialized successfully");
         }
+
+        // ColorOnlyTracker is lightweight (no AI models, pure OpenCV) - always available
+        color_only_tracker_ = std::make_shared<ColorOnlyTracker>("hub/calibration_settings_color_only.json");
+        writeDebugLog("Engine constructor: ColorOnly tracker (identity-free) initialized successfully");
     } catch (const std::exception& e) {
         writeDebugLog("Engine constructor: EXCEPTION in tracker init: " + std::string(e.what()));
         return;
@@ -109,7 +114,7 @@ Engine::Engine(const std::string& camera_settings_path, const std::string& devic
         &video_feed_enabled_,
         &current_tracker_type_
     );
-    command_processor_->setTrackerReferences(tracker_, simple_tracker_, simple_2d_tracker_, new_3d_tracker_);
+    command_processor_->setTrackerReferences(tracker_, simple_tracker_, simple_2d_tracker_, new_3d_tracker_, color_only_tracker_);
     command_processor_->setTrackerSwitchCallback([this](const std::string& type) {
         this->setTrackerType(type);
     });
@@ -786,6 +791,15 @@ void Engine::setTrackerType(const std::string& tracker_type) {
         tracker_ = new_3d_tracker_;
         current_tracker_type_ = "new_3d";
         writeDebugLog("setTrackerType() - Switched to new_3d tracker");
+        
+    } else if (tracker_type == "color_only") {
+        if (!color_only_tracker_) {
+            // Lazy init safety net (normally created in the constructor)
+            color_only_tracker_ = std::make_shared<ColorOnlyTracker>("hub/calibration_settings_color_only.json");
+        }
+        tracker_ = color_only_tracker_;
+        current_tracker_type_ = "color_only";
+        writeDebugLog("setTrackerType() - Switched to color_only tracker (identity-free)");
         
     } else {
         throw std::runtime_error("Unknown tracker type: " + tracker_type);

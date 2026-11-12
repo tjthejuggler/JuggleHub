@@ -416,6 +416,22 @@ runs the identical frame path headless over real box30 frames (passes:
 frame-rate independent. §3 identical. NOT yet tested on the camera —
 first live run is the user's.
 
+**Live counter v1 result + v2 fixes (2026-11-12 evening).**
+First live test (user, slow 3-ball cascade, real count 50): tracker showed
+10 — vs offline replay of cascade60 which OVER-counts (+6). Live delivery,
+not tracking, was broken. Diagnosed in live.py v2:
+1. at ~19 fps inference we cannot consume the 30 fps stream; the old loop
+   read QUEUED frames -> ever-growing staleness + queue-overflow frame
+   gaps exactly at catch moments. v2: capture thread keeps only the NEWEST
+   frame (LatestFrame).
+2. processing ~2 of 3 frames while dt stayed fixed at 1/30 inflated ball
+   speeds ~60% -> max_catch_speed gate denied real catches. v2: cfg.fps is
+   set from the measured median frame interval (honest dt).
+Also added --record <label> (saves the live session as a normal recording
+for offline scoring) and a wrists-L+R indicator on the overlay (pose
+losing a wrist is the other live-only failure mode). Selftest + §3
+identical. Awaiting the user's retest.
+
 ## 6. Quick reference
 
 | thing | where |

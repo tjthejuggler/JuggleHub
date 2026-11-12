@@ -1,28 +1,25 @@
-"""Live catch counter: watch the camera, count catches while you juggle.
+"""Live catch counter + test harness: measure how good live counting is.
 
 Same pipeline that is scored offline (perceive() + JuggleTracker), same
-constants — nothing is tuned here. The overlay shows the live CATCH/THROW
-counts (total + per hand), the last few events, the processing fps and the
-camera status lines (exposure mode, repeated-frame warning).
+constants — nothing is tuned here. Every take is RECORDED and LABELLED, so
+failures can be replayed offline frame-by-frame afterwards.
 
-Delivery notes (fixed after the first live test counted 10 of 50 catches):
-  * a capture thread keeps only the NEWEST camera frame — at ~19 fps of
-    inference we cannot consume 30 fps, and reading queued frames made the
-    tracker see ever-staler frames with overflow gaps right at catches;
-  * the tracker's dt comes from the MEASURED frame interval. Processing
-    every-other-ish frame with dt fixed at 1/30 inflated ball speeds ~60%
-    and the catch speed gate denied real catches.
-
-Keys:  r = reset counts, q or Esc = quit, space = pause.
---record <label> also saves the session as a normal recording under
-tracking_lab/recordings/ (scorable afterwards with mark_catches/evaluate).
+Session protocol (all on-screen):
+  * the overlay shows the TARGET catch count (--target, default 50);
+  * press  s  to START a take: a fresh tracker begins counting and the
+    camera frames are written as a recording;
+  * juggle the pattern, doing exactly the target number of catches;
+  * press  s  to STOP: the take ends, the tracker's count is frozen and
+    the terminal asks for your TRUE count — type it and press Enter;
+  * meta.json for the take stores BOTH numbers (tracker vs truth) plus
+    frame stamps, so the offline analysis knows exactly what to match.
+Other keys:  r = reset counts mid-take (drop recovery),  q = quit.
 
 Usage:
-  python3 -m tracking_lab.live                          # RealSense D455
+  python3 -m tracking_lab.live --target 50            # RealSense, 50 catches
   python3 -m tracking_lab.live --source webcam
-  python3 -m tracking_lab.live --record cascade50live
-  python3 -m tracking_lab.live --set held_radius_px=85   # config overrides
-  python3 -m tracking_lab.live --selftest               # headless wiring test
+  python3 -m tracking_lab.live --set held_radius_px=85  # config overrides
+  python3 -m tracking_lab.live --selftest             # headless wiring test
 """
 from __future__ import annotations
 
@@ -42,6 +39,8 @@ from .detectors import BallDetector, MotionDetector, PoseDetector
 from .perception import make_depth_fn, perceive
 from .tracker import JuggleTracker, TrackingConfig, _color_hist
 from .wizard import Cam, OUT_ROOT
+
+color_w, color_h = 640, 480     # set from the first frame at runtime
 
 
 def process_frame(tracker: JuggleTracker, rgb, depth, det, pose, motion,
@@ -85,58 +84,20 @@ class LatestFrame:
         self.t.join(timeout=2.0)
 
 
-class LiveRecorder:
-    """Writes the processed frames as a normal recording session (same layout
-    the wizard produces), so a live run can be scored offline afterwards."""
-
-    def __init__(self, label: str, has_depth: bool):
-        ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.out = os.path.join(OUT_ROOT, f"{ts}_{label}")
-        self.rgb_dir = os.path.join(self.out, "no_boxes")
-        os.makedirs(self.rgb_dir, exist_ok=True)
-        self.depth_dir = os.path.join(self.out, "depth")
-        self.has_depth = has_depth
-        if has_depth:
-            os.makedirs(self.depth_dir, exist_ok=True)
-        self.label = label
-        self.n = 0
-        self.stamps: list[float] = []
-
-    def add(self, color, depth, t0: float):
-        cv2.imwrite(os.path.join(self.rgb_dir, f"frame_{self.n}.jpg"), color,
-                    [cv2.IMWRITE_JPEG_QUALITY, 95])
-        if depth is not None:
-            cv2.imwrite(os.path.join(self.depth_dir,
-                                     f"frame_{self.n}_depth.png"), depth)
-        self.stamps.append(round(time.time() - t0, 4))
-        self.n += 1
-
-    def finish(self, fps_effective: float, cam: Cam | None = None):
-        meta = dict(label=self.label, source=(cam.source if cam else "unknown"),
-                    width=color_w, height=color_h,
-                    fps=round(fps_effective, 1), frames=self.n,
-                    duration_s=round(self.stamps[-1] if self.stamps else 0.0, 2),
-                    live=True)
-        if cam is not None:
-            meta["rgb_exposure"] = cam.exposure
-        meta["stamps"] = self.stamps
-        with open(os.path.join(self.out, "meta.json"), "w") as f:
-            json.dump(meta, f, indent=2)
-        print(f"saved live recording: {self.out} ({self.n} frames @ "
-              f"{fps_effective:.1f} fps)")
-        return self.out
-
-
-color_w, color_h = 640, 480     # set from the first frame at runtime
+def n_catches(tracker: JuggleTracker) -> int:
+    return sum(1 for e in tracker.events if e["event"] == "CATCH")
 
 
 def draw(img, tracker: JuggleTracker, fps: float, status: list,
-         paused: bool, wrists: dict) -> np.ndarray:
+         target: int, running: bool, wrists: dict,
+         last_result: str | None) -> np.ndarray:
     frame = img.copy()
-    catches = [e for e in tracker.events if e["event"] == "CATCH"]
-    throws = [e for e in tracker.events if e["event"] == "THROW"]
-    left = sum(1 for e in catches if e.get("hand") == "left_wrist")
-    right = sum(1 for e in catches if e.get("hand") == "right_wrist")
+    catches = n_catches(tracker)
+    throws = sum(1 for e in tracker.events if e["event"] == "THROW")
+    left = sum(1 for e in tracker.events
+               if e["event"] == "CATCH" and e.get("hand") == "left_wrist")
+    right = sum(1 for e in tracker.events
+                if e["event"] == "CATCH" and e.get("hand") == "right_wrist")
 
     for t in tracker.tracks:
         if getattr(t, "pending", False):
@@ -150,17 +111,23 @@ def draw(img, tracker: JuggleTracker, fps: float, status: list,
     for hand, (wx, wy) in wrists.items():
         cv2.circle(frame, (int(wx), int(wy)), 8, (255, 0, 255), 2)
 
-    cv2.putText(frame, str(len(catches)), (24, 96),
-                cv2.FONT_HERSHEY_SIMPLEX, 2.6, (0, 255, 0), 6)
+    # the big number: target while idle, tracker count while running
+    big_txt = str(target) if not running else str(catches)
+    big_col = (0, 255, 255) if not running else \
+        ((0, 255, 0) if catches >= target else (0, 200, 255))
+    cv2.putText(frame, big_txt, (24, 96), cv2.FONT_HERSHEY_SIMPLEX, 2.6,
+                big_col, 6)
     wrist_txt = f"wrists: {'L' if 'left_wrist' in wrists else '-'}" \
                 f"{'+R' if 'right_wrist' in wrists else ''}"
     if len(wrists) < 2:
         wrist_txt += "  (pose missing a wrist!)"
-    lines = [f"catches {len(catches)}   L {left}  R {right}",
-             f"throws {len(throws)}   C-T {len(catches) - len(throws)}",
-             f"{fps:.1f} fps   {wrist_txt}"]
-    if paused:
-        lines.insert(0, "PAUSED (space to resume)")
+    lines = [f"catches {catches} / target {target}   L {left}  R {right}",
+             f"throws {throws}   C-T {catches - throws}",
+             f"{fps:.1f} fps   {wrist_txt}",
+             "press S to START the take" if not running
+             else "recording... press S to STOP at the target"]
+    if last_result:
+        lines.insert(0, last_result)
     for i, txt in enumerate(lines):
         cv2.putText(frame, txt, (24, 128 + 26 * i),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
@@ -176,14 +143,67 @@ def draw(img, tracker: JuggleTracker, fps: float, status: list,
     return frame
 
 
+class TakeRecorder:
+    """Writes a take as a normal recording session (same layout the wizard
+    produces) plus the live-specific truth labels in meta.json."""
+
+    def __init__(self, label: str, has_depth: bool):
+        ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.out = os.path.join(OUT_ROOT, f"{ts}_{label}")
+        self.rgb_dir = os.path.join(self.out, "no_boxes")
+        os.makedirs(self.rgb_dir, exist_ok=True)
+        self.depth_dir = os.path.join(self.out, "depth")
+        if has_depth:
+            os.makedirs(self.depth_dir, exist_ok=True)
+        self.label, self.has_depth = label, has_depth
+        self.n = 0
+        self.stamps: list[float] = []
+
+    def add(self, color, depth, t0: float):
+        cv2.imwrite(os.path.join(self.rgb_dir, f"frame_{self.n}.jpg"), color,
+                    [cv2.IMWRITE_JPEG_QUALITY, 95])
+        if depth is not None:
+            cv2.imwrite(os.path.join(self.depth_dir,
+                                     f"frame_{self.n}_depth.png"), depth)
+        self.stamps.append(round(time.time() - t0, 4))
+        self.n += 1
+
+    def finish(self, meta_extra: dict, cam: Cam | None = None,
+               fps_effective: float = 0.0):
+        meta = dict(label=self.label, source=(cam.source if cam else "unknown"),
+                    width=color_w, height=color_h,
+                    fps=round(fps_effective, 1), frames=self.n,
+                    duration_s=round(self.stamps[-1] if self.stamps else 0.0, 2),
+                    live_take=True, started=self.out.split("/")[-1][:19])
+        if cam is not None:
+            meta["rgb_exposure"] = cam.exposure
+            meta.update(cam.guard.meta())
+        meta["stamps"] = self.stamps
+        meta.update(meta_extra)
+        with open(os.path.join(self.out, "meta.json"), "w") as f:
+            json.dump(meta, f, indent=2)
+        return self.out
+
+
+def ask_true_count(default: int) -> int:
+    """Ask the user for the real catch count of the take they just did."""
+    try:
+        raw = input(f"\nHow many catches did you JUST do? "
+                    f"[tracker said {default}; Enter = {default}]: ").strip()
+        return int(raw) if raw else default
+    except (ValueError, EOFError):
+        print("could not read a number — using the tracker count")
+        return default
+
+
 def main(argv=None) -> int:
     global color_w, color_h
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--source", default="realsense",
                     choices=["realsense", "webcam"])
-    ap.add_argument("--record", default=None, metavar="LABEL",
-                    help="also save the session as a recording under "
-                         "tracking_lab/recordings/")
+    ap.add_argument("--target", type=int, default=50,
+                    help="catches you will juggle per take (shown on screen)")
+    ap.add_argument("--label", default="live", help="take label prefix")
     ap.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
                     help="override one TrackingConfig field (as in evaluate)")
     ap.add_argument("--selftest", action="store_true",
@@ -214,66 +234,105 @@ def main(argv=None) -> int:
     motion = MotionDetector()
     cam = Cam(a.source)
     grab = LatestFrame(cam)
-    tracker = JuggleTracker(cfg)
-    rec = LiveRecorder(a.record, cam.source == "realsense") if a.record else None
+    cfg_work = cfg          # working copy whose fps adapts to the real rate
+    tracker = JuggleTracker(cfg_work)
+    running, take, t_take0 = False, None, 0.0
+    intervals: list[float] = []
     idx = 0
     fps, last_t, last_show = 0.0, time.perf_counter(), time.perf_counter()
-    intervals: list[float] = []
-    paused, wrists = False, {}
-    t0 = time.time()
-    print("live counter running: r=reset  q=quit  space=pause")
+    last_result = None
+    wrists: dict = {}
+    results: list[dict] = []
+    take_no = 0
+    print(f"live harness: target {a.target} catches per take. "
+          "S=start/stop take, r=reset, q=quit.")
     try:
         while True:
             color, depth = grab.get()
             color_h, color_w = color.shape[:2]
-            if not paused:
+            if running:
                 intervals.append(time.perf_counter() - last_t)
-                if len(intervals) > 60:      # keep the interval window fresh
+                if len(intervals) > 60:
                     intervals.pop(0)
                 if len(intervals) >= 20:
-                    # honest dt: the tracker must know how much real time
-                    # actually passed between the frames it sees
                     med = sorted(intervals)[len(intervals) // 2]
-                    cfg.fps = max(min(1.0 / max(med, 1e-3), 60.0), 5.0)
+                    cfg_work.fps = max(min(1.0 / max(med, 1e-3), 60.0), 5.0)
                 _ev, wrists = process_frame(tracker, color, depth, det, pose,
                                             motion, idx)
-                if rec is not None:
-                    rec.add(color, depth, t0)
+                take.add(color, depth, t_take0)
                 idx += 1
+            else:
+                wrists = {}   # idle: no tracking, no stale wrist dots
             now = time.perf_counter()
             fps = fps * 0.9 + (1.0 / max(now - last_t, 1e-6)) * 0.1
             last_t = now
             if now - last_show > 0.03:
                 cv2.imshow("live", draw(color, tracker, fps,
-                                        cam.status_lines(), paused, wrists))
+                                        cam.status_lines(), a.target,
+                                        running, wrists, last_result))
                 last_show = now
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
                 break
-            if key == ord("r"):
-                tracker = JuggleTracker(cfg)
+            if key == ord("s"):
+                if not running:
+                    # START: fresh tracker and recorder for this take
+                    take_no += 1
+                    cfg_work = TrackingConfig(**{
+                        f.name: getattr(cfg, f.name)
+                        for f in cfg.__dataclass_fields__.values()})
+                    tracker = JuggleTracker(cfg_work)
+                    take = TakeRecorder(f"{a.label}{a.target}_t{take_no}",
+                                        cam.source == "realsense")
+                    t_take0 = time.time()
+                    intervals, idx = [], 0
+                    running, last_result = True, None
+                    cam.guard.reset()
+                    print(f"take {take_no} STARTED (target {a.target})")
+                else:
+                    # STOP: save take + truth
+                    running = False
+                    trk = n_catches(tracker)
+                    true_n = ask_true_count(trk)
+                    eff_fps = take.n / max(time.time() - t_take0, 0.01)
+                    path = take.finish(
+                        dict(target=a.target, tracker_catch_count=trk,
+                             tracker_throw_count=sum(
+                                 1 for e in tracker.events
+                                 if e["event"] == "THROW"),
+                             user_count=true_n),
+                        cam, eff_fps)
+                    results.append(dict(take=take_no, true=true_n, trk=trk,
+                                        path=path))
+                    last_result = (f"take {take_no}: TRUE {true_n} vs "
+                                   f"TRACKER {trk}")
+                    print(f"take {take_no} saved: {path}\n"
+                          f"  TRUE {true_n} vs TRACKER {trk} "
+                          f"({trk - true_n:+d})")
+            if key == ord("r") and running:
+                tracker = JuggleTracker(cfg_work)
                 idx = 0
-                print("counts reset")
-            if key == ord(" "):
-                paused = not paused
+                print("counts reset (mid-take)")
     except KeyboardInterrupt:
         pass
     finally:
         grab.close()
         cam.close()
         cv2.destroyAllWindows()
-        if rec is not None:
-            rec.finish(idx / max(time.time() - t0, 0.01), cam)
-    catches = [e for e in tracker.events if e["event"] == "CATCH"]
-    print(f"session total: {len(catches)} catches "
-          f"(tracker ran at {cfg.fps:.1f} fps)")
+    if results:
+        print("\n=== live harness session summary ===")
+        for r in results:
+            print(f"take {r['take']}: true {r['true']}  tracker {r['trk']} "
+                  f"({r['trk'] - r['true']:+d})  {r['path']}")
+    else:
+        print("no completed takes (press s to start/stop a take)")
     return 0
 
 
 def _selftest(cfg: TrackingConfig) -> int:
-    """Headless: the exact live frame path over a cached recording's raw
-    frames (real detectors, no camera, no GUI). Verifies wiring only —
-    scores come from evaluate/event_score, not here."""
+    """Headless: the exact live frame path over a recording's raw frames
+    (real detectors, no camera, no GUI). Verifies wiring only — scores
+    come from evaluate/event_score, not here."""
     from . import evaluate
     from .recording import RecordingSession
 
@@ -288,10 +347,10 @@ def _selftest(cfg: TrackingConfig) -> int:
     for i in range(n):
         fr = sess[i]
         process_frame(tracker, fr.rgb, fr.depth, det, pose, motion, i)
-    catches = [e for e in tracker.events if e["event"] == "CATCH"]
-    print(f"selftest: {n} frames -> {len(catches)} catches, "
+    catches = n_catches(tracker)
+    print(f"selftest: {n} frames -> {catches} catches, "
           f"{len(tracker.events)} events, tracks {len(tracker.tracks)}")
-    assert len(catches) > 0, "no catches in 120 frames of box30 — wiring broken"
+    assert catches > 0, "no catches in 120 frames of box30 — wiring broken"
     print("selftest OK")
     return 0
 

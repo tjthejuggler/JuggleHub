@@ -1,0 +1,11 @@
+opencv-python>=4.8
+numpy>=1.24
+pillow>=10.0
+# SAM 3 official code (un-gated, Apache-2.0):
+#   git clone --depth 1 https://github.com/facebookresearch/sam3.git .third_party/sam3
+#   pip install -e .third_party/sam3
+#   pip install einops iopath hydra-core triton pycocotools psutil timm pandas submitit
+# Weights (no HF form/auth needed):
+#   bash sam3_live/fetch_weights.sh   -> models/sam3/sam3.pt (un-gated 1038lab mirror)
+# GPU box: torch>=2.7 + torchvision from https://download.pytorch.org/whl/cu128
+# RealSense input additionally needs: pyrealsense2

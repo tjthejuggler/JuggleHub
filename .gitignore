@@ -43,6 +43,8 @@ recordings/
 # Configuration files (keep templates)
 *.json
 !*_template.json
+!tracking_lab/baseline_eval_v8.json
+!tracking_lab/ground_truth/*.json
 
 # Compiled binaries
 *.exe
@@ -73,3 +75,26 @@ data_augmentation/config.py
 perf.data*
 # Memory Bank (local AI context)
 memory-bank/
+
+models/
+.third_party/
+tracking_lab/zai_apikey.txt
+
+# Secrets (never commit; rotate if they ever leak)
+tracking_lab/ngrok_token.txt
+
+# Scratch space, datasets and model checkpoints at the repo root
+.tmp/
+/*.zip
+/*.pt
+
+# Local AI context (codebase-memory graph) — machine-local, never commit
+.codebase-memory/
+
+# Profiling dumps and per-machine camera calibration output
+profile_results_*/
+camera_settings/
+
+# Root-level scratch analysis dumps (session artifacts, not source)
+/*.txt
+/*.jpg

@@ -1,0 +1,129 @@
+{
+ "session": "2026-11-10_19-25-59_box30",
+ "catches": [
+  {
+   "frame": 29,
+   "side": "L"
+  },
+  {
+   "frame": 30,
+   "side": "R"
+  },
+  {
+   "frame": 41,
+   "side": "L"
+  },
+  {
+   "frame": 42,
+   "side": "R"
+  },
+  {
+   "frame": 55,
+   "side": "R"
+  },
+  {
+   "frame": 56,
+   "side": "L"
+  },
+  {
+   "frame": 66,
+   "side": "L"
+  },
+  {
+   "frame": 67,
+   "side": "R"
+  },
+  {
+   "frame": 79,
+   "side": "R"
+  },
+  {
+   "frame": 80,
+   "side": "L"
+  },
+  {
+   "frame": 91,
+   "side": "L"
+  },
+  {
+   "frame": 91,
+   "side": "R"
+  },
+  {
+   "frame": 103,
+   "side": "L"
+  },
+  {
+   "frame": 104,
+   "side": "R"
+  },
+  {
+   "frame": 115,
+   "side": "L"
+  },
+  {
+   "frame": 116,
+   "side": "R"
+  },
+  {
+   "frame": 128,
+   "side": "L"
+  },
+  {
+   "frame": 129,
+   "side": "R"
+  },
+  {
+   "frame": 139,
+   "side": "L"
+  },
+  {
+   "frame": 140,
+   "side": "R"
+  },
+  {
+   "frame": 152,
+   "side": "L"
+  },
+  {
+   "frame": 152,
+   "side": "R"
+  },
+  {
+   "frame": 163,
+   "side": "L"
+  },
+  {
+   "frame": 164,
+   "side": "R"
+  },
+  {
+   "frame": 176,
+   "side": "L"
+  },
+  {
+   "frame": 177,
+   "side": "R"
+  },
+  {
+   "frame": 187,
+   "side": "L"
+  },
+  {
+   "frame": 188,
+   "side": "R"
+  },
+  {
+   "frame": 200,
+   "side": "L"
+  },
+  {
+   "frame": 201,
+   "side": "R"
+  },
+  {
+   "frame": 214,
+   "side": "L"
+  }
+ ]
+}

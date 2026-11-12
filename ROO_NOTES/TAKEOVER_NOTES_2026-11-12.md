@@ -432,6 +432,22 @@ for offline scoring) and a wrists-L+R indicator on the overlay (pose
 losing a wrist is the other live-only failure mode). Selftest + §3
 identical. Awaiting the user's retest.
 
+**Diagnosis of live50_t1 (2026-11-12 20:11, true 50 vs tracker 8).**
+The saved take is CLEAN: 385 frames @15.5 fps, wrists present 385/385,
+3.01 dets/frame. Replayed offline: **31 catches** (fps 30..5 constant:
+all 31; live-faithful emulation with depth+hist: 32; noisy live-like fps:
+34; constant 30 wrong-fps: 19). The v2 take (518 frames, 19:58) replays
+to 39. So the recorded frames contain a ~30-catch pattern and the
+tracker recovers it — but the LIVE loop's tracker only emitted 8 from
+the same stream. The divergence is in live-only state (most plausibly
+the adaptive cfg.fps schedule interacting with a slow oscillating loop,
+or inputs that differ from what got recorded). v4 instruments every
+tracked frame (telemetry.json: fps used, wrists, det count, running
+catch count) and stores live tracker events in meta.json, so the next
+take either reproduces the 8 (diffable per-frame) or the fix lands.
+Next: user does one more take with v4; then frame-level diff of live
+telemetry vs offline replay of the same take.
+
 ## 6. Quick reference
 
 | thing | where |

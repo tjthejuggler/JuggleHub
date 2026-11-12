@@ -44,13 +44,14 @@ color_w, color_h = 640, 480     # set from the first frame at runtime
 
 
 def process_frame(tracker: JuggleTracker, rgb, depth, det, pose, motion,
-                  idx: int) -> tuple[list[dict], dict]:
-    """One live frame through the exact offline pipeline -> (events, wrists)."""
+                  idx: int) -> tuple[list[dict], dict, int]:
+    """One live frame through the exact offline pipeline ->
+    (events, wrists, n_detections)."""
     wrists, face_pt, dets_raw, _n = perceive(rgb, det, pose, motion)
     depth_fn = make_depth_fn(depth, rgb.shape[:2]) if depth is not None else None
     dets = [(box, score, cls, _color_hist(rgb, box)) for box, score, cls in dets_raw]
     events = tracker.step(idx, dets, wrists, rgb, depth_fn, face_pt)
-    return events, wrists
+    return events, wrists, len(dets_raw)
 
 
 class LatestFrame:
@@ -144,6 +145,8 @@ def draw(img, tracker: JuggleTracker, fps: float, status: list,
 
 
 class TakeRecorder:
+    """Also captures per-frame telemetry (fps used, wrists, det count, catch
+    count) so a live divergence can be replayed offline and diffed."""
     """Writes a take as a normal recording session (same layout the wizard
     produces) plus the live-specific truth labels in meta.json."""
 
@@ -158,6 +161,7 @@ class TakeRecorder:
         self.label, self.has_depth = label, has_depth
         self.n = 0
         self.stamps: list[float] = []
+        self.telemetry: list[dict] = []
 
     def add(self, color, depth, t0: float):
         cv2.imwrite(os.path.join(self.rgb_dir, f"frame_{self.n}.jpg"), color,
@@ -169,7 +173,7 @@ class TakeRecorder:
         self.n += 1
 
     def finish(self, meta_extra: dict, cam: Cam | None = None,
-               fps_effective: float = 0.0):
+               fps_effective: float = 0.0, events: list | None = None):
         meta = dict(label=self.label, source=(cam.source if cam else "unknown"),
                     width=color_w, height=color_h,
                     fps=round(fps_effective, 1), frames=self.n,
@@ -180,6 +184,10 @@ class TakeRecorder:
             meta.update(cam.guard.meta())
         meta["stamps"] = self.stamps
         meta.update(meta_extra)
+        if events is not None:
+            meta["tracker_events"] = events
+        with open(os.path.join(self.out, "telemetry.json"), "w") as f:
+            json.dump(self.telemetry, f)
         with open(os.path.join(self.out, "meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
         return self.out
@@ -257,9 +265,12 @@ def main(argv=None) -> int:
                 if len(intervals) >= 20:
                     med = sorted(intervals)[len(intervals) // 2]
                     cfg_work.fps = max(min(1.0 / max(med, 1e-3), 60.0), 5.0)
-                _ev, wrists = process_frame(tracker, color, depth, det, pose,
-                                            motion, idx)
+                _ev, wrists, n_det = process_frame(tracker, color, depth,
+                                                   det, pose, motion, idx)
                 take.add(color, depth, t_take0)
+                take.telemetry.append(dict(
+                    i=idx, fps=round(cfg_work.fps, 2), w=len(wrists),
+                    d=n_det, c=n_catches(tracker)))
                 idx += 1
             else:
                 wrists = {}   # idle: no tracking, no stale wrist dots
@@ -301,7 +312,10 @@ def main(argv=None) -> int:
                                  1 for e in tracker.events
                                  if e["event"] == "THROW"),
                              user_count=true_n),
-                        cam, eff_fps)
+                        cam, eff_fps,
+                        events=[dict(frame=e["frame"], event=e["event"],
+                                     hand=e.get("hand"), track=e["track"])
+                                for e in tracker.events])
                     results.append(dict(take=take_no, true=true_n, trk=trk,
                                         path=path))
                     last_result = (f"take {take_no}: TRUE {true_n} vs "
@@ -347,6 +361,7 @@ def _selftest(cfg: TrackingConfig) -> int:
     for i in range(n):
         fr = sess[i]
         process_frame(tracker, fr.rgb, fr.depth, det, pose, motion, i)
+        # (selftest ignores the det count)
     catches = n_catches(tracker)
     print(f"selftest: {n} frames -> {catches} catches, "
           f"{len(tracker.events)} events, tracks {len(tracker.tracks)}")

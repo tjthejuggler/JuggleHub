@@ -405,6 +405,17 @@ runner and any further speed work need the camera/user.
   AUTO, T7 closed for ordinary balls. (LED-ball exposure was not part of
   this sweep; LED stays 'worse, avoid'.)
 
+**Built — live counter (T6 live runner, 2026-11-12).**
+[`tracking_lab/live.py`](tracking_lab/live.py): camera (realsense/webcam via
+wizard.Cam) -> the exact offline pipeline (perceive + JuggleTracker, same
+constants, no tuning) -> overlay window with live CATCH/THROW counts
+(total + L/R + C-T), track states, last events, fps and camera status.
+Keys: r reset, q/Esc quit, space pause. `--set` overrides, `--selftest`
+runs the identical frame path headless over real box30 frames (passes:
+120 frames -> 10 catches, 3 tracks). Expect ~19 fps processing; counts are
+frame-rate independent. §3 identical. NOT yet tested on the camera —
+first live run is the user's.
+
 ## 6. Quick reference
 
 | thing | where |

@@ -59,15 +59,27 @@ for size in (416, 448):
                 patience=20, lr0=0.004, project=run, name="run1", **AUG)
 
 # ---- validate + export + download --------------------------------------------
+# Ultralytics may save under <project>/<name> OR runs/detect/<project>/<name>
+# depending on cwd/version — locate each run's weights dir by glob instead of
+# assuming the path.
 from google.colab import files as gfiles
-import shutil
+import glob, shutil
+
+def find_weights(name):
+    for pat in (f"/content/{name}/run1/weights", f"{name}/run1/weights",
+                f"/content/runs/detect/{name}/run1/weights",
+                f"runs/detect/{name}/run1/weights"):
+        if os.path.isfile(os.path.join(pat, "best.pt")):
+            return pat
+    raise FileNotFoundError(f"best.pt for {name} not found under /content")
 
 for name, size in (("v12_640", 640), ("v8v12_416ft", 416), ("v8v12_448ft", 448)):
-    best = f"{name}/run1/weights/best.pt"
-    met = YOLO(best).val(data=yaml_path, imgsz=size)
+    wdir = find_weights(name)
+    print(f"[{name}] weights at {wdir}")
+    met = YOLO(os.path.join(wdir, "best.pt")).val(data=yaml_path, imgsz=size)
     print(f"[{name}] mAP50 {met.box.map50:.3f}  mAP50-95 {met.box.map:.3f}")
-    YOLO(best).export(format="openvino", imgsz=size)
-    shutil.make_archive(name, "zip", f"{name}/run1/weights")
+    YOLO(os.path.join(wdir, "best.pt")).export(format="openvino", imgsz=size)
+    shutil.make_archive(name, "zip", wdir)
     print(f"downloading {name}.zip ...")
     gfiles.download(f"{name}.zip")
 

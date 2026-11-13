@@ -735,3 +735,12 @@ Next lever if we want shower accuracy: flight-series TRANSITIONS
   loop stays ~13-18 fps. Real remaining options: (a) train a distilled
   smaller model on our data (Colab, hours), (b) fix the OpenVINO Arc-iGPU
   plugin (driver/runtime upgrade), (c) accept current fps and improve logic.
+
+### T11 — Colab resolution-matched fine-tune prep (2026-11-13)
+- Live retest v7.4.1: cascade 46/50 (--pattern cascade OK); shower 36/50
+  (shower spread is ±10 take-to-take; both recorded).
+- colab_416_finetune.py: paste-ready cell. Fine-tunes the deployed V8 best.pt
+  AT 416 and 448 (the plain 416 export failed because weights were trained at
+  640 — resolution-matched training is the fix candidate), exports OpenVINO,
+  downloads zips. Local acceptance: 12-take prox backtest error must not grow
+  vs the 640 default; speed target 17.6 ms (416) already measured.

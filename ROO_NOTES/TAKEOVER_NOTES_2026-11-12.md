@@ -627,3 +627,12 @@ machine kept as secondary channel; meta.json stores prox_catch_count +
 prox_events; telemetry has p= per-frame prox count. §3 identical
 (tracker.py untouched). Constants are physics, not tuned to takes
 (0.20-0.30 m prox changes nothing; 0.45 m arrival is a plateau edge).
+
+### v7.1 — robust wrist depth (5x5 min fallback)
+Fresh live take 2026-11-13_15-52-01 (truth 50): prox 41 live but 48 offline —
+the gap was wrist-depth dropout (coverage 525/883, 502/883 on the faster
+take): single-pixel depth at the wrist returns 0 ~40% of frames.
+Fix: prox path now samples min valid pixel in a 5x5 neighbourhood when the
+centre pixel is empty (proxcounter._robust_depth_fn; shared make_depth_fn
+untouched so §3 stays identical). Backtest all 4 labelled takes:
+52/49/53/53 vs truth 50 (mean |err| 2.25, was 27 for the state machine).

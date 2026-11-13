@@ -104,8 +104,8 @@ def process_frame(tracker: JuggleTracker, rgb, depth, det, pose, motion,
     events = tracker.step(idx, dets, wrists, rgb, depth_fn, face_pt)
     if _fx_fy is None:
         _fx_fy = make_intrinsics(rgb.shape[1], rgb.shape[0])
-    prox = prox_samples(dets_raw, depth_fn, wrists, rgb.shape[1],
-                        rgb.shape[0], *_fx_fy)
+    prox = prox_samples(dets_raw, depth, rgb.shape[:2], wrists,
+                        rgb.shape[1], rgb.shape[0], *_fx_fy)
     return events, wrists, len(dets_raw), prox
 
 

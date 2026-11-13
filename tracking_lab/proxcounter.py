@@ -142,10 +142,36 @@ def make_intrinsics(w: int, h: int):
     return fx, fx * h / w
 
 
-def prox_samples(dets_raw, depth_fn, wrists, w, h, fx, fy):
+def _robust_depth_fn(depth, rgb_shape):
+    """(x, y) -> metres | None; single pixel first, then the min valid value
+    in a 5x5 neighbourhood (wrists sit at depth edges / holes ~40% of the
+    time on fast takes, which starved the live counter)."""
+    if depth is None:
+        return None
+    import numpy as np
+    dh, dw = depth.shape[:2]
+    sy, sx = rgb_shape[0] / dh, rgb_shape[1] / dw
+
+    def depth_at(x, y):
+        xi, yi = int(x / sx), int(y / sy)
+        if not (0 <= yi < dh and 0 <= xi < dw):
+            return None
+        v = float(depth[yi, xi])
+        if v > 0:
+            return v / 1000.0
+        y0, y1 = max(0, yi - 2), min(dh, yi + 3)
+        x0, x1 = max(0, xi - 2), min(dw, xi + 3)
+        patch = depth[y0:y1, x0:x1]
+        patch = patch[patch > 0]
+        return float(patch.min()) / 1000.0 if patch.size else None
+    return depth_at
+
+
+def prox_samples(dets_raw, depth, rgb_shape, wrists, w, h, fx, fy):
     """Distance samples for one frame: hand -> (d_all, d_flight) in metres."""
     import numpy as np
     out: dict[str, tuple] = {}
+    depth_fn = _robust_depth_fn(depth, rgb_shape)
     if depth_fn is None:
         return out
     balls = []

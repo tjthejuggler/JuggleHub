@@ -699,3 +699,21 @@ Next lever if we want shower accuracy: flight-series TRANSITIONS
   shower mode still max(prox, tracker). Use --pattern shower for showers.
 - Quantization: nncf NOT installed yet; INT8 PTQ runs fine on local CPU
   (no GPU/Colab needed, calibrates on a few hundred recording frames).
+
+### T10 — INT8 quantization verdict (2026-11-13): accuracy perfect, speed CLOSED on this CPU
+- Built tracking_lab/quantize.py (NNCF 3.4 PTQ, calibrates on 3 recordings
+  incl. cascade+shower). Ball net INT8: detection parity with FP32 (113 vs 113
+  dets on 40 frames, identical score distributions), 2.7 MB artifact, 40 s to
+  build. Artifact: .tmp/quant/yolo11n_int8.xml (gitignored).
+- BUT pure infer: INT8 29.7 ms vs FP32 28.3 ms — no speedup; this CPU lacks a
+  fast INT8 path. PERFORMANCE_HINT=THROUGHPUT is worse (37.3 ms).
+- Input reshape 640->576/512/448: impossible — YOLO11 attention head Reshape
+  ops are baked for 640 (OpenVINO reshape check fails).
+- Local speed levers are now ALL closed: INT8 (this session), async, GPU
+  (segfault), 416 exports (accuracy), reshape (this session). Remaining paths
+  for higher fps: (a) re-export the ball .pt at 512 from Colab and re-judge,
+  (b) fix/upgrade the OpenVINO GPU plugin for the Arc iGPU, (c) train a
+  distilled smaller model properly (not just export-size reduction).
+- Long-term goal recorded (user, 2026-11-13): ONE pattern-agnostic
+  catch/throw/ball-identity system across thousands of patterns; eventually
+  siteswap recognition. Pattern-specific reconcile hacks are scaffolding only.

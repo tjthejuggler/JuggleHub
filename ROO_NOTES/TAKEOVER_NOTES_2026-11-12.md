@@ -649,3 +649,19 @@ User: 54/50 with "flickers before and after juggling". Two causes found:
 All 5 labelled takes after v7.2: 50/46/50/51/48 vs truth 50 (two exact,
 mean err -1). The 54-take's events shrank from 1.2-25.3s to 2.3-22.5s —
 the pre/post flickers are gone, L/R 24/24.
+
+### v7.3 — pattern-adaptive alternation + shower gap documented
+Shower take 2026-11-13_16-20-27 (truth 50): prox said 21. Cause: the
+cascade alternation rule collapses consecutive same-hand catches — but a
+shower catches with ONE hand. Fix shipped: alternation only applies when
+the last 8 events show >=2 catches per hand (genuine two-handed pattern).
+Cascade takes unchanged (50/46/50/51), shower 21 -> 25 — still far off.
+
+MEASURED shower physics (why it stays hard): BOTH wrists sit ~5-9 cm from
+some ball most of the time (p50 L 0.09 / R 0.05, minima 1-6 cm on BOTH
+hands, wrists symmetric at y~315 px). Per-hand proximity minima fire on
+catches AND throws at BOTH hands (feed hand releases right beside the
+stream), ~2.5 catches/s, so proximity alone cannot separate events.
+Next lever if we want shower accuracy: flight-series TRANSITIONS
+(held->flight = throw, flight->held = catch) or a per-pattern cycle model
+(tier2 pattern recognizer). Needs 2-3 more labelled shower takes first.

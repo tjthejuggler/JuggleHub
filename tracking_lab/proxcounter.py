@@ -77,9 +77,17 @@ class ProxCounter:
             else:
                 merged.append(ev)
         evs = merged
-        # 2. cascade alternation, repeated until stable (offline parity)
+        # 2. cascade alternation, repeated until stable — but ONLY when the
+        # recent history is genuinely two-handed (>=2 catches per hand in
+        # the last 8 events). A shower catches with one hand only; the
+        # alternation rule would otherwise eat every consecutive catch.
+        def two_handed(lst):
+            recent = lst[-8:]
+            l = sum(1 for e in recent if e["hand"] == "left_wrist")
+            r = sum(1 for e in recent if e["hand"] == "right_wrist")
+            return l >= 2 and r >= 2
         changed = True
-        while changed:
+        while changed and two_handed(evs):
             changed = False
             for a in range(len(evs) - 1):
                 b = a + 1

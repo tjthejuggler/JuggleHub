@@ -744,3 +744,15 @@ Next lever if we want shower accuracy: flight-series TRANSITIONS
   640 — resolution-matched training is the fix candidate), exports OpenVINO,
   downloads zips. Local acceptance: 12-take prox backtest error must not grow
   vs the 640 default; speed target 17.6 ms (416) already measured.
+- CORRECTION (user): v11 dataset was tried before and produced a model WORSE
+  than V8 — never deployed. The correct untested dataset is v12 (V8 + more).
+  The original .tmp/v12_dataset is broken (nc:1 in data.yaml); the clean
+  copy is .tmp/v12_clean (4103 train / 887 val, classes ball/ball_held,
+  from V9_3_targeted, manifest present), zipped as .tmp/v12_clean.zip (415MB).
+  colab_416_finetune.py rewritten around v12_clean with three runs:
+  (a) v12_640 — full 640 training from COCO yolo11n.pt, 150 epochs: finally
+      tests whether v12 beats the deployed V8 head-to-head;
+  (b) v8v12_416ft and (c) v8v12_448ft — fine-tunes from V8 best.pt (60 ep,
+      lr0=0.004, patience 20) using the proven AUG policy.
+  All runs export OpenVINO + auto-download zips. Acceptance unchanged:
+  12-take prox backtest error must not grow vs the 640 V8 default.

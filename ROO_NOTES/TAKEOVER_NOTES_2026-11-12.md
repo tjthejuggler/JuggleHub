@@ -776,3 +776,23 @@ Next lever if we want shower accuracy: flight-series TRANSITIONS
 - Key lesson recorded: frame-level mAP on the dataset does NOT predict
   end-to-end catch-count accuracy; the 9-take prox backtest is the only
   adoption metric.
+
+### T12 — V13 dataset built (2026-11-13): v12_clean + shower supervision
+- Diagnosis behind v13: v12 contains no shower footage, so fast cross-hand
+  flight frames were never supervised — the consistent shower loss of every
+  v12 candidate.
+- build_v13_dataset.py: labels 80 frames/session from the five OLD shower
+  recordings (shower40 x4 + columns_shower; 2026-11-13 shower50 takes
+  deliberately EXCLUDED so the 9-take backtest stays honest). Label quality
+  guard learned from the v11 failure (39% GLM/V8 overlap): every frame is
+  labelled TWICE by GLM-5.3-flash; a box survives only if IoU>=0.5 across
+  passes with the same state; frames with unstable ball counts are dropped.
+  Result: 333/400 frames kept (83%), cached resumably in .tmp/v13_labels.json.
+- Assembled .tmp/v13_dataset = v12_clean + 333 shower frames to train only:
+  4436 train / 887 val; all v12 verify() checks pass (no duplicate images,
+  no train/val recording overlap, valid class ids). Zip: .tmp/v13_dataset.zip
+  (441 MB). Contamination note in manifest: shower40/columns_shower TUNING
+  takes are now training material for v13 models.
+- colab_v13_train.py: two runs, judged ONLY by the local backtest —
+  (a) v8v13_640ft: fine-tune deployed V8 on v13 (the candidate),
+  (b) v13_640: full COCO train (control arm).

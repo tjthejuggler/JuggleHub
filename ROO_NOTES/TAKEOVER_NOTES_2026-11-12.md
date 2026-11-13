@@ -600,3 +600,30 @@ time. Colab training remains available if we later want to firm up the
 24% mid-confidence band or chase the last 3 starvation-linked misses,
 with the 325-frame labelled test set already prepared; but no recall
 crisis exists.
+
+### Session 2026-11-13 (pm) — first-principles depth-based catch counter (T9)
+User rejected the ~27-catch plateau: "use the depth camera to its fullest".
+Diagnosis: depth was ONLY an association gate; catches were decided by a
+2D frame-dwell state machine that starves at 16 fps.
+
+NEW detector (catchmine.py offline miner -> proxcounter.py online class):
+a catch = a ball ARRIVING at a hand in 3D. Deproject balls + wrists with
+depth (D435 HFOV 69.4 pinhole), then per hand: local minimum of nearest-ball
+3D distance (<0.25 m, minima are ~8 cm deep), CONFIRMED by a class-0
+(in-flight) ball having come <0.45 m during the approach (kills held-ball
+double-dips), then cascade alternation (same-hand <0.6 s with no opposite
+event between -> collapse to deeper min) + cross-hand merge (<0.15 s).
+
+Evidence on the 4 labelled live takes (truth 50 each):
+  tracker state machine: 22 / 8 / 31 / 39   (mean err -27)
+  offline miner:         47 / 41 / 48 / 55  (mean err +5, plateau 0.20-0.30 prox)
+  online ProxCounter:    42 / 40 / 50 / 58  (mean err -5; exact on take 3)
+Online==offline lessons: episode-latching merges catches (a hand always has
+SOME ball near it, p50=0.14 m) -> must be per-frame local minima; arrival
+snapshot must be taken at latch, not emit (class flips to held).
+
+live.py v7: ProxCounter is the PRIMARY count (big number); tracker state
+machine kept as secondary channel; meta.json stores prox_catch_count +
+prox_events; telemetry has p= per-frame prox count. §3 identical
+(tracker.py untouched). Constants are physics, not tuned to takes
+(0.20-0.30 m prox changes nothing; 0.45 m arrival is a plateau edge).

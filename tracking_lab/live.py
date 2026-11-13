@@ -46,6 +46,7 @@ import numpy as np
 
 from .detectors import BallDetector, MotionDetector, PoseDetector
 from .perception import fuse, make_depth_fn
+from .proxcounter import ProxCounter, make_intrinsics, prox_samples
 from .tracker import JuggleTracker, TrackingConfig, _color_hist
 from .wizard import Cam, OUT_ROOT
 
@@ -74,13 +75,15 @@ def scale_cfg(cfg: TrackingConfig, real_fps: float) -> None:
 
 _last_wrists: dict = {}
 _last_face = None
+_fx_fy: tuple | None = None     # color intrinsics, from the first frame
 
 
 def process_frame(tracker: JuggleTracker, rgb, depth, det, pose, motion,
-                  idx: int) -> tuple[list[dict], dict, int]:
+                  idx: int) -> tuple[list[dict], dict, int, dict]:
     """One live frame: ball net every frame; pose net every POSE_EVERY-th
-    frame (wrists held in between) -> (events, wrists, n_detections)."""
-    global _last_wrists, _last_face
+    frame (wrists held in between) -> (events, wrists, n_detections,
+    prox_samples)."""
+    global _last_wrists, _last_face, _fx_fy
     if idx % POSE_EVERY == 0:
         persons = pose.detect(rgb)
         _last_wrists, _last_face = {}, None
@@ -99,7 +102,11 @@ def process_frame(tracker: JuggleTracker, rgb, depth, det, pose, motion,
     dets = [(box, score, cls, _color_hist(rgb, box))
             for box, score, cls in dets_raw]
     events = tracker.step(idx, dets, wrists, rgb, depth_fn, face_pt)
-    return events, wrists, len(dets_raw)
+    if _fx_fy is None:
+        _fx_fy = make_intrinsics(rgb.shape[1], rgb.shape[0])
+    prox = prox_samples(dets_raw, depth_fn, wrists, rgb.shape[1],
+                        rgb.shape[0], *_fx_fy)
+    return events, wrists, len(dets_raw), prox
 
 
 class LatestFrame:
@@ -171,7 +178,8 @@ def n_catches(tracker: JuggleTracker) -> int:
 
 def draw(img, tracker: JuggleTracker, fps: float, status: list,
          target: int, running: bool, wrists: dict,
-         last_result: str | None, believed_fps: float) -> np.ndarray:
+         last_result: str | None, believed_fps: float,
+         prox: ProxCounter | None = None) -> np.ndarray:
     frame = img.copy()
     catches = n_catches(tracker)
     throws = sum(1 for e in tracker.events if e["event"] == "THROW")
@@ -192,17 +200,19 @@ def draw(img, tracker: JuggleTracker, fps: float, status: list,
     for hand, (wx, wy) in wrists.items():
         cv2.circle(frame, (int(wx), int(wy)), 8, (255, 0, 255), 2)
 
-    big_txt = str(target) if not running else str(catches)
+    pcount = prox.count if prox is not None else catches
+    pl, pr = (prox.side_counts() if prox is not None else (left, right))
+    big_txt = str(target) if not running else str(pcount)
     big_col = (0, 255, 255) if not running else \
-        ((0, 255, 0) if catches >= target else (0, 200, 255))
+        ((0, 255, 0) if pcount >= target else (0, 200, 255))
     cv2.putText(frame, big_txt, (24, 96), cv2.FONT_HERSHEY_SIMPLEX, 2.6,
                 big_col, 6)
     wrist_txt = f"wrists: {'L' if 'left_wrist' in wrists else '-'}" \
                 f"{'+R' if 'right_wrist' in wrists else ''}"
     if len(wrists) < 2:
         wrist_txt += "  (pose missing a wrist!)"
-    lines = [f"catches {catches} / target {target}   L {left}  R {right}",
-             f"throws {throws}   C-T {catches - throws}",
+    lines = [f"PROX {pcount} / target {target}   L {pl}  R {pr}",
+             f"tracker {catches} (L {left} R {right})  throws {throws}",
              f"{fps:.1f} fps (tracker dt {believed_fps:.1f} fps)  {wrist_txt}",
              "press S to START the take" if not running
              else "recording... press S to STOP at the target"]
@@ -324,6 +334,7 @@ def main(argv=None) -> int:
     cfg_work = TrackingConfig(**{f.name: getattr(base_cfg, f.name)
                                  for f in base_cfg.__dataclass_fields__.values()})
     tracker = JuggleTracker(cfg_work)
+    prox: ProxCounter | None = None      # 3D proximity counter (per take)
     running, take, t_take0 = False, None, 0.0
     intervals: list[float] = []
     last_proc: float | None = None   # stamp of the PREVIOUS PROCESSED frame
@@ -354,12 +365,15 @@ def main(argv=None) -> int:
                     med = sorted(intervals)[len(intervals) // 2]
                     cfg_work.fps = max(min(1.0 / max(med, 1e-3), 30.0), 5.0)
                     scale_cfg(cfg_work, cfg_work.fps)
-                _ev, wrists, n_det = process_frame(tracker, color, depth,
-                                                   det, pose, motion, idx)
+                _ev, wrists, n_det, prox_s = process_frame(
+                    tracker, color, depth, det, pose, motion, idx)
+                if prox is not None:
+                    prox.update(time.time() - t_take0, prox_s)
                 take.add(color, depth, t_take0)
                 take.telemetry.append(dict(
                     i=idx, fps=round(cfg_work.fps, 2), w=len(wrists),
-                    d=n_det, c=n_catches(tracker)))
+                    d=n_det, c=n_catches(tracker),
+                    p=prox.count if prox is not None else None))
                 idx += 1
             else:
                 wrists = {}   # idle: no tracking, no stale wrist dots
@@ -372,7 +386,7 @@ def main(argv=None) -> int:
                 cv2.imshow("live", draw(color, tracker, fps,
                                         cam.status_lines(), a.target,
                                         running, wrists, last_result,
-                                        cfg_work.fps))
+                                        cfg_work.fps, prox))
                 last_show = now
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
@@ -384,6 +398,7 @@ def main(argv=None) -> int:
                         f.name: getattr(base_cfg, f.name)
                         for f in base_cfg.__dataclass_fields__.values()})
                     tracker = JuggleTracker(cfg_work)
+                    prox = ProxCounter() if cam.source == "realsense" else None
                     take = Take(f"{a.label}{a.target}_t{take_no}",
                                 cam.source == "realsense", writer)
                     t_take0 = time.time()
@@ -395,27 +410,38 @@ def main(argv=None) -> int:
                 else:
                     running = False
                     trk = n_catches(tracker)
-                    true_n = ask_true_count(trk)
+                    pcount = prox.count if prox is not None else trk
+                    true_n = ask_true_count(pcount)
                     eff_fps = take.n / max(time.time() - t_take0, 0.01)
+                    meta_extra = dict(
+                        target=a.target, tracker_catch_count=trk,
+                        tracker_throw_count=sum(
+                            1 for e in tracker.events
+                            if e["event"] == "THROW"),
+                        user_count=true_n)
+                    if prox is not None:
+                        meta_extra.update(
+                            prox_catch_count=prox.count,
+                            prox_events=[dict(t=round(e["t"], 3),
+                                              hand=e["hand"], d=e["d"])
+                                         for e in prox.events])
                     path = take.finish(
-                        dict(target=a.target, tracker_catch_count=trk,
-                             tracker_throw_count=sum(
-                                 1 for e in tracker.events
-                                 if e["event"] == "THROW"),
-                             user_count=true_n),
-                        cam, eff_fps,
+                        meta_extra, cam, eff_fps,
                         events=[dict(frame=e["frame"], event=e["event"],
                                      hand=e.get("hand"), track=e["track"])
                                 for e in tracker.events])
                     results.append(dict(take=take_no, true=true_n, trk=trk,
-                                        path=path))
+                                        prox=pcount, path=path))
                     last_result = (f"take {take_no}: TRUE {true_n} vs "
-                                   f"TRACKER {trk}")
+                                   f"PROX {pcount} (tracker {trk})")
                     print(f"take {take_no} saved: {path}\n"
-                          f"  TRUE {true_n} vs TRACKER {trk} "
-                          f"({trk - true_n:+d})")
+                          f"  TRUE {true_n} vs PROX {pcount} "
+                          f"({pcount - true_n:+d})"
+                          f"   TRACKER {trk} ({trk - true_n:+d})")
             if key == ord("r") and running:
                 tracker = JuggleTracker(cfg_work)
+                if prox is not None:
+                    prox = ProxCounter()
                 idx = 0
                 print("counts reset (mid-take)")
     except KeyboardInterrupt:
@@ -428,7 +454,8 @@ def main(argv=None) -> int:
     if results:
         print("\n=== live harness session summary ===")
         for r in results:
-            print(f"take {r['take']}: true {r['true']}  tracker {r['trk']} "
+            print(f"take {r['take']}: true {r['true']}  prox {r['prox']} "
+                  f"({r['prox'] - r['true']:+d})  tracker {r['trk']} "
                   f"({r['trk'] - r['true']:+d})  {r['path']}")
     else:
         print("no completed takes (press s to start/stop a take)")
@@ -449,12 +476,17 @@ def _selftest(cfg: TrackingConfig) -> int:
     sess = RecordingSession(rec, load_depth=True)
     det, pose, motion = BallDetector(), PoseDetector(), MotionDetector()
     tracker = JuggleTracker(cfg)
+    prox = ProxCounter()
     n = min(120, len(sess))
     for i in range(n):
         fr = sess[i]
-        process_frame(tracker, fr.rgb, fr.depth, det, pose, motion, i)
+        _ev, _w, _nd, prox_s = process_frame(tracker, fr.rgb, fr.depth,
+                                             det, pose, motion, i)
+        prox.update(i / 30.0, prox_s)
     catches = n_catches(tracker)
     print(f"selftest: {n} frames -> {catches} catches, "
+          f"prox {prox.count} (L{prox.side_counts()[0]} "
+          f"R{prox.side_counts()[1]}), "
           f"{len(tracker.events)} events, tracks {len(tracker.tracks)}")
     assert catches > 0, "no catches in 120 frames of box30 — wiring broken"
     print("selftest OK")

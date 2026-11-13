@@ -717,3 +717,21 @@ Next lever if we want shower accuracy: flight-series TRANSITIONS
 - Long-term goal recorded (user, 2026-11-13): ONE pattern-agnostic
   catch/throw/ball-identity system across thousands of patterns; eventually
   siteswap recognition. Pattern-specific reconcile hacks are scaffolding only.
+
+### T10b — resolution re-export experiments (2026-11-13): 512 and 416 both CLOSED
+- Found the TRUE fine-tuned weights: engine/models/zipped/V8_balls_held/best.pt
+  (repo-root yolo11n.pt is stock COCO — an export from it is garbage by
+  construction; do not confuse them).
+- 512 re-export from best.pt: accuracy parity (142/142 dets, same scores) but
+  NO speedup (26.0 vs 24.7 ms) — inference is latency-bound at this size on
+  the Ultra 9 185H.
+- 416 re-export from best.pt: fast (17.6 ms, -25%) and frame-level parity
+  (139 dets, 135/139 matched <30px) — but END-TO-END prox backtest over the
+  12 labelled takes degrades badly (total abs err 196; showers 5-39, one
+  cascade 34). Small far balls and the in-flight/held split suffer exactly
+  where per-catch physics needs them. The old "416 unusable" verdict stands,
+  now for the right reason. 416 and 512 CLOSED.
+- Net: every speed lever on this machine is measured and closed. The live
+  loop stays ~13-18 fps. Real remaining options: (a) train a distilled
+  smaller model on our data (Colab, hours), (b) fix the OpenVINO Arc-iGPU
+  plugin (driver/runtime upgrade), (c) accept current fps and improve logic.

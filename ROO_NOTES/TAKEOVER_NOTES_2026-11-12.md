@@ -686,3 +686,16 @@ Next lever if we want shower accuracy: flight-series TRANSITIONS
   event-based with hysteresis → alias-robust; live meta showed 47/45/35/39 on
   showers). meta gains prox_pattern + prox_only_catch_count. Expected live
   shower ~44-47. §3 identical (tracker.py untouched).
+
+### v7.4.1 — --pattern CLI override (2026-11-13, live)
+- Live retest: showers 46/53 vs 50 (FIXED, was 21-25). But one CASCADE take
+  (17-08-45, ran at 11.5 fps) auto-detected as shower -> prox 71 (+21).
+- Offline forensics: that take's pair_frac is genuinely 0.62 — at low fps
+  cascades also produce synchronous cross-hand minima (sync_frac 0.49-0.95 on
+  labelled cascades). Ball-flight height features (above-wrist fractions at
+  40/80/120/160 px) do not separate either (varied showers overlap high-arc
+  cascades). Auto pattern detection from the hand-minima stream is CLOSED.
+- live.py: new --pattern {auto,cascade,shower} (default auto). Explicit wins;
+  shower mode still max(prox, tracker). Use --pattern shower for showers.
+- Quantization: nncf NOT installed yet; INT8 PTQ runs fine on local CPU
+  (no GPU/Colab needed, calibrates on a few hundred recording frames).

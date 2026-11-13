@@ -204,8 +204,15 @@ def draw(img, tracker: JuggleTracker, fps: float, status: list,
         cv2.circle(frame, (int(wx), int(wy)), 8, (255, 0, 255), 2)
 
     pcount = prox.count if prox is not None else catches
+    if prox is not None and prox.pattern == "shower":
+        # v7.4: in a shower the dip rhythm is aliased at our fps; the
+        # event-based tracker (release/acquire hysteresis) is more robust
+        # there, so take the better of the two
+        pcount = max(pcount, catches)
     pl, pr = (prox.side_counts() if prox is not None else (left, right))
     big_txt = str(target) if not running else str(pcount)
+    if prox is not None and prox.pattern == "shower":
+        big_txt += " (shower)"
     big_col = (0, 255, 255) if not running else \
         ((0, 255, 0) if pcount >= target else (0, 200, 255))
     cv2.putText(frame, big_txt, (24, 96), cv2.FONT_HERSHEY_SIMPLEX, 2.6,
@@ -414,6 +421,8 @@ def main(argv=None) -> int:
                     running = False
                     trk = n_catches(tracker)
                     pcount = prox.count if prox is not None else trk
+                    if prox is not None and prox.pattern == "shower":
+                        pcount = max(pcount, trk)
                     true_n = ask_true_count(pcount)
                     eff_fps = take.n / max(time.time() - t_take0, 0.01)
                     meta_extra = dict(
@@ -424,7 +433,9 @@ def main(argv=None) -> int:
                         user_count=true_n)
                     if prox is not None:
                         meta_extra.update(
-                            prox_catch_count=prox.count,
+                            prox_catch_count=pcount,
+                            prox_pattern=prox.pattern,
+                            prox_only_catch_count=prox.count,
                             prox_events=[dict(t=round(e["t"], 3),
                                               hand=e["hand"], d=e["d"])
                                          for e in prox.events])

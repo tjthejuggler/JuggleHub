@@ -665,3 +665,24 @@ stream), ~2.5 catches/s, so proximity alone cannot separate events.
 Next lever if we want shower accuracy: flight-series TRANSITIONS
 (held->flight = throw, flight->held = catch) or a per-pattern cycle model
 (tier2 pattern recognizer). Needs 2-3 more labelled shower takes first.
+
+### v7.4 — pattern-adaptive reconcile + shower-mode tracker fusion (2026-11-13)
+- 3 new labelled shower takes (16-31-55/16-32-18/16-32-46, truth 50/50/52; fps only
+  12-17 during shower vs 18.6 cascade). Corrected model per user: in a shower BOTH
+  hands catch; one hand throws straight across.
+- Measured structure: shower candidate minima are near-SIMULTANEOUS cross-hand
+  (L,R) pairs (pair_frac 0.49-0.67) — catch on one hand synchronised with throw
+  on the other. Cascade pair_frac 0.11-0.32. Discriminator: pair_frac > 0.40,
+  computed only over candidates with a FRESH (<=0.3 s) class-0 arrival — the lax
+  0.5 s window admits stale held-ball dips that inflated one cascade take to 0.60.
+- Catch-vs-throw separation via perception was tried 4 ways (dip asymmetry,
+  post-min rise, fresh-arrival ratio, timing) — all fail: dip rhythm is aliased
+  at 12-17 fps (information limit, not logic).
+- ProxCounter v7.4: pattern property (whole raw history, fresh-only voting);
+  shower mode = merge-only (MIN_GAP*0.5), NO cascade alternation; cascade mode
+  unchanged. Backtest 8 takes: cascades 53/46/51/47/51 vs 50; showers 44/38/44/40
+  vs 50/50/52/50 (was 25/23/25/21).
+- live.py: in shower mode primary count = max(prox, tracker) (tracker is
+  event-based with hysteresis → alias-robust; live meta showed 47/45/35/39 on
+  showers). meta gains prox_pattern + prox_only_catch_count. Expected live
+  shower ~44-47. §3 identical (tracker.py untouched).

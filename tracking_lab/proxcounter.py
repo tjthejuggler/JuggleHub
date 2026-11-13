@@ -30,6 +30,9 @@ FLIGHT_WIN = 0.5  # s lookback for the arrival confirmation
 STUCK = 1.0      # s; emit anyway if latched this long (held at hand)
 MIN_GAP = 0.30   # s; same-hand duplicate suppression
 ALT_WIN = 0.60   # s; cascade alternation window
+PAIR_WIN = 0.15  # s; simultaneous cross-hand pair window (shower)
+PAIR_FRAC = 0.40  # pair fraction above which the take is a shower
+FRESH_WIN = 0.30  # s; 'fresh' arrival window for pattern voting
 
 HANDS = ("left_wrist", "right_wrist")
 
@@ -50,6 +53,7 @@ class ProxCounter:
         self.prox, self.arrive = prox, arrive
         self.hands = {h: _Hand() for h in HANDS}
         self.events: list[dict] = []      # {t, hand, d}
+        self.raw: list[dict] = []         # confirmed candidates, pre-reconcile
 
     # ------------------------------------------------------------- helpers
     def _prune(self, h: _Hand, t: float):
@@ -60,15 +64,47 @@ class ProxCounter:
         vals = [d for _t, d in h.flight_win if d is not None]
         return min(vals) if vals else float("inf")
 
-    def _emit(self, hand: str, t: float, d: float):
-        """Record a raw candidate minimum and reconcile the event list with
-        the SAME multi-pass logic the offline miner uses post-hoc (cross-hand
-        merge, same-hand duplicate collapse, cascade alternation) — one-pass
-        greedy suppression under-counted chains on one take by +12."""
-        self.events.append(dict(t=t, hand=hand, d=round(d, 3)))
-        self.events.sort(key=lambda e: e["t"])
-        evs = self.events
-        # 1. cross-hand merge: same arrival seen on both wrists
+    # ------------------------------------------------------- pattern logic
+    @staticmethod
+    def _pair_frac(lst) -> float:
+        """Fraction of consecutive confirmed candidates that are
+        near-simultaneous (|dt| < PAIR_WIN) CROSS-HAND pairs. Measured on
+        2026-11-13: shower >= 0.49 on all 4 labelled takes, cascade <= 0.32
+        on all 4. In a shower the catch on one hand is synchronised with the
+        throw on the other -> simultaneous (L,R) pairs every cycle."""
+        n = len(lst) - 1
+        if n < 4:
+            return 0.0
+        lst = [e for e in lst if e.get("fresh")]
+        n = len(lst) - 1
+        if n < 4:
+            return 0.0
+        pairs = sum(1 for a, b in zip(lst, lst[1:])
+                    if b["t"] - a["t"] < PAIR_WIN and b["hand"] != a["hand"])
+        return pairs / n
+
+    @property
+    def pattern(self) -> str:
+        """"shower" | "cascade" | "unknown" (decided from recent raw list)."""
+        if len([e for e in self.raw if e.get("fresh")]) < 8:
+            return "unknown"
+        # whole-history decision: a rolling window flips cascade takes to
+        # "shower" during their chaotic first seconds and never recovers
+        return "shower" if self._pair_frac(self.raw) > PAIR_FRAC else "cascade"
+
+    def _emit(self, hand: str, t: float, d: float, fresh: bool = False):
+        """Record a raw candidate minimum and reconcile the event list.
+        Pattern-adaptive (v7.4): in a shower, catch-on-one-hand and
+        throw-on-the-other are SYNCHRONISED, so simultaneous (L,R) pairs
+        carry exactly one catch — merge them and DO NOT run the cascade
+        alternation rule (it would eat every consecutive catch). In a
+        cascade the hands alternate, and same-hand catch+throw pairs
+        within ALT_WIN still collapse to the deeper minimum."""
+        self.raw.append(dict(t=t, hand=hand, d=round(d, 3), fresh=fresh))
+        self.raw.sort(key=lambda e: e["t"])
+        evs = [dict(e) for e in self.raw]
+        # 1. merge: same arrival seen on both wrists (shower pairs), and
+        #    near-duplicate minima (frame jitter)
         merged = []
         for ev in evs:
             if merged and ev["t"] - merged[-1]["t"] < MIN_GAP * 0.5:
@@ -77,26 +113,21 @@ class ProxCounter:
             else:
                 merged.append(ev)
         evs = merged
-        # 2. cascade alternation, repeated until stable — but ONLY when the
-        # recent history is genuinely two-handed (>=2 catches per hand in
-        # the last 8 events). A shower catches with one hand only; the
-        # alternation rule would otherwise eat every consecutive catch.
-        def two_handed(lst):
-            recent = lst[-8:]
-            l = sum(1 for e in recent if e["hand"] == "left_wrist")
-            r = sum(1 for e in recent if e["hand"] == "right_wrist")
-            return l >= 2 and r >= 2
-        changed = True
-        while changed and two_handed(evs):
-            changed = False
-            for a in range(len(evs) - 1):
-                b = a + 1
-                if (evs[b]["t"] - evs[a]["t"] < ALT_WIN
-                        and evs[b]["hand"] == evs[a]["hand"]):
-                    drop = a if evs[a]["d"] >= evs[b]["d"] else b
-                    evs.pop(drop)
-                    changed = True
-                    break
+        # 2. cascade alternation, repeated until stable — ONLY in cascade
+        #    mode (shower structure would be destroyed: its same-hand
+        #    events sit inside the alternation window).
+        if self.pattern == "cascade":
+            changed = True
+            while changed:
+                changed = False
+                for a in range(len(evs) - 1):
+                    b = a + 1
+                    if (evs[b]["t"] - evs[a]["t"] < ALT_WIN
+                            and evs[b]["hand"] == evs[a]["hand"]):
+                        drop = a if evs[a]["d"] >= evs[b]["d"] else b
+                        evs.pop(drop)
+                        changed = True
+                        break
         self.events = evs
 
     # ---------------------------------------------------------------- api
@@ -125,9 +156,17 @@ class ProxCounter:
             if d_all > prev and h.falling and prev <= self.prox:
                 h.falling = False
                 # CONFIRM: a class-0 ball approached this hand recently
-                # (the ball now at the hand may already read class 1 'held')
-                if self._flight_min(h) <= self.arrive:
-                    self._emit(hand, h.prev_t, prev)
+                # (the ball now at the hand may already read class 1 'held').
+                # "fresh" = the approach happened in the last FRESH_WIN s;
+                # only fresh candidates vote on the pattern (the lax 0.5 s
+                # window admits stale held-ball dips on cascades, which
+                # inflated the shower pair fraction to 0.6 on one take).
+                fmin = self._flight_min(h)
+                fresh = min([d for tt, d in h.flight_win
+                             if d is not None and t - tt <= FRESH_WIN],
+                            default=float("inf")) <= self.arrive
+                if fmin <= self.arrive:
+                    self._emit(hand, h.prev_t, prev, fresh)
         return self.events[n0:]
 
     @property

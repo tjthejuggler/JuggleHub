@@ -167,28 +167,43 @@ def _robust_depth_fn(depth, rgb_shape):
     return depth_at
 
 
-def prox_samples(dets_raw, depth, rgb_shape, wrists, w, h, fx, fy):
-    """Distance samples for one frame: hand -> (d_all, d_flight) in metres."""
+def prox_samples(dets_raw, depth, rgb_shape, wrists, w, h, fx, fy,
+                 motion_boxes=None):
+    """Distance samples for one frame: hand -> (d_all, d_flight) in metres.
+
+    Motion blobs (MOG2) may support the proximity signal (they catch
+    motion-blurred arrivals YOLO misses) but can never CONFIRM arrival —
+    only a real YOLO class-0 ball can (a blob from hand movement before
+    juggling otherwise fakes an in-flight approach)."""
     import numpy as np
     out: dict[str, tuple] = {}
     depth_fn = _robust_depth_fn(depth, rgb_shape)
     if depth_fn is None:
         return out
+    motion = set(map(tuple, motion_boxes or []))
     balls = []
     for box, score, cls in dets_raw:
+        is_motion = (tuple(box) in motion) if motion else (score == 0.5)
         cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
         z = depth_fn(cx, cy)
         if z is not None:
-            balls.append((deproject(cx, cy, z, w, h, fx, fy), cls))
-    if not balls:
+            balls.append((deproject(cx, cy, z, w, h, fx, fy),
+                          cls, is_motion))
+    # activity gate: a real catch needs a juggler mid-pattern — both wrists
+    # tracked AND a real (non-motion) ball actually IN FLIGHT (class 0).
+    # Before/after the pattern all balls read 'held', and hand-movement
+    # motion blobs cannot fake flight.
+    real_flight = any(c == 0 and not m for _b, c, m in balls)
+    if len(wrists) < 2 or not real_flight:
         return out
     for hand, (wx, wy) in wrists.items():
         wz = depth_fn(wx, wy)
         if wz is None:
             continue
         hp = deproject(wx, wy, wz, w, h, fx, fy)
-        ds = [float(np.linalg.norm(b - hp)) for b, _c in balls]
-        fl = [d for d, (_b, c) in zip(ds, balls) if c == 0]
+        ds = [float(np.linalg.norm(b - hp)) for b, _c, _m in balls]
+        fl = [d for d, (b, c, m) in zip(ds, balls)
+              if c == 0 and not m]
         out[hand] = (min(ds), min(fl) if fl else None)
     return out
 

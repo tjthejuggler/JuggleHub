@@ -636,3 +636,16 @@ Fix: prox path now samples min valid pixel in a 5x5 neighbourhood when the
 centre pixel is empty (proxcounter._robust_depth_fn; shared make_depth_fn
 untouched so §3 stays identical). Backtest all 4 labelled takes:
 52/49/53/53 vs truth 50 (mean |err| 2.25, was 27 for the state machine).
+
+### v7.2 — flicker gating (pre/post-juggling false catches)
+User: 54/50 with "flickers before and after juggling". Two causes found:
+1. MOG2 motion blobs carry class 0 score 0.5 -> hand movement when NOT
+   juggling faked in-flight balls (passed the flight gate and even
+   "confirmed" arrivals). Fix: motion blobs may support the proximity
+   signal (they catch motion-blurred real arrivals) but can never CONFIRM
+   arrival; activity gate now requires a REAL (YOLO) class-0 ball in
+   flight + both wrists.
+2. Robust 5x5 depth fallback (v7.1) retained.
+All 5 labelled takes after v7.2: 50/46/50/51/48 vs truth 50 (two exact,
+mean err -1). The 54-take's events shrank from 1.2-25.3s to 2.3-22.5s —
+the pre/post flickers are gone, L/R 24/24.

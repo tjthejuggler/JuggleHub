@@ -104,8 +104,11 @@ def process_frame(tracker: JuggleTracker, rgb, depth, det, pose, motion,
     events = tracker.step(idx, dets, wrists, rgb, depth_fn, face_pt)
     if _fx_fy is None:
         _fx_fy = make_intrinsics(rgb.shape[1], rgb.shape[0])
+    # prox sees YOLO detections only: MOG2 motion blobs (class 0, score
+    # 0.5) make hand movement before/after the pattern look like flight
     prox = prox_samples(dets_raw, depth, rgb.shape[:2], wrists,
-                        rgb.shape[1], rgb.shape[0], *_fx_fy)
+                        rgb.shape[1], rgb.shape[0], *_fx_fy,
+                        motion_boxes=[b for b, _s, _c in mot_dets])
     return events, wrists, len(dets_raw), prox
 
 

@@ -59,6 +59,11 @@ FRAME_FIELDS = {
     "face_stall_frames": 20, "min_hits": 3,
 }
 
+POSE_EVERY = 2   # run the pose net every n-th tracked frame, hold wrists
+                 # between (measured on live50 2026-11-13: 21 -> 27 catches
+                 # on the same take — held wrists beat per-frame jitter at
+                 # ~16 fps, and it halves pose cost)
+
 
 def scale_cfg(cfg: TrackingConfig, real_fps: float) -> None:
     """Scale frame-count fields to the real processing rate (in place)."""
@@ -67,32 +72,29 @@ def scale_cfg(cfg: TrackingConfig, real_fps: float) -> None:
         setattr(cfg, name, max(1, round(base * s)))
 
 
+_last_wrists: dict = {}
+_last_face = None
+
+
 def process_frame(tracker: JuggleTracker, rgb, depth, det, pose, motion,
                   idx: int) -> tuple[list[dict], dict, int]:
-    """One live frame through the offline pipeline: the pose net runs in a
-    worker thread while the ball net runs here (same split as perceive(),
-    parallel) -> (events, wrists, n_detections)."""
-    res: dict = {}
-
-    def _pose():
+    """One live frame: ball net every frame; pose net every POSE_EVERY-th
+    frame (wrists held in between) -> (events, wrists, n_detections)."""
+    global _last_wrists, _last_face
+    if idx % POSE_EVERY == 0:
         persons = pose.detect(rgb)
-        wrists, face_pt = {}, None
+        _last_wrists, _last_face = {}, None
         for p in persons:
             for name in ("left_wrist", "right_wrist"):
                 if name in p["kpts"]:
-                    wrists[name] = (p["kpts"][name][0], p["kpts"][name][1])
-            if face_pt is None and "nose" in p["kpts"]:
-                face_pt = (p["kpts"]["nose"][0], p["kpts"]["nose"][1])
-        res["wrists"], res["face_pt"] = wrists, face_pt
-
-    th = threading.Thread(target=_pose, daemon=True)
-    th.start()
+                    _last_wrists[name] = (p["kpts"][name][0],
+                                          p["kpts"][name][1])
+            if _last_face is None and "nose" in p["kpts"]:
+                _last_face = (p["kpts"]["nose"][0], p["kpts"]["nose"][1])
+    wrists, face_pt = _last_wrists, _last_face
     ball_dets = det.detect(rgb)
     mot_dets = motion.detect(rgb)
-    th.join()
     dets_raw = fuse(ball_dets, mot_dets)
-    wrists = res.get("wrists", {})
-    face_pt = res.get("face_pt")
     depth_fn = make_depth_fn(depth, rgb.shape[:2]) if depth is not None else None
     dets = [(box, score, cls, _color_hist(rgb, box))
             for box, score, cls in dets_raw]

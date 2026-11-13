@@ -448,6 +448,27 @@ take either reproduces the 8 (diffable per-frame) or the fix lands.
 Next: user does one more take with v4; then frame-level diff of live
 telemetry vs offline replay of the same take.
 
+**ROOT CAUSE FOUND — live 8-of-50 bug (v4 telemetry, 2026-11-13).**
+Second take (2026-11-13_13-01-26, true 50, tracker 8): telemetry showed
+the tracker believed fps=60.0 for 257/276 frames. The old loop measured
+the interval BEFORE the work but reset last_t AFTER it — it timed only
+the queue poll (~1 ms), never the ~66 ms of inference. dt 4x too small ->
+Kalman predictions covered a fraction of real displacement -> association
+starves, catches never latch. Offline replay of the same frames: 31
+(yesterday) / 8-at-10.6fps (today: second factor below).
+Fixes in live.py v5 (tracker.py untouched, §3 identical):
+1. dt now measured between consecutive PROCESSED frames (last_proc stamp);
+   belief capped at the camera's physical 30 fps.
+2. Frame-count constants scaled to real fps (FRAME_FIELDS * fps/30): the
+   gates mean the same wall time live as offline at 30. Today's take with
+   scaling: 8 -> 16 catches offline (vs 8 unscaled).
+3. Loop rate nearly doubled: pose runs in a worker thread parallel to the
+   ball net (+20 ms/frame), recording jpeg/png writes are async (~15 ms).
+   Expect ~18-20 fps processing; deeper fix (smaller models) measured and
+   rejected (416 ball model detects 0.77/frame on cascade60 — unusable).
+Remaining honest gap (31 vs 50) is the SAME under-count structure as
+offline takes (misses at box/far-side catches), not a live bug.
+
 ## 6. Quick reference
 
 | thing | where |

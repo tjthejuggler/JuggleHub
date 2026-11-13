@@ -12,8 +12,17 @@ Session protocol (all on-screen):
   * press  s  to STOP: the take ends, the tracker's count is frozen and
     the terminal asks for your TRUE count — type it and press Enter;
   * meta.json for the take stores BOTH numbers (tracker vs truth) plus
-    frame stamps, so the offline analysis knows exactly what to match.
+    per-frame telemetry (fps believed, wrists, detections, catch count),
+    so the offline analysis knows exactly what to match.
 Other keys:  r = reset counts mid-take (drop recovery),  q = quit.
+
+Speed (v5): pose runs in a worker thread parallel to the ball net and
+recording writes are async, so the loop feeds the tracker ~18-20 fps
+instead of ~11. The tracker's dt comes from the measured interval between
+PROCESSED frames (an earlier bug measured only the queue poll and
+believed fps=60 -> predictions covered a quarter of the real ball
+displacement -> 8 of 50 catches). Frame-count constants are scaled to the
+real fps so gates mean the same WALL TIME as at 30 fps offline.
 
 Usage:
   python3 -m tracking_lab.live --target 50            # RealSense, 50 catches
@@ -36,20 +45,57 @@ import cv2
 import numpy as np
 
 from .detectors import BallDetector, MotionDetector, PoseDetector
-from .perception import make_depth_fn, perceive
+from .perception import fuse, make_depth_fn
 from .tracker import JuggleTracker, TrackingConfig, _color_hist
 from .wizard import Cam, OUT_ROOT
 
 color_w, color_h = 640, 480     # set from the first frame at runtime
 
+# frame-count config fields, with their 30 fps design values: live scales
+# them by real_fps/30 so every gate means the same wall time as offline
+FRAME_FIELDS = {
+    "held_dwell": 2, "min_catch_gap": 4, "throw_dwell": 3,
+    "min_flight_frames": 2, "coast_frames": 30, "held_max_occluded": 10,
+    "face_stall_frames": 20, "min_hits": 3,
+}
+
+
+def scale_cfg(cfg: TrackingConfig, real_fps: float) -> None:
+    """Scale frame-count fields to the real processing rate (in place)."""
+    s = max(min(real_fps / 30.0, 1.0), 0.2)
+    for name, base in FRAME_FIELDS.items():
+        setattr(cfg, name, max(1, round(base * s)))
+
 
 def process_frame(tracker: JuggleTracker, rgb, depth, det, pose, motion,
                   idx: int) -> tuple[list[dict], dict, int]:
-    """One live frame through the exact offline pipeline ->
-    (events, wrists, n_detections)."""
-    wrists, face_pt, dets_raw, _n = perceive(rgb, det, pose, motion)
+    """One live frame through the offline pipeline: the pose net runs in a
+    worker thread while the ball net runs here (same split as perceive(),
+    parallel) -> (events, wrists, n_detections)."""
+    res: dict = {}
+
+    def _pose():
+        persons = pose.detect(rgb)
+        wrists, face_pt = {}, None
+        for p in persons:
+            for name in ("left_wrist", "right_wrist"):
+                if name in p["kpts"]:
+                    wrists[name] = (p["kpts"][name][0], p["kpts"][name][1])
+            if face_pt is None and "nose" in p["kpts"]:
+                face_pt = (p["kpts"]["nose"][0], p["kpts"]["nose"][1])
+        res["wrists"], res["face_pt"] = wrists, face_pt
+
+    th = threading.Thread(target=_pose, daemon=True)
+    th.start()
+    ball_dets = det.detect(rgb)
+    mot_dets = motion.detect(rgb)
+    th.join()
+    dets_raw = fuse(ball_dets, mot_dets)
+    wrists = res.get("wrists", {})
+    face_pt = res.get("face_pt")
     depth_fn = make_depth_fn(depth, rgb.shape[:2]) if depth is not None else None
-    dets = [(box, score, cls, _color_hist(rgb, box)) for box, score, cls in dets_raw]
+    dets = [(box, score, cls, _color_hist(rgb, box))
+            for box, score, cls in dets_raw]
     events = tracker.step(idx, dets, wrists, rgb, depth_fn, face_pt)
     return events, wrists, len(dets_raw)
 
@@ -85,13 +131,45 @@ class LatestFrame:
         self.t.join(timeout=2.0)
 
 
+class AsyncWriter:
+    """Writes recording frames off the tracking thread (imwrite of jpeg+png
+    cost ~15 ms/frame — enough to halve the tracking rate)."""
+
+    def __init__(self):
+        self.q: queue.Queue = queue.Queue(maxsize=64)
+        self.stop = threading.Event()
+        self.t = threading.Thread(target=self._loop, daemon=True)
+        self.t.start()
+
+    def _loop(self):
+        while not self.stop.is_set() or not self.q.empty():
+            try:
+                item = self.q.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            if item is None:
+                break
+            path, img, params = item
+            cv2.imwrite(path, img, params or [])
+
+    def add(self, path, img, params=None):
+        try:
+            self.q.put_nowait((path, img, params))
+        except queue.Full:      # never block tracking for disk
+            pass
+
+    def close(self):
+        self.stop.set()
+        self.t.join(timeout=10.0)
+
+
 def n_catches(tracker: JuggleTracker) -> int:
     return sum(1 for e in tracker.events if e["event"] == "CATCH")
 
 
 def draw(img, tracker: JuggleTracker, fps: float, status: list,
          target: int, running: bool, wrists: dict,
-         last_result: str | None) -> np.ndarray:
+         last_result: str | None, believed_fps: float) -> np.ndarray:
     frame = img.copy()
     catches = n_catches(tracker)
     throws = sum(1 for e in tracker.events if e["event"] == "THROW")
@@ -112,7 +190,6 @@ def draw(img, tracker: JuggleTracker, fps: float, status: list,
     for hand, (wx, wy) in wrists.items():
         cv2.circle(frame, (int(wx), int(wy)), 8, (255, 0, 255), 2)
 
-    # the big number: target while idle, tracker count while running
     big_txt = str(target) if not running else str(catches)
     big_col = (0, 255, 255) if not running else \
         ((0, 255, 0) if catches >= target else (0, 200, 255))
@@ -124,7 +201,7 @@ def draw(img, tracker: JuggleTracker, fps: float, status: list,
         wrist_txt += "  (pose missing a wrist!)"
     lines = [f"catches {catches} / target {target}   L {left}  R {right}",
              f"throws {throws}   C-T {catches - throws}",
-             f"{fps:.1f} fps   {wrist_txt}",
+             f"{fps:.1f} fps (tracker dt {believed_fps:.1f} fps)  {wrist_txt}",
              "press S to START the take" if not running
              else "recording... press S to STOP at the target"]
     if last_result:
@@ -144,13 +221,11 @@ def draw(img, tracker: JuggleTracker, fps: float, status: list,
     return frame
 
 
-class TakeRecorder:
-    """Also captures per-frame telemetry (fps used, wrists, det count, catch
-    count) so a live divergence can be replayed offline and diffed."""
-    """Writes a take as a normal recording session (same layout the wizard
-    produces) plus the live-specific truth labels in meta.json."""
+class Take:
+    """One recorded, labelled take: frames (async-written), telemetry,
+    stamps; finished with tracker/truth counts in meta.json."""
 
-    def __init__(self, label: str, has_depth: bool):
+    def __init__(self, label: str, has_depth: bool, writer: AsyncWriter):
         ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.out = os.path.join(OUT_ROOT, f"{ts}_{label}")
         self.rgb_dir = os.path.join(self.out, "no_boxes")
@@ -158,17 +233,18 @@ class TakeRecorder:
         self.depth_dir = os.path.join(self.out, "depth")
         if has_depth:
             os.makedirs(self.depth_dir, exist_ok=True)
-        self.label, self.has_depth = label, has_depth
+        self.label, self.has_depth, self.writer = label, has_depth, writer
         self.n = 0
         self.stamps: list[float] = []
         self.telemetry: list[dict] = []
 
     def add(self, color, depth, t0: float):
-        cv2.imwrite(os.path.join(self.rgb_dir, f"frame_{self.n}.jpg"), color,
-                    [cv2.IMWRITE_JPEG_QUALITY, 95])
+        self.writer.add(os.path.join(self.rgb_dir, f"frame_{self.n}.jpg"),
+                        color, [cv2.IMWRITE_JPEG_QUALITY, 95])
         if depth is not None:
-            cv2.imwrite(os.path.join(self.depth_dir,
-                                     f"frame_{self.n}_depth.png"), depth)
+            self.writer.add(
+                os.path.join(self.depth_dir, f"frame_{self.n}_depth.png"),
+                depth, [])
         self.stamps.append(round(time.time() - t0, 4))
         self.n += 1
 
@@ -178,7 +254,7 @@ class TakeRecorder:
                     width=color_w, height=color_h,
                     fps=round(fps_effective, 1), frames=self.n,
                     duration_s=round(self.stamps[-1] if self.stamps else 0.0, 2),
-                    live_take=True, started=self.out.split("/")[-1][:19])
+                    live_take=True)
         if cam is not None:
             meta["rgb_exposure"] = cam.exposure
             meta.update(cam.guard.meta())
@@ -218,36 +294,39 @@ def main(argv=None) -> int:
                     help="headless: run the live frame path on a recording")
     a = ap.parse_args(argv)
 
-    cfg = TrackingConfig()
+    base_cfg = TrackingConfig()
     for item in a.set:
         name, sep, raw = item.partition("=")
-        if not sep or not hasattr(cfg, name):
+        if not sep or not hasattr(base_cfg, name):
             ap.error(f"--set {item}: expected NAME=VALUE with NAME a "
                      f"TrackingConfig field")
-        cur = getattr(cfg, name)
+        cur = getattr(base_cfg, name)
         try:
             val = (raw.lower() in ("1", "true", "yes") if isinstance(cur, bool)
                    else type(cur)(raw))
         except ValueError:
             ap.error(f"--set {item}: cannot read {raw!r} as "
                      f"{type(cur).__name__}")
-        setattr(cfg, name, val)
+        setattr(base_cfg, name, val)
         print(f"OVERRIDE {name} = {val!r} (default {cur!r})")
 
     if a.selftest:
-        return _selftest(cfg)
+        return _selftest(base_cfg)
 
     det = BallDetector()
     pose = PoseDetector()
     motion = MotionDetector()
     cam = Cam(a.source)
     grab = LatestFrame(cam)
-    cfg_work = cfg          # working copy whose fps adapts to the real rate
+    writer = AsyncWriter()
+    cfg_work = TrackingConfig(**{f.name: getattr(base_cfg, f.name)
+                                 for f in base_cfg.__dataclass_fields__.values()})
     tracker = JuggleTracker(cfg_work)
     running, take, t_take0 = False, None, 0.0
     intervals: list[float] = []
+    last_proc: float | None = None   # stamp of the PREVIOUS PROCESSED frame
     idx = 0
-    fps, last_t, last_show = 0.0, time.perf_counter(), time.perf_counter()
+    fps, last_show = 0.0, time.perf_counter()
     last_result = None
     wrists: dict = {}
     results: list[dict] = []
@@ -259,12 +338,20 @@ def main(argv=None) -> int:
             color, depth = grab.get()
             color_h, color_w = color.shape[:2]
             if running:
-                intervals.append(time.perf_counter() - last_t)
+                # dt between consecutive PROCESSED frames (the old version
+                # measured only the queue poll and believed fps=60 while
+                # the loop ran ~11-15 -> predictions covered a fraction of
+                # the real displacement -> 8 of 50 catches)
+                stamp = time.perf_counter()
+                if last_proc is not None:
+                    intervals.append(stamp - last_proc)
+                last_proc = stamp
                 if len(intervals) > 60:
                     intervals.pop(0)
-                if len(intervals) >= 20:
+                if len(intervals) >= 10:
                     med = sorted(intervals)[len(intervals) // 2]
-                    cfg_work.fps = max(min(1.0 / max(med, 1e-3), 60.0), 5.0)
+                    cfg_work.fps = max(min(1.0 / max(med, 1e-3), 30.0), 5.0)
+                    scale_cfg(cfg_work, cfg_work.fps)
                 _ev, wrists, n_det = process_frame(tracker, color, depth,
                                                    det, pose, motion, idx)
                 take.add(color, depth, t_take0)
@@ -274,34 +361,36 @@ def main(argv=None) -> int:
                 idx += 1
             else:
                 wrists = {}   # idle: no tracking, no stale wrist dots
+                last_proc = None
             now = time.perf_counter()
-            fps = fps * 0.9 + (1.0 / max(now - last_t, 1e-6)) * 0.1
-            last_t = now
+            loop_dt = now - last_show
+            if 1e-3 < loop_dt < 1.0:
+                fps = fps * 0.9 + (1.0 / loop_dt) * 0.1
             if now - last_show > 0.03:
                 cv2.imshow("live", draw(color, tracker, fps,
                                         cam.status_lines(), a.target,
-                                        running, wrists, last_result))
+                                        running, wrists, last_result,
+                                        cfg_work.fps))
                 last_show = now
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
                 break
             if key == ord("s"):
                 if not running:
-                    # START: fresh tracker and recorder for this take
                     take_no += 1
                     cfg_work = TrackingConfig(**{
-                        f.name: getattr(cfg, f.name)
-                        for f in cfg.__dataclass_fields__.values()})
+                        f.name: getattr(base_cfg, f.name)
+                        for f in base_cfg.__dataclass_fields__.values()})
                     tracker = JuggleTracker(cfg_work)
-                    take = TakeRecorder(f"{a.label}{a.target}_t{take_no}",
-                                        cam.source == "realsense")
+                    take = Take(f"{a.label}{a.target}_t{take_no}",
+                                cam.source == "realsense", writer)
                     t_take0 = time.time()
                     intervals, idx = [], 0
+                    last_proc = None
                     running, last_result = True, None
                     cam.guard.reset()
                     print(f"take {take_no} STARTED (target {a.target})")
                 else:
-                    # STOP: save take + truth
                     running = False
                     trk = n_catches(tracker)
                     true_n = ask_true_count(trk)
@@ -333,6 +422,7 @@ def main(argv=None) -> int:
         grab.close()
         cam.close()
         cv2.destroyAllWindows()
+        writer.close()      # flush pending frame writes
     if results:
         print("\n=== live harness session summary ===")
         for r in results:
@@ -344,9 +434,9 @@ def main(argv=None) -> int:
 
 
 def _selftest(cfg: TrackingConfig) -> int:
-    """Headless: the exact live frame path over a recording's raw frames
-    (real detectors, no camera, no GUI). Verifies wiring only — scores
-    come from evaluate/event_score, not here."""
+    """Headless: the live frame path (threaded pose, scaled constants) over
+    a recording's raw frames. Verifies wiring only — scores come from
+    evaluate/event_score, not here."""
     from . import evaluate
     from .recording import RecordingSession
 
@@ -361,7 +451,6 @@ def _selftest(cfg: TrackingConfig) -> int:
     for i in range(n):
         fr = sess[i]
         process_frame(tracker, fr.rgb, fr.depth, det, pose, motion, i)
-        # (selftest ignores the det count)
     catches = n_catches(tracker)
     print(f"selftest: {n} frames -> {catches} catches, "
           f"{len(tracker.events)} events, tracks {len(tracker.tracks)}")

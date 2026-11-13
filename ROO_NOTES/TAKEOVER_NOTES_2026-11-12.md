@@ -756,3 +756,23 @@ Next lever if we want shower accuracy: flight-series TRANSITIONS
       lr0=0.004, patience 20) using the proven AUG policy.
   All runs export OpenVINO + auto-download zips. Acceptance unchanged:
   12-take prox backtest error must not grow vs the 640 V8 default.
+
+### T11d — v12 Colab results + verdict (2026-11-13): ALL REJECTED, V8 stays
+- Trained on A100 (49-epoch early stop on the 448 ft; best epoch 29, val
+  mAP50 0.974 / mAP50-95 0.774 on the honest v12 split).
+- Local speed (BallDetector, 100 frames): V8 33.2 ms; v12_640 28.3;
+  416ft 14.9 (−55%); 448ft 17.3 (−48%).
+- Local 9-take prox backtest (rebuilt detcaches, identical conditions),
+  Σ|err| over the 8 counted takes: V8 45; v12_640 66; 416ft 65; 448ft 90.
+  Per-take pattern: cascades roughly par (V8 ±4, candidates ±4), but ALL
+  candidates lose 2-10 extra catches on every shower take. Resolution-
+  matched fine-tuning did NOT recover the plain-416-export loss, and the
+  full v12 640 training is also worse end-to-end than V8 despite better
+  val mAP — V8's edge comes from something the v12 split doesn't reward.
+- DECISION: V8 remains the deployed default. Speed work via model swap is
+  CLOSED with evidence (INT8, 512, 416 export, 416ft, 448ft, v12_640 all
+  measured and rejected). Candidates kept in .tmp/v12_models/ for future
+  work (e.g. distillation or a shower-heavy v13 dataset).
+- Key lesson recorded: frame-level mAP on the dataset does NOT predict
+  end-to-end catch-count accuracy; the 9-take prox backtest is the only
+  adoption metric.

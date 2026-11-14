@@ -7,11 +7,15 @@ five OLD shower recordings (shower40 x4 + columns_shower). The 2026-11-13
 shower50 takes are NOT in training, so the local 9-take prox backtest stays
 an honest judge.
 
-Two runs, both judged ONLY by the local backtest (never by val mAP):
+Three runs, all judged ONLY by the local backtest (never by val mAP):
   (a) v8v13_640ft — fine-tune from the deployed V8 best.pt at 640. This is
       the candidate with the best prior: keeps everything V8 knows, adds
-      shower supervision.
+      shower supervision. Same speed as V8 (~33 ms).
   (b) v13_640     — full train from COCO yolo11n.pt. Control arm.
+  (c) v8v13_416ft — fine-tune from V8 at 416: the SPEED arm (~15 ms,
+      measured on the v12 twin). The v12 416ft was fast but lost end-to-end
+      accuracy; with shower supervision it gets a second chance. Adoption
+      requires backtest error <= V8 AND a real fps gain.
 
 BEFORE RUNNING (on your machine):
   1. Upload to Colab (folder icon -> upload):
@@ -20,7 +24,7 @@ BEFORE RUNNING (on your machine):
   2. Runtime -> Change runtime type -> T4 GPU (or better). ~2-3 h total.
 
 Copy this ENTIRE file into ONE Colab cell and run. It auto-downloads:
-  v8v13_640ft.zip, v13_640.zip
+  v8v13_640ft.zip, v13_640.zip, v8v13_416ft.zip
 """
 
 # ---- setup -------------------------------------------------------------------
@@ -58,6 +62,11 @@ m = YOLO("yolo11n.pt")
 m.train(data=yaml_path, epochs=150, imgsz=640, batch=32, patience=25,
         project="v13_640", name="run1", **AUG)
 
+# (c) SPEED ARM: fine-tune V8 AT 416 — the resolution the fast export needs.
+model = YOLO(TEACHER)
+model.train(data=yaml_path, epochs=60, imgsz=416, batch=32, patience=20,
+            lr0=0.004, project="v8v13_416ft", name="run1", **AUG)
+
 # ---- validate + export + download ---------------------------------------------
 from google.colab import files as gfiles
 import glob, shutil
@@ -70,16 +79,17 @@ def find_weights(name):
             return pat
     raise FileNotFoundError(f"best.pt for {name} not found under /content")
 
-for name in ("v8v13_640ft", "v13_640"):
+for name, size in (("v8v13_640ft", 640), ("v13_640", 640), ("v8v13_416ft", 416)):
     wdir = find_weights(name)
     print(f"[{name}] weights at {wdir}")
     best = os.path.join(wdir, "best.pt")
-    met = YOLO(best).val(data=yaml_path, imgsz=640)
+    met = YOLO(best).val(data=yaml_path, imgsz=size)
     print(f"[{name}] mAP50 {met.box.map50:.3f}  mAP50-95 {met.box.map:.3f}")
-    YOLO(best).export(format="openvino", imgsz=640)
+    YOLO(best).export(format="openvino", imgsz=size)
     shutil.make_archive(name, "zip", wdir)
     print(f"downloading {name}.zip ...")
     gfiles.download(f"{name}.zip")
 
-print("DONE. Bring v8v13_640ft.zip and v13_640.zip to the PC; Roo validates "
-      "with the 9-take prox backtest (adoption only if error does not grow).")
+print("DONE. Bring v8v13_640ft.zip, v13_640.zip and v8v13_416ft.zip to the "
+      "PC; Roo validates with the 9-take prox backtest (adoption only if "
+      "error does not grow; the 416 arm also needs a real fps gain).")
